@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["BATCH_GROW_FACTOR",""],["BATCH_INITIAL_SIZE",""],["BATCH_MAX_SIZE",""],["MAX_TIME_SLICE","Batch executors are run in coroutines. `MAX_TIME_SLICE` is the maximum time a coroutine can run without being yielded."]],"fn":[["build_executors",""],["is_arrow_encodable",""]],"struct":[["BatchExecutorsRunner",""]]});

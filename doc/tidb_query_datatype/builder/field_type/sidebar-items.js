@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["FieldTypeBuilder","Helper to build a `FieldType` protobuf message."]]});

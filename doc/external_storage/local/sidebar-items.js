@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["LOCAL_STORAGE_TMP_DIR",""],["LOCAL_STORAGE_TMP_FILE_SUFFIX",""]],"fn":[["maybe_create_dir",""]],"struct":[["LocalStorage","A storage saves files in local file system."]]});

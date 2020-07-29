@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["ResolveLock","Resolve locks according to `txn_status`."]]});

@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Delete",""],["Insert",""],["Store","A store that operates over MVCC and support transactions."]],"trait":[["ToTxnStore","A trait for a general implementation to convert to a Txn store."]]});

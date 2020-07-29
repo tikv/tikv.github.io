@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Prewrite","The prewrite phase of a transaction. The first phase of 2PC."]]});

@@ -1,0 +1,1 @@
+initSidebarItems({"attr":[["rpn_fn","The `rpn_fn` attribute."]],"derive":[["AggrFunction","The `AggrFunction` custom derive."]],"mod":[["aggr_function",""],["rpn_function","Implementation of the `rpn_fn` attribute macro."]]});

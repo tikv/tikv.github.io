@@ -1,0 +1,4 @@
+(function() {var implementors = {};
+implementors["codec"] = [];
+implementors["tikv_util"] = [{"text":"impl&lt;'a&gt; <a class=\"trait\" href=\"codec/buffer/trait.BufferWriter.html\" title=\"trait codec::buffer::BufferWriter\">BufferWriter</a> for <a class=\"struct\" href=\"tikv_util/buffer_vec/struct.WithConcatExtend.html\" title=\"struct tikv_util::buffer_vec::WithConcatExtend\">WithConcatExtend</a>&lt;'a&gt;","synthetic":false,"types":["tikv_util::buffer_vec::WithConcatExtend"]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

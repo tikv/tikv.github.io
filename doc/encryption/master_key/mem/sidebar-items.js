@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["MemAesGcmBackend","An in-memory backend, it saves master key in memory."]]});

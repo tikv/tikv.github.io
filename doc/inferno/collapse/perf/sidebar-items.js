@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Folder","A stack collapser for the output of `perf script`."],["Options","`perf` folder configuration options."]]});

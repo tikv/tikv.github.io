@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["GlobalReplicationState","A global state that stores current replication mode and related metadata."],["StoreGroup","A registry that maps store to a group."]]});

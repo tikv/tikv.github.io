@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["malloc_conf","Returns the embeddec configure-time-specified run-time options config."]],"struct":[["MallocConf","A type providing access to the embedded configure-time-specified run-time options config."]]});

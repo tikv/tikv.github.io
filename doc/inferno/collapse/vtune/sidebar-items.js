@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Folder","A stack collapser for CSV call graphs created with the VTune `amplxe-cl` tool."],["Options","`vtune` folder configuration options."]]});

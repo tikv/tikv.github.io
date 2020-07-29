@@ -1,0 +1,1 @@
+initSidebarItems({"mod":[["collapse","Stack collapsing for various input formats."],["differential","Tool for creating an output required to generate differential flame graphs."],["flamegraph","Tools for producing flame graphs from folded stack traces."]]});

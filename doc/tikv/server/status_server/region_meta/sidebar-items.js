@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["RaftProgressState",""],["RaftStateRole",""]],"struct":[["Epoch",""],["RaftApplyState",""],["RaftHardState",""],["RaftProgress",""],["RaftSoftState",""],["RaftStatus",""],["RaftTruncatedState",""],["RegionMergeState",""],["RegionMeta",""],["RegionPeer",""]]});

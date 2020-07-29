@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["ScalarValue","A scalar value container, a.k.a. datum, for all concrete eval types."],["ScalarValueRef","A scalar value reference container. Can be created from `ScalarValue` or `VectorValue`."]],"fn":[["compare_int",""]]});

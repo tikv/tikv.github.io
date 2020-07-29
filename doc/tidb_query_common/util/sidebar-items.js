@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["convert_to_prefix_next","Convert the key to the smallest key which is larger than the key given."],["is_point","`is_point` checks if the key range represents a point."],["is_prefix_next","Check if `key`'s prefix next equals to `next`."]]});

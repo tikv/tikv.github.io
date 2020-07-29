@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["PessimisticRollback","Rollback pessimistic locks identified by `start_ts` and `for_update_ts`."]]});

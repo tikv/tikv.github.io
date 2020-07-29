@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["CODEC_VERSION",""]],"enum":[["RowSlice",""]],"mod":[["compat_v1","A compatible layer for converting V2 row datum into V1 row datum."],["encoder_for_test","This `encoder` module is only used for test, so the implementation is very straightforward."],["row_slice",""]],"struct":[["Flags",""],["LEBytes",""]],"trait":[["V1CompatibleEncoder",""]]});

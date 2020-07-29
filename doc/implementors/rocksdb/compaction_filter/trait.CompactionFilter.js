@@ -1,0 +1,3 @@
+(function() {var implementors = {};
+implementors["tikv"] = [{"text":"impl <a class=\"trait\" href=\"rocksdb/compaction_filter/trait.CompactionFilter.html\" title=\"trait rocksdb::compaction_filter::CompactionFilter\">CompactionFilter</a> for <a class=\"struct\" href=\"tikv/server/gc_worker/compaction_filter/struct.WriteCompactionFilter.html\" title=\"struct tikv::server::gc_worker::compaction_filter::WriteCompactionFilter\">WriteCompactionFilter</a>","synthetic":false,"types":["tikv::server::gc_worker::compaction_filter::WriteCompactionFilter"]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

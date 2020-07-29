@@ -1,0 +1,1 @@
+initSidebarItems({"mod":[["file_max","Retreive the file-max value from /proc/sys/fs/file-max"]]});

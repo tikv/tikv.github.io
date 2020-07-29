@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Rollback","Rollback from the transaction that was started at `start_ts`."]]});

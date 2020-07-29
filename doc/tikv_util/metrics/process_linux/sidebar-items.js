@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["monitor_process","Monitors current process."]],"struct":[["BOOT_TIME",""],["CLK_TCK",""],["PAGESIZE",""],["ProcessCollector","A collector to collect process metrics."]]});

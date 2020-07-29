@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["TASKS_SLOTS_NUM",""]],"fn":[["id_index",""]],"struct":[["CmdTimer",""],["Scheduler","Scheduler which schedules the execution of `storage::Command`s."],["SchedulerInner",""],["Task","Task is a running command."],["TaskContext",""]]});

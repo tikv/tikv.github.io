@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["start_global_steady_timer",""],["start_global_timer",""]],"struct":[["GLOBAL_STEADY_TIMER",""],["GLOBAL_TIMER_HANDLE",""],["STEADY_CLOCK",""],["SteadyClock","A clock that produces time in a steady speed."],["SteadyTimer","A timer that creates steady delays."],["TimeZero","A struct that marks the zero time."],["TimeoutTask",""],["Timer",""]]});

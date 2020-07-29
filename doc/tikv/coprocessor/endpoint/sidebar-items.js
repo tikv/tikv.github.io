@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["LIGHT_TASK_THRESHOLD","Requests that need time of less than `LIGHT_TASK_THRESHOLD` is considered as light ones, which means they don't need a permit from the semaphore before execution."]],"fn":[["make_error_response",""]],"struct":[["Endpoint","A pool to build and run Coprocessor request handlers."]]});

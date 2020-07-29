@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Cursor",""],["CursorBuilder","A handy utility to build a snapshot cursor according to various configurations."]]});

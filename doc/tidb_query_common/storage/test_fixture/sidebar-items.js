@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["FixtureStorage","A `Storage` implementation that returns fixed source data (i.e. fixture). Useful in tests."]],"type":[["ErrorBuilder",""],["FixtureValue",""]]});

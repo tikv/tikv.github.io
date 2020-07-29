@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["RequestReason",""],["TokenOrRequest","Either a valid token, or an HTTP request that can be used to acquire one"]],"mod":[["prelude",""]],"struct":[["ServiceAccountAccess","A token provider for a GCP service account."],["ServiceAccountInfo","Minimal parts needed from a GCP service acccount key for token acquisition"]]});

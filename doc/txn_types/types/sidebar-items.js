@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["SHORT_VALUE_MAX_LEN",""],["SHORT_VALUE_PREFIX",""]],"enum":[["Mutation","A row mutation."],["MutationType",""]],"fn":[["is_short_value",""]],"struct":[["Key","Key type."],["OldValue",""],["TxnExtra",""]],"type":[["KvPair","Key-value pair type."],["OldValues",""],["Value","Value type which is essentially raw bytes."]]});

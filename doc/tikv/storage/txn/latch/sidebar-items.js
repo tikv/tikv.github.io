@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["WAITING_LIST_MAX_CAPACITY",""],["WAITING_LIST_SHRINK_SIZE",""]],"struct":[["Latch","Latch which is used to serialize accesses to resources hashed to the same slot."],["Latches","Latches which are used for concurrency control in the scheduler."],["Lock","Lock required for a command."]]});

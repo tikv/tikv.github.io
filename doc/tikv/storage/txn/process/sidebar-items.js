@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["FORWARD_MIN_MUTATIONS_NUM",""],["RESOLVE_LOCK_BATCH_SIZE",""]],"fn":[["extract_lock_from_result",""],["find_mvcc_infos_by_key",""],["process_read_impl",""],["process_write_impl",""]],"struct":[["ReleasedLocks",""],["WriteResult",""]],"type":[["LockWritesVals",""]]});

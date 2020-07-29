@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["Never",""]],"fn":[["init_log_for_test",""]],"struct":[["CaseTraceLogger","A logger that add a test case tag before each line of log."],["Serializer",""]]});

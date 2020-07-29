@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["EvalType","Function implementations' parameter data types."]]});

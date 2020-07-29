@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["GC_MAX_ROW_VERSIONS_THRESHOLD",""]],"fn":[["check_need_gc",""],["get_mvcc_properties",""]],"struct":[["MvccReader",""]]});

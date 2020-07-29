@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["MvccByKey","Retrieve MVCC information for the given key."]]});

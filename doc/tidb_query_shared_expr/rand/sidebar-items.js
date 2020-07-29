@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["MAX_RAND_BYTES_LENGTH",""],["MAX_RAND_VALUE",""]],"fn":[["gen_random_bytes","Generate random bytes."]],"struct":[["MySQLRng",""]]});

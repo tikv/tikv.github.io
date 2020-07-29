@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["ConfChangeTransition",""],["ConfChangeType",""],["EntryType",""],["MessageType",""]],"fn":[["file_descriptor_proto",""]],"struct":[["ConfChange",""],["ConfChangeSingle",""],["ConfChangeV2",""],["ConfState",""],["Entry",""],["HardState",""],["Message",""],["Snapshot",""],["SnapshotMetadata",""]]});

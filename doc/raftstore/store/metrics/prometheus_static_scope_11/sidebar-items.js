@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["SnapValidVec",""],["SnapValidVecDelegator",""],["SnapValidVecInner",""]]});

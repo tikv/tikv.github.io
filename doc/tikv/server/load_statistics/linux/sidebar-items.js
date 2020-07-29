@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["calc_cpu_load",""]],"struct":[["ThreadLoadStatistics","A Linux-specific `ThreadLoadStatistics`. It collects threads load metrics."]]});

@@ -1,0 +1,314 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `raft` crate."><meta name="keywords" content="rust, rustlang, rust-lang, raft"><title>raft - Rust</title><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../dark.css"><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script src="../storage.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="shortcut icon" href="../favicon.ico"><style type="text/css">#crate-search{background-image:url("../down-arrow.svg");}</style></head><body class="rustdoc mod"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../raft/index.html'><div class='logo-container'><img src='../rust-logo.png' alt='logo'></div></a><p class='location'>Crate raft</p><div class="sidebar-elems"><a id='all-types' href='all.html'><p>See all raft's items</p></a><div class="block items"><ul><li><a href="#reexports">Re-exports</a></li><li><a href="#modules">Modules</a></li><li><a href="#structs">Structs</a></li><li><a href="#enums">Enums</a></li><li><a href="#constants">Constants</a></li><li><a href="#functions">Functions</a></li><li><a href="#types">Type Definitions</a></li></ul></div><p class='location'></p><script>window.sidebarCurrent = {name: 'raft', ty: 'mod', relpath: '../'};</script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../settings.html"><img src="../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class='fqn'><span class='out-of-band'><span id='render-detail'><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class='inner'>&#x2212;</span>]</a></span><a class='srclink' href='../src/raft/lib.rs.html#17-567' title='goto source code'>[src]</a></span><span class='in-band'>Crate <a class="mod" href=''>raft</a></span></h1><div class='docblock'><h2 id="creating-a-raft-node" class="section-header"><a href="#creating-a-raft-node">Creating a Raft node</a></h2>
+<p>You can use <a href="raw_node/struct.RawNode.html#method.new"><code>RawNode::new</code></a> to create the Raft node. To
+create the Raft node, you need to provide a <a href="storage/trait.Storage.html"><code>Storage</code></a> component, and
+a <a href="struct.Config.html"><code>Config</code></a> to the <a href="raw_node/struct.RawNode.html#method.new"><code>RawNode::new</code></a>
+function.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">raft</span>::{
+    <span class="ident">Config</span>,
+    <span class="ident">storage</span>::<span class="ident">MemStorage</span>,
+    <span class="ident">raw_node</span>::<span class="ident">RawNode</span>,
+};
+<span class="kw">use</span> <span class="ident">slog</span>::{<span class="ident">Drain</span>, <span class="ident">o</span>};
+
+<span class="comment">// Select some defaults, then change what we need.</span>
+<span class="kw">let</span> <span class="ident">config</span> <span class="op">=</span> <span class="ident">Config</span> {
+    <span class="ident">id</span>: <span class="number">1</span>,
+    ..<span class="ident">Default</span>::<span class="ident">default</span>()
+};
+<span class="comment">// Initialize logger.</span>
+<span class="kw">let</span> <span class="ident">logger</span> <span class="op">=</span> <span class="ident">slog</span>::<span class="ident">Logger</span>::<span class="ident">root</span>(<span class="ident">slog_stdlog</span>::<span class="ident">StdLog</span>.<span class="ident">fuse</span>(), <span class="macro">o</span><span class="macro">!</span>());
+<span class="comment">// ... Make any configuration changes.</span>
+<span class="comment">// After, make sure it&#39;s valid!</span>
+<span class="ident">config</span>.<span class="ident">validate</span>().<span class="ident">unwrap</span>();
+<span class="comment">// We&#39;ll use the built-in `MemStorage`, but you will likely want your own.</span>
+<span class="comment">// Finally, create our Raft node!</span>
+<span class="kw">let</span> <span class="ident">storage</span> <span class="op">=</span> <span class="ident">MemStorage</span>::<span class="ident">new_with_conf_state</span>((<span class="macro">vec</span><span class="macro">!</span>[<span class="number">1</span>], <span class="macro">vec</span><span class="macro">!</span>[]));
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">node</span> <span class="op">=</span> <span class="ident">RawNode</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">config</span>, <span class="ident">storage</span>, <span class="kw-2">&amp;</span><span class="ident">logger</span>).<span class="ident">unwrap</span>();
+<span class="comment">// We will coax it into being the lead of a single node cluster for exploration.</span>
+<span class="ident">node</span>.<span class="ident">raft</span>.<span class="ident">become_candidate</span>();
+<span class="ident">node</span>.<span class="ident">raft</span>.<span class="ident">become_leader</span>();</pre></div>
+<h2 id="ticking-the-raft-node" class="section-header"><a href="#ticking-the-raft-node">Ticking the Raft node</a></h2>
+<p>Use a timer to tick the Raft node at regular intervals. See the following example using Rust
+channel <code>recv_timeout</code> to drive the Raft node at least every 100ms, calling
+<a href="raw_node/struct.RawNode.html#method.tick"><code>tick()</code></a> each time.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">sync</span>::<span class="ident">mpsc</span>::{<span class="ident">channel</span>, <span class="ident">RecvTimeoutError</span>}, <span class="ident">time</span>::{<span class="ident">Instant</span>, <span class="ident">Duration</span>}};
+
+<span class="comment">// We&#39;re using a channel, but this could be any stream of events.</span>
+<span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">channel</span>();
+<span class="kw">let</span> <span class="ident">timeout</span> <span class="op">=</span> <span class="ident">Duration</span>::<span class="ident">from_millis</span>(<span class="number">100</span>);
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">remaining_timeout</span> <span class="op">=</span> <span class="ident">timeout</span>;
+
+<span class="comment">// Send the `tx` somewhere else...</span>
+
+<span class="kw">loop</span> {
+    <span class="kw">let</span> <span class="ident">now</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now</span>();
+
+    <span class="kw">match</span> <span class="ident">rx</span>.<span class="ident">recv_timeout</span>(<span class="ident">remaining_timeout</span>) {
+        <span class="prelude-val">Ok</span>(()) <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="comment">// Let&#39;s save this for later.</span>
+            <span class="macro">unimplemented</span><span class="macro">!</span>()
+        },
+        <span class="prelude-val">Err</span>(<span class="ident">RecvTimeoutError</span>::<span class="ident">Timeout</span>) <span class="op">=</span><span class="op">&gt;</span> (),
+        <span class="prelude-val">Err</span>(<span class="ident">RecvTimeoutError</span>::<span class="ident">Disconnected</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">unimplemented</span><span class="macro">!</span>(),
+    }
+
+    <span class="kw">let</span> <span class="ident">elapsed</span> <span class="op">=</span> <span class="ident">now</span>.<span class="ident">elapsed</span>();
+    <span class="kw">if</span> <span class="ident">elapsed</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">remaining_timeout</span> {
+        <span class="ident">remaining_timeout</span> <span class="op">=</span> <span class="ident">timeout</span>;
+        <span class="comment">// We drive Raft every 100ms.</span>
+        <span class="ident">node</span>.<span class="ident">tick</span>();
+    } <span class="kw">else</span> {
+        <span class="ident">remaining_timeout</span> <span class="op">-</span><span class="op">=</span> <span class="ident">elapsed</span>;
+    }
+}</pre></div>
+<h2 id="proposing-to-and-stepping-the-raft-node" class="section-header"><a href="#proposing-to-and-stepping-the-raft-node">Proposing to, and stepping the Raft node</a></h2>
+<p>Using the <code>propose</code> function you can drive the Raft node when the client sends a request to the
+Raft server. You can call <code>propose</code> to add the request to the Raft log explicitly.</p>
+<p>In most cases, the client needs to wait for a response for the request. For example, if the
+client writes a value to a key and wants to know whether the write succeeds or not, but the
+write flow is asynchronous in Raft, so the write log entry must be replicated to other followers,
+then committed and at last applied to the state machine, so here we need a way to notify the client
+after the write is finished.</p>
+<p>One simple way is to use a unique ID for the client request, and save the associated callback
+function in a hash map. When the log entry is applied, we can get the ID from the decoded entry,
+call the corresponding callback, and notify the client.</p>
+<p>You can call the <code>step</code> function when you receive the Raft messages from other nodes.</p>
+<p>Here is a simple example to use <code>propose</code> and <code>step</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">enum</span> <span class="ident">Msg</span> {
+    <span class="ident">Propose</span> {
+        <span class="ident">id</span>: <span class="ident">u8</span>,
+        <span class="ident">callback</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Fn</span>() <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span>,
+    },
+    <span class="ident">Raft</span>(<span class="ident">Message</span>),
+}
+
+<span class="comment">// Simulate a message coming down the stream.</span>
+<span class="ident">tx</span>.<span class="ident">send</span>(<span class="ident">Msg</span>::<span class="ident">Propose</span> { <span class="ident">id</span>: <span class="number">1</span>, <span class="ident">callback</span>: <span class="ident">Box</span>::<span class="ident">new</span>(<span class="op">|</span><span class="op">|</span> ()) });
+
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cbs</span> <span class="op">=</span> <span class="ident">HashMap</span>::<span class="ident">new</span>();
+<span class="kw">loop</span> {
+    <span class="kw">let</span> <span class="ident">now</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now</span>();
+
+    <span class="kw">match</span> <span class="ident">rx</span>.<span class="ident">recv_timeout</span>(<span class="ident">remaining_timeout</span>) {
+        <span class="prelude-val">Ok</span>(<span class="ident">Msg</span>::<span class="ident">Propose</span> { <span class="ident">id</span>, <span class="ident">callback</span> }) <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">cbs</span>.<span class="ident">insert</span>(<span class="ident">id</span>, <span class="ident">callback</span>);
+            <span class="ident">node</span>.<span class="ident">propose</span>(<span class="macro">vec</span><span class="macro">!</span>[], <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">id</span>]).<span class="ident">unwrap</span>();
+        }
+        <span class="prelude-val">Ok</span>(<span class="ident">Msg</span>::<span class="ident">Raft</span>(<span class="ident">m</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">node</span>.<span class="ident">step</span>(<span class="ident">m</span>).<span class="ident">unwrap</span>(),
+        <span class="prelude-val">Err</span>(<span class="ident">RecvTimeoutError</span>::<span class="ident">Timeout</span>) <span class="op">=</span><span class="op">&gt;</span> (),
+        <span class="prelude-val">Err</span>(<span class="ident">RecvTimeoutError</span>::<span class="ident">Disconnected</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">unimplemented</span><span class="macro">!</span>(),
+    }
+
+    <span class="kw">let</span> <span class="ident">elapsed</span> <span class="op">=</span> <span class="ident">now</span>.<span class="ident">elapsed</span>();
+    <span class="kw">if</span> <span class="ident">elapsed</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">remaining_timeout</span> {
+        <span class="ident">remaining_timeout</span> <span class="op">=</span> <span class="ident">timeout</span>;
+        <span class="comment">// We drive Raft every 100ms.</span>
+        <span class="ident">node</span>.<span class="ident">tick</span>();
+    } <span class="kw">else</span> {
+        <span class="ident">remaining_timeout</span> <span class="op">-</span><span class="op">=</span> <span class="ident">elapsed</span>;
+    }
+    <span class="kw">break</span>;
+}</pre></div>
+<p>In the above example, we use a channel to receive the <code>propose</code> and <code>step</code> messages. We only
+propose the request ID to the Raft log. In your own practice, you can embed the ID in your request
+and propose the encoded binary request data.</p>
+<h2 id="processing-the-ready-state" class="section-header"><a href="#processing-the-ready-state">Processing the <code>Ready</code> State</a></h2>
+<p>When your Raft node is ticked and running, Raft should enter a <code>Ready</code> state. You need to first use
+<code>has_ready</code> to check whether Raft is ready. If yes, use the <code>ready</code> function to get a <code>Ready</code>
+state:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">if</span> <span class="op">!</span><span class="ident">node</span>.<span class="ident">has_ready</span>() {
+    <span class="kw">return</span>;
+}
+
+<span class="comment">// The Raft is ready, we can do something now.</span>
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ready</span> <span class="op">=</span> <span class="ident">node</span>.<span class="ident">ready</span>();</pre></div>
+<p>The <code>Ready</code> state contains quite a bit of information, and you need to check and process them one
+by one:</p>
+<ol>
+<li>
+<p>Check whether <code>snapshot</code> is empty or not. If not empty, it means that the Raft node has received
+a Raft snapshot from the leader and we must apply the snapshot:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">if</span> <span class="op">!</span><span class="ident">ready</span>.<span class="ident">snapshot</span>().<span class="ident">is_empty</span>() {
+    <span class="comment">// This is a snapshot, we need to apply the snapshot at first.</span>
+    <span class="ident">node</span>.<span class="ident">mut_store</span>()
+        .<span class="ident">wl</span>()
+        .<span class="ident">apply_snapshot</span>(<span class="ident">ready</span>.<span class="ident">snapshot</span>().<span class="ident">clone</span>())
+        .<span class="ident">unwrap</span>();
+}
+</pre></div>
+</li>
+<li>
+<p>Check whether <code>entries</code> is empty or not. If not empty, it means that there are newly added
+entries but has not been committed yet, we must append the entries to the Raft log:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">if</span> <span class="op">!</span><span class="ident">ready</span>.<span class="ident">entries</span>().<span class="ident">is_empty</span>() {
+    <span class="comment">// Append entries to the Raft log</span>
+    <span class="ident">node</span>.<span class="ident">mut_store</span>().<span class="ident">wl</span>().<span class="ident">append</span>(<span class="ident">ready</span>.<span class="ident">entries</span>()).<span class="ident">unwrap</span>();
+}
+</pre></div>
+</li>
+<li>
+<p>Check whether <code>hs</code> is empty or not. If not empty, it means that the <code>HardState</code> of the node has
+changed. For example, the node may vote for a new leader, or the commit index has been increased.
+We must persist the changed <code>HardState</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">hs</span>) <span class="op">=</span> <span class="ident">ready</span>.<span class="ident">hs</span>() {
+    <span class="comment">// Raft HardState changed, and we need to persist it.</span>
+    <span class="ident">node</span>.<span class="ident">mut_store</span>().<span class="ident">wl</span>().<span class="ident">set_hardstate</span>(<span class="ident">hs</span>.<span class="ident">clone</span>());
+}</pre></div>
+</li>
+<li>
+<p>Check whether <code>messages</code> is empty or not. If not, it means that the node will send messages to
+other nodes. There has been an optimization for sending messages: if the node is a leader, this can
+be done together with step 1 in parallel; if the node is not a leader, it needs to reply the
+messages to the leader after appending the Raft entries:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">if</span> <span class="op">!</span><span class="ident">is_leader</span> {
+    <span class="comment">// If not leader, the follower needs to reply the messages to</span>
+    <span class="comment">// the leader after appending Raft entries.</span>
+    <span class="kw">let</span> <span class="ident">msgs</span> <span class="op">=</span> <span class="ident">ready</span>.<span class="ident">messages</span>.<span class="ident">drain</span>(..);
+    <span class="kw">for</span> <span class="ident">_msg</span> <span class="kw">in</span> <span class="ident">msgs</span> {
+        <span class="comment">// Send messages to other peers.</span>
+    }
+}</pre></div>
+</li>
+<li>
+<p>Check whether <code>committed_entires</code> is empty or not. If not, it means that there are some newly
+committed log entries which you must apply to the state machine. Of course, after applying, you
+need to update the applied index and resume <code>apply</code> later:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">committed_entries</span>) <span class="op">=</span> <span class="ident">ready</span>.<span class="ident">committed_entries</span>.<span class="ident">take</span>() {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">_last_apply_index</span> <span class="op">=</span> <span class="number">0</span>;
+    <span class="kw">for</span> <span class="ident">entry</span> <span class="kw">in</span> <span class="ident">committed_entries</span> {
+        <span class="comment">// Mostly, you need to save the last apply index to resume applying</span>
+        <span class="comment">// after restart. Here we just ignore this because we use a Memory storage.</span>
+        <span class="ident">_last_apply_index</span> <span class="op">=</span> <span class="ident">entry</span>.<span class="ident">index</span>;
+
+        <span class="kw">if</span> <span class="ident">entry</span>.<span class="ident">data</span>.<span class="ident">is_empty</span>() {
+            <span class="comment">// Emtpy entry, when the peer becomes Leader it will send an empty entry.</span>
+            <span class="kw">continue</span>;
+        }
+
+        <span class="kw">match</span> <span class="ident">entry</span>.<span class="ident">get_entry_type</span>() {
+            <span class="ident">EntryType</span>::<span class="ident">EntryNormal</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">handle_normal</span>(<span class="ident">entry</span>),
+            <span class="ident">EntryType</span>::<span class="ident">EntryConfChange</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">handle_conf_change</span>(<span class="ident">entry</span>),
+            <span class="ident">EntryType</span>::<span class="ident">EntryConfChangeV2</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">unimplemented</span><span class="macro">!</span>(),
+        }
+    }
+}</pre></div>
+</li>
+<li>
+<p>Call <code>advance</code> to prepare for the next <code>Ready</code> state.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="ident">node</span>.<span class="ident">advance</span>(<span class="ident">ready</span>);</pre></div>
+</li>
+</ol>
+<p>For more information, check out an <a href="examples/single_mem_node/main.rs#L113-L179">example</a>.</p>
+<h2 id="arbitrary-membership-changes" class="section-header"><a href="#arbitrary-membership-changes">Arbitrary Membership Changes</a></h2>
+<blockquote>
+<p><strong>Note:</strong> This is an experimental feature.</p>
+</blockquote>
+<p>When building a resilient, scalable distributed system there is a strong need to be able to change
+the membership of a peer group <em>dynamically, without downtime.</em> This Raft crate supports this via
+<strong>Joint Consensus</strong>
+(<a href="https://web.stanford.edu/%7Eouster/cgi-bin/papers/raft-atc14">Raft paper, section 6</a>).</p>
+<p>It permits resilient arbitrary dynamic membership changes. A membership change can do any or all of
+the following:</p>
+<ul>
+<li>Add peer (learner or voter) <em>n</em> to the group.</li>
+<li>Remove peer <em>n</em> from the group.</li>
+<li>Remove a leader (unmanaged, via stepdown)</li>
+<li>Promote a learner to a voter.</li>
+<li>Replace a node <em>n</em> with another node <em>m</em>.</li>
+</ul>
+<p>It (currently) does not:</p>
+<ul>
+<li>Allow control of the replacement leader during a stepdown.</li>
+<li>Optionally roll back a change during a peer group pause where the new peer group configuration
+fails.</li>
+<li>Provide automated promotion of newly added voters from learner to voter when they are caught up.
+This must be done as a two stage process for now.</li>
+</ul>
+<blockquote>
+<p>PRs to enable these are welcome! We'd love to mentor/support you through implementing it.</p>
+</blockquote>
+<p>This means it's possible to do:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">use</span> <span class="ident">raft</span>::{<span class="ident">Config</span>, <span class="ident">storage</span>::<span class="ident">MemStorage</span>, <span class="ident">raw_node</span>::<span class="ident">RawNode</span>, <span class="ident">eraftpb</span>::<span class="kw-2">*</span>};
+<span class="kw">use</span> <span class="ident">protobuf</span>::<span class="ident">Message</span> <span class="kw">as</span> <span class="ident">PbMessage</span>;
+<span class="kw">use</span> <span class="ident">slog</span>::{<span class="ident">Drain</span>, <span class="ident">o</span>};
+
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">config</span> <span class="op">=</span> <span class="ident">Config</span> { <span class="ident">id</span>: <span class="number">1</span>, ..<span class="ident">Default</span>::<span class="ident">default</span>() };
+<span class="kw">let</span> <span class="ident">store</span> <span class="op">=</span> <span class="ident">MemStorage</span>::<span class="ident">new_with_conf_state</span>((<span class="macro">vec</span><span class="macro">!</span>[<span class="number">1</span>, <span class="number">2</span>], <span class="macro">vec</span><span class="macro">!</span>[]));
+<span class="kw">let</span> <span class="ident">logger</span> <span class="op">=</span> <span class="ident">slog</span>::<span class="ident">Logger</span>::<span class="ident">root</span>(<span class="ident">slog_stdlog</span>::<span class="ident">StdLog</span>.<span class="ident">fuse</span>(), <span class="macro">o</span><span class="macro">!</span>());
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">node</span> <span class="op">=</span> <span class="ident">RawNode</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">config</span>, <span class="ident">store</span>, <span class="kw-2">&amp;</span><span class="ident">logger</span>).<span class="ident">unwrap</span>();
+<span class="ident">node</span>.<span class="ident">raft</span>.<span class="ident">become_candidate</span>();
+<span class="ident">node</span>.<span class="ident">raft</span>.<span class="ident">become_leader</span>();
+</pre></div>
+<p>This process is a two-phase process, during the midst of it the peer group's leader is managing
+<strong>two independent, possibly overlapping peer sets</strong>.</p>
+<blockquote>
+<p><strong>Note:</strong> In order to maintain resiliency guarantees  (progress while a majority of both peer sets is
+active), it is very important to wait until the entire peer group has exited the transition phase
+before taking old, removed peers offline.</p>
+</blockquote>
+</div><h2 id='reexports' class='section-header'><a href="#reexports">Re-exports</a></h2>
+<table><tr><td><code>pub use self::raft_log::<a class="constant" href="../raft/util/constant.NO_LIMIT.html" title="constant raft::util::NO_LIMIT">NO_LIMIT</a>;</code></td></tr><tr><td><code>pub use self::raw_node::<a class="fn" href="../raft/raw_node/fn.is_empty_snap.html" title="fn raft::raw_node::is_empty_snap">is_empty_snap</a>;</code></td></tr><tr><td><code>pub use self::raw_node::<a class="struct" href="../raft/raw_node/struct.Peer.html" title="struct raft::raw_node::Peer">Peer</a>;</code></td></tr><tr><td><code>pub use self::raw_node::<a class="struct" href="../raft/raw_node/struct.RawNode.html" title="struct raft::raw_node::RawNode">RawNode</a>;</code></td></tr><tr><td><code>pub use self::raw_node::<a class="struct" href="../raft/raw_node/struct.Ready.html" title="struct raft::raw_node::Ready">Ready</a>;</code></td></tr><tr><td><code>pub use self::raw_node::<a class="enum" href="../raft/raw_node/enum.SnapshotStatus.html" title="enum raft::raw_node::SnapshotStatus">SnapshotStatus</a>;</code></td></tr><tr><td><code>pub use self::storage::<a class="struct" href="../raft/storage/struct.RaftState.html" title="struct raft::storage::RaftState">RaftState</a>;</code></td></tr><tr><td><code>pub use self::storage::<a class="trait" href="../raft/storage/trait.Storage.html" title="trait raft::storage::Storage">Storage</a>;</code></td></tr><tr><td><code>pub use self::util::<a class="fn" href="../raft/util/fn.majority.html" title="fn raft::util::majority">majority</a>;</code></td></tr></table><h2 id='modules' class='section-header'><a href="#modules">Modules</a></h2>
+<table><tr class='module-item'><td><a class="mod" href="eraftpb/index.html" title='raft::eraftpb mod'>eraftpb</a></td><td class='docblock-short'><p>Generated file from <code>eraftpb.proto</code></p>
+</td></tr><tr class='module-item'><td><a class="mod" href="prelude/index.html" title='raft::prelude mod'>prelude</a></td><td class='docblock-short'><p>A &quot;prelude&quot; for crates using the <code>raft</code> crate.</p>
+</td></tr><tr class='module-item'><td><a class="mod" href="raw_node/index.html" title='raft::raw_node mod'>raw_node</a></td><td class='docblock-short'><p>The raw node of the raft module.</p>
+</td></tr><tr class='module-item'><td><a class="mod" href="storage/index.html" title='raft::storage mod'>storage</a></td><td class='docblock-short'><p>Represents the storage trait and example implementation.</p>
+</td></tr><tr class='module-item'><td><a class="mod" href="util/index.html" title='raft::util mod'>util</a></td><td class='docblock-short'><p>This module contains a collection of various tools to use to manipulate
+and control messages and data associated with raft.</p>
+</td></tr></table><h2 id='structs' class='section-header'><a href="#structs">Structs</a></h2>
+<table><tr class='module-item'><td><a class="struct" href="struct.Config.html" title='raft::Config struct'>Config</a></td><td class='docblock-short'><p>Config contains the parameters to start a raft.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.Configuration.html" title='raft::Configuration struct'>Configuration</a></td><td class='docblock-short'><p>A Raft internal representation of a Configuration.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.Inflights.html" title='raft::Inflights struct'>Inflights</a></td><td class='docblock-short'><p>A buffer of inflight messages.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.Progress.html" title='raft::Progress struct'>Progress</a></td><td class='docblock-short'><p>The progress of catching up from a restart.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.ProgressSet.html" title='raft::ProgressSet struct'>ProgressSet</a></td><td class='docblock-short'><p><code>ProgressSet</code> contains several <code>Progress</code>es,
+which could be <code>Leader</code>, <code>Follower</code> and <code>Learner</code>.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.Raft.html" title='raft::Raft struct'>Raft</a></td><td class='docblock-short'><p>A struct that represents the raft consensus itself. Stores details concerning the current
+and possible state the system can take.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.RaftLog.html" title='raft::RaftLog struct'>RaftLog</a></td><td class='docblock-short'><p>Raft log implementation</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.ReadState.html" title='raft::ReadState struct'>ReadState</a></td><td class='docblock-short'><p>ReadState provides state for read only query.
+It's caller's responsibility to send MsgReadIndex first before getting
+this state from ready. It's also caller's duty to differentiate if this
+state is what it requests through request_ctx, e.g. given a unique id as
+request_ctx.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.SoftState.html" title='raft::SoftState struct'>SoftState</a></td><td class='docblock-short'><p>SoftState provides state that is useful for logging and debugging.
+The state is volatile and does not need to be persisted to the WAL.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.Status.html" title='raft::Status struct'>Status</a></td><td class='docblock-short'><p>Represents the current status of the raft</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.Unstable.html" title='raft::Unstable struct'>Unstable</a></td><td class='docblock-short'><p>The unstable.entries[i] has raft log position i+unstable.offset.
+Note that unstable.offset may be less than the highest log
+position in storage; this means that the next write to storage
+might need to truncate the log before persisting unstable.entries.</p>
+</td></tr></table><h2 id='enums' class='section-header'><a href="#enums">Enums</a></h2>
+<table><tr class='module-item'><td><a class="enum" href="enum.Error.html" title='raft::Error enum'>Error</a></td><td class='docblock-short'><p>The base error type for raft</p>
+</td></tr><tr class='module-item'><td><a class="enum" href="enum.ProgressState.html" title='raft::ProgressState enum'>ProgressState</a></td><td class='docblock-short'><p>The state of the progress.</p>
+</td></tr><tr class='module-item'><td><a class="enum" href="enum.ReadOnlyOption.html" title='raft::ReadOnlyOption enum'>ReadOnlyOption</a></td><td class='docblock-short'><p>Determines the relative safety of and consistency of read only requests.</p>
+</td></tr><tr class='module-item'><td><a class="enum" href="enum.StateRole.html" title='raft::StateRole enum'>StateRole</a></td><td class='docblock-short'><p>The role of the node.</p>
+</td></tr><tr class='module-item'><td><a class="enum" href="enum.StorageError.html" title='raft::StorageError enum'>StorageError</a></td><td class='docblock-short'><p>An error with the storage.</p>
+</td></tr></table><h2 id='constants' class='section-header'><a href="#constants">Constants</a></h2>
+<table><tr class='module-item'><td><a class="constant" href="constant.INVALID_ID.html" title='raft::INVALID_ID constant'>INVALID_ID</a></td><td class='docblock-short'><p>A constant represents invalid id of raft.</p>
+</td></tr><tr class='module-item'><td><a class="constant" href="constant.INVALID_INDEX.html" title='raft::INVALID_INDEX constant'>INVALID_INDEX</a></td><td class='docblock-short'><p>A constant represents invalid index of raft log.</p>
+</td></tr></table><h2 id='functions' class='section-header'><a href="#functions">Functions</a></h2>
+<table><tr class='module-item'><td><a class="fn" href="fn.vote_resp_msg_type.html" title='raft::vote_resp_msg_type fn'>vote_resp_msg_type</a></td><td class='docblock-short'><p>Maps vote and pre_vote message types to their correspond responses.</p>
+</td></tr></table><h2 id='types' class='section-header'><a href="#types">Type Definitions</a></h2>
+<table><tr class='module-item'><td><a class="type" href="type.Result.html" title='raft::Result type'>Result</a></td><td class='docblock-short'><p>A result type that wraps up the raft errors.</p>
+</td></tr></table></section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../";window.currentCrate = "raft";</script><script src="../main.js"></script><script defer src="../search-index.js"></script></body></html>

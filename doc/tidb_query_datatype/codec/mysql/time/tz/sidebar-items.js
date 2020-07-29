@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["Tz","A time zone represented by either offset (i.e. +8) or name (i.e. Asia/Shanghai). In addition, local time zone is also valid."],["TzOffset","A time zone offset, corresponding to the [`Tz`]."]]});

@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["MAX_I16",""],["MAX_I32",""],["MAX_I8",""],["MAX_U16",""],["MAX_U32",""],["MAX_U8",""],["MIN_I16",""],["MIN_I32",""],["MIN_I8",""]],"struct":[["Column",""]],"trait":[["RowEncoder",""],["ScalarValueEncoder",""]]});

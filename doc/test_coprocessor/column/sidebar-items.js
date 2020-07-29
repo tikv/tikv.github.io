@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["TYPE_LONG",""],["TYPE_VAR_CHAR",""]],"struct":[["Column",""],["ColumnBuilder",""]]});

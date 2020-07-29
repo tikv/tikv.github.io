@@ -1,0 +1,4 @@
+(function() {var implementors = {};
+implementors["tikv"] = [{"text":"impl&lt;E:&nbsp;<a class=\"trait\" href=\"tikv/storage/kv/trait.Engine.html\" title=\"trait tikv::storage::kv::Engine\">Engine</a>&gt; <a class=\"trait\" href=\"tikv_util/trait.AssertSend.html\" title=\"trait tikv_util::AssertSend\">AssertSend</a> for <a class=\"struct\" href=\"tikv/coprocessor/struct.Endpoint.html\" title=\"struct tikv::coprocessor::Endpoint\">Endpoint</a>&lt;E&gt;","synthetic":false,"types":["tikv::coprocessor::endpoint::Endpoint"]}];
+implementors["tikv_util"] = [];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

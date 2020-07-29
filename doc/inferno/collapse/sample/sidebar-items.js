@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Folder","A stack collapser for the output of `sample` on macOS."],["Options","`sample` folder configuration options."]]});

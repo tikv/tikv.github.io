@@ -1,0 +1,5 @@
+(function() {var implementors = {};
+implementors["cdc"] = [{"text":"impl <a class=\"trait\" href=\"raftstore/coprocessor/trait.RoleObserver.html\" title=\"trait raftstore::coprocessor::RoleObserver\">RoleObserver</a> for <a class=\"struct\" href=\"cdc/struct.CdcObserver.html\" title=\"struct cdc::CdcObserver\">CdcObserver</a>","synthetic":false,"types":["cdc::observer::CdcObserver"]}];
+implementors["raftstore"] = [];
+implementors["tikv"] = [{"text":"impl <a class=\"trait\" href=\"raftstore/coprocessor/trait.RoleObserver.html\" title=\"trait raftstore::coprocessor::RoleObserver\">RoleObserver</a> for <a class=\"struct\" href=\"tikv/server/lock_manager/deadlock/struct.RoleChangeNotifier.html\" title=\"struct tikv::server::lock_manager::deadlock::RoleChangeNotifier\">RoleChangeNotifier</a>","synthetic":false,"types":["tikv::server::lock_manager::deadlock::RoleChangeNotifier"]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["CHECK_CLUSTER_BOOTSTRAPPED_RETRY_SECONDS",""],["MAX_CHECK_CLUSTER_BOOTSTRAPPED_RETRY_COUNT",""]],"fn":[["create_raft_storage","Creates a new storage engine which is backed by the Raft consensus protocol."]],"struct":[["Node","A wrapper for the raftstore which runs Multi-Raft."]]});

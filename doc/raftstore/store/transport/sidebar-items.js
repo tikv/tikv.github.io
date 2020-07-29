@@ -1,0 +1,1 @@
+initSidebarItems({"trait":[["CasualRouter","Routes message to target region."],["ProposalRouter","Routes proposal to target region."],["StoreRouter","Routes message to store FSM."],["Transport","Transports messages between different Raft peers."]]});

@@ -1,0 +1,264 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `engine_traits` crate."><meta name="keywords" content="rust, rustlang, rust-lang, engine_traits"><title>engine_traits - Rust</title><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../dark.css"><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script src="../storage.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="shortcut icon" href="../favicon.ico"><style type="text/css">#crate-search{background-image:url("../down-arrow.svg");}</style></head><body class="rustdoc mod"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../engine_traits/index.html'><div class='logo-container'><img src='../rust-logo.png' alt='logo'></div></a><p class='location'>Crate engine_traits</p><div class="sidebar-elems"><a id='all-types' href='all.html'><p>See all engine_traits's items</p></a><div class="block items"><ul><li><a href="#reexports">Re-exports</a></li><li><a href="#modules">Modules</a></li><li><a href="#structs">Structs</a></li><li><a href="#enums">Enums</a></li><li><a href="#constants">Constants</a></li><li><a href="#traits">Traits</a></li><li><a href="#functions">Functions</a></li><li><a href="#types">Type Definitions</a></li></ul></div><p class='location'></p><script>window.sidebarCurrent = {name: 'engine_traits', ty: 'mod', relpath: '../'};</script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../settings.html"><img src="../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class='fqn'><span class='out-of-band'><span id='render-detail'><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class='inner'>&#x2212;</span>]</a></span><a class='srclink' href='../src/engine_traits/lib.rs.html#3-336' title='goto source code'>[src]</a></span><span class='in-band'>Crate <a class="mod" href=''>engine_traits</a></span></h1><div class='docblock'><p>A generic TiKV storage engine</p>
+<p>This is a work-in-progress attempt to abstract all the features needed by
+TiKV to persist its data, so that storage engines other than RocksDB may be
+added to TiKV in the future.</p>
+<p>This crate <strong>must not have any transitive dependencies on RocksDB</strong>. The
+RocksDB implementation is in the <code>engine_rocks</code> crate.</p>
+<p>In addition to documenting the API, this documentation contains a
+description of the porting process, current design decisions and design
+guidelines, and refactoring tips.</p>
+<h2 id="capabilities-of-a-tikv-engine" class="section-header"><a href="#capabilities-of-a-tikv-engine">Capabilities of a TiKV engine</a></h2>
+<p>TiKV engines store binary keys and values.</p>
+<p>Every pair lives in a <a href="https://github.com/facebook/rocksdb/wiki/Column-Families"><em>column family</em></a>, which can be thought of as being
+independent data stores.</p>
+<p>Consistent read-only views of the database are accessed through <em>snapshots</em>.</p>
+<p>Multiple writes can be committed atomically with a <em>write batch</em>.</p>
+<h1 id="the-tikv-engine-api" class="section-header"><a href="#the-tikv-engine-api">The TiKV engine API</a></h1>
+<p>The API inherits its design from RocksDB. As support for other engines is
+added to TiKV, it is expected that this API will become more abstract, and
+less Rocks-specific.</p>
+<p>This crate is almost entirely traits, plus a few &quot;plain-old-data&quot; types that
+are shared between engines.</p>
+<p>Some key types include:</p>
+<ul>
+<li>
+<p><a href="../engine_traits/engine/trait.KvEngine.html" title="`KvEngine`"><code>KvEngine</code></a> - a key-value engine, and the primary type defined by this
+crate. Most code that uses generic engines will be bounded over a generic
+type implementing <code>KvEngine</code>. <code>KvEngine</code> itself is bounded by many other
+traits that provide collections of functionality, with the intent that as
+TiKV evolves it may be possible to use each trait individually, and to
+define classes of engine that do not implement all collections of
+features.</p>
+</li>
+<li>
+<p><a href="../engine_traits/snapshot/trait.Snapshot.html" title="`Snapshot`"><code>Snapshot</code></a> - a view into the state of the database at a moment in time.
+For reading sets of consistent data.</p>
+</li>
+<li>
+<p><a href="../engine_traits/peekable/trait.Peekable.html" title="`Peekable`"><code>Peekable</code></a> - types that can read single values. This includes engines
+and snapshots.</p>
+</li>
+<li>
+<p><a href="../engine_traits/iterable/trait.Iterable.html" title="`Iterable`"><code>Iterable</code></a> - types that can iterate over the values of a range of keys,
+by creating instances of the TiKV-specific <a href="../engine_traits/iterable/trait.Iterator.html" title="`Iterator`"><code>Iterator</code></a> trait. This
+includes engines and snapshots.</p>
+</li>
+<li>
+<p><a href="../engine_traits/mutable/trait.SyncMutable.html" title="`SyncMutable`"><code>SyncMutable</code></a> and <a href="../engine_traits/mutable/trait.Mutable.html" title="`Mutable`"><code>Mutable</code></a> - types to which single key/value pairs
+can be written. This includes engines and write batches.</p>
+</li>
+<li>
+<p><a href="../engine_traits/write_batch/trait.WriteBatch.html" title="`WriteBatch`"><code>WriteBatch</code></a> - types that can commit multiple key/value pairs in batches.
+A <code>WriteBatchExt::WriteBtach</code> commits all pairs in one atomic transaction.
+A <code>WriteBatchExt::WriteBatchVec</code> does not (FIXME: is this correct?).</p>
+</li>
+</ul>
+<p>The <code>KvEngine</code> instance generally acts as a factory for types that implement
+other traits in the crate. These factory methods, associated types, and
+other associated methods are defined in &quot;extension&quot; traits. For example, methods
+on engines related to batch writes are in the <code>WriteBatchExt</code> trait.</p>
+<h1 id="design-notes" class="section-header"><a href="#design-notes">Design notes</a></h1>
+<ul>
+<li>
+<p><code>KvEngine</code> is the main engine trait. It requires many other traits, which
+have many other associated types that implement yet more traits.</p>
+</li>
+<li>
+<p>Features should be grouped into their own modules with their own
+traits. A common pattern is to have an associated type that implements
+a trait, and an &quot;extension&quot; trait that associates that type with <code>KvEngine</code>,
+which is part of `KvEngine's trait requirements.</p>
+</li>
+<li>
+<p>For now, for simplicity, all extension traits are required by <code>KvEngine</code>.
+In the future it may be feasible to separate them for engines with
+different feature sets.</p>
+</li>
+<li>
+<p>Associated types generally have the same name as the trait they
+are required to implement. Engine extensions generally have the same
+name suffixed with <code>Ext</code>. Concrete implementations usually have the
+same name prefixed with the database name, i.e. <code>Rocks</code>.</p>
+<p>Example:</p>
+
+<div class='information'><div class='tooltip ignore'>ⓘ<span class='tooltiptext'>This example is not tested</span></div></div><div class="example-wrap"><pre class="rust rust-example-rendered ignore">
+<span class="comment">// in engine_traits</span>
+
+<span class="kw">trait</span> <span class="ident">WriteBatchExt</span> {
+    <span class="kw">type</span> <span class="ident">WriteBatch</span>: <span class="ident">WriteBatch</span>;
+}
+
+<span class="kw">trait</span> <span class="ident">WriteBatch</span> { }</pre></div>
+
+<div class='information'><div class='tooltip ignore'>ⓘ<span class='tooltiptext'>This example is not tested</span></div></div><div class="example-wrap"><pre class="rust rust-example-rendered ignore">
+<span class="comment">// in engine_rocks</span>
+
+<span class="kw">impl</span> <span class="ident">WriteBatchExt</span> <span class="kw">for</span> <span class="ident">RocksEngine</span> {
+    <span class="kw">type</span> <span class="ident">WriteBatch</span> <span class="op">=</span> <span class="ident">RocksWriteBatch</span>;
+}
+
+<span class="kw">impl</span> <span class="ident">WriteBatch</span> <span class="kw">for</span> <span class="ident">RocksWriteBatch</span> { }</pre></div>
+</li>
+<li>
+<p>All engines use the same error type, defined in this crate. Thus
+engine-specific type information is boxed and hidden.</p>
+</li>
+<li>
+<p><code>KvEngine</code> is a factory type for some of its associated types, but not
+others. For now, use factory methods when RocksDB would require factory
+method (that is, when the DB is required to create the associated type -
+if the associated type can be created without context from the database,
+use a standard new method). If future engines require factory methods, the
+traits can be converted then.</p>
+</li>
+<li>
+<p>Types that require a handle to the engine (or some other &quot;parent&quot; type)
+do so with either Rc or Arc. An example is EngineIterator. The reason
+for this is that associated types cannot contain lifetimes. That requires
+&quot;generic associated types&quot;. See</p>
+<ul>
+<li><a href="https://github.com/rust-lang/rfcs/pull/1598">https://github.com/rust-lang/rfcs/pull/1598</a></li>
+<li><a href="https://github.com/rust-lang/rust/issues/44265">https://github.com/rust-lang/rust/issues/44265</a></li>
+</ul>
+</li>
+<li>
+<p>Traits can't have mutually-recursive associated types. That is, if
+<code>KvEngine</code> has a <code>Snapshot</code> associated type, <code>Snapshot</code> can't then have a
+<code>KvEngine</code> associated type - the compiler will not be able to resolve both
+<code>KvEngine</code>s to the same type. In these cases, e.g. <code>Snapshot</code> needs to be
+parameterized over its engine type and <code>impl Snapshot&lt;RocksEngine&gt; for RocksSnapshot</code>.</p>
+</li>
+</ul>
+<h1 id="the-porting-process" class="section-header"><a href="#the-porting-process">The porting process</a></h1>
+<p>These are some guidelines that seem to make the porting managable. As the
+process continues new strategies are discovered and written here. This is a
+big refactoring and will take many monthse.</p>
+<p>Refactoring is a craft, not a science, and figuring out how to overcome any
+particular situation takes experience and intuation, but these principles
+can help.</p>
+<p>A guiding principle is to do one thing at a time. In particular, don't
+redesign while encapsulating.</p>
+<p>The port is happening in stages:</p>
+<ol>
+<li>Migrating the <code>engine</code> abstractions</li>
+<li>Eliminating direct-use of <code>rocksdb</code> re-exports</li>
+<li>&quot;Pulling up&quot; the generic abstractions though TiKV</li>
+<li>Isolating test cases from RocksDB</li>
+</ol>
+<p>These stages are described in more detail:</p>
+<h2 id="1-migrating-the-engine-abstractions" class="section-header"><a href="#1-migrating-the-engine-abstractions">1) Migrating the <code>engine</code> abstractions</a></h2>
+<p>The engine crate was an earlier attempt to abstract the storage engine. Much
+of its structure is duplicated near-identically in engine_traits, the
+difference being that engine_traits has no RocksDB dependencies. Having no
+RocksDB dependencies makes it trivial to guarantee that the abstractions are
+truly abstract.</p>
+<p><code>engine</code> also reexports raw bindings from <code>rust-rocksdb</code> for every purpose
+for which there is not yet an abstract trait.</p>
+<p>During this stage, we will eliminate the wrappers from <code>engine</code> to reduce
+code duplication. We do this by identifying a small subsystem within
+<code>engine</code>, duplicating it within <code>engine_traits</code> and <code>engine_rocks</code>, deleting
+the code from <code>engine</code>, and fixing all the callers to work with the
+abstracted implementation.</p>
+<p>At the end of this stage the <code>engine</code> dependency will contain no code except
+for <code>rust-rocksdb</code> reexports. TiKV will still depend on the concrete
+RocksDB implementations from <code>engine_rocks</code>, as well as the raw API's from
+reexported from the <code>rust-rocksdb</code> crate.</p>
+<h2 id="2-eliminating-the-engine-dep-from-tikv-with-new-abstractions" class="section-header"><a href="#2-eliminating-the-engine-dep-from-tikv-with-new-abstractions">2) Eliminating the <code>engine</code> dep from TiKV with new abstractions</a></h2>
+<p>TiKV uses reexported <code>rust-rocksdb</code> APIs via the <code>engine</code> crate. During this
+stage we need to identify each of these APIs, duplicate them generically in
+the <code>engine_traits</code> and <code>engine_rocks</code> crate, and convert all callers to use
+the <code>engine_rocks</code> crate instead.</p>
+<p>At the end of this phase the <code>engine</code> crate will be deleted.</p>
+<h2 id="3-pulling-up-the-generic-abstractions-through-tikv" class="section-header"><a href="#3-pulling-up-the-generic-abstractions-through-tikv">3) &quot;Pulling up&quot; the generic abstractions through TiKv</a></h2>
+<p>With all of TiKV using the <code>engine_traits</code> traits in conjunction with the
+concrete <code>engine_rocks</code> types, we can push generic type parameters up
+through the application. Then we will remove the concrete <code>engine_rocks</code>
+dependency from TiKV so that it is impossible to re-introduce
+engine-specific code again.</p>
+<p>We will probably introduce some other crate to mediate between multiple
+engine implementations, such that at the end of this phase TiKV will
+not have a dependency on <code>engine_rocks</code>.</p>
+<p>It will though still have a dev-dependency on <code>engine_rocks</code> for the
+test cases.</p>
+<h2 id="4-isolating-test-cases-from-rocksdb" class="section-header"><a href="#4-isolating-test-cases-from-rocksdb">4) Isolating test cases from RocksDB</a></h2>
+<p>Eventually we need our test suite to run over multiple engines.
+The exact strategy here is yet to be determined, but it may begin by
+breaking the <code>engine_rocks</code> dependency with a new <code>engine_test</code>, that
+begins by simply wrapping <code>engine_rocks</code>.</p>
+<h1 id="refactoring-tips" class="section-header"><a href="#refactoring-tips">Refactoring tips</a></h1>
+<ul>
+<li>
+<p>Port modules with the fewest RocksDB dependencies at a time, modifying
+those modules's callers to convert to and from the engine traits as
+needed. Move in and out of the engine_traits world with the
+<code>RocksDB::from_ref</code> and <code>RocksDB::as_inner</code> methods.</p>
+</li>
+<li>
+<p>Down follow the type system too far &quot;down the rabbit hole&quot;. When you see
+that another subsystem is blocking you from refactoring the system you
+are trying to refactor, stop, stash your changes, and focus on the other
+system instead.</p>
+</li>
+<li>
+<p>You will through away branches that lead to dead ends. Learn from the
+experience and try again from a different angle.</p>
+</li>
+<li>
+<p>For now, use the same APIs as the RocksDB bindings, as methods
+on the various engine traits, and with this crate's error type.</p>
+</li>
+<li>
+<p>When new types are needed from the RocksDB API, add a new module, define a
+new trait (possibly with the same name as the RocksDB type), then define a
+<code>TraitExt</code> trait to &quot;mixin&quot; to the <code>KvEngine</code> trait.</p>
+</li>
+<li>
+<p>Port methods directly from the existing <code>engine</code> crate by re-implementing
+it in engine_traits and engine_rocks, replacing all the callers with calls
+into the traits, then delete the versions in the <code>engine</code> crate.</p>
+</li>
+<li>
+<p>Use the .c() method from engine_rocks::compat::Compat to get a
+KvEngine reference from Arc<DB> in the fewest characters. It also
+works on Snapshot, and can be adapted to other types.</p>
+</li>
+<li>
+<p>Use <code>IntoOther</code> to adapt between error types of dependencies that are not
+themselves interdependent. E.g. raft::Error can be created from
+engine_traits::Error even though neither <code>raft</code> tor <code>engine_traits</code> know
+about each other.</p>
+</li>
+<li>
+<p>&quot;Plain old data&quot; types in <code>engine</code> can be moved directly into
+<code>engine_traits</code> and reexported from <code>engine</code> to ease the transition.
+Likewise <code>engine_rocks</code> can temporarily call code from inside <code>engine</code>.</p>
+</li>
+</ul>
+</div><h2 id='reexports' class='section-header'><a href="#reexports">Re-exports</a></h2>
+<table><tr><td><code>pub use crate::<a class="mod" href="../engine_traits/range/index.html" title="mod engine_traits::range">range</a>::*;</code></td></tr><tr><td><code>pub use crate::<a class="mod" href="../engine_traits/metrics_flusher/index.html" title="mod engine_traits::metrics_flusher">metrics_flusher</a>::*;</code></td></tr><tr><td><code>pub use <a class="mod" href="../engine_traits/compaction_job/index.html" title="mod engine_traits::compaction_job">compaction_job</a>::*;</code></td></tr></table><h2 id='modules' class='section-header'><a href="#modules">Modules</a></h2>
+<table><tr class='module-item'><td><a class="mod" href="cf_defs/index.html" title='engine_traits::cf_defs mod'>cf_defs</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="mod" href="cf_handle/index.html" title='engine_traits::cf_handle mod'>cf_handle</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="mod" href="cf_names/index.html" title='engine_traits::cf_names mod'>cf_names</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="mod" href="cf_options/index.html" title='engine_traits::cf_options mod'>cf_options</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="mod" href="compact/index.html" title='engine_traits::compact mod'>compact</a></td><td class='docblock-short'><p>Functionality related to compaction</p>
+</td></tr><tr class='module-item'><td><a class="mod" href="compaction_job/index.html" title='engine_traits::compaction_job mod'>compaction_job</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="mod" href="db_options/index.html" title='engine_traits::db_options mod'>db_options</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="mod" href="db_vector/index.html" title='engine_traits::db_vector mod'>db_vector</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="mod" href="encryption/index.html" title='engine_traits::encryption mod'>encryption</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="mod" href="engine/index.html" title='engine_traits::engine mod'>engine</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="mod" href="engines/index.html" title='engine_traits::engines mod'>engines</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="mod" href="errors/index.html" title='engine_traits::errors mod'>errors</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="mod" href="import/index.html" title='engine_traits::import mod'>import</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="mod" href="iterable/index.html" title='engine_traits::iterable mod'>iterable</a></td><td class='docblock-short'><p>Iteration over engines and snapshots.</p>
+</td></tr><tr class='module-item'><td><a class="mod" href="metrics_flusher/index.html" title='engine_traits::metrics_flusher mod'>metrics_flusher</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="mod" href="misc/index.html" title='engine_traits::misc mod'>misc</a></td><td class='docblock-short'><p>This trait contains miscellaneous features that have
+not been carefully factored into other traits.</p>
+</td></tr><tr class='module-item'><td><a class="mod" href="mutable/index.html" title='engine_traits::mutable mod'>mutable</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="mod" href="options/index.html" title='engine_traits::options mod'>options</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="mod" href="peekable/index.html" title='engine_traits::peekable mod'>peekable</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="mod" href="properties/index.html" title='engine_traits::properties mod'>properties</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="mod" href="range/index.html" title='engine_traits::range mod'>range</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="mod" href="range_properties/index.html" title='engine_traits::range_properties mod'>range_properties</a></td><td class='docblock-short'><p>Various metrics related to key ranges</p>
+</td></tr><tr class='module-item'><td><a class="mod" href="snapshot/index.html" title='engine_traits::snapshot mod'>snapshot</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="mod" href="sst/index.html" title='engine_traits::sst mod'>sst</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="mod" href="table_properties/index.html" title='engine_traits::table_properties mod'>table_properties</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="mod" href="util/index.html" title='engine_traits::util mod'>util</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="mod" href="write_batch/index.html" title='engine_traits::write_batch mod'>write_batch</a></td><td class='docblock-short'></td></tr></table><h2 id='structs' class='section-header'><a href="#structs">Structs</a></h2>
+<table><tr class='module-item'><td><a class="struct" href="struct.FileEncryptionInfo.html" title='engine_traits::FileEncryptionInfo struct'>FileEncryptionInfo</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="struct" href="struct.IndexHandle.html" title='engine_traits::IndexHandle struct'>IndexHandle</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="struct" href="struct.IndexHandles.html" title='engine_traits::IndexHandles struct'>IndexHandles</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="struct" href="struct.IterOptions.html" title='engine_traits::IterOptions struct'>IterOptions</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="struct" href="struct.KvEngines.html" title='engine_traits::KvEngines struct'>KvEngines</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="struct" href="struct.ReadOptions.html" title='engine_traits::ReadOptions struct'>ReadOptions</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="struct" href="struct.WriteOptions.html" title='engine_traits::WriteOptions struct'>WriteOptions</a></td><td class='docblock-short'></td></tr></table><h2 id='enums' class='section-header'><a href="#enums">Enums</a></h2>
+<table><tr class='module-item'><td><a class="enum" href="enum.EncryptionMethod.html" title='engine_traits::EncryptionMethod enum'>EncryptionMethod</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="enum" href="enum.Error.html" title='engine_traits::Error enum'>Error</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="enum" href="enum.SeekKey.html" title='engine_traits::SeekKey enum'>SeekKey</a></td><td class='docblock-short'><p>A token indicating where an iterator &quot;seek&quot; operation should stop.</p>
+</td></tr><tr class='module-item'><td><a class="enum" href="enum.SeekMode.html" title='engine_traits::SeekMode enum'>SeekMode</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="enum" href="enum.SstCompressionType.html" title='engine_traits::SstCompressionType enum'>SstCompressionType</a></td><td class='docblock-short'></td></tr></table><h2 id='constants' class='section-header'><a href="#constants">Constants</a></h2>
+<table><tr class='module-item'><td><a class="constant" href="constant.ALL_CFS.html" title='engine_traits::ALL_CFS constant'>ALL_CFS</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="constant" href="constant.CF_DEFAULT.html" title='engine_traits::CF_DEFAULT constant'>CF_DEFAULT</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="constant" href="constant.CF_LOCK.html" title='engine_traits::CF_LOCK constant'>CF_LOCK</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="constant" href="constant.CF_RAFT.html" title='engine_traits::CF_RAFT constant'>CF_RAFT</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="constant" href="constant.CF_VER_DEFAULT.html" title='engine_traits::CF_VER_DEFAULT constant'>CF_VER_DEFAULT</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="constant" href="constant.CF_WRITE.html" title='engine_traits::CF_WRITE constant'>CF_WRITE</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="constant" href="constant.DATA_CFS.html" title='engine_traits::DATA_CFS constant'>DATA_CFS</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="constant" href="constant.DATA_KEY_PREFIX_LEN.html" title='engine_traits::DATA_KEY_PREFIX_LEN constant'>DATA_KEY_PREFIX_LEN</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="constant" href="constant.LARGE_CFS.html" title='engine_traits::LARGE_CFS constant'>LARGE_CFS</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="constant" href="constant.MAX_DELETE_BATCH_SIZE.html" title='engine_traits::MAX_DELETE_BATCH_SIZE constant'>MAX_DELETE_BATCH_SIZE</a></td><td class='docblock-short'></td></tr></table><h2 id='traits' class='section-header'><a href="#traits">Traits</a></h2>
+<table><tr class='module-item'><td><a class="trait" href="trait.CFHandle.html" title='engine_traits::CFHandle trait'>CFHandle</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="trait" href="trait.CFHandleExt.html" title='engine_traits::CFHandleExt trait'>CFHandleExt</a></td><td class='docblock-short'><p>Trait for engines with column family handles.</p>
+</td></tr><tr class='module-item'><td><a class="trait" href="trait.CFNamesExt.html" title='engine_traits::CFNamesExt trait'>CFNamesExt</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="trait" href="trait.ColumnFamilyOptions.html" title='engine_traits::ColumnFamilyOptions trait'>ColumnFamilyOptions</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="trait" href="trait.CompactExt.html" title='engine_traits::CompactExt trait'>CompactExt</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="trait" href="trait.DBOptions.html" title='engine_traits::DBOptions trait'>DBOptions</a></td><td class='docblock-short'><p>A handle to a database's options</p>
+</td></tr><tr class='module-item'><td><a class="trait" href="trait.DBOptionsExt.html" title='engine_traits::DBOptionsExt trait'>DBOptionsExt</a></td><td class='docblock-short'><p>A trait for engines that support setting global options</p>
+</td></tr><tr class='module-item'><td><a class="trait" href="trait.DBVector.html" title='engine_traits::DBVector trait'>DBVector</a></td><td class='docblock-short'><p>A type that holds buffers queried from the database.</p>
+</td></tr><tr class='module-item'><td><a class="trait" href="trait.DecodeProperties.html" title='engine_traits::DecodeProperties trait'>DecodeProperties</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="trait" href="trait.EncryptionKeyManager.html" title='engine_traits::EncryptionKeyManager trait'>EncryptionKeyManager</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="trait" href="trait.ExternalSstFileInfo.html" title='engine_traits::ExternalSstFileInfo trait'>ExternalSstFileInfo</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="trait" href="trait.ImportExt.html" title='engine_traits::ImportExt trait'>ImportExt</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="trait" href="trait.IngestExternalFileOptions.html" title='engine_traits::IngestExternalFileOptions trait'>IngestExternalFileOptions</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="trait" href="trait.Iterable.html" title='engine_traits::Iterable trait'>Iterable</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="trait" href="trait.Iterator.html" title='engine_traits::Iterator trait'>Iterator</a></td><td class='docblock-short'><p>An iterator over a consistent set of keys and values.</p>
+</td></tr><tr class='module-item'><td><a class="trait" href="trait.KvEngine.html" title='engine_traits::KvEngine trait'>KvEngine</a></td><td class='docblock-short'><p>A TiKV key-value store</p>
+</td></tr><tr class='module-item'><td><a class="trait" href="trait.MiscExt.html" title='engine_traits::MiscExt trait'>MiscExt</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="trait" href="trait.Mutable.html" title='engine_traits::Mutable trait'>Mutable</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="trait" href="trait.Peekable.html" title='engine_traits::Peekable trait'>Peekable</a></td><td class='docblock-short'><p>Types from which values can be read.</p>
+</td></tr><tr class='module-item'><td><a class="trait" href="trait.RangePropertiesExt.html" title='engine_traits::RangePropertiesExt trait'>RangePropertiesExt</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="trait" href="trait.Snapshot.html" title='engine_traits::Snapshot trait'>Snapshot</a></td><td class='docblock-short'><p>A consistent read-only view of the database.</p>
+</td></tr><tr class='module-item'><td><a class="trait" href="trait.SstExt.html" title='engine_traits::SstExt trait'>SstExt</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="trait" href="trait.SstReader.html" title='engine_traits::SstReader trait'>SstReader</a></td><td class='docblock-short'><p>SstReader is used to read an SST file.</p>
+</td></tr><tr class='module-item'><td><a class="trait" href="trait.SstWriter.html" title='engine_traits::SstWriter trait'>SstWriter</a></td><td class='docblock-short'><p>SstWriter is used to create sst files that can be added to database later.</p>
+</td></tr><tr class='module-item'><td><a class="trait" href="trait.SstWriterBuilder.html" title='engine_traits::SstWriterBuilder trait'>SstWriterBuilder</a></td><td class='docblock-short'><p>A builder builds a SstWriter.</p>
+</td></tr><tr class='module-item'><td><a class="trait" href="trait.SyncMutable.html" title='engine_traits::SyncMutable trait'>SyncMutable</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="trait" href="trait.TableProperties.html" title='engine_traits::TableProperties trait'>TableProperties</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="trait" href="trait.TablePropertiesCollection.html" title='engine_traits::TablePropertiesCollection trait'>TablePropertiesCollection</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="trait" href="trait.TablePropertiesCollectionIter.html" title='engine_traits::TablePropertiesCollectionIter trait'>TablePropertiesCollectionIter</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="trait" href="trait.TablePropertiesExt.html" title='engine_traits::TablePropertiesExt trait'>TablePropertiesExt</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="trait" href="trait.TablePropertiesKey.html" title='engine_traits::TablePropertiesKey trait'>TablePropertiesKey</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="trait" href="trait.TitanDBOptions.html" title='engine_traits::TitanDBOptions trait'>TitanDBOptions</a></td><td class='docblock-short'><p>Titan-specefic options</p>
+</td></tr><tr class='module-item'><td><a class="trait" href="trait.UserCollectedProperties.html" title='engine_traits::UserCollectedProperties trait'>UserCollectedProperties</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="trait" href="trait.WriteBatch.html" title='engine_traits::WriteBatch trait'>WriteBatch</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="trait" href="trait.WriteBatchExt.html" title='engine_traits::WriteBatchExt trait'>WriteBatchExt</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="trait" href="trait.WriteBatchVecExt.html" title='engine_traits::WriteBatchVecExt trait'>WriteBatchVecExt</a></td><td class='docblock-short'></td></tr></table><h2 id='functions' class='section-header'><a href="#functions">Functions</a></h2>
+<table><tr class='module-item'><td><a class="fn" href="fn.collect.html" title='engine_traits::collect fn'>collect</a></td><td class='docblock-short'><p>Collect all items of <code>it</code> into a vector, generally used for tests.</p>
+</td></tr><tr class='module-item'><td><a class="fn" href="fn.name_to_cf.html" title='engine_traits::name_to_cf fn'>name_to_cf</a></td><td class='docblock-short'></td></tr></table><h2 id='types' class='section-header'><a href="#types">Type Definitions</a></h2>
+<table><tr class='module-item'><td><a class="type" href="type.CfName.html" title='engine_traits::CfName type'>CfName</a></td><td class='docblock-short'></td></tr><tr class='module-item'><td><a class="type" href="type.Result.html" title='engine_traits::Result type'>Result</a></td><td class='docblock-short'></td></tr></table></section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../";window.currentCrate = "engine_traits";</script><script src="../main.js"></script><script defer src="../search-index.js"></script></body></html>

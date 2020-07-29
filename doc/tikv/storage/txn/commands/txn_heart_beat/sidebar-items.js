@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["TxnHeartBeat","Heart beat of a transaction. It enlarges the primary lock's TTL."]]});

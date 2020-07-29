@@ -1,0 +1,4 @@
+(function() {var implementors = {};
+implementors["raft"] = [];
+implementors["raftstore"] = [{"text":"impl&lt;EK, ER&gt; <a class=\"trait\" href=\"raft/storage/trait.Storage.html\" title=\"trait raft::storage::Storage\">Storage</a> for <a class=\"struct\" href=\"raftstore/store/struct.PeerStorage.html\" title=\"struct raftstore::store::PeerStorage\">PeerStorage</a>&lt;EK, ER&gt; <span class=\"where fmt-newline\">where<br>&nbsp;&nbsp;&nbsp;&nbsp;EK: <a class=\"trait\" href=\"engine_traits/engine/trait.KvEngine.html\" title=\"trait engine_traits::engine::KvEngine\">KvEngine</a>,<br>&nbsp;&nbsp;&nbsp;&nbsp;ER: <a class=\"trait\" href=\"engine_traits/engine/trait.KvEngine.html\" title=\"trait engine_traits::engine::KvEngine\">KvEngine</a>,&nbsp;</span>","synthetic":false,"types":["raftstore::store::peer_storage::PeerStorage"]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

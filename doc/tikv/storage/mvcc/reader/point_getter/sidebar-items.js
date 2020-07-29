@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["PointGetter","This struct can be used to get the value of user keys. Internally, rollbacks are ignored and smaller version will be tried. If the isolation level is Si, locks will be checked first."],["PointGetterBuilder","`PointGetter` factory."]]});

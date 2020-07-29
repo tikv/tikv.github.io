@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["set_namespace","Sets the namespace used in the metrics. This function should be called before the metrics are used or any thread pool is created."]],"struct":[["MULTILEVEL_LEVEL0_CHANCE","The chance that a level 0 task is scheduled to run."],["MULTILEVEL_LEVEL_ELAPSED","Elapsed time of each level in the multilevel task queue."]]});

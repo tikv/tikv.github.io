@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Commit","Commit the transaction that started at `lock_ts`."]]});

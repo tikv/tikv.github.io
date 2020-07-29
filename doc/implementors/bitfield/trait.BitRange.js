@@ -1,0 +1,4 @@
+(function() {var implementors = {};
+implementors["bitfield"] = [];
+implementors["tidb_query_datatype"] = [{"text":"impl&lt;T&gt; <a class=\"trait\" href=\"bitfield/trait.BitRange.html\" title=\"trait bitfield::BitRange\">BitRange</a>&lt;T&gt; for <a class=\"struct\" href=\"tidb_query_datatype/codec/mysql/time/struct.Time.html\" title=\"struct tidb_query_datatype::codec::mysql::time::Time\">Time</a> <span class=\"where fmt-newline\">where<br>&nbsp;&nbsp;&nbsp;&nbsp;<a class=\"primitive\" href=\"https://doc.rust-lang.org/nightly/std/primitive.u64.html\">u64</a>: <a class=\"trait\" href=\"bitfield/trait.BitRange.html\" title=\"trait bitfield::BitRange\">BitRange</a>&lt;T&gt;,&nbsp;</span>","synthetic":false,"types":["tidb_query_datatype::codec::mysql::time::Time"]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

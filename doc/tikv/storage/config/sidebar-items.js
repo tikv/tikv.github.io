@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["DEFAULT_DATA_DIR",""],["DEFAULT_GC_RATIO_THRESHOLD",""],["DEFAULT_MAX_KEY_SIZE",""],["DEFAULT_RESERVER_SPACE_SIZE",""],["DEFAULT_ROCKSDB_SUB_DIR",""],["DEFAULT_SCHED_CONCURRENCY",""],["DEFAULT_SCHED_PENDING_WRITE_MB",""],["MAX_SCHED_CONCURRENCY",""]],"struct":[["BlockCacheConfig",""],["Config",""],["StorageConfigManger",""]]});

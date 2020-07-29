@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["FLAG_DELETE",""],["FLAG_LOCK",""],["FLAG_PUT",""],["FLAG_ROLLBACK",""],["PROTECTED_ROLLBACK_SHORT_VALUE","The short value for rollback records which are protected from being collapsed."]],"enum":[["WriteType",""]],"struct":[["Write",""],["WriteRef",""]]});

@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["from_files","Produce an output that can be used to generate a differential flame graph from a before and an after profile."],["from_readers","Produce an output that can be used to generate a differential flame graph."]],"struct":[["Options","Configure the generated output."]]});

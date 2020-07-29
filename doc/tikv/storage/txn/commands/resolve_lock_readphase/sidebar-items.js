@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["ResolveLockReadPhase","Scan locks for resolving according to `txn_status`."]]});

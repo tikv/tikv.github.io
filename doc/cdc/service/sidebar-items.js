@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["CDC_MAX_RESP_SIZE",""],["CDC_MSG_MAX_BATCH_SIZE",""],["CDC_MSG_NOTIFY_COUNT",""]],"static":[["CONNECTION_ID_ALLOC",""]],"struct":[["Conn",""],["ConnID","A unique identifier of a Connection."],["Service","Service implements the `ChangeData` service."]]});

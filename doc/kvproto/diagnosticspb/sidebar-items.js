@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["LogLevel",""],["SearchLogRequestTarget",""],["ServerInfoType",""]],"fn":[["create_diagnostics",""]],"struct":[["DiagnosticsClient",""],["LogMessage",""],["SearchLogRequest",""],["SearchLogResponse",""],["ServerInfoItem",""],["ServerInfoPair",""],["ServerInfoRequest",""],["ServerInfoResponse",""]],"trait":[["Diagnostics",""]]});

@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["DEFAULT_POOL_SIZE",""],["SNAP_CHUNK_LEN",""]],"enum":[["Task","A task for either receiving Snapshot or sending Snapshot"]],"fn":[["recv_snap",""],["send_snap","Send the snapshot to specified address."]],"struct":[["RecvSnapContext",""],["Runner",""],["SendStat",""],["SnapChunk",""]],"type":[["Callback",""]]});

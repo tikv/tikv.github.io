@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["narenas","Returns the current limit on the number of arenas."]],"struct":[["NArenas","A type providing access to the current limit on the number of arenas."]]});

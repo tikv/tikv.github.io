@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["BinaryModifier","A helper struct that derives a new JSON by combining and manipulating the encoded bytes directly. Only used by `json_replace`, `json_set`, `json_insert` and `json_remove`"]]});

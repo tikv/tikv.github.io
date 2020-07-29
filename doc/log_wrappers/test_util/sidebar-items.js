@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["SyncLoggerBuffer","A buffer which can be served as a logging destination while being able to access its content."]]});

@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["APPLY_PROPOSAL",""],["GlobalStoreStat",""],["LocalStoreStat",""],["StoreStat",""]]});

@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["AggrFnStateFirst","The state of the FIRST aggregate function."]],"struct":[["AggrFnDefinitionParserFirst","The parser for FIRST aggregate function."],["AggrFnFirst","The FIRST aggregate function."]]});

@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["SnapCfSize",""],["SnapCfSizeDelegator",""],["SnapCfSizeInner",""]]});

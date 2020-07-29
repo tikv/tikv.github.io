@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["BufferVec","A vector like container storing multiple buffers. Each buffer is a `[u8]` slice in arbitrary length."],["Iter",""],["WithConcatExtend",""]]});

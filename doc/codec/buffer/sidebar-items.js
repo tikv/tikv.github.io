@@ -1,0 +1,1 @@
+initSidebarItems({"trait":[["BufferReader","A trait to provide sequential read over a memory buffer."],["BufferWriter","A trait to provide sequential write over a fixed size or dynamic size memory buffer."]]});

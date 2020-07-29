@@ -1,0 +1,4 @@
+(function() {var implementors = {};
+implementors["engine_panic"] = [{"text":"impl <a class=\"trait\" href=\"engine_traits/cf_handle/trait.CFHandle.html\" title=\"trait engine_traits::cf_handle::CFHandle\">CFHandle</a> for <a class=\"struct\" href=\"engine_panic/struct.PanicCFHandle.html\" title=\"struct engine_panic::PanicCFHandle\">PanicCFHandle</a>","synthetic":false,"types":["engine_panic::cf_handle::PanicCFHandle"]}];
+implementors["engine_rocks"] = [{"text":"impl <a class=\"trait\" href=\"engine_traits/cf_handle/trait.CFHandle.html\" title=\"trait engine_traits::cf_handle::CFHandle\">CFHandle</a> for <a class=\"struct\" href=\"engine_rocks/struct.RocksCFHandle.html\" title=\"struct engine_rocks::RocksCFHandle\">RocksCFHandle</a>","synthetic":false,"types":["engine_rocks::cf_handle::RocksCFHandle"]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

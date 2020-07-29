@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["ChunkedVecJson","A vector storing `Option<Json>` with a compact layout."]]});

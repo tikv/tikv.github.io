@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Builder","Builder for [`Limiter`]."],["Consume","The future returned by [`Limiter::consume()`]."],["Limiter","A type to control the maximum speed limit of multiple streams."],["Resource","A speed-limited wrapper of a byte stream."]]});

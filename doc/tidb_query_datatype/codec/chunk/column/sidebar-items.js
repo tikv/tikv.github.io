@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Column","`Column` stores the same column data of multi rows in one chunk."]],"trait":[["ChunkColumnEncoder","`ChunkColumnEncoder` encodes the Chunk column."]]});

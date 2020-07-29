@@ -1,0 +1,1 @@
+initSidebarItems({"macro":[["impl_chunked_vec_common",""],["match_template_collator",""],["match_template_evaluable",""]],"mod":[["builder","Builder utilities for making type representations. Currently only includes `FieldTypeBuilder` for building the `FieldType` protobuf message."],["codec",""],["def","Type definitions"],["error",""],["expr",""],["prelude",""]]});

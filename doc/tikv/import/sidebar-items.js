@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["Error",""]],"mod":[["sst_service",""]],"struct":[["Config",""],["ImportSSTService","ImportSSTService provides tikv-server with the ability to ingest SST files."],["SSTImporter","SSTImporter manages SST files that are waiting for ingesting."],["SSTWriter",""]],"type":[["Result",""]]});

@@ -1,0 +1,1 @@
+initSidebarItems({"mod":[["dev","Network device information from `/proc/net/dev`."]]});

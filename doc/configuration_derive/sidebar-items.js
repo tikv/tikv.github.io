@@ -1,0 +1,1 @@
+initSidebarItems({"derive":[["Configuration",""]],"fn":[["check_generics",""],["diff",""],["encoder",""],["generate_token",""],["get_config_attrs",""],["get_encoder",""],["get_struct_fields",""],["is_attr",""],["typed",""],["update",""]]});

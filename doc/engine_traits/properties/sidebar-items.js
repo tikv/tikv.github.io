@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["IndexHandle",""],["IndexHandles",""]],"trait":[["DecodeProperties",""]]});

@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["ASYNC_COMMIT_PREFIX",""],["FLAG_DELETE",""],["FLAG_LOCK",""],["FLAG_PESSIMISTIC",""],["FLAG_PUT",""],["FOR_UPDATE_TS_PREFIX",""],["MIN_COMMIT_TS_PREFIX",""],["TXN_SIZE_PREFIX",""]],"enum":[["LockType",""]],"struct":[["Lock",""]]});

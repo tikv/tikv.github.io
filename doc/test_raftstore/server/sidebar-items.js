@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["must_new_cluster",""],["must_new_cluster_and_debug_client",""],["must_new_cluster_and_kv_client",""],["new_incompatible_server_cluster",""],["new_server_cluster",""]],"struct":[["ServerCluster",""],["ServerMeta",""]],"type":[["CopHooks",""],["PendingServices",""],["SimulateEngine",""],["SimulateServerTransport",""],["SimulateStoreTransport",""]]});

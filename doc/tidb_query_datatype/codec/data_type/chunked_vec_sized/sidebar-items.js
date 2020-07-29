@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["ChunkedVecSized","A vector storing `Option<T>` with a compact layout."]]});

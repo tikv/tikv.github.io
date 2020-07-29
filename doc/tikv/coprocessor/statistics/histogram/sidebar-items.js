@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Bucket","Bucket is an element of histogram."],["Histogram","Histogram represents statistics for a column or index."]]});

@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["must_call","Creates a callback that is automatically called on drop if it's not called explicitly."]],"struct":[["MustCall",""]],"type":[["Callback",""]]});

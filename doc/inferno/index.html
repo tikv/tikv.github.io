@@ -1,0 +1,88 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `inferno` crate."><meta name="keywords" content="rust, rustlang, rust-lang, inferno"><title>inferno - Rust</title><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../dark.css"><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script src="../storage.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="shortcut icon" href="../favicon.ico"><style type="text/css">#crate-search{background-image:url("../down-arrow.svg");}</style></head><body class="rustdoc mod"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../inferno/index.html'><div class='logo-container'><img src='../rust-logo.png' alt='logo'></div></a><p class='location'>Crate inferno</p><div class="sidebar-elems"><a id='all-types' href='all.html'><p>See all inferno's items</p></a><div class="block items"><ul><li><a href="#modules">Modules</a></li></ul></div><p class='location'></p><script>window.sidebarCurrent = {name: 'inferno', ty: 'mod', relpath: '../'};</script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../settings.html"><img src="../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class='fqn'><span class='out-of-band'><span id='render-detail'><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class='inner'>&#x2212;</span>]</a></span><a class='srclink' href='../src/inferno/lib.rs.html#1-169' title='goto source code'>[src]</a></span><span class='in-band'>Crate <a class="mod" href=''>inferno</a></span></h1><div class='docblock'><p>Inferno is a set of tools that let you to produce <a href="http://www.brendangregg.com/flamegraphs.html">flame graphs</a> from performance profiles of
+your application. It's a port of parts Brendan Gregg's original <a href="https://github.com/brendangregg/FlameGraph">flamegraph toolkit</a> that aims
+to improve the performance of the original flamegraph tools and provide programmatic access to
+them to facilitate integration with <em>other</em> tools (like <a href="https://github.com/nokia/not-perf">not-perf</a>).</p>
+<p>Inferno, like the original flame graph toolkit, consists of two &quot;stages&quot;: stack collapsing and
+plotting. In the original Perl implementations, these were represented by the <code>stackcollapse-*</code>
+binaries and <code>flamegraph.pl</code> respectively. In Inferno, collapsing is available through the
+<a href="../inferno/collapse/index.html" title="`collapse`"><code>collapse</code></a> module and the <code>inferno-collapse-*</code> binaries, and plotting can be found in the
+<a href="../inferno/flamegraph/index.html" title="`flamegraph`"><code>flamegraph</code></a> module and the <code>inferno-flamegraph</code> binary.</p>
+<h1 id="command-line-use" class="section-header"><a href="#command-line-use">Command-line use</a></h1><h2 id="collapsing-stacks" class="section-header"><a href="#collapsing-stacks">Collapsing stacks</a></h2>
+<p>Most sampling profilers (as opposed to <a href="https://danluu.com/perf-tracing/">tracing profilers</a>) work by repeatedly recording the
+state of the <a href="https://en.wikipedia.org/wiki/Call_stack">call stack</a>. The stack can be sampled based on a fixed sampling interval, based
+on <a href="https://perf.wiki.kernel.org/index.php/Tutorial#Events">hardware or software events</a>, or some combination of the two. In the end, you get a series
+of <a href="https://en.wikipedia.org/wiki/Stack_trace">stack traces</a>, each of which represents a snapshot of where the program was at different
+points in time.</p>
+<p>Given enough of these snapshots, you can get a pretty good idea of where your program is
+spending its time by looking at which functions appear in many of the traces. To ease this
+analysis, we want to &quot;collapse&quot; the stack traces so if a particular trace occurs more than
+once, we instead just keep it <em>once</em> along with a count of how many times we've seen it. This
+is what the various collapsing tools do! You'll sometimes see the resulting tuples of stack +
+count called a &quot;folded stack trace&quot;.</p>
+<p>Since profiling tools produce stack traces in a myriad of different formats, and the flame
+graph plotter expects input in a particular folded stack trace format, each profiler needs a
+separate collapse implementation. While the original Perl implementation supports <em>lots</em> of
+profilers, Inferno currently only supports four: the widely used <a href="https://perf.wiki.kernel.org/index.php/Main_Page"><code>perf</code></a> tool (specifically
+the output from <code>perf script</code>), <a href="https://www.joyent.com/dtrace">DTrace</a>, <a href="https://gist.github.com/loderunner/36724cc9ee8db66db305#profiling-with-sample">sample</a>, and <a href="https://software.intel.com/en-us/vtune-amplifier-help-command-line-interface">VTune</a>. Support for xdebug is
+<a href="https://twitter.com/DanielLockyer/status/1094605231155900416">hopefully coming soon</a>, and <a href="https://github.com/iovisor/bpftrace"><code>bpftrace</code></a> should get <a href="https://github.com/jonhoo/inferno/issues/51#issuecomment-466732304">native support</a> before too long.</p>
+<p>Inferno supports profiles from applications written in any language, but we'll walk through an
+example with a Rust program. To profile a Rust application, you would first set</p>
+<pre><code class="language-toml">[profile.release]
+debug = true
+</code></pre>
+<p>in your <code>Cargo.toml</code> so that your profile will have useful function names and such included.
+Then, compile with <code>--release</code>, and then run your favorite performance profiler:</p>
+<h3 id="perf-linux" class="section-header"><a href="#perf-linux">perf (Linux)</a></h3>
+<pre><code class="language-console"># perf record --call-graph dwarf target/release/mybin
+$ perf script | inferno-collapse-perf &gt; stacks.folded
+</code></pre>
+<p>For more advanced uses, see Brendan Gregg's excellent <a href="http://www.brendangregg.com/perf.html">perf examples</a> page.</p>
+<h3 id="dtrace-macos" class="section-header"><a href="#dtrace-macos">DTrace (macOS)</a></h3>
+<pre><code class="language-console">$ target/release/mybin &amp;
+$ pid=$!
+# dtrace -x ustackframes=100 -n &quot;profile-97 /pid == $pid/ { @[ustack()] = count(); } tick-60s { exit(0); }&quot;  -o out.user_stacks
+$ cat out.user_stacks | inferno-collapse-dtrace &gt; stacks.folded
+</code></pre>
+<p>For more advanced uses, see also upstream FlameGraph's <a href="http://www.brendangregg.com/FlameGraphs/cpuflamegraphs.html#DTrace">DTrace examples</a>.
+You may also be interested in something like <a href="http://dtrace.org/blogs/dap/2012/01/05/where-does-your-node-program-spend-its-time/">NodeJS's ustack helper</a>.</p>
+<h3 id="sample-macos" class="section-header"><a href="#sample-macos">sample (macOS)</a></h3>
+<pre><code class="language-console">$ target/release/mybin &amp;
+$ pid=$!
+$ sample $pid 30 -file sample.txt
+$ inferno-collapse-sample sample.txt &gt; stacks.folded
+</code></pre>
+<h3 id="vtune-windows-and-linux" class="section-header"><a href="#vtune-windows-and-linux">VTune (Windows and Linux)</a></h3>
+<pre><code class="language-console">$ amplxe-cl -collect hotspots -r resultdir -- target/release/mybin
+$ amplxe-cl -R top-down -call-stack-mode all -column=\&quot;CPU Time:Self\&quot;,\&quot;Module\&quot; -report-out result.csv -filter \&quot;Function Stack\&quot; -format csv -csv-delimiter comma -r resultdir
+$ inferno-collapse-vtune result.csv &gt; stacks.folded
+</code></pre>
+<h2 id="producing-a-flame-graph" class="section-header"><a href="#producing-a-flame-graph">Producing a flame graph</a></h2>
+<p>Once you have a folded stack file, you're ready to produce the flame graph SVG image. To do so,
+simply provide the folded stack file to <code>inferno-flamegraph</code>, and it will print the resulting
+SVG. Following on from the example above:</p>
+<pre><code class="language-console">$ cat stacks.folded | inferno-flamegraph &gt; profile.svg
+</code></pre>
+<p>And then open <code>profile.svg</code> in your viewer of choice.</p>
+<h2 id="differential-flame-graphs" class="section-header"><a href="#differential-flame-graphs">Differential flame graphs</a></h2>
+<p>You can debug CPU performance regressions with the help of differential flame graphs.
+They let you easily visualize the differences between two profiles performed before and
+after a code change. See Brendan Gregg's <a href="http://www.brendangregg.com/blog/2014-11-09/differential-flame-graphs.html">differential flame graphs</a> blog post for a great
+writeup. To create one you must first pass the two folded stack files to <code>inferno-diff-folded</code>,
+then send the output to <code>inferno-flamegraph</code>. Example:</p>
+<pre><code class="language-console">$ inferno-diff-folded folded1 folded2 | inferno-flamegraph &gt; diff2.svg
+</code></pre>
+<p>The flamegraph will be colored based on higher samples (red) and smaller samples (blue). The
+frame widths will be based on the 2nd folded profile. This might be confusing if stack frames
+disappear entirely; it will make the most sense to ALSO create a differential based on the 1st
+profile widths, while switching the hues. To do this, reverse the order of the input files
+and pass the <code>--negate</code> flag to <code>inferno-flamegraph</code> like this:</p>
+<pre><code class="language-console">$ inferno-diff-folded folded2 folded1 | inferno-flamegraph --negate &gt; diff1.svg
+</code></pre>
+<h1 id="development" class="section-header"><a href="#development">Development</a></h1>
+<p>This crate was initially developed through <a href="https://www.youtube.com/watch?v=jTpK-bNZiA4&amp;list=PLqbS7AVVErFimAvMW-kIJUwxpPvcPBCsz">a series of live coding sessions</a>. If you want to
+contribute to the code, that may be a good way to learn why it's all designed the way it is!</p>
+</div><h2 id='modules' class='section-header'><a href="#modules">Modules</a></h2>
+<table><tr class='module-item'><td><a class="mod" href="collapse/index.html" title='inferno::collapse mod'>collapse</a></td><td class='docblock-short'><p>Stack collapsing for various input formats.</p>
+</td></tr><tr class='module-item'><td><a class="mod" href="differential/index.html" title='inferno::differential mod'>differential</a></td><td class='docblock-short'><p>Tool for creating an output required to generate differential flame graphs.</p>
+</td></tr><tr class='module-item'><td><a class="mod" href="flamegraph/index.html" title='inferno::flamegraph mod'>flamegraph</a></td><td class='docblock-short'><p>Tools for producing flame graphs from folded stack traces.</p>
+</td></tr></table></section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../";window.currentCrate = "inferno";</script><script src="../main.js"></script><script defer src="../search-index.js"></script></body></html>

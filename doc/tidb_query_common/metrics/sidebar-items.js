@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["ExecutorName",""]],"mod":[["prometheus_static_scope_0",""]],"struct":[["COPR_EXECUTOR_COUNT",""],["EXECUTOR_COUNT_METRICS",""],["LocalCoprExecutorCount",""],["LocalCoprExecutorCountInner",""]]});

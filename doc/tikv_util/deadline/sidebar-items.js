@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Deadline","A handy structure for checking deadline."],["DeadlineError",""]]});

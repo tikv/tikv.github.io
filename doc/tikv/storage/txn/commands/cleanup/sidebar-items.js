@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Cleanup","Rollback mutations on a single key."]]});

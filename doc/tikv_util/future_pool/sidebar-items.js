@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["THREAD_LAST_TICK_TIME",""],["TICK_INTERVAL",""]],"fn":[["try_tick_thread","Tries to trigger a tick in current thread."]],"mod":[["builder",""],["metrics",""]],"struct":[["Builder",""],["Config",""],["Env",""],["Full",""],["FuturePool",""],["FuturePoolRunner",""]],"type":[["ThreadPool",""]]});

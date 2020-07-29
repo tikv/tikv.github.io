@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["MaybeHttpsStream","A stream which may be wrapped with TLS."]],"struct":[["HttpsConnector","A Connector using OpenSSL to support `http` and `https` schemes."]]});

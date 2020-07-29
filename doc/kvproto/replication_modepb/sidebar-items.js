@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["DrAutoSyncState",""],["RegionReplicationState",""],["ReplicationMode",""]],"fn":[["file_descriptor_proto",""]],"struct":[["DrAutoSync",""],["RegionReplicationStatus",""],["ReplicationStatus",""]]});

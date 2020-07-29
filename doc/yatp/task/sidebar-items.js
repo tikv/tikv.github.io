@@ -1,0 +1,1 @@
+initSidebarItems({"mod":[["callback","A [`FnOnce`] or [`FnMut`] closure."],["future","A [`Future`]."]]});

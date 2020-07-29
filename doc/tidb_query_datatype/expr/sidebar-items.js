@@ -1,0 +1,1 @@
+initSidebarItems({"mod":[["ctx",""]],"struct":[["EvalConfig",""],["EvalContext","Some global variables needed in an evaluation."],["EvalWarnings",""],["Flag","Flags are used by `DagRequest.flags` to handle execution mode, like how to handle truncate error."],["SqlMode","Please refer to SQLMode in `mysql/const.go` in repo `pingcap/parser` for details."]]});

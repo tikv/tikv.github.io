@@ -1,0 +1,1 @@
+initSidebarItems({"mod":[["linux",""]],"struct":[["ThreadLoad","A load metric for all threads."],["ThreadLoadStatistics","A Linux-specific `ThreadLoadStatistics`. It collects threads load metrics."]]});

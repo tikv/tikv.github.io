@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["LazyBatchColumnVec","Stores multiple `LazyBatchColumn`s. Each column has an equal length."]]});

@@ -1,0 +1,3 @@
+(function() {var implementors = {};
+implementors["tikv_util"] = [{"text":"impl <a class=\"trait\" href=\"tokio_timer/clock/now/trait.Now.html\" title=\"trait tokio_timer::clock::now::Now\">Now</a> for <a class=\"struct\" href=\"tikv_util/timer/struct.SteadyClock.html\" title=\"struct tikv_util::timer::SteadyClock\">SteadyClock</a>","synthetic":false,"types":["tikv_util::timer::SteadyClock"]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

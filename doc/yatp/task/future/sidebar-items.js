@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["reschedule","Gives up a time slice to the task scheduler."]],"struct":[["Runner","[`Future`] task runner."],["Task","A [`Future`] task."],["TaskCell","A [`Future`] task cell."]]});

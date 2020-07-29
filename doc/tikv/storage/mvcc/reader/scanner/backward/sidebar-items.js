@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["REVERSE_SEEK_BOUND",""]],"struct":[["BackwardKvScanner","This struct can be used to scan keys starting from the given user key in the reverse order (less than)."]]});

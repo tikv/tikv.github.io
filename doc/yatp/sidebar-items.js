@@ -1,0 +1,1 @@
+initSidebarItems({"mod":[["metrics","Metrics of the thread pool."],["pool","The pool implement details."],["queue","The task queues available for the thread pool."],["task","Supported tasks."]],"struct":[["Builder","A builder for the thread pool."],["Remote","Submits tasks to associated thread pool."]]});

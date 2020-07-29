@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["SyncTestStorage","A `Storage` like structure with sync API."],["SyncTestStorageBuilder","A builder to build a `SyncTestStorage`."]]});

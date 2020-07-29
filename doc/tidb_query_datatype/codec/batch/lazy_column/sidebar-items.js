@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["LazyBatchColumn","A container stores an array of datums, which can be either raw (not decoded), or decoded into the `VectorValue` type."]]});

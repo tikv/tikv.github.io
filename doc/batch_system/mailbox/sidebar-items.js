@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["BasicMailbox","A basic mailbox."],["Mailbox","A more high level mailbox."]]});

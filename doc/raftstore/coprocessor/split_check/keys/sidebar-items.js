@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["get_region_approximate_keys","Get the approximate number of keys in the range."],["get_region_approximate_keys_cf",""]],"struct":[["Checker",""],["KeysCheckObserver",""]]});

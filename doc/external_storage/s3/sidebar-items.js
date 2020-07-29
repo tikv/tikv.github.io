@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["MINIMUM_PART_SIZE","Specifies the minimum size to use multi-part upload. AWS S3 requires each part to be at least 5 MiB."]],"struct":[["S3Storage","S3 compatible storage"],["S3Uploader","A helper for uploading a large files to S3 storage."]]});

@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["handle_send_error",""]],"struct":[["RaftStoreBlackHole",""],["ServerRaftStoreRouter","A router that routes messages to the raftstore"]],"trait":[["RaftStoreRouter","Routes messages to the raftstore."]]});

@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Folder","A collapser that tries to find an appropriate implementation of `Collapse` based on the input, then delegates to that collapser if one is found."],["Options","Folder configuration options."]]});

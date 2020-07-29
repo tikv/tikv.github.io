@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["BatchTableScanExecutor",""],["TableScanExecutorImpl",""]],"type":[["HandleIndicesVec",""]]});

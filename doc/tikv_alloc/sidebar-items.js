@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["activate_prof",""],["add_thread_memory_accessor",""],["allocator",""],["deactivate_prof",""],["dump_prof",""],["dump_stats",""],["fetch_stats",""],["remove_thread_memory_accessor",""]],"mod":[["error",""],["imp",""]],"static":[["ALLOC",""]],"type":[["AllocStats",""],["Allocator",""]]});

@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["Task","A callback task, which is either a [`FnOnce`] or a [`FnMut`]."]],"struct":[["Handle","Handle passed to the task closure."],["Runner","Callback task runner."],["TaskCell","The task cell for callback tasks."]]});

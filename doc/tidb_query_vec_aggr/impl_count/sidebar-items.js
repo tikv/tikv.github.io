@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["AggrFnCount","The COUNT aggregate function."],["AggrFnDefinitionParserCount","The parser for COUNT aggregate function."],["AggrFnStateCount","The state of the COUNT aggregate function."]]});

@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["ExtraMessageType",""],["PeerState",""]],"struct":[["Done",""],["ExtraMessage",""],["KeyValue",""],["MergeState",""],["RaftApplyState",""],["RaftLocalState",""],["RaftMessage",""],["RaftSnapshotData",""],["RaftTruncatedState",""],["RegionLocalState",""],["SnapshotCfFile",""],["SnapshotChunk",""],["SnapshotMeta",""],["StoreIdent",""]]});

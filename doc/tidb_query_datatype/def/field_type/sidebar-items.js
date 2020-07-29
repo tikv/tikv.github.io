@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["Collation","Valid values of `tipb::FieldType::collate` and `tipb::ColumnInfo::collation`."],["FieldTypeTp","Valid values of `tipb::FieldType::tp` and `tipb::ColumnInfo::tp`."]],"struct":[["FieldTypeFlag",""]],"trait":[["FieldTypeAccessor","A uniform `FieldType` access interface for `FieldType` and `ColumnInfo`."]]});

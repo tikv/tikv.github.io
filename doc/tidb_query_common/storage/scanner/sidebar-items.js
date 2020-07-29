@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["KEY_BUFFER_CAPACITY",""]],"struct":[["RangesScanner","A scanner that scans over multiple ranges. Each range can be a point range containing only one row, or an interval range containing multiple rows."],["RangesScannerOptions",""]]});

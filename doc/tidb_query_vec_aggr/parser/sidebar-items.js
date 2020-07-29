@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["map_pb_sig_to_aggr_func_parser",""]],"struct":[["AllAggrDefinitionParser","Parse all aggregate function definition from protobuf."]],"trait":[["AggrDefinitionParser","Parse a specific aggregate function definition from protobuf."]]});

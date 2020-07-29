@@ -1,0 +1,1 @@
+initSidebarItems({"trait":[["FieldTypeAccessor","A uniform `FieldType` access interface for `FieldType` and `ColumnInfo`."]]});

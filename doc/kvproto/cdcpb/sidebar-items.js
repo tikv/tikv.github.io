@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["EventLogType",""],["EventRowOpType",""],["Event_oneof_event",""]],"fn":[["create_change_data",""]],"struct":[["ChangeDataClient",""],["ChangeDataEvent",""],["ChangeDataRequest",""],["Error",""],["ErrorDuplicateRequest",""],["Event",""],["EventAdmin",""],["EventEntries",""],["EventRow",""],["Header",""]],"trait":[["ChangeData",""]]});

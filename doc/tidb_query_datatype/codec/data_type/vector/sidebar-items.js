@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["VectorValue","A vector value container, a.k.a. column, for all concrete eval types."]],"trait":[["VectorValueExt","Additional `VectorValue` methods available via generics. These methods support different concrete types but have same names and should be specified via the generic parameter type."]]});

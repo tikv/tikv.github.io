@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["create_env_logger",""],["new_logger",""]],"trait":[["Logger",""]]});

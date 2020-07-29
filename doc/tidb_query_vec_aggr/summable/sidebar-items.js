@@ -1,0 +1,1 @@
+initSidebarItems({"trait":[["Summable","A trait for all summable types."]]});

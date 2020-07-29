@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["calc_day_number",""],["calc_days_in_year","calculates days in one year, it works with 0 <= year <= 99."],["calc_weekday","calculates weekday from daynr, returns 0 for Monday, 1 for Tuesday ..."]],"trait":[["DateTimeExtension",""],["WeekdayExtension",""]]});

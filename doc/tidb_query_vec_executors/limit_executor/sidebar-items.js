@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["BatchLimitExecutor","Executor that retrieves rows from the source executor and only produces part of the rows."]]});

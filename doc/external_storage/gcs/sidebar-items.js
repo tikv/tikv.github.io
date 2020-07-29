@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["HARDCODED_ENDPOINTS",""]],"enum":[["RequestError",""]],"fn":[["copy_predefined_acl",""]],"struct":[["GCSStorage",""]],"trait":[["ResultExt",""]]});

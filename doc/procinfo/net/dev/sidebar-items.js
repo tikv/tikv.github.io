@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["dev","Returns list of all network devices and information about their state."]],"struct":[["DeviceStatus","Network device status information."]]});

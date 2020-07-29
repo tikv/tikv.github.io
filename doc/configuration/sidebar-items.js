@@ -1,0 +1,1 @@
+initSidebarItems({"derive":[["Configuration",""]],"enum":[["ConfigValue",""]],"trait":[["ConfigManager",""],["Configuration","The Configuration trait"]],"type":[["ConfigChange",""],["Result",""]]});

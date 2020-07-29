@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["RaftReadyVec",""],["RaftReadyVecDelegator",""],["RaftReadyVecInner",""]]});

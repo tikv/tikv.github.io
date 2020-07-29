@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["PessimisticLockRes",""],["SecondaryLocksStatus",""],["StorageCallback",""],["TxnStatus","Represents the status of a transaction."]],"struct":[["MvccInfo","`MvccInfo` stores all mvcc information of given key. Used by `MvccGetByKey` and `MvccGetByStartTs`."],["PrewriteResult",""]],"trait":[["StorageCallbackType",""]]});

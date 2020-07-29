@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["MAX_TXN_WRITE_SIZE",""]],"enum":[["MissingLockAction",""],["SecondaryLockStatus",""]],"fn":[["make_txn_error",""]],"struct":[["GcInfo",""],["MvccTxn",""],["ReleasedLock","`ReleasedLock` contains the information of the lock released by `commit`, `rollback` and so on. It's used by `LockManager` to wake up transactions waiting for locks."]]});

@@ -1,0 +1,3 @@
+(function() {var implementors = {};
+implementors["cdc"] = [{"text":"impl <a class=\"trait\" href=\"kvproto/protos/cdcpb_grpc/trait.ChangeData.html\" title=\"trait kvproto::protos::cdcpb_grpc::ChangeData\">ChangeData</a> for <a class=\"struct\" href=\"cdc/struct.Service.html\" title=\"struct cdc::Service\">Service</a>","synthetic":false,"types":["cdc::service::Service"]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["Error","Core error type for all errors possible from tame-gcs"]],"struct":[["ApiError",""],["ApiErrorInner",""],["HttpError",""],["HttpStatusError",""],["IoError",""],["JsonError",""]]});

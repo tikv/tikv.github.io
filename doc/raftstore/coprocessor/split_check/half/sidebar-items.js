@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["BUCKET_NUMBER_LIMIT",""],["BUCKET_SIZE_LIMIT_MB",""]],"fn":[["get_region_approximate_middle","Get region approximate middle key based on default and write cf size."],["half_split_bucket_size",""]],"struct":[["Checker",""],["HalfCheckObserver",""]]});

@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["rewrite_prefix","Rewrites the prefix of a byte array."],["rewrite_prefix_of_end_bound",""],["rewrite_prefix_of_end_key","Rewrites the prefix of a byte array used as the end key."],["rewrite_prefix_of_start_bound",""]],"struct":[["WrongPrefix","An error indicating the key cannot be rewritten because it does not start with the given prefix."]]});

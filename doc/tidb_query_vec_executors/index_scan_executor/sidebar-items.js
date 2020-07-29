@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["DecodeHandleStrategy",""]],"struct":[["BatchIndexScanExecutor",""],["IndexScanExecutorImpl",""]]});

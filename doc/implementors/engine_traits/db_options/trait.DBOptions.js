@@ -1,0 +1,4 @@
+(function() {var implementors = {};
+implementors["engine_panic"] = [{"text":"impl <a class=\"trait\" href=\"engine_traits/db_options/trait.DBOptions.html\" title=\"trait engine_traits::db_options::DBOptions\">DBOptions</a> for <a class=\"struct\" href=\"engine_panic/struct.PanicDBOptions.html\" title=\"struct engine_panic::PanicDBOptions\">PanicDBOptions</a>","synthetic":false,"types":["engine_panic::db_options::PanicDBOptions"]}];
+implementors["engine_rocks"] = [{"text":"impl <a class=\"trait\" href=\"engine_traits/db_options/trait.DBOptions.html\" title=\"trait engine_traits::db_options::DBOptions\">DBOptions</a> for <a class=\"struct\" href=\"engine_rocks/struct.RocksDBOptions.html\" title=\"struct engine_rocks::RocksDBOptions\">RocksDBOptions</a>","synthetic":false,"types":["engine_rocks::db_options::RocksDBOptions"]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

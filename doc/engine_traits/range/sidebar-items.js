@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Range","A range of keys, `start_key` is included, but not `end_key`."]]});

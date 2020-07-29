@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["dummy_scheduler",""],["poll",""]],"struct":[["Scheduler","Scheduler provides interface to schedule task to underlying workers."],["Stopped",""],["Worker","A worker that can schedule time consuming tasks."]],"trait":[["Runnable",""]]});

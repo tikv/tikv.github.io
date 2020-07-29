@@ -1,0 +1,1 @@
+initSidebarItems({"trait":[["Snapshot","A consistent read-only view of the database."]]});

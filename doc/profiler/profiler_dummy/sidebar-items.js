@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["start","Start profiling. Always returns false if `profiling` feature is not enabled."],["stop","Stop profiling. Always returns false if `profiling` feature is not enabled."]]});

@@ -1,0 +1,4 @@
+(function() {var implementors = {};
+implementors["serde"] = [];
+implementors["tidb_query_datatype"] = [{"text":"impl&lt;'de&gt; <a class=\"trait\" href=\"serde/de/trait.Visitor.html\" title=\"trait serde::de::Visitor\">Visitor</a>&lt;'de&gt; for <a class=\"struct\" href=\"tidb_query_datatype/codec/mysql/json/serde/struct.JsonVisitor.html\" title=\"struct tidb_query_datatype::codec::mysql::json::serde::JsonVisitor\">JsonVisitor</a>","synthetic":false,"types":["tidb_query_datatype::codec::mysql::json::serde::JsonVisitor"]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

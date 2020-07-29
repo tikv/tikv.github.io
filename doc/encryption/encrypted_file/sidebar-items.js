@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["TMP_FILE_SUFFIX",""]],"mod":[["header",""]],"struct":[["EncryptedFile","An file encrypted by master key."]]});

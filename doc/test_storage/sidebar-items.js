@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["new_raft_engine",""],["new_raft_storage_with_store_count",""]],"mod":[["assert_storage",""],["sync_storage",""],["util",""]],"struct":[["AssertionStorage",""],["SyncTestStorage","A `Storage` like structure with sync API."],["SyncTestStorageBuilder","A builder to build a `SyncTestStorage`."]]});

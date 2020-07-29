@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["init_data_with_commit",""],["init_data_with_details",""],["init_data_with_engine_and_commit",""],["init_with_data",""]],"struct":[["ProductTable",""]]});

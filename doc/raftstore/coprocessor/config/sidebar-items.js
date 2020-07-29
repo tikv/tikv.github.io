@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["BATCH_SPLIT_LIMIT","Default batch split limit."],["SPLIT_KEYS","Default region split keys."],["SPLIT_SIZE_MB","Default region split size."]],"enum":[["ConsistencyCheckMethod",""]],"struct":[["Config",""],["SplitCheckConfigManager",""]]});

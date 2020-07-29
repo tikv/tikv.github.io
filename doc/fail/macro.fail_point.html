@@ -1,0 +1,58 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `fail_point` macro in crate `fail`."><meta name="keywords" content="rust, rustlang, rust-lang, fail_point"><title>fail::fail_point - Rust</title><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../dark.css"><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script src="../storage.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="shortcut icon" href="../favicon.ico"><style type="text/css">#crate-search{background-image:url("../down-arrow.svg");}</style></head><body class="rustdoc macro"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../fail/index.html'><div class='logo-container'><img src='../rust-logo.png' alt='logo'></div></a><div class="sidebar-elems"><p class='location'><a href='index.html'>fail</a></p><script>window.sidebarCurrent = {name: 'fail_point', ty: 'macro', relpath: ''};</script><script defer src="sidebar-items.js"></script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../settings.html"><img src="../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class='fqn'><span class='out-of-band'><span id='render-detail'><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class='inner'>&#x2212;</span>]</a></span><a class='srclink' href='../src/fail/lib.rs.html#785-801' title='goto source code'>[src]</a></span><span class='in-band'>Macro <a href='index.html'>fail</a>::<wbr><a class="macro" href=''>fail_point</a></span></h1><div class="docblock type-decl hidden-by-usual-hider"><div class="example-wrap"><pre class="rust macro">
+<span class="macro">macro_rules</span><span class="macro">!</span> <span class="ident">fail_point</span> {
+    (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>:<span class="ident">expr</span>) <span class="op">=</span><span class="op">&gt;</span> { ... };
+    (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>:<span class="ident">expr</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">e</span>:<span class="ident">expr</span>) <span class="op">=</span><span class="op">&gt;</span> { ... };
+    (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>:<span class="ident">expr</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">cond</span>:<span class="ident">expr</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">e</span>:<span class="ident">expr</span>) <span class="op">=</span><span class="op">&gt;</span> { ... };
+}</pre></div>
+</div><div class='docblock'><p>Define a fail point (requires <code>failpoints</code> feature).</p>
+<p>The <code>fail_point!</code> macro has three forms, and they all take a name as the
+first argument. The simplest form takes only a name and is suitable for
+executing most fail point behavior, including panicking, but not for early
+return or conditional execution based on a local flag.</p>
+<p>The three forms of fail points look as follows.</p>
+<ol>
+<li>A basic fail point:</li>
+</ol>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">fn</span> <span class="ident">function_return_unit</span>() {
+    <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;fail-point-1&quot;</span>);
+}</pre></div>
+<p>This form of fail point can be configured to panic, print, sleep, pause, etc., but
+not to return from the function early.</p>
+<ol start="2">
+<li>A fail point that may return early:</li>
+</ol>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">fn</span> <span class="ident">function_return_value</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u64</span> {
+    <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;fail-point-2&quot;</span>, <span class="op">|</span><span class="ident">r</span><span class="op">|</span> <span class="ident">r</span>.<span class="ident">map_or</span>(<span class="number">2</span>, <span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">e</span>.<span class="ident">parse</span>().<span class="ident">unwrap</span>()));
+    <span class="number">0</span>
+}</pre></div>
+<p>This form of fail point can additionally be configured to return early from
+the enclosing function. It accepts a closure, which itself accepts an
+<code>Option&lt;String&gt;</code>, and is expected to transform that argument into the early
+return value. The argument string is sourced from the fail point
+configuration string. For example configuring this &quot;fail-point-2&quot; as
+&quot;return(100)&quot; will execute the fail point closure, passing it a <code>Some</code> value
+containing a <code>String</code> equal to &quot;100&quot;; the closure then parses it into the
+return value.</p>
+<ol start="3">
+<li>A fail point with conditional execution:</li>
+</ol>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">fn</span> <span class="ident">function_conditional</span>(<span class="ident">enable</span>: <span class="ident">bool</span>) {
+    <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;fail-point-3&quot;</span>, <span class="ident">enable</span>, <span class="op">|</span><span class="kw">_</span><span class="op">|</span> {});
+}</pre></div>
+<p>In this final form, the second argument is a local boolean expression that
+must evaluate to <code>true</code> before the fail point is evaluated. The third
+argument is again an early-return closure.</p>
+<p>The three macro arguments (or &quot;designators&quot;) are called <code>$name</code>, <code>$cond</code>,
+and <code>$e</code>. <code>$name</code> must be <code>&amp;str</code>, <code>$cond</code> must be a boolean expression,
+and<code>$e</code> must be a function or closure that accepts an <code>Option&lt;String&gt;</code> and
+returns the same type as the enclosing function.</p>
+<p>For more examples see the <a href="index.html">crate documentation</a>. For more
+information about controlling fail points see the <a href="fn.cfg.html"><code>cfg</code></a>
+function.</p>
+</div></section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../";window.currentCrate = "fail";</script><script src="../main.js"></script><script defer src="../search-index.js"></script></body></html>

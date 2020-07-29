@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["Range",""]],"mod":[["range",""],["ranges_iter",""],["scanner",""],["test_fixture",""]],"struct":[["IntervalRange",""],["PointRange",""]],"trait":[["Storage","The abstract storage interface. The table scan and index scan executor relies on a `Storage` implementation to provide source data."]],"type":[["OwnedKvPair",""],["Result",""]]});

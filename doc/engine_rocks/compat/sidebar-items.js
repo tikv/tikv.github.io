@@ -1,0 +1,1 @@
+initSidebarItems({"trait":[["Compat","A trait to enter the world of engine traits from a raw `Arc<DB>` with as little syntax as possible."]]});

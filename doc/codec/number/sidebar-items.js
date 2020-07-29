@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["F64_SIZE",""],["I64_SIZE",""],["MAX_VARINT64_LENGTH",""],["U64_SIZE",""]],"struct":[["NumberCodec","Byte encoding and decoding utility for primitive number types."]],"trait":[["NumberDecoder",""],["NumberEncoder",""]]});

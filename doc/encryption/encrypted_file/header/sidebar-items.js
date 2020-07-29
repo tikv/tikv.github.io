@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["Version",""]],"struct":[["Header","Header of encrypted file."]]});

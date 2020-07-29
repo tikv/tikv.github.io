@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["SignedUrlOptional","Optional parameters that can be used to tweak url signing"],["UrlSigner","A generator for signed URLs, which can be used to grant temporary access to specific storage resources even if the client making the request is not otherwise logged in or normally able to access to the storage resources in question."]]});

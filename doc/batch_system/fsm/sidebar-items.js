@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["NOTIFYSTATE_DROP",""],["NOTIFYSTATE_IDLE",""],["NOTIFYSTATE_NOTIFIED",""]],"struct":[["FsmState",""]],"trait":[["Fsm","A Fsm is a finite state machine. It should be able to be notified for updating internal state according to incoming messages."],["FsmScheduler","`FsmScheduler` schedules `Fsm` for later handles."]]});
