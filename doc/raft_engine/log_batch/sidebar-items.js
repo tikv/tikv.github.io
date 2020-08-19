@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["BATCH_MIN_SIZE",""],["CHECKSUM_LEN",""],["HEADER_LEN",""]],"enum":[["Command",""],["CompressionType",""],["LogItemType",""],["OpType",""]],"fn":[["decompress",""],["test_batch_checksum",""]],"struct":[["Entries",""],["KeyValue",""],["LogBatch",""],["LogItem",""]]});

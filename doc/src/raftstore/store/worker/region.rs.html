@@ -1095,6 +1095,10 @@
 <span id="1095">1095</span>
 <span id="1096">1096</span>
 <span id="1097">1097</span>
+<span id="1098">1098</span>
+<span id="1099">1099</span>
+<span id="1100">1100</span>
+<span id="1101">1101</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1107,11 +1111,12 @@
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">time</span>::{<span class="ident">Duration</span>, <span class="ident">Instant</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">u64</span>;
 
-<span class="kw">use</span> <span class="ident">engine_rocks</span>::<span class="ident">RocksEngine</span>;
 <span class="kw">use</span> <span class="ident">engine_traits</span>::<span class="ident">CF_RAFT</span>;
-<span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">KvEngine</span>, <span class="ident">KvEngines</span>, <span class="ident">Mutable</span>};
+<span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">Engines</span>, <span class="ident">KvEngine</span>, <span class="ident">Mutable</span>};
+<span class="kw">use</span> <span class="ident">error_code</span>::<span class="ident">ErrorCodeExt</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">raft_serverpb</span>::{<span class="ident">PeerState</span>, <span class="ident">RaftApplyState</span>, <span class="ident">RegionLocalState</span>};
 <span class="kw">use</span> <span class="ident">raft</span>::<span class="ident">eraftpb</span>::<span class="ident">Snapshot</span> <span class="kw">as</span> <span class="ident">RaftSnapshot</span>;
+<span class="kw">use</span> <span class="ident">raft_engine</span>::<span class="ident">RaftEngine</span>;
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">coprocessor</span>::<span class="ident">CoprocessorHost</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">peer_storage</span>::{
@@ -1314,21 +1319,21 @@
 <span class="kw">struct</span> <span class="ident">SnapContext</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">R</span><span class="op">&gt;</span>
 <span class="kw">where</span>
     <span class="ident">EK</span>: <span class="ident">KvEngine</span>,
-    <span class="ident">ER</span>: <span class="ident">KvEngine</span>,
+    <span class="ident">ER</span>: <span class="ident">RaftEngine</span>,
 {
-    <span class="ident">engines</span>: <span class="ident">KvEngines</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>,
+    <span class="ident">engines</span>: <span class="ident">Engines</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>,
     <span class="ident">batch_size</span>: <span class="ident">usize</span>,
-    <span class="ident">mgr</span>: <span class="ident">SnapManager</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>,
+    <span class="ident">mgr</span>: <span class="ident">SnapManager</span>,
     <span class="ident">use_delete_range</span>: <span class="ident">bool</span>,
     <span class="ident">pending_delete_ranges</span>: <span class="ident">PendingDeleteRanges</span>,
-    <span class="ident">coprocessor_host</span>: <span class="ident">CoprocessorHost</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>,
+    <span class="ident">coprocessor_host</span>: <span class="ident">CoprocessorHost</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>,
     <span class="ident">router</span>: <span class="ident">R</span>,
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">R</span><span class="op">&gt;</span> <span class="ident">SnapContext</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">R</span><span class="op">&gt;</span>
 <span class="kw">where</span>
     <span class="ident">EK</span>: <span class="ident">KvEngine</span>,
-    <span class="ident">ER</span>: <span class="ident">KvEngine</span>,
+    <span class="ident">ER</span>: <span class="ident">RaftEngine</span>,
     <span class="ident">R</span>: <span class="ident">CasualRouter</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>,
 {
     <span class="doccomment">/// Generates the snapshot of the Region.</span>
@@ -1385,7 +1390,7 @@
             <span class="ident">kv_snap</span>,
             <span class="ident">notifier</span>,
         ) {
-            <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;failed to generate snap!!!&quot;</span>; <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>, <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>);
+            <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;failed to generate snap!!!&quot;</span>; <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>, <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>, <span class="string">&quot;error_code&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>.<span class="ident">error_code</span>());
             <span class="kw">return</span>;
         }
 
@@ -1493,7 +1498,8 @@
                 <span class="ident">SNAP_COUNTER</span>.<span class="ident">apply</span>.<span class="ident">abort</span>.<span class="ident">inc</span>();
             }
             <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;failed to apply snap!!!&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>);
+                <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;failed to apply snap!!!&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>, <span class="string">&quot;error_code&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>.<span class="ident">error_code</span>());
+
                 <span class="ident">status</span>.<span class="ident">swap</span>(<span class="ident">JOB_STATUS_FAILED</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
                 <span class="ident">SNAP_COUNTER</span>.<span class="ident">apply</span>.<span class="ident">fail</span>.<span class="ident">inc</span>();
             }
@@ -1522,6 +1528,7 @@
                     <span class="string">&quot;start_key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">log_wrappers</span>::<span class="ident">Key</span>(<span class="ident">start_key</span>),
                     <span class="string">&quot;end_key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">log_wrappers</span>::<span class="ident">Key</span>(<span class="ident">end_key</span>),
                     <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>,
+                    <span class="string">&quot;error_code&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>.<span class="ident">error_code</span>(),
                 );
                 <span class="kw">return</span>;
             }
@@ -1537,6 +1544,7 @@
                 <span class="string">&quot;start_key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">log_wrappers</span>::<span class="ident">Key</span>(<span class="ident">start_key</span>),
                 <span class="string">&quot;end_key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">log_wrappers</span>::<span class="ident">Key</span>(<span class="ident">end_key</span>),
                 <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>,
+                <span class="string">&quot;error_code&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>.<span class="ident">error_code</span>(),
             );
         } <span class="kw">else</span> {
             <span class="macro">info</span><span class="macro">!</span>(
@@ -1654,7 +1662,7 @@
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Runner</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">R</span><span class="op">&gt;</span>
 <span class="kw">where</span>
     <span class="ident">EK</span>: <span class="ident">KvEngine</span>,
-    <span class="ident">ER</span>: <span class="ident">KvEngine</span>,
+    <span class="ident">ER</span>: <span class="ident">RaftEngine</span>,
 {
     <span class="ident">pool</span>: <span class="ident">ThreadPool</span><span class="op">&lt;</span><span class="ident">TaskCell</span><span class="op">&gt;</span>,
     <span class="ident">ctx</span>: <span class="ident">SnapContext</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">R</span><span class="op">&gt;</span>,
@@ -1666,15 +1674,15 @@
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">R</span><span class="op">&gt;</span> <span class="ident">Runner</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">R</span><span class="op">&gt;</span>
 <span class="kw">where</span>
     <span class="ident">EK</span>: <span class="ident">KvEngine</span>,
-    <span class="ident">ER</span>: <span class="ident">KvEngine</span>,
+    <span class="ident">ER</span>: <span class="ident">RaftEngine</span>,
     <span class="ident">R</span>: <span class="ident">CasualRouter</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>,
 {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
-        <span class="ident">engines</span>: <span class="ident">KvEngines</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>,
-        <span class="ident">mgr</span>: <span class="ident">SnapManager</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>,
+        <span class="ident">engines</span>: <span class="ident">Engines</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>,
+        <span class="ident">mgr</span>: <span class="ident">SnapManager</span>,
         <span class="ident">batch_size</span>: <span class="ident">usize</span>,
         <span class="ident">use_delete_range</span>: <span class="ident">bool</span>,
-        <span class="ident">coprocessor_host</span>: <span class="ident">CoprocessorHost</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>,
+        <span class="ident">coprocessor_host</span>: <span class="ident">CoprocessorHost</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>,
         <span class="ident">router</span>: <span class="ident">R</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Runner</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">R</span><span class="op">&gt;</span> {
         <span class="ident">Runner</span> {
@@ -1727,7 +1735,7 @@
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">R</span><span class="op">&gt;</span> <span class="ident">Runnable</span><span class="op">&lt;</span><span class="ident">Task</span><span class="op">&lt;</span><span class="ident">EK</span>::<span class="ident">Snapshot</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Runner</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">R</span><span class="op">&gt;</span>
 <span class="kw">where</span>
     <span class="ident">EK</span>: <span class="ident">KvEngine</span>,
-    <span class="ident">ER</span>: <span class="ident">KvEngine</span>,
+    <span class="ident">ER</span>: <span class="ident">RaftEngine</span>,
     <span class="ident">R</span>: <span class="ident">CasualRouter</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Clone</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
 {
     <span class="kw">fn</span> <span class="ident">run</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">task</span>: <span class="ident">Task</span><span class="op">&lt;</span><span class="ident">EK</span>::<span class="ident">Snapshot</span><span class="op">&gt;</span>) {
@@ -1796,7 +1804,7 @@
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">R</span><span class="op">&gt;</span> <span class="ident">RunnableWithTimer</span><span class="op">&lt;</span><span class="ident">Task</span><span class="op">&lt;</span><span class="ident">EK</span>::<span class="ident">Snapshot</span><span class="op">&gt;</span>, <span class="ident">Event</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Runner</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">R</span><span class="op">&gt;</span>
 <span class="kw">where</span>
     <span class="ident">EK</span>: <span class="ident">KvEngine</span>,
-    <span class="ident">ER</span>: <span class="ident">KvEngine</span>,
+    <span class="ident">ER</span>: <span class="ident">RaftEngine</span>,
     <span class="ident">R</span>: <span class="ident">CasualRouter</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Clone</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
 {
     <span class="kw">fn</span> <span class="ident">on_timeout</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">timer</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Timer</span><span class="op">&lt;</span><span class="ident">Event</span><span class="op">&gt;</span>, <span class="ident">event</span>: <span class="ident">Event</span>) {
@@ -1837,7 +1845,7 @@
     <span class="kw">use</span> <span class="ident">engine_traits</span>::{
         <span class="ident">CFHandleExt</span>, <span class="ident">CFNamesExt</span>, <span class="ident">CompactExt</span>, <span class="ident">MiscExt</span>, <span class="ident">Mutable</span>, <span class="ident">Peekable</span>, <span class="ident">SyncMutable</span>, <span class="ident">WriteBatchExt</span>,
     };
-    <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">KvEngine</span>, <span class="ident">KvEngines</span>};
+    <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">Engines</span>, <span class="ident">KvEngine</span>};
     <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">CF_DEFAULT</span>, <span class="ident">CF_RAFT</span>};
     <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">raft_serverpb</span>::{<span class="ident">PeerState</span>, <span class="ident">RaftApplyState</span>, <span class="ident">RegionLocalState</span>};
     <span class="kw">use</span> <span class="ident">raft</span>::<span class="ident">eraftpb</span>::<span class="ident">Entry</span>;
@@ -1935,11 +1943,11 @@
         <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span> <span class="ident">get_test_db_for_regions</span>(<span class="kw-2">&amp;</span><span class="ident">temp_dir</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="kw-2">&amp;</span>[<span class="number">1</span>]).<span class="ident">unwrap</span>();
 
         <span class="kw">let</span> <span class="ident">snap_dir</span> <span class="op">=</span> <span class="ident">Builder</span>::<span class="ident">new</span>().<span class="ident">prefix</span>(<span class="string">&quot;snap_dir&quot;</span>).<span class="ident">tempdir</span>().<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">mgr</span> <span class="op">=</span> <span class="ident">SnapManager</span>::<span class="ident">new</span>(<span class="ident">snap_dir</span>.<span class="ident">path</span>().<span class="ident">to_str</span>().<span class="ident">unwrap</span>(), <span class="prelude-val">None</span>);
+        <span class="kw">let</span> <span class="ident">mgr</span> <span class="op">=</span> <span class="ident">SnapManager</span>::<span class="ident">new</span>(<span class="ident">snap_dir</span>.<span class="ident">path</span>().<span class="ident">to_str</span>().<span class="ident">unwrap</span>());
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">worker</span> <span class="op">=</span> <span class="ident">Worker</span>::<span class="ident">new</span>(<span class="string">&quot;region-worker&quot;</span>);
         <span class="kw">let</span> <span class="ident">sched</span> <span class="op">=</span> <span class="ident">worker</span>.<span class="ident">scheduler</span>();
         <span class="kw">let</span> <span class="ident">shared_block_cache</span> <span class="op">=</span> <span class="bool-val">false</span>;
-        <span class="kw">let</span> <span class="ident">engines</span> <span class="op">=</span> <span class="ident">KvEngines</span>::<span class="ident">new</span>(<span class="ident">engine</span>.<span class="ident">kv</span>.<span class="ident">clone</span>(), <span class="ident">engine</span>.<span class="ident">raft</span>.<span class="ident">clone</span>(), <span class="ident">shared_block_cache</span>);
+        <span class="kw">let</span> <span class="ident">engines</span> <span class="op">=</span> <span class="ident">Engines</span>::<span class="ident">new</span>(<span class="ident">engine</span>.<span class="ident">kv</span>.<span class="ident">clone</span>(), <span class="ident">engine</span>.<span class="ident">raft</span>.<span class="ident">clone</span>(), <span class="ident">shared_block_cache</span>);
         <span class="kw">let</span> (<span class="ident">router</span>, <span class="kw">_</span>) <span class="op">=</span> <span class="ident">mpsc</span>::<span class="ident">sync_channel</span>(<span class="number">1</span>);
         <span class="kw">let</span> <span class="ident">runner</span> <span class="op">=</span> <span class="ident">RegionRunner</span>::<span class="ident">new</span>(
             <span class="ident">engines</span>,
@@ -2017,9 +2025,9 @@
         }
 
         <span class="kw">let</span> <span class="ident">shared_block_cache</span> <span class="op">=</span> <span class="bool-val">false</span>;
-        <span class="kw">let</span> <span class="ident">engines</span> <span class="op">=</span> <span class="ident">KvEngines</span>::<span class="ident">new</span>(<span class="ident">engine</span>.<span class="ident">kv</span>.<span class="ident">clone</span>(), <span class="ident">engine</span>.<span class="ident">raft</span>.<span class="ident">clone</span>(), <span class="ident">shared_block_cache</span>);
+        <span class="kw">let</span> <span class="ident">engines</span> <span class="op">=</span> <span class="ident">Engines</span>::<span class="ident">new</span>(<span class="ident">engine</span>.<span class="ident">kv</span>.<span class="ident">clone</span>(), <span class="ident">engine</span>.<span class="ident">raft</span>.<span class="ident">clone</span>(), <span class="ident">shared_block_cache</span>);
         <span class="kw">let</span> <span class="ident">snap_dir</span> <span class="op">=</span> <span class="ident">Builder</span>::<span class="ident">new</span>().<span class="ident">prefix</span>(<span class="string">&quot;snap_dir&quot;</span>).<span class="ident">tempdir</span>().<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">mgr</span> <span class="op">=</span> <span class="ident">SnapManager</span>::<span class="ident">new</span>(<span class="ident">snap_dir</span>.<span class="ident">path</span>().<span class="ident">to_str</span>().<span class="ident">unwrap</span>(), <span class="prelude-val">None</span>);
+        <span class="kw">let</span> <span class="ident">mgr</span> <span class="op">=</span> <span class="ident">SnapManager</span>::<span class="ident">new</span>(<span class="ident">snap_dir</span>.<span class="ident">path</span>().<span class="ident">to_str</span>().<span class="ident">unwrap</span>());
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">worker</span> <span class="op">=</span> <span class="ident">Worker</span>::<span class="ident">new</span>(<span class="string">&quot;snap-manager&quot;</span>);
         <span class="kw">let</span> <span class="ident">sched</span> <span class="op">=</span> <span class="ident">worker</span>.<span class="ident">scheduler</span>();
         <span class="kw">let</span> (<span class="ident">router</span>, <span class="ident">receiver</span>) <span class="op">=</span> <span class="ident">mpsc</span>::<span class="ident">sync_channel</span>(<span class="number">1</span>);
@@ -2067,7 +2075,7 @@
             }
             <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="ident">s1</span>.<span class="ident">get_data</span>();
             <span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> <span class="ident">SnapKey</span>::<span class="ident">from_snap</span>(<span class="kw-2">&amp;</span><span class="ident">s1</span>).<span class="ident">unwrap</span>();
-            <span class="kw">let</span> <span class="ident">mgr</span> <span class="op">=</span> <span class="ident">SnapManager</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>::<span class="ident">new</span>(<span class="ident">snap_dir</span>.<span class="ident">path</span>().<span class="ident">to_str</span>().<span class="ident">unwrap</span>(), <span class="prelude-val">None</span>);
+            <span class="kw">let</span> <span class="ident">mgr</span> <span class="op">=</span> <span class="ident">SnapManager</span>::<span class="ident">new</span>(<span class="ident">snap_dir</span>.<span class="ident">path</span>().<span class="ident">to_str</span>().<span class="ident">unwrap</span>());
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">s2</span> <span class="op">=</span> <span class="ident">mgr</span>.<span class="ident">get_snapshot_for_sending</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>).<span class="ident">unwrap</span>();
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">s3</span> <span class="op">=</span> <span class="ident">mgr</span>.<span class="ident">get_snapshot_for_receiving</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="kw-2">&amp;</span><span class="ident">data</span>[..]).<span class="ident">unwrap</span>();
             <span class="ident">io</span>::<span class="ident">copy</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">s2</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">s3</span>).<span class="ident">unwrap</span>();

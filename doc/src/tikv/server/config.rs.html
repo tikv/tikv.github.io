@@ -369,10 +369,18 @@
 <span id="369">369</span>
 <span id="370">370</span>
 <span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
+<span id="379">379</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
-<span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">i32</span>, <span class="ident">isize</span>};
+<span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">cmp</span>, <span class="ident">i32</span>, <span class="ident">isize</span>};
 
 <span class="kw">use</span> <span class="kw">super</span>::<span class="prelude-ty">Result</span>;
 <span class="kw">use</span> <span class="ident">grpcio</span>::<span class="ident">CompressionAlgorithms</span>;
@@ -403,6 +411,9 @@
 
 <span class="comment">// Number of rows in each chunk for streaming coprocessor.</span>
 <span class="kw">const</span> <span class="ident">DEFAULT_ENDPOINT_STREAM_BATCH_ROW_LIMIT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">128</span>;
+
+<span class="comment">// At least 4 long coprocessor requests are allowed to run concurrently.</span>
+<span class="kw">const</span> <span class="ident">MIN_ENDPOINT_MAX_CONCURRENCY</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">4</span>;
 
 <span class="kw">const</span> <span class="ident">DEFAULT_SNAP_MAX_BYTES_PER_SEC</span>: <span class="ident">u64</span> <span class="op">=</span> <span class="number">100</span> <span class="op">*</span> <span class="number">1024</span> <span class="op">*</span> <span class="number">1024</span>;
 
@@ -463,6 +474,10 @@
     <span class="kw">pub</span> <span class="ident">end_point_enable_batch_if_possible</span>: <span class="ident">bool</span>,
     <span class="kw">pub</span> <span class="ident">end_point_request_max_handle_duration</span>: <span class="ident">ReadableDuration</span>,
     <span class="kw">pub</span> <span class="ident">end_point_max_concurrency</span>: <span class="ident">usize</span>,
+    <span class="comment">// Memory locks must be checked if async commit is enabled.</span>
+    <span class="comment">// CAUTION: The current lock table implementation doesn&#39;t have good performance. Enabling</span>
+    <span class="comment">// it may slow down TiKV. This option may be removed in the future.</span>
+    <span class="kw">pub</span> <span class="ident">end_point_check_memory_locks</span>: <span class="ident">bool</span>,
     <span class="kw">pub</span> <span class="ident">snap_max_write_bytes_per_sec</span>: <span class="ident">ReadableSize</span>,
     <span class="kw">pub</span> <span class="ident">snap_max_total_size</span>: <span class="ident">ReadableSize</span>,
     <span class="kw">pub</span> <span class="ident">stats_concurrency</span>: <span class="ident">usize</span>,
@@ -524,7 +539,8 @@
             <span class="ident">end_point_request_max_handle_duration</span>: <span class="ident">ReadableDuration</span>::<span class="ident">secs</span>(
                 <span class="ident">DEFAULT_ENDPOINT_REQUEST_MAX_HANDLE_SECS</span>,
             ),
-            <span class="ident">end_point_max_concurrency</span>: <span class="ident">cpu_num</span>,
+            <span class="ident">end_point_max_concurrency</span>: <span class="ident">cmp</span>::<span class="ident">max</span>(<span class="ident">cpu_num</span> <span class="kw">as</span> <span class="ident">usize</span>, <span class="ident">MIN_ENDPOINT_MAX_CONCURRENCY</span>),
+            <span class="ident">end_point_check_memory_locks</span>: <span class="bool-val">false</span>,
             <span class="ident">snap_max_write_bytes_per_sec</span>: <span class="ident">ReadableSize</span>(<span class="ident">DEFAULT_SNAP_MAX_BYTES_PER_SEC</span>),
             <span class="ident">snap_max_total_size</span>: <span class="ident">ReadableSize</span>(<span class="number">0</span>),
             <span class="ident">stats_concurrency</span>: <span class="number">1</span>,

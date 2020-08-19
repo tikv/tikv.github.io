@@ -1194,8 +1194,6 @@
 <span id="1194">1194</span>
 <span id="1195">1195</span>
 <span id="1196">1196</span>
-<span id="1197">1197</span>
-<span id="1198">1198</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1208,9 +1206,9 @@
 
 <span class="kw">use</span> <span class="ident">engine_rocks</span>::<span class="ident">RocksEngine</span>;
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">MiscExt</span>, <span class="ident">CF_DEFAULT</span>, <span class="ident">CF_LOCK</span>, <span class="ident">CF_WRITE</span>};
-<span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">Future</span>;
+<span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">executor</span>::<span class="ident">block_on</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">kvrpcpb</span>::{<span class="ident">Context</span>, <span class="ident">IsolationLevel</span>, <span class="ident">LockInfo</span>};
-<span class="kw">use</span> <span class="ident">pd_client</span>::{<span class="ident">ClusterVersion</span>, <span class="ident">DummyPdClient</span>, <span class="ident">PdClient</span>};
+<span class="kw">use</span> <span class="ident">pd_client</span>::{<span class="ident">ClusterVersion</span>, <span class="ident">PdClient</span>};
 <span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">coprocessor</span>::{<span class="ident">CoprocessorHost</span>, <span class="ident">RegionInfoProvider</span>};
 <span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">router</span>::<span class="ident">ServerRaftStoreRouter</span>;
 <span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">store</span>::<span class="ident">msg</span>::<span class="ident">StoreMsg</span>;
@@ -1224,12 +1222,15 @@
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">server</span>::<span class="ident">metrics</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">kv</span>::{<span class="ident">Engine</span>, <span class="ident">ScanMode</span>, <span class="ident">Statistics</span>};
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">mvcc</span>::{<span class="ident">check_need_gc</span>, <span class="ident">Error</span> <span class="kw">as</span> <span class="ident">MvccError</span>, <span class="ident">GcInfo</span>, <span class="ident">MvccReader</span>, <span class="ident">MvccTxn</span>};
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::{
+    <span class="ident">concurrency_manager</span>::<span class="ident">ConcurrencyManager</span>,
+    <span class="ident">mvcc</span>::{<span class="ident">check_need_gc</span>, <span class="ident">Error</span> <span class="kw">as</span> <span class="ident">MvccError</span>, <span class="ident">GcInfo</span>, <span class="ident">MvccReader</span>, <span class="ident">MvccTxn</span>},
+};
 
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">applied_lock_collector</span>::{<span class="ident">AppliedLockCollector</span>, <span class="ident">Callback</span> <span class="kw">as</span> <span class="ident">LockCollectorCallback</span>};
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">config</span>::{<span class="ident">GcConfig</span>, <span class="ident">GcWorkerConfigManager</span>};
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">gc_manager</span>::{<span class="ident">AutoGcConfig</span>, <span class="ident">GcManager</span>, <span class="ident">GcManagerHandle</span>};
-<span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">init_compaction_filter</span>, <span class="ident">Callback</span>, <span class="ident">Error</span>, <span class="ident">ErrorInner</span>, <span class="prelude-ty">Result</span>};
+<span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">Callback</span>, <span class="ident">CompactionFilterInitializer</span>, <span class="ident">Error</span>, <span class="ident">ErrorInner</span>, <span class="prelude-ty">Result</span>};
 
 <span class="doccomment">/// After the GC scan of a key, output a message to the log if there are at least this many</span>
 <span class="doccomment">/// versions of the key.</span>
@@ -1249,9 +1250,7 @@
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">PdClient</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span> <span class="ident">GcSafePointProvider</span> <span class="kw">for</span> <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
     <span class="kw">fn</span> <span class="ident">get_safe_point</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">TimeStamp</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">future</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_gc_safe_point</span>();
-        <span class="ident">future</span>
-            .<span class="ident">wait</span>()
+        <span class="ident">block_on</span>(<span class="self">self</span>.<span class="ident">get_gc_safe_point</span>())
             .<span class="ident">map</span>(<span class="ident">Into</span>::<span class="ident">into</span>)
             .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">box_err</span><span class="macro">!</span>(<span class="string">&quot;failed to get safe point from PD: {:?}&quot;</span>, <span class="ident">e</span>))
     }
@@ -1382,7 +1381,7 @@
         <span class="ident">safe_point</span>: <span class="ident">TimeStamp</span>,
         <span class="ident">key</span>: <span class="kw-2">&amp;</span><span class="ident">Key</span>,
         <span class="ident">gc_info</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">GcInfo</span>,
-        <span class="ident">txn</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">MvccTxn</span><span class="op">&lt;</span><span class="ident">E</span>::<span class="ident">Snap</span>, <span class="ident">DummyPdClient</span><span class="op">&gt;</span>,
+        <span class="ident">txn</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">MvccTxn</span><span class="op">&lt;</span><span class="ident">E</span>::<span class="ident">Snap</span><span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">next_gc_info</span> <span class="op">=</span> <span class="ident">txn</span>.<span class="ident">gc</span>(<span class="ident">key</span>.<span class="ident">clone</span>(), <span class="ident">safe_point</span>)<span class="question-mark">?</span>;
         <span class="ident">gc_info</span>.<span class="ident">found_versions</span> <span class="op">+</span><span class="op">=</span> <span class="ident">next_gc_info</span>.<span class="ident">found_versions</span>;
@@ -1392,23 +1391,19 @@
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="kw">fn</span> <span class="ident">new_txn</span>(<span class="ident">snap</span>: <span class="ident">E</span>::<span class="ident">Snap</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">MvccTxn</span><span class="op">&lt;</span><span class="ident">E</span>::<span class="ident">Snap</span>, <span class="ident">DummyPdClient</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">new_txn</span>(<span class="ident">snap</span>: <span class="ident">E</span>::<span class="ident">Snap</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">MvccTxn</span><span class="op">&lt;</span><span class="ident">E</span>::<span class="ident">Snap</span><span class="op">&gt;</span> {
         <span class="comment">// TODO txn only used for GC, but this is hacky, maybe need an Option?</span>
-        <span class="kw">let</span> <span class="ident">pd_client</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">DummyPdClient</span>::<span class="ident">new</span>());
+        <span class="kw">let</span> <span class="ident">concurrency_manager</span> <span class="op">=</span> <span class="ident">ConcurrencyManager</span>::<span class="ident">new</span>(<span class="number">1</span>.<span class="ident">into</span>());
         <span class="ident">MvccTxn</span>::<span class="ident">for_scan</span>(
             <span class="ident">snap</span>,
             <span class="prelude-val">Some</span>(<span class="ident">ScanMode</span>::<span class="ident">Forward</span>),
             <span class="ident">TimeStamp</span>::<span class="ident">zero</span>(),
             <span class="bool-val">false</span>,
-            <span class="ident">pd_client</span>,
+            <span class="ident">concurrency_manager</span>,
         )
     }
 
-    <span class="kw">fn</span> <span class="ident">flush_txn</span>(
-        <span class="ident">txn</span>: <span class="ident">MvccTxn</span><span class="op">&lt;</span><span class="ident">E</span>::<span class="ident">Snap</span>, <span class="ident">DummyPdClient</span><span class="op">&gt;</span>,
-        <span class="ident">limiter</span>: <span class="kw-2">&amp;</span><span class="ident">Limiter</span>,
-        <span class="ident">engine</span>: <span class="kw-2">&amp;</span><span class="ident">E</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">flush_txn</span>(<span class="ident">txn</span>: <span class="ident">MvccTxn</span><span class="op">&lt;</span><span class="ident">E</span>::<span class="ident">Snap</span><span class="op">&gt;</span>, <span class="ident">limiter</span>: <span class="kw-2">&amp;</span><span class="ident">Limiter</span>, <span class="ident">engine</span>: <span class="kw-2">&amp;</span><span class="ident">E</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">write_size</span> <span class="op">=</span> <span class="ident">txn</span>.<span class="ident">write_size</span>();
         <span class="kw">let</span> <span class="ident">modifies</span> <span class="op">=</span> <span class="ident">txn</span>.<span class="ident">into_modifies</span>();
         <span class="kw">if</span> <span class="op">!</span><span class="ident">modifies</span>.<span class="ident">is_empty</span>() {
@@ -1823,7 +1818,7 @@
         <span class="kw">let</span> <span class="ident">kvdb</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">engine</span>.<span class="ident">kv_engine</span>();
         <span class="kw">let</span> <span class="ident">cfg_mgr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">config_manager</span>.<span class="ident">clone</span>();
         <span class="kw">let</span> <span class="ident">cluster_version</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">cluster_version</span>.<span class="ident">clone</span>();
-        <span class="ident">init_compaction_filter</span>(<span class="ident">kvdb</span>, <span class="ident">safe_point</span>.<span class="ident">clone</span>(), <span class="ident">cfg_mgr</span>, <span class="ident">cluster_version</span>);
+        <span class="ident">kvdb</span>.<span class="ident">init_compaction_filter</span>(<span class="ident">safe_point</span>.<span class="ident">clone</span>(), <span class="ident">cfg_mgr</span>, <span class="ident">cluster_version</span>);
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">handle</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">gc_manager_handle</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">handle</span>.<span class="ident">is_none</span>());
@@ -2034,6 +2029,7 @@
     <span class="kw">impl</span> <span class="ident">Engine</span> <span class="kw">for</span> <span class="ident">PrefixedEngine</span> {
         <span class="comment">// Use RegionSnapshot which can remove the z prefix internally.</span>
         <span class="kw">type</span> <span class="ident">Snap</span> <span class="op">=</span> <span class="ident">RegionSnapshot</span><span class="op">&lt;</span><span class="ident">RocksSnapshot</span><span class="op">&gt;</span>;
+        <span class="kw">type</span> <span class="ident">Local</span> <span class="op">=</span> <span class="ident">RocksEngine</span>;
 
         <span class="kw">fn</span> <span class="ident">kv_engine</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">RocksEngine</span> {
             <span class="self">self</span>.<span class="number">0</span>.<span class="ident">kv_engine</span>()
@@ -2125,7 +2121,7 @@
     <span class="doccomment">/// Assert the data in `storage` is the same as `expected_data`. Keys in `expected_data` should</span>
     <span class="doccomment">/// be encoded form without ts.</span>
     <span class="kw">fn</span> <span class="ident">check_data</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">Engine</span><span class="op">&gt;</span>(
-        <span class="ident">storage</span>: <span class="kw-2">&amp;</span><span class="ident">Storage</span><span class="op">&lt;</span><span class="ident">E</span>, <span class="ident">DummyLockManager</span>, <span class="ident">DummyPdClient</span><span class="op">&gt;</span>,
+        <span class="ident">storage</span>: <span class="kw-2">&amp;</span><span class="ident">Storage</span><span class="op">&lt;</span><span class="ident">E</span>, <span class="ident">DummyLockManager</span><span class="op">&gt;</span>,
         <span class="ident">expected_data</span>: <span class="kw-2">&amp;</span><span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     ) {
         <span class="kw">let</span> <span class="ident">scan_res</span> <span class="op">=</span> <span class="ident">storage</span>

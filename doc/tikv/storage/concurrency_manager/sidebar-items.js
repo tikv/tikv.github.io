@@ -1,0 +1,1 @@
+initSidebarItems({"mod":[["key_handle",""],["lock_table",""]],"struct":[["ConcurrencyManager",""],["KeyHandle","An entry in the in-memory table providing functions related to a specific key."],["KeyHandleGuard","A `KeyHandle` with its mutex locked."],["LockTable",""]]});

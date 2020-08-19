@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["ResolveLock","Resolve locks according to `txn_status`."]]});
+initSidebarItems({"constant":[["RESOLVE_LOCK_BATCH_SIZE",""]],"struct":[["ResolveLock","Resolve locks according to `txn_status`."]]});

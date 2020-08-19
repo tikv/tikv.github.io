@@ -278,6 +278,48 @@
 <span id="278">278</span>
 <span id="279">279</span>
 <span id="280">280</span>
+<span id="281">281</span>
+<span id="282">282</span>
+<span id="283">283</span>
+<span id="284">284</span>
+<span id="285">285</span>
+<span id="286">286</span>
+<span id="287">287</span>
+<span id="288">288</span>
+<span id="289">289</span>
+<span id="290">290</span>
+<span id="291">291</span>
+<span id="292">292</span>
+<span id="293">293</span>
+<span id="294">294</span>
+<span id="295">295</span>
+<span id="296">296</span>
+<span id="297">297</span>
+<span id="298">298</span>
+<span id="299">299</span>
+<span id="300">300</span>
+<span id="301">301</span>
+<span id="302">302</span>
+<span id="303">303</span>
+<span id="304">304</span>
+<span id="305">305</span>
+<span id="306">306</span>
+<span id="307">307</span>
+<span id="308">308</span>
+<span id="309">309</span>
+<span id="310">310</span>
+<span id="311">311</span>
+<span id="312">312</span>
+<span id="313">313</span>
+<span id="314">314</span>
+<span id="315">315</span>
+<span id="316">316</span>
+<span id="317">317</span>
+<span id="318">318</span>
+<span id="319">319</span>
+<span id="320">320</span>
+<span id="321">321</span>
+<span id="322">322</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -300,6 +342,8 @@
 <span class="kw">const</span> <span class="ident">FLAG_DELETE</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="string">b&#39;D&#39;</span>;
 <span class="kw">const</span> <span class="ident">FLAG_LOCK</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="string">b&#39;L&#39;</span>;
 <span class="kw">const</span> <span class="ident">FLAG_ROLLBACK</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="string">b&#39;R&#39;</span>;
+
+<span class="kw">const</span> <span class="ident">FLAG_OVERLAPPED_ROLLBACK</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="string">b&#39;R&#39;</span>;
 
 <span class="doccomment">/// The short value for rollback records which are protected from being collapsed.</span>
 <span class="kw">const</span> <span class="ident">PROTECTED_ROLLBACK_SHORT_VALUE</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>] <span class="op">=</span> <span class="string">b&quot;p&quot;</span>;
@@ -339,6 +383,14 @@
     <span class="kw">pub</span> <span class="ident">write_type</span>: <span class="ident">WriteType</span>,
     <span class="kw">pub</span> <span class="ident">start_ts</span>: <span class="ident">TimeStamp</span>,
     <span class="kw">pub</span> <span class="ident">short_value</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// The `commit_ts` of transactions can be non-globally-unique. But since we store Rollback</span>
+    <span class="doccomment">/// records in the same CF where Commit records is, and Rollback records are saved with</span>
+    <span class="doccomment">/// `user_key{start_ts}` as the internal key, the collision between Commit and Rollback</span>
+    <span class="doccomment">/// records can&#39;t be avoided. In this case, we keep the Commit record, and set the</span>
+    <span class="doccomment">/// `has_overlapped_rollback` flag to indicate that there&#39;s also a Rollback record.</span>
+    <span class="doccomment">/// Also note that `has_overlapped_rollback` field is only necessary when the Rollback record</span>
+    <span class="doccomment">/// should be protected.</span>
+    <span class="kw">pub</span> <span class="ident">has_overlapped_rollback</span>: <span class="ident">bool</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">std</span>::<span class="ident">fmt</span>::<span class="ident">Debug</span> <span class="kw">for</span> <span class="ident">Write</span> {
@@ -354,6 +406,7 @@
                     .<span class="ident">map</span>(<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="ident">hex</span>::<span class="ident">encode_upper</span>(<span class="ident">v</span>))
                     .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="string">&quot;None&quot;</span>.<span class="ident">to_owned</span>()),
             )
+            .<span class="ident">field</span>(<span class="string">&quot;has_overlapped_rollback&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">has_overlapped_rollback</span>)
             .<span class="ident">finish</span>()
     }
 }
@@ -366,6 +419,7 @@
             <span class="ident">write_type</span>,
             <span class="ident">start_ts</span>,
             <span class="ident">short_value</span>,
+            <span class="ident">has_overlapped_rollback</span>: <span class="bool-val">false</span>,
         }
     }
 
@@ -381,7 +435,14 @@
             <span class="ident">write_type</span>: <span class="ident">WriteType</span>::<span class="ident">Rollback</span>,
             <span class="ident">start_ts</span>,
             <span class="ident">short_value</span>,
+            <span class="ident">has_overlapped_rollback</span>: <span class="bool-val">false</span>,
         }
+    }
+
+    <span class="attribute">#[<span class="ident">inline</span>]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_overlapped_rollback</span>(<span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">has_overlapped_rollback</span>: <span class="ident">bool</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+        <span class="self">self</span>.<span class="ident">has_overlapped_rollback</span> <span class="op">=</span> <span class="ident">has_overlapped_rollback</span>;
+        <span class="self">self</span>
     }
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
@@ -398,6 +459,7 @@
             <span class="ident">write_type</span>: <span class="self">self</span>.<span class="ident">write_type</span>,
             <span class="ident">start_ts</span>: <span class="self">self</span>.<span class="ident">start_ts</span>,
             <span class="ident">short_value</span>: <span class="self">self</span>.<span class="ident">short_value</span>.<span class="ident">as_deref</span>(),
+            <span class="ident">has_overlapped_rollback</span>: <span class="self">self</span>.<span class="ident">has_overlapped_rollback</span>,
         }
     }
 }
@@ -407,6 +469,14 @@
     <span class="kw">pub</span> <span class="ident">write_type</span>: <span class="ident">WriteType</span>,
     <span class="kw">pub</span> <span class="ident">start_ts</span>: <span class="ident">TimeStamp</span>,
     <span class="kw">pub</span> <span class="ident">short_value</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> [<span class="ident">u8</span>]<span class="op">&gt;</span>,
+    <span class="doccomment">/// The `commit_ts` of transactions can be non-globally-unique. But since we store Rollback</span>
+    <span class="doccomment">/// records in the same CF where Commit records is, and Rollback records are saved with</span>
+    <span class="doccomment">/// `user_key{start_ts}` as the internal key, the collision between Commit and Rollback</span>
+    <span class="doccomment">/// records can&#39;t be avoided. In this case, we keep the Commit record, and set the</span>
+    <span class="doccomment">/// `has_overlapped_rollback` flag to indicate that there&#39;s also a Rollback record.</span>
+    <span class="doccomment">/// Also note that `has_overlapped_rollback` field is only necessary when the Rollback record</span>
+    <span class="doccomment">/// should be protected.</span>
+    <span class="kw">pub</span> <span class="ident">has_overlapped_rollback</span>: <span class="ident">bool</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">WriteRef</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span> {
@@ -420,45 +490,55 @@
             .<span class="ident">read_var_u64</span>()
             .<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">Error</span>::<span class="ident">from</span>(<span class="ident">ErrorInner</span>::<span class="ident">BadFormatWrite</span>))<span class="question-mark">?</span>
             .<span class="ident">into</span>();
-        <span class="kw">if</span> <span class="ident">b</span>.<span class="ident">is_empty</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">WriteRef</span> {
-                <span class="ident">write_type</span>,
-                <span class="ident">start_ts</span>,
-                <span class="ident">short_value</span>: <span class="prelude-val">None</span>,
-            });
-        }
 
-        <span class="kw">let</span> <span class="ident">flag</span> <span class="op">=</span> <span class="ident">b</span>
-            .<span class="ident">read_u8</span>()
-            .<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">Error</span>::<span class="ident">from</span>(<span class="ident">ErrorInner</span>::<span class="ident">BadFormatWrite</span>))<span class="question-mark">?</span>;
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">flag</span>, <span class="ident">SHORT_VALUE_PREFIX</span>, <span class="string">&quot;invalid flag [{}] in write&quot;</span>, <span class="ident">flag</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">short_value</span> <span class="op">=</span> <span class="prelude-val">None</span>;
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">has_overlapped_rollback</span> <span class="op">=</span> <span class="bool-val">false</span>;
 
-        <span class="kw">let</span> <span class="ident">len</span> <span class="op">=</span> <span class="ident">b</span>
-            .<span class="ident">read_u8</span>()
-            .<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">Error</span>::<span class="ident">from</span>(<span class="ident">ErrorInner</span>::<span class="ident">BadFormatWrite</span>))<span class="question-mark">?</span>;
-        <span class="kw">if</span> <span class="ident">len</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">!</span><span class="op">=</span> <span class="ident">b</span>.<span class="ident">len</span>() {
-            <span class="macro">panic</span><span class="macro">!</span>(
-                <span class="string">&quot;short value len [{}] not equal to content len [{}]&quot;</span>,
-                <span class="ident">len</span>,
-                <span class="ident">b</span>.<span class="ident">len</span>()
-            );
+        <span class="kw">while</span> <span class="op">!</span><span class="ident">b</span>.<span class="ident">is_empty</span>() {
+            <span class="kw">match</span> <span class="ident">b</span>
+                .<span class="ident">read_u8</span>()
+                .<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">Error</span>::<span class="ident">from</span>(<span class="ident">ErrorInner</span>::<span class="ident">BadFormatWrite</span>))<span class="question-mark">?</span>
+            {
+                <span class="ident">SHORT_VALUE_PREFIX</span> <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="kw">let</span> <span class="ident">len</span> <span class="op">=</span> <span class="ident">b</span>
+                        .<span class="ident">read_u8</span>()
+                        .<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">Error</span>::<span class="ident">from</span>(<span class="ident">ErrorInner</span>::<span class="ident">BadFormatWrite</span>))<span class="question-mark">?</span>;
+                    <span class="kw">if</span> <span class="ident">b</span>.<span class="ident">len</span>() <span class="op">&lt;</span> <span class="ident">len</span> <span class="kw">as</span> <span class="ident">usize</span> {
+                        <span class="macro">panic</span><span class="macro">!</span>(
+                            <span class="string">&quot;content len [{}] shorter than short value len [{}]&quot;</span>,
+                            <span class="ident">b</span>.<span class="ident">len</span>(),
+                            <span class="ident">len</span>,
+                        );
+                    }
+                    <span class="ident">short_value</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">b</span>[..<span class="ident">len</span> <span class="kw">as</span> <span class="ident">usize</span>]);
+                    <span class="ident">b</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">b</span>[<span class="ident">len</span> <span class="kw">as</span> <span class="ident">usize</span>..];
+                }
+                <span class="ident">FLAG_OVERLAPPED_ROLLBACK</span> <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="ident">has_overlapped_rollback</span> <span class="op">=</span> <span class="bool-val">true</span>;
+                }
+                <span class="ident">flag</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;invalid flag [{}] in write&quot;</span>, <span class="ident">flag</span>),
+            }
         }
 
         <span class="prelude-val">Ok</span>(<span class="ident">WriteRef</span> {
             <span class="ident">write_type</span>,
             <span class="ident">start_ts</span>,
-            <span class="ident">short_value</span>: <span class="prelude-val">Some</span>(<span class="ident">b</span>),
+            <span class="ident">short_value</span>,
+            <span class="ident">has_overlapped_rollback</span>,
         })
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_bytes</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">b</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">with_capacity</span>(<span class="number">1</span> <span class="op">+</span> <span class="ident">MAX_VAR_U64_LEN</span> <span class="op">+</span> <span class="ident">SHORT_VALUE_MAX_LEN</span> <span class="op">+</span> <span class="number">2</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">b</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">with_capacity</span>(<span class="number">1</span> <span class="op">+</span> <span class="ident">MAX_VAR_U64_LEN</span> <span class="op">+</span> <span class="ident">SHORT_VALUE_MAX_LEN</span> <span class="op">+</span> <span class="number">2</span> <span class="op">+</span> <span class="number">1</span>);
         <span class="ident">b</span>.<span class="ident">push</span>(<span class="self">self</span>.<span class="ident">write_type</span>.<span class="ident">to_u8</span>());
         <span class="ident">b</span>.<span class="ident">encode_var_u64</span>(<span class="self">self</span>.<span class="ident">start_ts</span>.<span class="ident">into_inner</span>()).<span class="ident">unwrap</span>();
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">v</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">short_value</span> {
             <span class="ident">b</span>.<span class="ident">push</span>(<span class="ident">SHORT_VALUE_PREFIX</span>);
             <span class="ident">b</span>.<span class="ident">push</span>(<span class="ident">v</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">u8</span>);
             <span class="ident">b</span>.<span class="ident">extend_from_slice</span>(<span class="ident">v</span>);
+        }
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">has_overlapped_rollback</span> {
+            <span class="ident">b</span>.<span class="ident">push</span>(<span class="ident">FLAG_OVERLAPPED_ROLLBACK</span>);
         }
         <span class="ident">b</span>
     }
@@ -480,6 +560,7 @@
             <span class="self">self</span>.<span class="ident">start_ts</span>,
             <span class="self">self</span>.<span class="ident">short_value</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="ident">v</span>.<span class="ident">to_owned</span>()),
         )
+        .<span class="ident">set_overlapped_rollback</span>(<span class="self">self</span>.<span class="ident">has_overlapped_rollback</span>)
     }
 }
 
@@ -527,6 +608,9 @@
             <span class="ident">Write</span>::<span class="ident">new</span>(<span class="ident">WriteType</span>::<span class="ident">Delete</span>, (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">20</span>).<span class="ident">into</span>(), <span class="prelude-val">None</span>),
             <span class="ident">Write</span>::<span class="ident">new_rollback</span>((<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">40</span>).<span class="ident">into</span>(), <span class="bool-val">true</span>),
             <span class="ident">Write</span>::<span class="ident">new</span>(<span class="ident">WriteType</span>::<span class="ident">Rollback</span>, (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">41</span>).<span class="ident">into</span>(), <span class="prelude-val">None</span>),
+            <span class="ident">Write</span>::<span class="ident">new</span>(<span class="ident">WriteType</span>::<span class="ident">Put</span>, <span class="number">123</span>.<span class="ident">into</span>(), <span class="prelude-val">None</span>).<span class="ident">set_overlapped_rollback</span>(<span class="bool-val">true</span>),
+            <span class="ident">Write</span>::<span class="ident">new</span>(<span class="ident">WriteType</span>::<span class="ident">Put</span>, <span class="number">456</span>.<span class="ident">into</span>(), <span class="prelude-val">Some</span>(<span class="string">b&quot;short_value&quot;</span>.<span class="ident">to_vec</span>()))
+                .<span class="ident">set_overlapped_rollback</span>(<span class="bool-val">true</span>),
         ];
         <span class="kw">for</span> (<span class="ident">i</span>, <span class="ident">write</span>) <span class="kw">in</span> <span class="ident">writes</span>.<span class="ident">drain</span>(..).<span class="ident">enumerate</span>() {
             <span class="kw">let</span> <span class="ident">v</span> <span class="op">=</span> <span class="ident">write</span>.<span class="ident">as_ref</span>().<span class="ident">to_bytes</span>();

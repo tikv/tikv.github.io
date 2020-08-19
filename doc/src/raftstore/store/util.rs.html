@@ -1241,6 +1241,16 @@
 <span id="1241">1241</span>
 <span id="1242">1242</span>
 <span id="1243">1243</span>
+<span id="1244">1244</span>
+<span id="1245">1245</span>
+<span id="1246">1246</span>
+<span id="1247">1247</span>
+<span id="1248">1248</span>
+<span id="1249">1249</span>
+<span id="1250">1250</span>
+<span id="1251">1251</span>
+<span id="1252">1252</span>
+<span id="1253">1253</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1290,13 +1300,16 @@
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">peer</span> <span class="op">=</span> <span class="ident">metapb</span>::<span class="ident">Peer</span>::<span class="ident">default</span>();
     <span class="ident">peer</span>.<span class="ident">set_store_id</span>(<span class="ident">store_id</span>);
     <span class="ident">peer</span>.<span class="ident">set_id</span>(<span class="ident">peer_id</span>);
+    <span class="ident">peer</span>.<span class="ident">set_role</span>(<span class="ident">metapb</span>::<span class="ident">PeerRole</span>::<span class="ident">Voter</span>);
     <span class="ident">peer</span>
 }
 
 <span class="comment">// a helper function to create learner peer easily.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_learner_peer</span>(<span class="ident">store_id</span>: <span class="ident">u64</span>, <span class="ident">peer_id</span>: <span class="ident">u64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">metapb</span>::<span class="ident">Peer</span> {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">peer</span> <span class="op">=</span> <span class="ident">new_peer</span>(<span class="ident">store_id</span>, <span class="ident">peer_id</span>);
-    <span class="ident">peer</span>.<span class="ident">set_is_learner</span>(<span class="bool-val">true</span>);
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">peer</span> <span class="op">=</span> <span class="ident">metapb</span>::<span class="ident">Peer</span>::<span class="ident">default</span>();
+    <span class="ident">peer</span>.<span class="ident">set_store_id</span>(<span class="ident">store_id</span>);
+    <span class="ident">peer</span>.<span class="ident">set_id</span>(<span class="ident">peer_id</span>);
+    <span class="ident">peer</span>.<span class="ident">set_role</span>(<span class="ident">metapb</span>::<span class="ident">PeerRole</span>::<span class="ident">Learner</span>);
     <span class="ident">peer</span>
 }
 
@@ -1404,7 +1417,7 @@
             <span class="op">|</span> <span class="ident">AdminCmdType</span>::<span class="ident">InvalidAdmin</span>
             <span class="op">|</span> <span class="ident">AdminCmdType</span>::<span class="ident">ComputeHash</span>
             <span class="op">|</span> <span class="ident">AdminCmdType</span>::<span class="ident">VerifyHash</span> <span class="op">=</span><span class="op">&gt;</span> {}
-            <span class="ident">AdminCmdType</span>::<span class="ident">ChangePeer</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">check_conf_ver</span> <span class="op">=</span> <span class="bool-val">true</span>,
+            <span class="ident">AdminCmdType</span>::<span class="ident">ChangePeer</span> <span class="op">|</span> <span class="ident">AdminCmdType</span>::<span class="ident">ChangePeerV2</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">check_conf_ver</span> <span class="op">=</span> <span class="bool-val">true</span>,
             <span class="ident">AdminCmdType</span>::<span class="ident">Split</span>
             <span class="op">|</span> <span class="ident">AdminCmdType</span>::<span class="ident">BatchSplit</span>
             <span class="op">|</span> <span class="ident">AdminCmdType</span>::<span class="ident">PrepareMerge</span>
@@ -1539,9 +1552,9 @@
     <span class="comment">// Because every store can only have one replica for the same region,</span>
     <span class="comment">// so just one round check is enough.</span>
     <span class="ident">lhs</span>.<span class="ident">get_peers</span>().<span class="ident">iter</span>().<span class="ident">all</span>(<span class="op">|</span><span class="ident">lp</span><span class="op">|</span> {
-        <span class="ident">rhs</span>.<span class="ident">get_peers</span>().<span class="ident">iter</span>().<span class="ident">any</span>(<span class="op">|</span><span class="ident">rp</span><span class="op">|</span> {
-            <span class="ident">rp</span>.<span class="ident">get_store_id</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">lp</span>.<span class="ident">get_store_id</span>() <span class="kw-2">&amp;</span><span class="op">&amp;</span> <span class="ident">rp</span>.<span class="ident">get_is_learner</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">lp</span>.<span class="ident">get_is_learner</span>()
-        })
+        <span class="ident">rhs</span>.<span class="ident">get_peers</span>()
+            .<span class="ident">iter</span>()
+            .<span class="ident">any</span>(<span class="op">|</span><span class="ident">rp</span><span class="op">|</span> <span class="ident">rp</span>.<span class="ident">get_store_id</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">lp</span>.<span class="ident">get_store_id</span>() <span class="kw-2">&amp;</span><span class="op">&amp;</span> <span class="ident">rp</span>.<span class="ident">get_role</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">lp</span>.<span class="ident">get_role</span>())
     })
 }
 
@@ -1850,13 +1863,19 @@
     <span class="comment">// Here `learners` means learner peers, and `nodes` means voter peers.</span>
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">conf_state</span> <span class="op">=</span> <span class="ident">ConfState</span>::<span class="ident">default</span>();
     <span class="kw">for</span> <span class="ident">p</span> <span class="kw">in</span> <span class="ident">region</span>.<span class="ident">get_peers</span>() {
-        <span class="kw">if</span> <span class="ident">p</span>.<span class="ident">get_is_learner</span>() {
+        <span class="comment">// TODO: when using joint consensus we also need to consider joint state</span>
+        <span class="comment">// which contains other roles like IncommingVoter and DemotingVoter</span>
+        <span class="kw">if</span> <span class="ident">is_learner</span>(<span class="ident">p</span>) {
             <span class="ident">conf_state</span>.<span class="ident">mut_learners</span>().<span class="ident">push</span>(<span class="ident">p</span>.<span class="ident">get_id</span>());
         } <span class="kw">else</span> {
             <span class="ident">conf_state</span>.<span class="ident">mut_voters</span>().<span class="ident">push</span>(<span class="ident">p</span>.<span class="ident">get_id</span>());
         }
     }
     <span class="ident">conf_state</span>
+}
+
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_learner</span>(<span class="ident">peer</span>: <span class="kw-2">&amp;</span><span class="ident">metapb</span>::<span class="ident">Peer</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="ident">peer</span>.<span class="ident">get_role</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">metapb</span>::<span class="ident">PeerRole</span>::<span class="ident">Learner</span>
 }
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">KeysInfoFormatter</span><span class="op">&lt;</span>
@@ -2159,7 +2178,7 @@
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">peer</span> <span class="op">=</span> <span class="ident">metapb</span>::<span class="ident">Peer</span>::<span class="ident">default</span>();
         <span class="ident">peer</span>.<span class="ident">set_id</span>(<span class="number">2</span>);
-        <span class="ident">peer</span>.<span class="ident">set_is_learner</span>(<span class="bool-val">true</span>);
+        <span class="ident">peer</span>.<span class="ident">set_role</span>(<span class="ident">metapb</span>::<span class="ident">PeerRole</span>::<span class="ident">Learner</span>);
         <span class="ident">region</span>.<span class="ident">mut_peers</span>().<span class="ident">push</span>(<span class="ident">peer</span>);
 
         <span class="kw">let</span> <span class="ident">cs</span> <span class="op">=</span> <span class="ident">conf_state_from_region</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>);
@@ -2174,8 +2193,8 @@
         <span class="ident">region</span>.<span class="ident">mut_peers</span>().<span class="ident">push</span>(<span class="ident">new_peer</span>(<span class="number">1</span>, <span class="number">1</span>));
         <span class="ident">region</span>.<span class="ident">mut_peers</span>().<span class="ident">push</span>(<span class="ident">new_learner_peer</span>(<span class="number">2</span>, <span class="number">2</span>));
 
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">find_peer</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="number">1</span>).<span class="ident">unwrap</span>().<span class="ident">get_is_learner</span>());
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">find_peer</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="number">2</span>).<span class="ident">unwrap</span>().<span class="ident">get_is_learner</span>());
+        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">is_learner</span>(<span class="ident">find_peer</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="number">1</span>).<span class="ident">unwrap</span>()));
+        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">is_learner</span>(<span class="ident">find_peer</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="number">2</span>).<span class="ident">unwrap</span>()));
 
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">remove_peer</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">region</span>, <span class="number">1</span>).<span class="ident">is_some</span>());
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">remove_peer</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">region</span>, <span class="number">1</span>).<span class="ident">is_none</span>());
@@ -2436,6 +2455,7 @@
             <span class="ident">AdminCmdType</span>::<span class="ident">Split</span>,
             <span class="ident">AdminCmdType</span>::<span class="ident">BatchSplit</span>,
             <span class="ident">AdminCmdType</span>::<span class="ident">ChangePeer</span>,
+            <span class="ident">AdminCmdType</span>::<span class="ident">ChangePeerV2</span>,
             <span class="ident">AdminCmdType</span>::<span class="ident">PrepareMerge</span>,
             <span class="ident">AdminCmdType</span>::<span class="ident">CommitMerge</span>,
             <span class="ident">AdminCmdType</span>::<span class="ident">RollbackMerge</span>,

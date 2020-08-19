@@ -720,6 +720,73 @@
 <span id="720">720</span>
 <span id="721">721</span>
 <span id="722">722</span>
+<span id="723">723</span>
+<span id="724">724</span>
+<span id="725">725</span>
+<span id="726">726</span>
+<span id="727">727</span>
+<span id="728">728</span>
+<span id="729">729</span>
+<span id="730">730</span>
+<span id="731">731</span>
+<span id="732">732</span>
+<span id="733">733</span>
+<span id="734">734</span>
+<span id="735">735</span>
+<span id="736">736</span>
+<span id="737">737</span>
+<span id="738">738</span>
+<span id="739">739</span>
+<span id="740">740</span>
+<span id="741">741</span>
+<span id="742">742</span>
+<span id="743">743</span>
+<span id="744">744</span>
+<span id="745">745</span>
+<span id="746">746</span>
+<span id="747">747</span>
+<span id="748">748</span>
+<span id="749">749</span>
+<span id="750">750</span>
+<span id="751">751</span>
+<span id="752">752</span>
+<span id="753">753</span>
+<span id="754">754</span>
+<span id="755">755</span>
+<span id="756">756</span>
+<span id="757">757</span>
+<span id="758">758</span>
+<span id="759">759</span>
+<span id="760">760</span>
+<span id="761">761</span>
+<span id="762">762</span>
+<span id="763">763</span>
+<span id="764">764</span>
+<span id="765">765</span>
+<span id="766">766</span>
+<span id="767">767</span>
+<span id="768">768</span>
+<span id="769">769</span>
+<span id="770">770</span>
+<span id="771">771</span>
+<span id="772">772</span>
+<span id="773">773</span>
+<span id="774">774</span>
+<span id="775">775</span>
+<span id="776">776</span>
+<span id="777">777</span>
+<span id="778">778</span>
+<span id="779">779</span>
+<span id="780">780</span>
+<span id="781">781</span>
+<span id="782">782</span>
+<span id="783">783</span>
+<span id="784">784</span>
+<span id="785">785</span>
+<span id="786">786</span>
+<span id="787">787</span>
+<span id="788">788</span>
+<span id="789">789</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -739,7 +806,6 @@
 <span class="kw">use</span> <span class="ident">nom</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">regex</span>::<span class="ident">Regex</span>;
 
-<span class="kw">const</span> <span class="ident">INVALID_TIMESTAMP</span>: <span class="ident">i64</span> <span class="op">=</span> <span class="op">-</span><span class="number">1</span>;
 <span class="kw">const</span> <span class="ident">TIMESTAMP_LENGTH</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">30</span>;
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Default</span>)]</span>
@@ -752,6 +818,8 @@
     <span class="ident">end_time</span>: <span class="ident">i64</span>,
     <span class="ident">level_flag</span>: <span class="ident">usize</span>,
     <span class="ident">patterns</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">regex</span>::<span class="ident">Regex</span><span class="op">&gt;</span>,
+
+    <span class="ident">pre_log</span>: <span class="ident">LogMessage</span>,
 }
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
@@ -851,6 +919,7 @@
             <span class="ident">end_time</span>,
             <span class="ident">level_flag</span>,
             <span class="ident">patterns</span>,
+            <span class="ident">pre_log</span>: <span class="ident">LogMessage</span>::<span class="ident">default</span>(),
         })
     }
 }
@@ -878,44 +947,56 @@
                         <span class="kw">continue</span>;
                     }
                 };
-                <span class="kw">if</span> <span class="ident">input</span>.<span class="ident">len</span>() <span class="op">&lt;</span> <span class="ident">TIMESTAMP_LENGTH</span> {
+                <span class="kw">if</span> <span class="self">self</span>.<span class="ident">pre_log</span>.<span class="ident">time</span> <span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">begin_time</span> <span class="kw-2">&amp;</span><span class="op">&amp;</span> <span class="ident">input</span>.<span class="ident">len</span>() <span class="op">&lt;</span> <span class="ident">TIMESTAMP_LENGTH</span> {
                     <span class="kw">continue</span>;
                 }
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">item</span> <span class="op">=</span> <span class="ident">LogMessage</span>::<span class="ident">default</span>();
                 <span class="kw">match</span> <span class="ident">parse</span>(<span class="kw-2">&amp;</span><span class="ident">input</span>) {
                     <span class="prelude-val">Ok</span>((<span class="ident">content</span>, (<span class="ident">time</span>, <span class="ident">level</span>))) <span class="op">=</span><span class="op">&gt;</span> {
-                        <span class="comment">// The remain content timestamp more the end time or this file contains inrecognation formation</span>
-                        <span class="kw">if</span> <span class="ident">time</span> <span class="op">=</span><span class="op">=</span> <span class="ident">INVALID_TIMESTAMP</span> <span class="op">|</span><span class="op">|</span> <span class="ident">time</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">end_time</span> {
-                            <span class="kw">break</span>;
-                        }
-                        <span class="kw">if</span> <span class="ident">time</span> <span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">begin_time</span> {
-                            <span class="kw">continue</span>;
-                        }
-                        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">level_flag</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> <span class="kw-2">&amp;</span><span class="op">&amp;</span> <span class="self">self</span>.<span class="ident">level_flag</span> <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> (<span class="ident">level</span> <span class="kw">as</span> <span class="ident">usize</span>)) <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
-                            <span class="kw">continue</span>;
-                        }
-                        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">patterns</span>.<span class="ident">is_empty</span>() {
-                            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">not_match</span> <span class="op">=</span> <span class="bool-val">false</span>;
-                            <span class="kw">for</span> <span class="ident">pattern</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">patterns</span>.<span class="ident">iter</span>() {
-                                <span class="kw">if</span> <span class="op">!</span><span class="ident">pattern</span>.<span class="ident">is_match</span>(<span class="ident">content</span>) {
-                                    <span class="ident">not_match</span> <span class="op">=</span> <span class="bool-val">true</span>;
-                                    <span class="kw">break</span>;
-                                }
-                            }
-                            <span class="kw">if</span> <span class="ident">not_match</span> {
-                                <span class="kw">continue</span>;
-                            }
-                        }
-                        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">item</span> <span class="op">=</span> <span class="ident">LogMessage</span>::<span class="ident">default</span>();
+                        <span class="self">self</span>.<span class="ident">pre_log</span>.<span class="ident">set_time</span>(<span class="ident">time</span>);
+                        <span class="self">self</span>.<span class="ident">pre_log</span>.<span class="ident">set_level</span>(<span class="ident">level</span>);
+
                         <span class="ident">item</span>.<span class="ident">set_time</span>(<span class="ident">time</span>);
                         <span class="ident">item</span>.<span class="ident">set_level</span>(<span class="ident">level</span>);
                         <span class="ident">item</span>.<span class="ident">set_message</span>(<span class="ident">content</span>.<span class="ident">to_owned</span>());
-                        <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">item</span>);
                     }
-                    <span class="prelude-val">Err</span>(<span class="ident">err</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                        <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;parse line failed: {:?}&quot;</span>, <span class="ident">err</span>);
+                    <span class="prelude-val">Err</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">pre_log</span>.<span class="ident">time</span> <span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">begin_time</span> {
+                            <span class="kw">continue</span>;
+                        }
+                        <span class="comment">// treat the invalid log with the pre valid log time and level but its own whole line content</span>
+                        <span class="ident">item</span>.<span class="ident">set_time</span>(<span class="self">self</span>.<span class="ident">pre_log</span>.<span class="ident">time</span>);
+                        <span class="ident">item</span>.<span class="ident">set_level</span>(<span class="self">self</span>.<span class="ident">pre_log</span>.<span class="ident">get_level</span>());
+                        <span class="ident">item</span>.<span class="ident">set_message</span>(<span class="ident">input</span>.<span class="ident">to_owned</span>());
+                    }
+                }
+                <span class="comment">// stop to handle remain contents</span>
+                <span class="kw">if</span> <span class="ident">item</span>.<span class="ident">time</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">end_time</span> {
+                    <span class="kw">return</span> <span class="prelude-val">None</span>;
+                }
+                <span class="kw">if</span> <span class="ident">item</span>.<span class="ident">time</span> <span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">begin_time</span> {
+                    <span class="kw">continue</span>;
+                }
+                <span class="comment">// always keep unknown level log</span>
+                <span class="kw">if</span> <span class="ident">item</span>.<span class="ident">get_level</span>() <span class="op">!</span><span class="op">=</span> <span class="ident">LogLevel</span>::<span class="ident">Unknown</span>
+                    <span class="kw-2">&amp;</span><span class="op">&amp;</span> <span class="self">self</span>.<span class="ident">level_flag</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span>
+                    <span class="kw-2">&amp;</span><span class="op">&amp;</span> <span class="self">self</span>.<span class="ident">level_flag</span> <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> (<span class="ident">item</span>.<span class="ident">level</span> <span class="kw">as</span> <span class="ident">usize</span>)) <span class="op">=</span><span class="op">=</span> <span class="number">0</span>
+                {
+                    <span class="kw">continue</span>;
+                }
+                <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">patterns</span>.<span class="ident">is_empty</span>() {
+                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">not_match</span> <span class="op">=</span> <span class="bool-val">false</span>;
+                    <span class="kw">for</span> <span class="ident">pattern</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">patterns</span>.<span class="ident">iter</span>() {
+                        <span class="kw">if</span> <span class="op">!</span><span class="ident">pattern</span>.<span class="ident">is_match</span>(<span class="kw-2">&amp;</span><span class="ident">item</span>.<span class="ident">message</span>) {
+                            <span class="ident">not_match</span> <span class="op">=</span> <span class="bool-val">true</span>;
+                            <span class="kw">break</span>;
+                        }
+                    }
+                    <span class="kw">if</span> <span class="ident">not_match</span> {
                         <span class="kw">continue</span>;
                     }
                 }
+                <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">item</span>);
             }
         }
         <span class="prelude-val">None</span>
@@ -954,12 +1035,12 @@
 }
 
 <span class="doccomment">/// Parses the single log line and retrieve the log meta and log body.</span>
-<span class="kw">fn</span> <span class="ident">parse</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">IResult</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">str</span>, (<span class="ident">i64</span>, <span class="ident">LogLevel</span>)<span class="op">&gt;</span> {
-    <span class="kw">let</span> (<span class="ident">content</span>, (<span class="ident">time</span>, <span class="ident">level</span>, <span class="kw">_</span>)) <span class="op">=</span> <span class="ident">tuple</span>((<span class="ident">parse_time</span>, <span class="ident">parse_level</span>, <span class="ident">space1</span>))(<span class="ident">input</span>)<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">timestamp</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">DateTime</span>::<span class="ident">parse_from_str</span>(<span class="ident">time</span>, <span class="string">&quot;%Y/%m/%d %H:%M:%S%.3f %z&quot;</span>) {
-        <span class="prelude-val">Ok</span>(<span class="ident">t</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">t</span>.<span class="ident">timestamp_millis</span>(),
-        <span class="prelude-val">Err</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">INVALID_TIMESTAMP</span>,
-    };
+<span class="kw">fn</span> <span class="ident">parse</span>(<span class="ident">input</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span><span class="ident">str</span>, (<span class="ident">i64</span>, <span class="ident">LogLevel</span>)), <span class="ident">Error</span><span class="op">&gt;</span> {
+    <span class="kw">let</span> (<span class="ident">content</span>, (<span class="ident">time</span>, <span class="ident">level</span>, <span class="kw">_</span>)) <span class="op">=</span> <span class="ident">tuple</span>((<span class="ident">parse_time</span>, <span class="ident">parse_level</span>, <span class="ident">space1</span>))(<span class="ident">input</span>)
+        .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">err</span><span class="op">|</span> <span class="ident">Error</span>::<span class="ident">ParseError</span>(<span class="ident">err</span>.<span class="ident">to_string</span>()))<span class="question-mark">?</span>;
+    <span class="kw">let</span> <span class="ident">timestamp</span> <span class="op">=</span> <span class="ident">DateTime</span>::<span class="ident">parse_from_str</span>(<span class="ident">time</span>, <span class="string">&quot;%Y/%m/%d %H:%M:%S%.3f %z&quot;</span>)
+        .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">err</span><span class="op">|</span> <span class="ident">Error</span>::<span class="ident">ParseError</span>(<span class="ident">err</span>.<span class="ident">to_string</span>()))<span class="question-mark">?</span>
+        .<span class="ident">timestamp_millis</span>();
     <span class="kw">let</span> <span class="ident">level</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">level</span> {
         <span class="string">&quot;trace&quot;</span> <span class="op">|</span> <span class="string">&quot;TRACE&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">LogLevel</span>::<span class="ident">Trace</span>,
         <span class="string">&quot;debug&quot;</span> <span class="op">|</span> <span class="string">&quot;DEBUG&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">LogLevel</span>::<span class="ident">Debug</span>,
@@ -975,36 +1056,44 @@
 <span class="doccomment">/// Parses the start time and end time of a log file and return the maximal and minimal</span>
 <span class="doccomment">/// timestamp in unix milliseconds.</span>
 <span class="kw">fn</span> <span class="ident">parse_time_range</span>(<span class="ident">file</span>: <span class="kw-2">&amp;</span><span class="ident">std</span>::<span class="ident">fs</span>::<span class="ident">File</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">i64</span>, <span class="ident">i64</span>), <span class="ident">Error</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">buffer</span> <span class="op">=</span> <span class="ident">BufReader</span>::<span class="ident">new</span>(<span class="ident">file</span>);
-    <span class="kw">let</span> <span class="ident">file_start_time</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">buffer</span>.<span class="ident">lines</span>().<span class="ident">next</span>() {
-        <span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(<span class="ident">line</span>)) <span class="op">=</span><span class="op">&gt;</span> {
-            <span class="kw">let</span> (<span class="kw">_</span>, (<span class="ident">time</span>, <span class="kw">_</span>)) <span class="op">=</span>
-                <span class="ident">parse</span>(<span class="kw-2">&amp;</span><span class="ident">line</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">err</span><span class="op">|</span> <span class="ident">Error</span>::<span class="ident">ParseError</span>(<span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;Parse error: {:?}&quot;</span>, <span class="ident">err</span>)))<span class="question-mark">?</span>;
-            <span class="ident">time</span>
-        }
-        <span class="prelude-val">Some</span>(<span class="prelude-val">Err</span>(<span class="ident">err</span>)) <span class="op">=</span><span class="op">&gt;</span> {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">err</span>.<span class="ident">into</span>());
-        }
-        <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">INVALID_TIMESTAMP</span>,
-    };
-
-    <span class="kw">let</span> <span class="ident">buffer</span> <span class="op">=</span> <span class="ident">BufReader</span>::<span class="ident">new</span>(<span class="ident">file</span>);
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rev_lines</span> <span class="op">=</span> <span class="ident">rev_lines</span>::<span class="ident">RevLines</span>::<span class="ident">with_capacity</span>(<span class="number">512</span>, <span class="ident">buffer</span>)<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">file_end_time</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">rev_lines</span>.<span class="ident">next</span>() {
-        <span class="prelude-val">Some</span>(<span class="ident">line</span>) <span class="op">=</span><span class="op">&gt;</span> {
-            <span class="kw">let</span> (<span class="kw">_</span>, (<span class="ident">time</span>, <span class="kw">_</span>)) <span class="op">=</span>
-                <span class="ident">parse</span>(<span class="kw-2">&amp;</span><span class="ident">line</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">err</span><span class="op">|</span> <span class="ident">Error</span>::<span class="ident">ParseError</span>(<span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;Parse error: {:?}&quot;</span>, <span class="ident">err</span>)))<span class="question-mark">?</span>;
-            <span class="ident">time</span>
-        }
-        <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">INVALID_TIMESTAMP</span>,
-    };
+    <span class="kw">let</span> <span class="ident">file_start_time</span> <span class="op">=</span> <span class="ident">parse_start_time</span>(<span class="ident">file</span>, <span class="number">10</span>)<span class="question-mark">?</span>;
+    <span class="kw">let</span> <span class="ident">file_end_time</span> <span class="op">=</span> <span class="ident">parse_end_time</span>(<span class="ident">file</span>, <span class="number">10</span>)<span class="question-mark">?</span>;
     <span class="prelude-val">Ok</span>((<span class="ident">file_start_time</span>, <span class="ident">file_end_time</span>))
+}
+
+<span class="kw">fn</span> <span class="ident">parse_start_time</span>(<span class="ident">file</span>: <span class="kw-2">&amp;</span><span class="ident">std</span>::<span class="ident">fs</span>::<span class="ident">File</span>, <span class="ident">try_lines</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">i64</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="ident">buffer</span> <span class="op">=</span> <span class="ident">BufReader</span>::<span class="ident">new</span>(<span class="ident">file</span>);
+    <span class="kw">for</span> (<span class="ident">i</span>, <span class="ident">line</span>) <span class="kw">in</span> <span class="ident">buffer</span>.<span class="ident">lines</span>().<span class="ident">enumerate</span>() {
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>((<span class="kw">_</span>, (<span class="ident">time</span>, <span class="kw">_</span>))) <span class="op">=</span> <span class="ident">parse</span>(<span class="kw-2">&amp;</span><span class="ident">line</span><span class="question-mark">?</span>) {
+            <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">time</span>);
+        }
+        <span class="kw">if</span> <span class="ident">i</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">try_lines</span> {
+            <span class="kw">break</span>;
+        }
+    }
+
+    <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">ParseError</span>(<span class="string">&quot;Invalid log file&quot;</span>.<span class="ident">to_string</span>()))
+}
+
+<span class="kw">fn</span> <span class="ident">parse_end_time</span>(<span class="ident">file</span>: <span class="kw-2">&amp;</span><span class="ident">std</span>::<span class="ident">fs</span>::<span class="ident">File</span>, <span class="ident">try_lines</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">i64</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="ident">buffer</span> <span class="op">=</span> <span class="ident">BufReader</span>::<span class="ident">new</span>(<span class="ident">file</span>);
+    <span class="kw">let</span> <span class="ident">rev_lines</span> <span class="op">=</span> <span class="ident">rev_lines</span>::<span class="ident">RevLines</span>::<span class="ident">with_capacity</span>(<span class="number">512</span>, <span class="ident">buffer</span>)<span class="question-mark">?</span>;
+    <span class="kw">for</span> (<span class="ident">i</span>, <span class="ident">line</span>) <span class="kw">in</span> <span class="ident">rev_lines</span>.<span class="ident">enumerate</span>() {
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>((<span class="kw">_</span>, (<span class="ident">time</span>, <span class="kw">_</span>))) <span class="op">=</span> <span class="ident">parse</span>(<span class="kw-2">&amp;</span><span class="ident">line</span>) {
+            <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">time</span>);
+        }
+        <span class="kw">if</span> <span class="ident">i</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">try_lines</span> {
+            <span class="kw">break</span>;
+        }
+    }
+
+    <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">ParseError</span>(<span class="string">&quot;Invalid log file&quot;</span>.<span class="ident">to_string</span>()))
 }
 
 <span class="comment">// Batch size of the log streaming</span>
 <span class="kw">const</span> <span class="ident">LOG_ITEM_BATCH_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">256</span>;
 
-<span class="kw">fn</span> <span class="ident">bacth_log_item</span>(<span class="ident">item</span>: <span class="ident">LogIterator</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw">impl</span> <span class="ident">Stream</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">SearchLogResponse</span>, <span class="ident">Error</span> <span class="op">=</span> ()<span class="op">&gt;</span> {
+<span class="kw">fn</span> <span class="ident">batch_log_item</span>(<span class="ident">item</span>: <span class="ident">LogIterator</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw">impl</span> <span class="ident">Stream</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">SearchLogResponse</span>, <span class="ident">Error</span> <span class="op">=</span> ()<span class="op">&gt;</span> {
     <span class="ident">iter_ok</span>(<span class="ident">item</span>.<span class="ident">batching</span>(<span class="op">|</span><span class="ident">iter</span><span class="op">|</span> {
         <span class="kw">let</span> <span class="ident">batch</span> <span class="op">=</span> <span class="ident">iter</span>.<span class="ident">take</span>(<span class="ident">LOG_ITEM_BATCH_SIZE</span>).<span class="ident">collect_vec</span>();
         <span class="kw">if</span> <span class="ident">batch</span>.<span class="ident">is_empty</span>() {
@@ -1022,7 +1111,7 @@
     <span class="kw-2">mut</span> <span class="ident">req</span>: <span class="ident">SearchLogRequest</span>,
 ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw">impl</span> <span class="ident">Stream</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">SearchLogResponse</span>, <span class="ident">Error</span> <span class="op">=</span> ()<span class="op">&gt;</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
     <span class="kw">if</span> <span class="op">!</span><span class="ident">log_file</span>.<span class="ident">as_ref</span>().<span class="ident">exists</span>() {
-        <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">bacth_log_item</span>(<span class="ident">LogIterator</span>::<span class="ident">default</span>()));
+        <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">batch_log_item</span>(<span class="ident">LogIterator</span>::<span class="ident">default</span>()));
     }
     <span class="kw">let</span> <span class="ident">begin_time</span> <span class="op">=</span> <span class="ident">req</span>.<span class="ident">get_start_time</span>();
     <span class="kw">let</span> <span class="ident">end_time</span> <span class="op">=</span> <span class="ident">req</span>.<span class="ident">get_end_time</span>();
@@ -1037,7 +1126,7 @@
         .<span class="ident">into_iter</span>()
         .<span class="ident">fold</span>(<span class="number">0</span>, <span class="op">|</span><span class="ident">acc</span>, <span class="ident">x</span><span class="op">|</span> <span class="ident">acc</span> <span class="op">|</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> (<span class="ident">x</span> <span class="kw">as</span> <span class="ident">usize</span>)));
     <span class="kw">let</span> <span class="ident">item</span> <span class="op">=</span> <span class="ident">LogIterator</span>::<span class="ident">new</span>(<span class="ident">log_file</span>, <span class="ident">begin_time</span>, <span class="ident">end_time</span>, <span class="ident">level_flag</span>, <span class="ident">patterns</span>)<span class="question-mark">?</span>;
-    <span class="prelude-val">Ok</span>(<span class="ident">bacth_log_item</span>(<span class="ident">item</span>))
+    <span class="prelude-val">Ok</span>(<span class="ident">batch_log_item</span>(<span class="ident">item</span>))
 }
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
@@ -1078,10 +1167,9 @@
     }
 
     <span class="kw">fn</span> <span class="ident">timestamp</span>(<span class="ident">time</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">i64</span> {
-        <span class="kw">match</span> <span class="ident">DateTime</span>::<span class="ident">parse_from_str</span>(<span class="ident">time</span>, <span class="string">&quot;%Y/%m/%d %H:%M:%S%.3f %z&quot;</span>) {
-            <span class="prelude-val">Ok</span>(<span class="ident">t</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">t</span>.<span class="ident">timestamp_millis</span>(),
-            <span class="prelude-val">Err</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">INVALID_TIMESTAMP</span>,
-        }
+        <span class="ident">DateTime</span>::<span class="ident">parse_from_str</span>(<span class="ident">time</span>, <span class="string">&quot;%Y/%m/%d %H:%M:%S%.3f %z&quot;</span>)
+            .<span class="ident">unwrap</span>()
+            .<span class="ident">timestamp_millis</span>()
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
@@ -1209,6 +1297,33 @@
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
+    <span class="kw">fn</span> <span class="ident">test_parse_time_range_with_invalid_logs</span>() {
+        <span class="kw">let</span> <span class="ident">dir</span> <span class="op">=</span> <span class="ident">tempdir</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">log_file</span> <span class="op">=</span> <span class="ident">dir</span>.<span class="ident">path</span>().<span class="ident">join</span>(<span class="string">&quot;tikv.log&quot;</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">file</span> <span class="op">=</span> <span class="ident">File</span>::<span class="ident">create</span>(<span class="kw-2">&amp;</span><span class="ident">log_file</span>).<span class="ident">unwrap</span>();
+        <span class="macro">write</span><span class="macro">!</span>(
+            <span class="ident">file</span>,
+            <span class="string">r#&quot;Some invalid logs in the beginning,
+Hello TiKV,
+[2019/08/23 18:09:52.387 +08:00] [warning] [foo.rs:100] [some message] [key=val]
+[2019/08/23 18:09:53.387 +08:00] [INFO] [foo.rs:100] [some message] [key=val]
+[2019/08/23 18:09:54.387 +08:00] [trace] [foo.rs:100] [some message] [key=val]
+[2019/08/23 18:09:55.387 +08:00] [DEBUG] [foo.rs:100] [some message] [key=val]
+[2019/08/23 18:09:56.387 +08:00] [ERROR] [foo.rs:100] [some message] [key=val]
+[2019/08/23 18:09:57.387 +08:00] [CRITICAL] [foo.rs:100] [some message] [key=val]
+[2019/08/23 18:09:58.387 +08:00] [WARN] [foo.rs:100] [some message] [key=val]
+Welcome to TiKV,
+Some invalid logs in the end,&quot;#</span>
+        )
+        .<span class="ident">unwrap</span>();
+
+        <span class="kw">let</span> <span class="ident">file</span> <span class="op">=</span> <span class="ident">File</span>::<span class="ident">open</span>(<span class="kw-2">&amp;</span><span class="ident">log_file</span>).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">start_time</span> <span class="op">=</span> <span class="ident">timestamp</span>(<span class="string">&quot;2019/08/23 18:09:52.387 +08:00&quot;</span>);
+        <span class="kw">let</span> <span class="ident">end_time</span> <span class="op">=</span> <span class="ident">timestamp</span>(<span class="string">&quot;2019/08/23 18:09:58.387 +08:00&quot;</span>);
+        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">parse_time_range</span>(<span class="kw-2">&amp;</span><span class="ident">file</span>).<span class="ident">unwrap</span>(), (<span class="ident">start_time</span>, <span class="ident">end_time</span>));
+    }
+
+    <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_log_iterator</span>() {
         <span class="kw">let</span> <span class="ident">dir</span> <span class="op">=</span> <span class="ident">tempdir</span>().<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">log_file</span> <span class="op">=</span> <span class="ident">dir</span>.<span class="ident">path</span>().<span class="ident">join</span>(<span class="string">&quot;tikv.log&quot;</span>);
@@ -1218,7 +1333,9 @@
             <span class="string">r#&quot;[2019/08/23 18:09:53.387 +08:00] [INFO] [foo.rs:100] [some message] [key=val]
 [2019/08/23 18:09:54.387 +08:00] [trace] [foo.rs:100] [some message] [key=val]
 [2019/08/23 18:09:55.387 +08:00] [DEBUG] [foo.rs:100] [some message] [key=val]
+Some invalid logs 1: Welcome to TiKV
 [2019/08/23 18:09:56.387 +08:00] [ERROR] [foo.rs:100] [some message] [key=val]
+Some invalid logs 2: Welcome to TiKV
 [2019/08/23 18:09:57.387 +08:00] [CRITICAL] [foo.rs:100] [some message] [key=val]
 [2019/08/23 18:09:58.387 +08:00] [WARN] [foo.rs:100] [some message] [key=val] - test-filter
 [2019/08/23 18:09:59.387 +08:00] [warning] [foo.rs:100] [some message] [key=val]&quot;#</span>
@@ -1232,9 +1349,11 @@
             <span class="string">r#&quot;[2019/08/23 18:10:01.387 +08:00] [INFO] [foo.rs:100] [some message] [key=val]
 [2019/08/23 18:10:02.387 +08:00] [trace] [foo.rs:100] [some message] [key=val]
 [2019/08/23 18:10:03.387 +08:00] [DEBUG] [foo.rs:100] [some message] [key=val]
+Some invalid logs 3: Welcome to TiKV
 [2019/08/23 18:10:04.387 +08:00] [ERROR] [foo.rs:100] [some message] [key=val]
 [2019/08/23 18:10:05.387 +08:00] [CRITICAL] [foo.rs:100] [some message] [key=val]
-[2019/08/23 18:10:06.387 +08:00] [WARN] [foo.rs:100] [some message] [key=val]&quot;#</span>
+[2019/08/23 18:10:06.387 +08:00] [WARN] [foo.rs:100] [some message] [key=val]
+Some invalid logs 4: Welcome to TiKV - test-filter&quot;#</span>
         )
         .<span class="ident">unwrap</span>();
 
@@ -1245,16 +1364,20 @@
             <span class="string">&quot;2019/08/23 18:09:53.387 +08:00&quot;</span>,
             <span class="string">&quot;2019/08/23 18:09:54.387 +08:00&quot;</span>,
             <span class="string">&quot;2019/08/23 18:09:55.387 +08:00&quot;</span>,
+            <span class="string">&quot;2019/08/23 18:09:55.387 +08:00&quot;</span>, <span class="comment">// for invalid line</span>
             <span class="string">&quot;2019/08/23 18:09:56.387 +08:00&quot;</span>,
+            <span class="string">&quot;2019/08/23 18:09:56.387 +08:00&quot;</span>, <span class="comment">// for invalid line</span>
             <span class="string">&quot;2019/08/23 18:09:57.387 +08:00&quot;</span>,
             <span class="string">&quot;2019/08/23 18:09:58.387 +08:00&quot;</span>,
             <span class="string">&quot;2019/08/23 18:09:59.387 +08:00&quot;</span>,
             <span class="string">&quot;2019/08/23 18:10:01.387 +08:00&quot;</span>,
             <span class="string">&quot;2019/08/23 18:10:02.387 +08:00&quot;</span>,
             <span class="string">&quot;2019/08/23 18:10:03.387 +08:00&quot;</span>,
+            <span class="string">&quot;2019/08/23 18:10:03.387 +08:00&quot;</span>, <span class="comment">// for invalid line</span>
             <span class="string">&quot;2019/08/23 18:10:04.387 +08:00&quot;</span>,
             <span class="string">&quot;2019/08/23 18:10:05.387 +08:00&quot;</span>,
             <span class="string">&quot;2019/08/23 18:10:06.387 +08:00&quot;</span>,
+            <span class="string">&quot;2019/08/23 18:10:06.387 +08:00&quot;</span>, <span class="comment">// for invalid line</span>
         ]
         .<span class="ident">iter</span>()
         .<span class="ident">map</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">timestamp</span>(<span class="ident">s</span>))
@@ -1275,12 +1398,14 @@
         .<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">expected</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
             <span class="string">&quot;2019/08/23 18:09:56.387 +08:00&quot;</span>,
+            <span class="string">&quot;2019/08/23 18:09:56.387 +08:00&quot;</span>, <span class="comment">// for invalid line</span>
             <span class="string">&quot;2019/08/23 18:09:57.387 +08:00&quot;</span>,
             <span class="string">&quot;2019/08/23 18:09:58.387 +08:00&quot;</span>,
             <span class="string">&quot;2019/08/23 18:09:59.387 +08:00&quot;</span>,
             <span class="string">&quot;2019/08/23 18:10:01.387 +08:00&quot;</span>,
             <span class="string">&quot;2019/08/23 18:10:02.387 +08:00&quot;</span>,
             <span class="string">&quot;2019/08/23 18:10:03.387 +08:00&quot;</span>,
+            <span class="string">&quot;2019/08/23 18:10:03.387 +08:00&quot;</span>, <span class="comment">// for invalid line</span>
         ]
         .<span class="ident">iter</span>()
         .<span class="ident">map</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">timestamp</span>(<span class="ident">s</span>))
@@ -1289,6 +1414,7 @@
             <span class="ident">log_iter</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">m</span><span class="op">|</span> <span class="ident">m</span>.<span class="ident">get_time</span>()).<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">i64</span><span class="op">&gt;</span><span class="op">&gt;</span>(),
             <span class="ident">expected</span>
         );
+
         <span class="kw">let</span> <span class="ident">log_iter</span> <span class="op">=</span> <span class="ident">LogIterator</span>::<span class="ident">new</span>(
             <span class="kw-2">&amp;</span><span class="ident">log_file</span>,
             <span class="ident">timestamp</span>(<span class="string">&quot;2019/08/23 18:09:56.387 +08:00&quot;</span>),
@@ -1299,6 +1425,7 @@
         .<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">expected</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
             <span class="string">&quot;2019/08/23 18:09:56.387 +08:00&quot;</span>,
+            <span class="string">&quot;2019/08/23 18:09:56.387 +08:00&quot;</span>, <span class="comment">// for invalid line</span>
             <span class="string">&quot;2019/08/23 18:09:57.387 +08:00&quot;</span>,
             <span class="string">&quot;2019/08/23 18:09:58.387 +08:00&quot;</span>,
         ]
@@ -1319,7 +1446,6 @@
             <span class="macro">vec</span><span class="macro">!</span>[],
         )
         .<span class="ident">unwrap</span>();
-
         <span class="kw">let</span> <span class="ident">expected</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[<span class="string">&quot;2019/08/23 18:09:53.387 +08:00&quot;</span>]
             .<span class="ident">iter</span>()
             .<span class="ident">map</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">timestamp</span>(<span class="ident">s</span>))
@@ -1342,6 +1468,7 @@
                 <span class="string">&quot;2019/08/23 18:09:58.387 +08:00&quot;</span>,
                 <span class="string">&quot;2019/08/23 18:09:59.387 +08:00&quot;</span>,
                 <span class="string">&quot;2019/08/23 18:10:06.387 +08:00&quot;</span>,
+                <span class="string">&quot;2019/08/23 18:10:06.387 +08:00&quot;</span>, <span class="comment">// for invalid line</span>
             ]
             .<span class="ident">iter</span>()
             .<span class="ident">map</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">timestamp</span>(<span class="ident">s</span>))
@@ -1361,10 +1488,13 @@
             <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">regex</span>::<span class="ident">Regex</span>::<span class="ident">new</span>(<span class="string">&quot;.*test-filter.*&quot;</span>).<span class="ident">unwrap</span>()],
         )
         .<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">expected</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[<span class="string">&quot;2019/08/23 18:09:58.387 +08:00&quot;</span>]
-            .<span class="ident">iter</span>()
-            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">timestamp</span>(<span class="ident">s</span>))
-            .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">i64</span><span class="op">&gt;</span><span class="op">&gt;</span>();
+        <span class="kw">let</span> <span class="ident">expected</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
+            <span class="string">&quot;2019/08/23 18:09:58.387 +08:00&quot;</span>,
+            <span class="string">&quot;2019/08/23 18:10:06.387 +08:00&quot;</span>, <span class="comment">// for invalid line</span>
+        ]
+        .<span class="ident">iter</span>()
+        .<span class="ident">map</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">timestamp</span>(<span class="ident">s</span>))
+        .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">i64</span><span class="op">&gt;</span><span class="op">&gt;</span>();
         <span class="macro">assert_eq</span><span class="macro">!</span>(
             <span class="ident">log_iter</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">m</span><span class="op">|</span> <span class="ident">m</span>.<span class="ident">get_time</span>()).<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">i64</span><span class="op">&gt;</span><span class="op">&gt;</span>(),
             <span class="ident">expected</span>
@@ -1388,6 +1518,7 @@
         )
         .<span class="ident">unwrap</span>();
 
+        <span class="comment">// this file is ignored because its filename is not expected</span>
         <span class="kw">let</span> <span class="ident">log_file2</span> <span class="op">=</span> <span class="ident">dir</span>.<span class="ident">path</span>().<span class="ident">join</span>(<span class="string">&quot;tikv.log.2&quot;</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">file</span> <span class="op">=</span> <span class="ident">File</span>::<span class="ident">create</span>(<span class="kw-2">&amp;</span><span class="ident">log_file2</span>).<span class="ident">unwrap</span>();
         <span class="macro">write</span><span class="macro">!</span>(
@@ -1408,10 +1539,12 @@
             <span class="string">r#&quot;[2019/08/23 18:11:53.387 +08:00] [INFO] [foo.rs:100] [some message] [key=val]
 [2019/08/23 18:11:54.387 +08:00] [trace] [foo.rs:100] [some message] [key=val]
 [2019/08/23 18:11:55.387 +08:00] [DEBUG] [foo.rs:100] [some message] [key=val]
+Some invalid logs 1: Welcome to TiKV - test-filter
 [2019/08/23 18:11:56.387 +08:00] [ERROR] [foo.rs:100] [some message] [key=val]
 [2019/08/23 18:11:57.387 +08:00] [CRITICAL] [foo.rs:100] [some message] [key=val]
 [2019/08/23 18:11:58.387 +08:00] [WARN] [foo.rs:100] [some message] [key=val] - test-filter
-[2019/08/23 18:11:59.387 +08:00] [warning] [foo.rs:100] [some message] [key=val]&quot;#</span>
+[2019/08/23 18:11:59.387 +08:00] [warning] [foo.rs:100] [some message] [key=val]
+Some invalid logs 2: Welcome to TiKV - test-filter&quot;#</span>
         )
         .<span class="ident">unwrap</span>();
 
@@ -1423,6 +1556,7 @@
         <span class="kw">let</span> <span class="ident">expected</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
             <span class="string">&quot;2019/08/23 18:09:58.387 +08:00&quot;</span>,
             <span class="string">&quot;2019/08/23 18:11:58.387 +08:00&quot;</span>,
+            <span class="string">&quot;2019/08/23 18:11:59.387 +08:00&quot;</span>, <span class="comment">// for invalid line</span>
         ]
         .<span class="ident">iter</span>()
         .<span class="ident">map</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">timestamp</span>(<span class="ident">s</span>))

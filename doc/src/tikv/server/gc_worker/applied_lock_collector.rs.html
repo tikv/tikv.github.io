@@ -801,6 +801,12 @@
 <span id="801">801</span>
 <span id="802">802</span>
 <span id="803">803</span>
+<span id="804">804</span>
+<span id="805">805</span>
+<span id="806">806</span>
+<span id="807">807</span>
+<span id="808">808</span>
+<span id="809">809</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -814,12 +820,12 @@
 <span class="kw">use</span> <span class="ident">engine_rocks</span>::<span class="ident">RocksEngine</span>;
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">CfName</span>, <span class="ident">CF_LOCK</span>};
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">kvrpcpb</span>::<span class="ident">LockInfo</span>;
-<span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">raft_cmdpb</span>::{<span class="ident">CmdType</span>, <span class="ident">Request</span> <span class="kw">as</span> <span class="ident">RaftRequest</span>};
+<span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">raft_cmdpb</span>::<span class="ident">CmdType</span>;
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">worker</span>::{<span class="ident">Builder</span> <span class="kw">as</span> <span class="ident">WorkerBuilder</span>, <span class="ident">Runnable</span>, <span class="ident">ScheduleError</span>, <span class="ident">Scheduler</span>, <span class="ident">Worker</span>};
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">mvcc</span>::{<span class="ident">Error</span> <span class="kw">as</span> <span class="ident">MvccError</span>, <span class="ident">Lock</span>, <span class="ident">TimeStamp</span>};
 <span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">coprocessor</span>::{
-    <span class="ident">ApplySnapshotObserver</span>, <span class="ident">BoxApplySnapshotObserver</span>, <span class="ident">BoxQueryObserver</span>, <span class="ident">Coprocessor</span>,
+    <span class="ident">ApplySnapshotObserver</span>, <span class="ident">BoxApplySnapshotObserver</span>, <span class="ident">BoxQueryObserver</span>, <span class="ident">Cmd</span>, <span class="ident">Coprocessor</span>,
     <span class="ident">CoprocessorHost</span>, <span class="ident">ObserverContext</span>, <span class="ident">QueryObserver</span>,
 };
 
@@ -939,15 +945,17 @@
             .<span class="ident">sender</span>
             .<span class="ident">schedule</span>(<span class="ident">LockCollectorTask</span>::<span class="ident">ObservedLocks</span>(<span class="ident">locks</span>));
         <span class="comment">// Wrap the fail point in a closure, so we can modify local variables without return.</span>
-        <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused_mut</span>)]</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">send_fp</span> <span class="op">=</span> <span class="op">|</span><span class="op">|</span> {
-            <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;lock_observer_send&quot;</span>, <span class="op">|</span><span class="kw">_</span><span class="op">|</span> {
-                <span class="kw-2">*</span><span class="ident">res</span> <span class="op">=</span> <span class="prelude-val">Err</span>(<span class="ident">ScheduleError</span>::<span class="ident">Full</span>(<span class="ident">LockCollectorTask</span>::<span class="ident">ObservedLocks</span>(
-                    <span class="macro">vec</span><span class="macro">!</span>[],
-                )));
-            })
-        };
-        <span class="ident">send_fp</span>();
+        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;failpoints&quot;</span>)]</span>
+        {
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">send_fp</span> <span class="op">=</span> <span class="op">|</span><span class="op">|</span> {
+                <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;lock_observer_send&quot;</span>, <span class="op">|</span><span class="kw">_</span><span class="op">|</span> {
+                    <span class="kw-2">*</span><span class="ident">res</span> <span class="op">=</span> <span class="prelude-val">Err</span>(<span class="ident">ScheduleError</span>::<span class="ident">Full</span>(<span class="ident">LockCollectorTask</span>::<span class="ident">ObservedLocks</span>(
+                        <span class="macro">vec</span><span class="macro">!</span>[],
+                    )));
+                })
+            };
+            <span class="ident">send_fp</span>();
+        }
 
         <span class="kw">match</span> <span class="ident">res</span> {
             <span class="prelude-val">Ok</span>(()) <span class="op">=</span><span class="op">&gt;</span> (),
@@ -965,19 +973,20 @@
 <span class="kw">impl</span> <span class="ident">Coprocessor</span> <span class="kw">for</span> <span class="ident">LockObserver</span> {}
 
 <span class="kw">impl</span> <span class="ident">QueryObserver</span> <span class="kw">for</span> <span class="ident">LockObserver</span> {
-    <span class="kw">fn</span> <span class="ident">pre_apply_query</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ObserverContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>, <span class="ident">requests</span>: <span class="kw-2">&amp;</span>[<span class="ident">RaftRequest</span>]) {
-        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">state</span>.<span class="ident">is_clean</span>() {
-            <span class="kw">return</span>;
-        }
-
+    <span class="kw">fn</span> <span class="ident">post_apply_query</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ObserverContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>, <span class="ident">cmd</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Cmd</span>) {
+        <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;notify_lock_observer_query&quot;</span>);
         <span class="kw">let</span> <span class="ident">max_ts</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">state</span>.<span class="ident">load_max_ts</span>();
         <span class="kw">if</span> <span class="ident">max_ts</span>.<span class="ident">is_zero</span>() {
             <span class="kw">return</span>;
         }
 
+        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">state</span>.<span class="ident">is_clean</span>() {
+            <span class="kw">return</span>;
+        }
+
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">locks</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[];
         <span class="comment">// For each put in CF_LOCK, collect it if its ts &lt;= max_ts.</span>
-        <span class="kw">for</span> <span class="ident">req</span> <span class="kw">in</span> <span class="ident">requests</span> {
+        <span class="kw">for</span> <span class="ident">req</span> <span class="kw">in</span> <span class="ident">cmd</span>.<span class="ident">request</span>.<span class="ident">get_requests</span>() {
             <span class="kw">if</span> <span class="ident">req</span>.<span class="ident">get_cmd_type</span>() <span class="op">!</span><span class="op">=</span> <span class="ident">CmdType</span>::<span class="ident">Put</span> {
                 <span class="kw">continue</span>;
             }
@@ -1011,22 +1020,23 @@
 }
 
 <span class="kw">impl</span> <span class="ident">ApplySnapshotObserver</span> <span class="kw">for</span> <span class="ident">LockObserver</span> {
-    <span class="kw">fn</span> <span class="ident">pre_apply_plain_kvs</span>(
+    <span class="kw">fn</span> <span class="ident">apply_plain_kvs</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ObserverContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>,
         <span class="ident">cf</span>: <span class="ident">CfName</span>,
         <span class="ident">kv_pairs</span>: <span class="kw-2">&amp;</span>[(<span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>)],
     ) {
+        <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;notify_lock_observer_snapshot&quot;</span>);
         <span class="kw">if</span> <span class="ident">cf</span> <span class="op">!</span><span class="op">=</span> <span class="ident">CF_LOCK</span> {
-            <span class="kw">return</span>;
-        }
-
-        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">state</span>.<span class="ident">is_clean</span>() {
             <span class="kw">return</span>;
         }
 
         <span class="kw">let</span> <span class="ident">max_ts</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">state</span>.<span class="ident">load_max_ts</span>();
         <span class="kw">if</span> <span class="ident">max_ts</span>.<span class="ident">is_zero</span>() {
+            <span class="kw">return</span>;
+        }
+
+        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">state</span>.<span class="ident">is_clean</span>() {
             <span class="kw">return</span>;
         }
 
@@ -1039,7 +1049,7 @@
             })
             .<span class="ident">filter</span>(<span class="op">|</span><span class="ident">result</span><span class="op">|</span> <span class="ident">result</span>.<span class="ident">is_err</span>() <span class="op">|</span><span class="op">|</span> <span class="ident">result</span>.<span class="ident">as_ref</span>().<span class="ident">unwrap</span>().<span class="number">1</span>.<span class="ident">ts</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">max_ts</span>)
             .<span class="ident">map</span>(<span class="op">|</span><span class="ident">result</span><span class="op">|</span> {
-                <span class="comment">// `pre_apply_plain_keys` will be invoked with the data_key in RocksDB layer. So we</span>
+                <span class="comment">// `apply_plain_keys` will be invoked with the data_key in RocksDB layer. So we</span>
                 <span class="comment">// need to remove the `z` prefix.</span>
                 <span class="ident">result</span>.<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">key</span>, <span class="ident">lock</span>)<span class="op">|</span> (<span class="ident">Key</span>::<span class="ident">from_encoded_slice</span>(<span class="ident">origin_key</span>(<span class="ident">key</span>)), <span class="ident">lock</span>))
             })
@@ -1057,7 +1067,7 @@
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">pre_apply_sst</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ObserverContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>, <span class="ident">cf</span>: <span class="ident">CfName</span>, <span class="ident">_path</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) {
+    <span class="kw">fn</span> <span class="ident">apply_sst</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ObserverContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>, <span class="ident">cf</span>: <span class="ident">CfName</span>, <span class="ident">_path</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) {
         <span class="kw">if</span> <span class="ident">cf</span> <span class="op">=</span><span class="op">=</span> <span class="ident">CF_LOCK</span> {
             <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;cannot collect all applied lock: snapshot of lock cf applied from sst file&quot;</span>);
             <span class="self">self</span>.<span class="ident">state</span>.<span class="ident">mark_dirty</span>();
@@ -1263,7 +1273,9 @@
     <span class="kw">use</span> <span class="ident">engine_traits</span>::<span class="ident">CF_DEFAULT</span>;
     <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">kvrpcpb</span>::<span class="ident">Op</span>;
     <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">metapb</span>::<span class="ident">Region</span>;
-    <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">raft_cmdpb</span>::{<span class="ident">PutRequest</span>, <span class="ident">RaftCmdRequest</span>};
+    <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">raft_cmdpb</span>::{
+        <span class="ident">PutRequest</span>, <span class="ident">RaftCmdRequest</span>, <span class="ident">RaftCmdResponse</span>, <span class="ident">Request</span> <span class="kw">as</span> <span class="ident">RaftRequest</span>,
+    };
     <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">mpsc</span>::<span class="ident">channel</span>;
     <span class="kw">use</span> <span class="ident">txn_types</span>::<span class="ident">LockType</span>;
 
@@ -1306,10 +1318,10 @@
         <span class="ident">req</span>
     }
 
-    <span class="kw">fn</span> <span class="ident">make_raft_cmd_req</span>(<span class="ident">requests</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">RaftRequest</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">RaftCmdRequest</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">RaftCmdRequest</span>::<span class="ident">default</span>();
-        <span class="ident">res</span>.<span class="ident">set_requests</span>(<span class="ident">requests</span>.<span class="ident">into</span>());
-        <span class="ident">res</span>
+    <span class="kw">fn</span> <span class="ident">make_raft_cmd</span>(<span class="ident">requests</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">RaftRequest</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Cmd</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">RaftCmdRequest</span>::<span class="ident">default</span>();
+        <span class="ident">req</span>.<span class="ident">set_requests</span>(<span class="ident">requests</span>.<span class="ident">into</span>());
+        <span class="ident">Cmd</span>::<span class="ident">new</span>(<span class="number">0</span>, <span class="ident">req</span>, <span class="ident">RaftCmdResponse</span>::<span class="ident">default</span>())
     }
 
     <span class="kw">fn</span> <span class="ident">new_test_collector</span>() <span class="op">-</span><span class="op">&gt;</span> (<span class="ident">AppliedLockCollector</span>, <span class="ident">CoprocessorHost</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>) {
@@ -1414,7 +1426,7 @@
             <span class="ident">make_apply_request</span>(<span class="string">b&quot;1&quot;</span>.<span class="ident">to_vec</span>(), <span class="string">b&quot;1&quot;</span>.<span class="ident">to_vec</span>(), <span class="ident">CF_DEFAULT</span>, <span class="ident">CmdType</span>::<span class="ident">Put</span>),
             <span class="ident">make_apply_request</span>(<span class="string">b&quot;2&quot;</span>.<span class="ident">to_vec</span>(), <span class="string">b&quot;2&quot;</span>.<span class="ident">to_vec</span>(), <span class="ident">CF_LOCK</span>, <span class="ident">CmdType</span>::<span class="ident">Delete</span>),
         ];
-        <span class="ident">coprocessor_host</span>.<span class="ident">pre_apply</span>(<span class="kw-2">&amp;</span><span class="ident">Region</span>::<span class="ident">default</span>(), <span class="kw-2">&amp;</span><span class="ident">make_raft_cmd_req</span>(<span class="ident">req</span>));
+        <span class="ident">coprocessor_host</span>.<span class="ident">post_apply</span>(<span class="kw-2">&amp;</span><span class="ident">Region</span>::<span class="ident">default</span>(), <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">make_raft_cmd</span>(<span class="ident">req</span>));
         <span class="ident">expected_result</span>.<span class="ident">push</span>(<span class="ident">locks</span>[<span class="number">0</span>].<span class="ident">clone</span>());
         <span class="macro">assert_eq</span><span class="macro">!</span>(
             <span class="ident">get_collected_locks</span>(<span class="kw-2">&amp;</span><span class="ident">c</span>, <span class="number">100</span>).<span class="ident">unwrap</span>(),
@@ -1439,7 +1451,7 @@
                 .<span class="ident">filter</span>(<span class="op">|</span><span class="ident">l</span><span class="op">|</span> <span class="ident">l</span>.<span class="ident">get_lock_version</span>() <span class="op">&lt;</span><span class="op">=</span> <span class="number">100</span>)
                 .<span class="ident">cloned</span>(),
         );
-        <span class="ident">coprocessor_host</span>.<span class="ident">pre_apply</span>(<span class="kw-2">&amp;</span><span class="ident">Region</span>::<span class="ident">default</span>(), <span class="kw-2">&amp;</span><span class="ident">make_raft_cmd_req</span>(<span class="ident">req</span>.<span class="ident">clone</span>()));
+        <span class="ident">coprocessor_host</span>.<span class="ident">post_apply</span>(<span class="kw-2">&amp;</span><span class="ident">Region</span>::<span class="ident">default</span>(), <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">make_raft_cmd</span>(<span class="ident">req</span>.<span class="ident">clone</span>()));
         <span class="macro">assert_eq</span><span class="macro">!</span>(
             <span class="ident">get_collected_locks</span>(<span class="kw-2">&amp;</span><span class="ident">c</span>, <span class="number">100</span>).<span class="ident">unwrap</span>(),
             (<span class="ident">expected_result</span>, <span class="bool-val">true</span>)
@@ -1449,7 +1461,7 @@
         <span class="comment">// dropped.</span>
         <span class="ident">start_collecting</span>(<span class="kw-2">&amp;</span><span class="ident">c</span>, <span class="number">110</span>).<span class="ident">unwrap</span>();
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">get_collected_locks</span>(<span class="kw-2">&amp;</span><span class="ident">c</span>, <span class="number">110</span>).<span class="ident">unwrap</span>(), (<span class="macro">vec</span><span class="macro">!</span>[], <span class="bool-val">true</span>));
-        <span class="ident">coprocessor_host</span>.<span class="ident">pre_apply</span>(<span class="kw-2">&amp;</span><span class="ident">Region</span>::<span class="ident">default</span>(), <span class="kw-2">&amp;</span><span class="ident">make_raft_cmd_req</span>(<span class="ident">req</span>));
+        <span class="ident">coprocessor_host</span>.<span class="ident">post_apply</span>(<span class="kw-2">&amp;</span><span class="ident">Region</span>::<span class="ident">default</span>(), <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">make_raft_cmd</span>(<span class="ident">req</span>));
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">get_collected_locks</span>(<span class="kw-2">&amp;</span><span class="ident">c</span>, <span class="number">110</span>).<span class="ident">unwrap</span>(), (<span class="ident">locks</span>, <span class="bool-val">true</span>));
     }
 
@@ -1483,7 +1495,7 @@
         <span class="ident">start_collecting</span>(<span class="kw-2">&amp;</span><span class="ident">c</span>, <span class="number">100</span>).<span class="ident">unwrap</span>();
 
         <span class="comment">// Apply plain file to other CFs. Nothing happens.</span>
-        <span class="ident">coprocessor_host</span>.<span class="ident">pre_apply_plain_kvs_from_snapshot</span>(
+        <span class="ident">coprocessor_host</span>.<span class="ident">post_apply_plain_kvs_from_snapshot</span>(
             <span class="kw-2">&amp;</span><span class="ident">Region</span>::<span class="ident">default</span>(),
             <span class="ident">CF_DEFAULT</span>,
             <span class="kw-2">&amp;</span><span class="ident">lock_kvs</span>,
@@ -1496,7 +1508,7 @@
             .<span class="ident">filter</span>(<span class="op">|</span><span class="ident">l</span><span class="op">|</span> <span class="ident">l</span>.<span class="ident">get_lock_version</span>() <span class="op">&lt;</span><span class="op">=</span> <span class="number">100</span>)
             .<span class="ident">cloned</span>()
             .<span class="ident">collect</span>();
-        <span class="ident">coprocessor_host</span>.<span class="ident">pre_apply_plain_kvs_from_snapshot</span>(<span class="kw-2">&amp;</span><span class="ident">Region</span>::<span class="ident">default</span>(), <span class="ident">CF_LOCK</span>, <span class="kw-2">&amp;</span><span class="ident">lock_kvs</span>);
+        <span class="ident">coprocessor_host</span>.<span class="ident">post_apply_plain_kvs_from_snapshot</span>(<span class="kw-2">&amp;</span><span class="ident">Region</span>::<span class="ident">default</span>(), <span class="ident">CF_LOCK</span>, <span class="kw-2">&amp;</span><span class="ident">lock_kvs</span>);
         <span class="macro">assert_eq</span><span class="macro">!</span>(
             <span class="ident">get_collected_locks</span>(<span class="kw-2">&amp;</span><span class="ident">c</span>, <span class="number">100</span>).<span class="ident">unwrap</span>(),
             (<span class="ident">expected_locks</span>.<span class="ident">clone</span>(), <span class="bool-val">true</span>)
@@ -1524,16 +1536,16 @@
         <span class="comment">// dropped.</span>
         <span class="ident">start_collecting</span>(<span class="kw-2">&amp;</span><span class="ident">c</span>, <span class="number">110</span>).<span class="ident">unwrap</span>();
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">get_collected_locks</span>(<span class="kw-2">&amp;</span><span class="ident">c</span>, <span class="number">110</span>).<span class="ident">unwrap</span>(), (<span class="macro">vec</span><span class="macro">!</span>[], <span class="bool-val">true</span>));
-        <span class="ident">coprocessor_host</span>.<span class="ident">pre_apply_plain_kvs_from_snapshot</span>(<span class="kw-2">&amp;</span><span class="ident">Region</span>::<span class="ident">default</span>(), <span class="ident">CF_LOCK</span>, <span class="kw-2">&amp;</span><span class="ident">lock_kvs</span>);
+        <span class="ident">coprocessor_host</span>.<span class="ident">post_apply_plain_kvs_from_snapshot</span>(<span class="kw-2">&amp;</span><span class="ident">Region</span>::<span class="ident">default</span>(), <span class="ident">CF_LOCK</span>, <span class="kw-2">&amp;</span><span class="ident">lock_kvs</span>);
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">get_collected_locks</span>(<span class="kw-2">&amp;</span><span class="ident">c</span>, <span class="number">110</span>).<span class="ident">unwrap</span>(), (<span class="ident">locks</span>.<span class="ident">clone</span>(), <span class="bool-val">true</span>));
 
         <span class="comment">// Apply SST file to other cfs. Nothing happens.</span>
-        <span class="ident">coprocessor_host</span>.<span class="ident">pre_apply_sst_from_snapshot</span>(<span class="kw-2">&amp;</span><span class="ident">Region</span>::<span class="ident">default</span>(), <span class="ident">CF_DEFAULT</span>, <span class="string">&quot;&quot;</span>);
+        <span class="ident">coprocessor_host</span>.<span class="ident">post_apply_sst_from_snapshot</span>(<span class="kw-2">&amp;</span><span class="ident">Region</span>::<span class="ident">default</span>(), <span class="ident">CF_DEFAULT</span>, <span class="string">&quot;&quot;</span>);
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">get_collected_locks</span>(<span class="kw-2">&amp;</span><span class="ident">c</span>, <span class="number">110</span>).<span class="ident">unwrap</span>(), (<span class="ident">locks</span>.<span class="ident">clone</span>(), <span class="bool-val">true</span>));
 
         <span class="comment">// Apply SST file to lock cf is not supported. This will cause error and therefore</span>
         <span class="comment">// `is_clean` will be set to false.</span>
-        <span class="ident">coprocessor_host</span>.<span class="ident">pre_apply_sst_from_snapshot</span>(<span class="kw-2">&amp;</span><span class="ident">Region</span>::<span class="ident">default</span>(), <span class="ident">CF_LOCK</span>, <span class="string">&quot;&quot;</span>);
+        <span class="ident">coprocessor_host</span>.<span class="ident">post_apply_sst_from_snapshot</span>(<span class="kw-2">&amp;</span><span class="ident">Region</span>::<span class="ident">default</span>(), <span class="ident">CF_LOCK</span>, <span class="string">&quot;&quot;</span>);
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">get_collected_locks</span>(<span class="kw-2">&amp;</span><span class="ident">c</span>, <span class="number">110</span>).<span class="ident">unwrap</span>(), (<span class="ident">locks</span>, <span class="bool-val">false</span>));
     }
 
@@ -1545,13 +1557,13 @@
         <span class="comment">// The value is not a valid lock.</span>
         <span class="kw">let</span> (<span class="ident">k</span>, <span class="ident">v</span>) <span class="op">=</span> (<span class="ident">Key</span>::<span class="ident">from_raw</span>(<span class="string">b&quot;k1&quot;</span>).<span class="ident">into_encoded</span>(), <span class="string">b&quot;v1&quot;</span>.<span class="ident">to_vec</span>());
         <span class="kw">let</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">make_apply_request</span>(<span class="ident">k</span>.<span class="ident">clone</span>(), <span class="ident">v</span>.<span class="ident">clone</span>(), <span class="ident">CF_LOCK</span>, <span class="ident">CmdType</span>::<span class="ident">Put</span>);
-        <span class="ident">coprocessor_host</span>.<span class="ident">pre_apply</span>(<span class="kw-2">&amp;</span><span class="ident">Region</span>::<span class="ident">default</span>(), <span class="kw-2">&amp;</span><span class="ident">make_raft_cmd_req</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">req</span>]));
+        <span class="ident">coprocessor_host</span>.<span class="ident">post_apply</span>(<span class="kw-2">&amp;</span><span class="ident">Region</span>::<span class="ident">default</span>(), <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">make_raft_cmd</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">req</span>]));
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">get_collected_locks</span>(<span class="kw-2">&amp;</span><span class="ident">c</span>, <span class="number">1</span>).<span class="ident">unwrap</span>(), (<span class="macro">vec</span><span class="macro">!</span>[], <span class="bool-val">false</span>));
 
         <span class="comment">// `is_clean` should be reset after invoking `start_collecting`.</span>
         <span class="ident">start_collecting</span>(<span class="kw-2">&amp;</span><span class="ident">c</span>, <span class="number">2</span>).<span class="ident">unwrap</span>();
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">get_collected_locks</span>(<span class="kw-2">&amp;</span><span class="ident">c</span>, <span class="number">2</span>).<span class="ident">unwrap</span>(), (<span class="macro">vec</span><span class="macro">!</span>[], <span class="bool-val">true</span>));
-        <span class="ident">coprocessor_host</span>.<span class="ident">pre_apply_plain_kvs_from_snapshot</span>(
+        <span class="ident">coprocessor_host</span>.<span class="ident">post_apply_plain_kvs_from_snapshot</span>(
             <span class="kw-2">&amp;</span><span class="ident">Region</span>::<span class="ident">default</span>(),
             <span class="ident">CF_LOCK</span>,
             <span class="kw-2">&amp;</span>[(<span class="ident">keys</span>::<span class="ident">data_key</span>(<span class="kw-2">&amp;</span><span class="ident">k</span>), <span class="ident">v</span>)],
@@ -1571,8 +1583,8 @@
         <span class="kw">let</span> <span class="ident">batch_generate_locks</span> <span class="op">=</span> <span class="op">|</span><span class="ident">count</span><span class="op">|</span> {
             <span class="kw">let</span> (<span class="ident">k</span>, <span class="ident">v</span>) <span class="op">=</span> <span class="ident">lock_info_to_kv</span>(<span class="ident">lock</span>.<span class="ident">clone</span>());
             <span class="kw">let</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">make_apply_request</span>(<span class="ident">k</span>, <span class="ident">v</span>, <span class="ident">CF_LOCK</span>, <span class="ident">CmdType</span>::<span class="ident">Put</span>);
-            <span class="kw">let</span> <span class="ident">raft_cmd_req</span> <span class="op">=</span> <span class="ident">make_raft_cmd_req</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">req</span>; <span class="ident">count</span>]);
-            <span class="ident">coprocessor_host</span>.<span class="ident">pre_apply</span>(<span class="kw-2">&amp;</span><span class="ident">Region</span>::<span class="ident">default</span>(), <span class="kw-2">&amp;</span><span class="ident">raft_cmd_req</span>);
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">raft_cmd</span> <span class="op">=</span> <span class="ident">make_raft_cmd</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">req</span>; <span class="ident">count</span>]);
+            <span class="ident">coprocessor_host</span>.<span class="ident">post_apply</span>(<span class="kw-2">&amp;</span><span class="ident">Region</span>::<span class="ident">default</span>(), <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">raft_cmd</span>);
         };
 
         <span class="ident">batch_generate_locks</span>(<span class="ident">MAX_COLLECT_SIZE</span> <span class="op">-</span> <span class="number">1</span>);

@@ -3345,6 +3345,32 @@
 <span id="3345">3345</span>
 <span id="3346">3346</span>
 <span id="3347">3347</span>
+<span id="3348">3348</span>
+<span id="3349">3349</span>
+<span id="3350">3350</span>
+<span id="3351">3351</span>
+<span id="3352">3352</span>
+<span id="3353">3353</span>
+<span id="3354">3354</span>
+<span id="3355">3355</span>
+<span id="3356">3356</span>
+<span id="3357">3357</span>
+<span id="3358">3358</span>
+<span id="3359">3359</span>
+<span id="3360">3360</span>
+<span id="3361">3361</span>
+<span id="3362">3362</span>
+<span id="3363">3363</span>
+<span id="3364">3364</span>
+<span id="3365">3365</span>
+<span id="3366">3366</span>
+<span id="3367">3367</span>
+<span id="3368">3368</span>
+<span id="3369">3369</span>
+<span id="3370">3370</span>
+<span id="3371">3371</span>
+<span id="3372">3372</span>
+<span id="3373">3373</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -3356,7 +3382,8 @@
 <span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">cmp</span>, <span class="ident">mem</span>, <span class="ident">u64</span>, <span class="ident">usize</span>};
 
 <span class="kw">use</span> <span class="ident">crossbeam</span>::<span class="ident">atomic</span>::<span class="ident">AtomicCell</span>;
-<span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">KvEngine</span>, <span class="ident">KvEngines</span>, <span class="ident">Snapshot</span>, <span class="ident">WriteOptions</span>};
+<span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">Engines</span>, <span class="ident">KvEngine</span>, <span class="ident">Snapshot</span>, <span class="ident">WriteOptions</span>};
+<span class="kw">use</span> <span class="ident">error_code</span>::<span class="ident">ErrorCodeExt</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">kvrpcpb</span>::<span class="ident">ExtraOp</span> <span class="kw">as</span> <span class="ident">TxnExtraOp</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">metapb</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">pdpb</span>::<span class="ident">PeerStats</span>;
@@ -3376,6 +3403,7 @@
     <span class="self">self</span>, <span class="ident">Progress</span>, <span class="ident">ProgressState</span>, <span class="ident">RawNode</span>, <span class="ident">Ready</span>, <span class="ident">SnapshotStatus</span>, <span class="ident">StateRole</span>, <span class="ident">INVALID_INDEX</span>,
     <span class="ident">NO_LIMIT</span>,
 };
+<span class="kw">use</span> <span class="ident">raft_engine</span>::<span class="ident">RaftEngine</span>;
 <span class="kw">use</span> <span class="ident">smallvec</span>::<span class="ident">SmallVec</span>;
 <span class="kw">use</span> <span class="ident">time</span>::<span class="ident">Timespec</span>;
 <span class="kw">use</span> <span class="ident">txn_types</span>::<span class="ident">TxnExtra</span>;
@@ -3385,6 +3413,7 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">fsm</span>::<span class="ident">apply</span>::<span class="ident">CatchUpLogs</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">fsm</span>::<span class="ident">store</span>::<span class="ident">PollContext</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">fsm</span>::{<span class="ident">apply</span>, <span class="ident">Apply</span>, <span class="ident">ApplyMetrics</span>, <span class="ident">ApplyTask</span>, <span class="ident">GroupState</span>, <span class="ident">Proposal</span>};
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">util</span>::<span class="ident">is_learner</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">worker</span>::{<span class="ident">ReadDelegate</span>, <span class="ident">ReadExecutor</span>, <span class="ident">ReadProgress</span>, <span class="ident">RegionTask</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::{<span class="ident">Callback</span>, <span class="ident">Config</span>, <span class="ident">GlobalReplicationState</span>, <span class="ident">PdTask</span>, <span class="ident">ReadResponse</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">Error</span>, <span class="prelude-ty">Result</span>};
@@ -3526,7 +3555,7 @@
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Peer</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>
 <span class="kw">where</span>
     <span class="ident">EK</span>: <span class="ident">KvEngine</span>,
-    <span class="ident">ER</span>: <span class="ident">KvEngine</span>,
+    <span class="ident">ER</span>: <span class="ident">RaftEngine</span>,
 {
     <span class="doccomment">/// The ID of the Region which this Peer belongs to.</span>
     <span class="ident">region_id</span>: <span class="ident">u64</span>,
@@ -3638,13 +3667,13 @@
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span> <span class="ident">Peer</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>
 <span class="kw">where</span>
     <span class="ident">EK</span>: <span class="ident">KvEngine</span>,
-    <span class="ident">ER</span>: <span class="ident">KvEngine</span>,
+    <span class="ident">ER</span>: <span class="ident">RaftEngine</span>,
 {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
         <span class="ident">store_id</span>: <span class="ident">u64</span>,
         <span class="ident">cfg</span>: <span class="kw-2">&amp;</span><span class="ident">Config</span>,
         <span class="ident">sched</span>: <span class="ident">Scheduler</span><span class="op">&lt;</span><span class="ident">RegionTask</span><span class="op">&lt;</span><span class="ident">EK</span>::<span class="ident">Snapshot</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-        <span class="ident">engines</span>: <span class="ident">KvEngines</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>,
+        <span class="ident">engines</span>: <span class="ident">Engines</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>,
         <span class="ident">region</span>: <span class="kw-2">&amp;</span><span class="ident">metapb</span>::<span class="ident">Region</span>,
         <span class="ident">peer</span>: <span class="ident">metapb</span>::<span class="ident">Peer</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Peer</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span><span class="op">&gt;</span> {
@@ -3856,7 +3885,10 @@
     }
 
     <span class="doccomment">/// Tries to destroy itself. Returns a job (if needed) to do more cleaning tasks.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">maybe_destroy</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">DestroyPeerJob</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">maybe_destroy</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">C</span><span class="op">&gt;</span>(
+        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
+        <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="ident">PollContext</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">T</span>, <span class="ident">C</span><span class="op">&gt;</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">DestroyPeerJob</span><span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">pending_remove</span> {
             <span class="macro">info</span><span class="macro">!</span>(
                 <span class="string">&quot;is being destroyed, skip&quot;</span>;
@@ -3864,6 +3896,17 @@
                 <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">peer</span>.<span class="ident">get_id</span>(),
             );
             <span class="kw">return</span> <span class="prelude-val">None</span>;
+        }
+        {
+            <span class="kw">let</span> <span class="ident">meta</span> <span class="op">=</span> <span class="ident">ctx</span>.<span class="ident">store_meta</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+            <span class="kw">if</span> <span class="ident">meta</span>.<span class="ident">atomic_snap_regions</span>.<span class="ident">contains_key</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">region_id</span>) {
+                <span class="macro">info</span><span class="macro">!</span>(
+                    <span class="string">&quot;stale peer is applying atomic snapshot, will destroy next time&quot;</span>;
+                    <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">region_id</span>,
+                    <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">peer</span>.<span class="ident">get_id</span>(),
+                );
+                <span class="kw">return</span> <span class="prelude-val">None</span>;
+            }
         }
         <span class="comment">// If initialized is false, it implicitly means apply fsm does not exist now.</span>
         <span class="kw">let</span> <span class="ident">initialized</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_store</span>().<span class="ident">is_initialized</span>();
@@ -3916,7 +3959,7 @@
 
         <span class="comment">// Set Tombstone state explicitly</span>
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">kv_wb</span> <span class="op">=</span> <span class="ident">ctx</span>.<span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">write_batch</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">raft_wb</span> <span class="op">=</span> <span class="ident">ctx</span>.<span class="ident">engines</span>.<span class="ident">raft</span>.<span class="ident">write_batch</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">raft_wb</span> <span class="op">=</span> <span class="ident">ctx</span>.<span class="ident">engines</span>.<span class="ident">raft</span>.<span class="ident">log_batch</span>(<span class="number">1024</span>);
         <span class="self">self</span>.<span class="ident">mut_store</span>().<span class="ident">clear_meta</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">kv_wb</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">raft_wb</span>)<span class="question-mark">?</span>;
         <span class="ident">write_peer_state</span>(
             <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">kv_wb</span>,
@@ -3928,7 +3971,7 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">write_opts</span> <span class="op">=</span> <span class="ident">WriteOptions</span>::<span class="ident">new</span>();
         <span class="ident">write_opts</span>.<span class="ident">set_sync</span>(<span class="ident">ctx</span>.<span class="ident">cfg</span>.<span class="ident">sync_log</span>);
         <span class="ident">ctx</span>.<span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">write_opt</span>(<span class="kw-2">&amp;</span><span class="ident">kv_wb</span>, <span class="kw-2">&amp;</span><span class="ident">write_opts</span>)<span class="question-mark">?</span>;
-        <span class="ident">ctx</span>.<span class="ident">engines</span>.<span class="ident">raft</span>.<span class="ident">write_opt</span>(<span class="kw-2">&amp;</span><span class="ident">raft_wb</span>, <span class="kw-2">&amp;</span><span class="ident">write_opts</span>)<span class="question-mark">?</span>;
+        <span class="ident">ctx</span>.<span class="ident">engines</span>.<span class="ident">raft</span>.<span class="ident">consume</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">raft_wb</span>, <span class="ident">ctx</span>.<span class="ident">cfg</span>.<span class="ident">sync_log</span>)<span class="question-mark">?</span>;
 
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">get_store</span>().<span class="ident">is_initialized</span>() <span class="kw-2">&amp;</span><span class="op">&amp;</span> <span class="op">!</span><span class="ident">keep_data</span> {
             <span class="comment">// If we meet panic when deleting data and raft log, the dirty data</span>
@@ -3939,6 +3982,7 @@
                     <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">region_id</span>,
                     <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">peer</span>.<span class="ident">get_id</span>(),
                     <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>,
+                    <span class="string">&quot;error_code&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>.<span class="ident">error_code</span>(),
                 );
             }
         }
@@ -4603,7 +4647,7 @@
             <span class="self">self</span>.<span class="ident">send</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>.<span class="ident">trans</span>, <span class="ident">messages</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>.<span class="ident">raft_metrics</span>.<span class="ident">message</span>);
         }
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">destroy_regions</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[];
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">get_pending_snapshot</span>().<span class="ident">is_some</span>() {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">has_pending_snapshot</span>() {
             <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">ready_to_handle_pending_snap</span>() {
                 <span class="kw">let</span> <span class="ident">count</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pending_request_snapshot_count</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
                 <span class="macro">debug</span><span class="macro">!</span>(
@@ -4776,7 +4820,7 @@
         }
 
         <span class="kw">let</span> <span class="ident">apply_snap_result</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">mut_store</span>().<span class="ident">post_ready</span>(<span class="ident">invoke_ctx</span>);
-        <span class="kw">if</span> <span class="ident">apply_snap_result</span>.<span class="ident">is_some</span>() <span class="kw-2">&amp;</span><span class="op">&amp;</span> <span class="self">self</span>.<span class="ident">peer</span>.<span class="ident">get_is_learner</span>() {
+        <span class="kw">if</span> <span class="ident">apply_snap_result</span>.<span class="ident">is_some</span>() {
             <span class="comment">// The peer may change from learner to voter after snapshot applied.</span>
             <span class="kw">let</span> <span class="ident">peer</span> <span class="op">=</span> <span class="self">self</span>
                 .<span class="ident">region</span>()
@@ -5273,7 +5317,7 @@
         <span class="kw">let</span> <span class="ident">peer</span> <span class="op">=</span> <span class="ident">change_peer</span>.<span class="ident">get_peer</span>();
 
         <span class="comment">// Check the request itself is valid or not.</span>
-        <span class="kw">match</span> (<span class="ident">change_type</span>, <span class="ident">peer</span>.<span class="ident">get_is_learner</span>()) {
+        <span class="kw">match</span> (<span class="ident">change_type</span>, <span class="ident">is_learner</span>(<span class="ident">peer</span>)) {
             (<span class="ident">ConfChangeType</span>::<span class="ident">AddNode</span>, <span class="bool-val">true</span>) <span class="op">|</span> (<span class="ident">ConfChangeType</span>::<span class="ident">AddLearnerNode</span>, <span class="bool-val">false</span>) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="macro">warn</span><span class="macro">!</span>(
                     <span class="string">&quot;invalid conf change request&quot;</span>;
@@ -5770,6 +5814,7 @@
                     <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">region_id</span>,
                     <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">peer</span>.<span class="ident">get_id</span>(),
                     <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>,
+                    <span class="string">&quot;error_code&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>.<span class="ident">error_code</span>(),
                 );
                 <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>);
             }
@@ -6016,7 +6061,7 @@
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span> <span class="ident">Peer</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>
 <span class="kw">where</span>
     <span class="ident">EK</span>: <span class="ident">KvEngine</span>,
-    <span class="ident">ER</span>: <span class="ident">KvEngine</span>,
+    <span class="ident">ER</span>: <span class="ident">RaftEngine</span>,
 {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">insert_peer_cache</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">peer</span>: <span class="ident">metapb</span>::<span class="ident">Peer</span>) {
         <span class="self">self</span>.<span class="ident">peer_cache</span>.<span class="ident">borrow_mut</span>().<span class="ident">insert</span>(<span class="ident">peer</span>.<span class="ident">get_id</span>(), <span class="ident">peer</span>);
@@ -6169,6 +6214,7 @@
                 <span class="string">&quot;target_peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">to_peer_id</span>,
                 <span class="string">&quot;target_store_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">to_store_id</span>,
                 <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>,
+                <span class="string">&quot;error_code&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>.<span class="ident">error_code</span>(),
             );
             <span class="kw">if</span> <span class="ident">to_peer_id</span> <span class="op">=</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">leader_id</span>() {
                 <span class="self">self</span>.<span class="ident">leader_unreachable</span> <span class="op">=</span> <span class="bool-val">true</span>;
@@ -6202,6 +6248,7 @@
                     <span class="string">&quot;target_peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">peer</span>.<span class="ident">get_id</span>(),
                     <span class="string">&quot;target_store_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">peer</span>.<span class="ident">get_store_id</span>(),
                     <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>,
+                    <span class="string">&quot;error_code&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>.<span class="ident">error_code</span>(),
                 );
             } <span class="kw">else</span> {
                 <span class="ident">ctx</span>.<span class="ident">need_flush_trans</span> <span class="op">=</span> <span class="bool-val">true</span>;
@@ -6236,6 +6283,7 @@
                     <span class="string">&quot;target_peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">peer</span>.<span class="ident">get_id</span>(),
                     <span class="string">&quot;target_store_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">peer</span>.<span class="ident">get_store_id</span>(),
                     <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>,
+                    <span class="string">&quot;error_code&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>.<span class="ident">error_code</span>(),
                 );
             } <span class="kw">else</span> {
                 <span class="ident">ctx</span>.<span class="ident">need_flush_trans</span> <span class="op">=</span> <span class="bool-val">true</span>;
@@ -6286,7 +6334,8 @@
                 <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">peer</span>.<span class="ident">get_id</span>(),
                 <span class="string">&quot;target_peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">to_peer</span>.<span class="ident">get_id</span>(),
                 <span class="string">&quot;target_store_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">to_peer</span>.<span class="ident">get_store_id</span>(),
-                <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>
+                <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>,
+                <span class="string">&quot;error_code&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>.<span class="ident">error_code</span>(),
             );
         } <span class="kw">else</span> {
             <span class="ident">ctx</span>.<span class="ident">need_flush_trans</span> <span class="op">=</span> <span class="bool-val">true</span>;
@@ -6376,7 +6425,7 @@
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span> <span class="ident">RequestInspector</span> <span class="kw">for</span> <span class="ident">Peer</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>
 <span class="kw">where</span>
     <span class="ident">EK</span>: <span class="ident">KvEngine</span>,
-    <span class="ident">ER</span>: <span class="ident">KvEngine</span>,
+    <span class="ident">ER</span>: <span class="ident">RaftEngine</span>,
 {
     <span class="kw">fn</span> <span class="ident">has_applied_to_current_term</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
         <span class="self">self</span>.<span class="ident">get_store</span>().<span class="ident">applied_index_term</span>() <span class="op">=</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">term</span>()
@@ -6405,7 +6454,7 @@
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">T</span>, <span class="ident">C</span><span class="op">&gt;</span> <span class="ident">ReadExecutor</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">PollContext</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">T</span>, <span class="ident">C</span><span class="op">&gt;</span>
 <span class="kw">where</span>
     <span class="ident">EK</span>: <span class="ident">KvEngine</span>,
-    <span class="ident">ER</span>: <span class="ident">KvEngine</span>,
+    <span class="ident">ER</span>: <span class="ident">RaftEngine</span>,
 {
     <span class="kw">fn</span> <span class="ident">get_engine</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">EK</span> {
         <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">engines</span>.<span class="ident">kv</span>
@@ -6433,6 +6482,7 @@
         <span class="kw">let</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">msg</span>.<span class="ident">get_admin_request</span>();
         <span class="kw">return</span> <span class="kw">match</span> <span class="ident">req</span>.<span class="ident">get_cmd_type</span>() {
             <span class="ident">AdminCmdType</span>::<span class="ident">ChangePeer</span>
+            <span class="op">|</span> <span class="ident">AdminCmdType</span>::<span class="ident">ChangePeerV2</span>
             <span class="op">|</span> <span class="ident">AdminCmdType</span>::<span class="ident">Split</span>
             <span class="op">|</span> <span class="ident">AdminCmdType</span>::<span class="ident">BatchSplit</span>
             <span class="op">|</span> <span class="ident">AdminCmdType</span>::<span class="ident">PrepareMerge</span>
@@ -6458,6 +6508,7 @@
         <span class="ident">AdminCmdType</span>::<span class="ident">Split</span>
         <span class="op">|</span> <span class="ident">AdminCmdType</span>::<span class="ident">BatchSplit</span>
         <span class="op">|</span> <span class="ident">AdminCmdType</span>::<span class="ident">ChangePeer</span>
+        <span class="op">|</span> <span class="ident">AdminCmdType</span>::<span class="ident">ChangePeerV2</span>
         <span class="op">|</span> <span class="ident">AdminCmdType</span>::<span class="ident">ComputeHash</span>
         <span class="op">|</span> <span class="ident">AdminCmdType</span>::<span class="ident">VerifyHash</span>
         <span class="op">|</span> <span class="ident">AdminCmdType</span>::<span class="ident">PrepareMerge</span>
@@ -6487,7 +6538,7 @@
     <span class="kw">fn</span> <span class="ident">pending_merge_state</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">MergeState</span><span class="op">&gt;</span>;
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span>: <span class="ident">KvEngine</span>, <span class="ident">ER</span>: <span class="ident">KvEngine</span><span class="op">&gt;</span> <span class="ident">AbstractPeer</span> <span class="kw">for</span> <span class="ident">Peer</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span>: <span class="ident">KvEngine</span>, <span class="ident">ER</span>: <span class="ident">RaftEngine</span><span class="op">&gt;</span> <span class="ident">AbstractPeer</span> <span class="kw">for</span> <span class="ident">Peer</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span> {
     <span class="kw">fn</span> <span class="ident">meta_peer</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">metapb</span>::<span class="ident">Peer</span> {
         <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">peer</span>
     }
@@ -6545,6 +6596,7 @@
             <span class="ident">AdminCmdType</span>::<span class="ident">Split</span>,
             <span class="ident">AdminCmdType</span>::<span class="ident">BatchSplit</span>,
             <span class="ident">AdminCmdType</span>::<span class="ident">ChangePeer</span>,
+            <span class="ident">AdminCmdType</span>::<span class="ident">ChangePeerV2</span>,
             <span class="ident">AdminCmdType</span>::<span class="ident">ComputeHash</span>,
             <span class="ident">AdminCmdType</span>::<span class="ident">VerifyHash</span>,
             <span class="ident">AdminCmdType</span>::<span class="ident">PrepareMerge</span>,

@@ -761,17 +761,13 @@
 <span id="761">761</span>
 <span id="762">762</span>
 <span id="763">763</span>
-<span id="764">764</span>
-<span id="765">765</span>
-<span id="766">766</span>
-<span id="767">767</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">CfName</span>, <span class="ident">KvEngine</span>};
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">metapb</span>::<span class="ident">Region</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">pdpb</span>::<span class="ident">CheckPolicy</span>;
-<span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">raft_cmdpb</span>::{<span class="ident">RaftCmdRequest</span>, <span class="ident">RaftCmdResponse</span>};
+<span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">raft_cmdpb</span>::<span class="ident">RaftCmdRequest</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">marker</span>::<span class="ident">PhantomData</span>;
 <span class="kw">use</span> <span class="ident">txn_types</span>::<span class="ident">TxnExtra</span>;
 
@@ -1124,19 +1120,16 @@
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">post_apply</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">region</span>: <span class="kw-2">&amp;</span><span class="ident">Region</span>, <span class="ident">resp</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">RaftCmdResponse</span>) {
-        <span class="kw">if</span> <span class="op">!</span><span class="ident">resp</span>.<span class="ident">has_admin_response</span>() {
-            <span class="kw">let</span> <span class="ident">query</span> <span class="op">=</span> <span class="ident">resp</span>.<span class="ident">mut_responses</span>();
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">vec_query</span> <span class="op">=</span> <span class="ident">mem</span>::<span class="ident">take</span>(<span class="ident">query</span>).<span class="ident">into</span>();
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">post_apply</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">region</span>: <span class="kw-2">&amp;</span><span class="ident">Region</span>, <span class="ident">cmd</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Cmd</span>) {
+        <span class="kw">if</span> <span class="op">!</span><span class="ident">cmd</span>.<span class="ident">response</span>.<span class="ident">has_admin_response</span>() {
             <span class="macro">loop_ob</span><span class="macro">!</span>(
                 <span class="ident">region</span>,
                 <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">registry</span>.<span class="ident">query_observers</span>,
                 <span class="ident">post_apply_query</span>,
-                <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">vec_query</span>,
+                <span class="ident">cmd</span>,
             );
-            <span class="kw-2">*</span><span class="ident">query</span> <span class="op">=</span> <span class="ident">vec_query</span>.<span class="ident">into</span>();
         } <span class="kw">else</span> {
-            <span class="kw">let</span> <span class="ident">admin</span> <span class="op">=</span> <span class="ident">resp</span>.<span class="ident">mut_admin_response</span>();
+            <span class="kw">let</span> <span class="ident">admin</span> <span class="op">=</span> <span class="ident">cmd</span>.<span class="ident">response</span>.<span class="ident">mut_admin_response</span>();
             <span class="macro">loop_ob</span><span class="macro">!</span>(
                 <span class="ident">region</span>,
                 <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">registry</span>.<span class="ident">admin_observers</span>,
@@ -1146,7 +1139,7 @@
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">pre_apply_plain_kvs_from_snapshot</span>(
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">post_apply_plain_kvs_from_snapshot</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">region</span>: <span class="kw-2">&amp;</span><span class="ident">Region</span>,
         <span class="ident">cf</span>: <span class="ident">CfName</span>,
@@ -1155,17 +1148,17 @@
         <span class="macro">loop_ob</span><span class="macro">!</span>(
             <span class="ident">region</span>,
             <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">registry</span>.<span class="ident">apply_snapshot_observers</span>,
-            <span class="ident">pre_apply_plain_kvs</span>,
+            <span class="ident">apply_plain_kvs</span>,
             <span class="ident">cf</span>,
             <span class="ident">kv_pairs</span>
         );
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">pre_apply_sst_from_snapshot</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">region</span>: <span class="kw-2">&amp;</span><span class="ident">Region</span>, <span class="ident">cf</span>: <span class="ident">CfName</span>, <span class="ident">path</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">post_apply_sst_from_snapshot</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">region</span>: <span class="kw-2">&amp;</span><span class="ident">Region</span>, <span class="ident">cf</span>: <span class="ident">CfName</span>, <span class="ident">path</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) {
         <span class="macro">loop_ob</span><span class="macro">!</span>(
             <span class="ident">region</span>,
             <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">registry</span>.<span class="ident">apply_snapshot_observers</span>,
-            <span class="ident">pre_apply_sst</span>,
+            <span class="ident">apply_sst</span>,
             <span class="ident">cf</span>,
             <span class="ident">path</span>
         );
@@ -1285,7 +1278,7 @@
     <span class="kw">use</span> <span class="ident">engine_panic</span>::<span class="ident">PanicEngine</span>;
     <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">metapb</span>::<span class="ident">Region</span>;
     <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">raft_cmdpb</span>::{
-        <span class="ident">AdminRequest</span>, <span class="ident">AdminResponse</span>, <span class="ident">RaftCmdRequest</span>, <span class="ident">RaftCmdResponse</span>, <span class="ident">Request</span>, <span class="ident">Response</span>,
+        <span class="ident">AdminRequest</span>, <span class="ident">AdminResponse</span>, <span class="ident">RaftCmdRequest</span>, <span class="ident">RaftCmdResponse</span>, <span class="ident">Request</span>,
     };
 
     <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Default</span>)]</span>
@@ -1341,7 +1334,7 @@
             <span class="ident">ctx</span>.<span class="ident">bypass</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">bypass</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
         }
 
-        <span class="kw">fn</span> <span class="ident">post_apply_query</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ObserverContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>, <span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Response</span><span class="op">&gt;</span>) {
+        <span class="kw">fn</span> <span class="ident">post_apply_query</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ObserverContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>, <span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Cmd</span>) {
             <span class="self">self</span>.<span class="ident">called</span>.<span class="ident">fetch_add</span>(<span class="number">6</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
             <span class="ident">ctx</span>.<span class="ident">bypass</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">bypass</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
         }
@@ -1367,7 +1360,7 @@
     }
 
     <span class="kw">impl</span> <span class="ident">ApplySnapshotObserver</span> <span class="kw">for</span> <span class="ident">TestCoprocessor</span> {
-        <span class="kw">fn</span> <span class="ident">pre_apply_plain_kvs</span>(
+        <span class="kw">fn</span> <span class="ident">apply_plain_kvs</span>(
             <span class="kw-2">&amp;</span><span class="self">self</span>,
             <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ObserverContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>,
             <span class="kw">_</span>: <span class="ident">CfName</span>,
@@ -1377,7 +1370,7 @@
             <span class="ident">ctx</span>.<span class="ident">bypass</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">bypass</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
         }
 
-        <span class="kw">fn</span> <span class="ident">pre_apply_sst</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ObserverContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>, <span class="kw">_</span>: <span class="ident">CfName</span>, <span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) {
+        <span class="kw">fn</span> <span class="ident">apply_sst</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ObserverContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>, <span class="kw">_</span>: <span class="ident">CfName</span>, <span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) {
             <span class="self">self</span>.<span class="ident">called</span>.<span class="ident">fetch_add</span>(<span class="number">10</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
             <span class="ident">ctx</span>.<span class="ident">bypass</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">bypass</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
         }
@@ -1436,7 +1429,7 @@
         <span class="macro">assert_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">3</span>]);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">admin_resp</span> <span class="op">=</span> <span class="ident">RaftCmdResponse</span>::<span class="ident">default</span>();
         <span class="ident">admin_resp</span>.<span class="ident">set_admin_response</span>(<span class="ident">AdminResponse</span>::<span class="ident">default</span>());
-        <span class="ident">host</span>.<span class="ident">post_apply</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">admin_resp</span>);
+        <span class="ident">host</span>.<span class="ident">post_apply</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Cmd</span>::<span class="ident">new</span>(<span class="number">0</span>, <span class="ident">admin_req</span>, <span class="ident">admin_resp</span>));
         <span class="macro">assert_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">6</span>]);
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">query_req</span> <span class="op">=</span> <span class="ident">RaftCmdRequest</span>::<span class="ident">default</span>();
@@ -1445,9 +1438,8 @@
         <span class="macro">assert_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">10</span>]);
         <span class="ident">host</span>.<span class="ident">pre_apply</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="kw-2">&amp;</span><span class="ident">query_req</span>);
         <span class="macro">assert_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">15</span>]);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">query_resp</span> <span class="op">=</span> <span class="ident">admin_resp</span>;
-        <span class="ident">query_resp</span>.<span class="ident">clear_admin_response</span>();
-        <span class="ident">host</span>.<span class="ident">post_apply</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">query_resp</span>);
+        <span class="kw">let</span> <span class="ident">query_resp</span> <span class="op">=</span> <span class="ident">RaftCmdResponse</span>::<span class="ident">default</span>();
+        <span class="ident">host</span>.<span class="ident">post_apply</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Cmd</span>::<span class="ident">new</span>(<span class="number">0</span>, <span class="ident">query_req</span>, <span class="ident">query_resp</span>));
         <span class="macro">assert_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">21</span>]);
 
         <span class="ident">host</span>.<span class="ident">on_role_change</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="ident">StateRole</span>::<span class="ident">Leader</span>);
@@ -1456,9 +1448,9 @@
         <span class="ident">host</span>.<span class="ident">on_region_changed</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="ident">RegionChangeEvent</span>::<span class="ident">Create</span>, <span class="ident">StateRole</span>::<span class="ident">Follower</span>);
         <span class="macro">assert_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">36</span>]);
 
-        <span class="ident">host</span>.<span class="ident">pre_apply_plain_kvs_from_snapshot</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="string">&quot;default&quot;</span>, <span class="kw-2">&amp;</span>[]);
+        <span class="ident">host</span>.<span class="ident">post_apply_plain_kvs_from_snapshot</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="string">&quot;default&quot;</span>, <span class="kw-2">&amp;</span>[]);
         <span class="macro">assert_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">45</span>]);
-        <span class="ident">host</span>.<span class="ident">pre_apply_sst_from_snapshot</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="string">&quot;default&quot;</span>, <span class="string">&quot;&quot;</span>);
+        <span class="ident">host</span>.<span class="ident">post_apply_sst_from_snapshot</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="string">&quot;default&quot;</span>, <span class="string">&quot;&quot;</span>);
         <span class="macro">assert_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">55</span>]);
         <span class="kw">let</span> <span class="ident">observe_id</span> <span class="op">=</span> <span class="ident">ObserveID</span>::<span class="ident">new</span>();
         <span class="ident">host</span>.<span class="ident">prepare_for_apply</span>(<span class="ident">observe_id</span>, <span class="number">0</span>);
@@ -1466,7 +1458,7 @@
         <span class="ident">host</span>.<span class="ident">on_apply_cmd</span>(
             <span class="ident">observe_id</span>,
             <span class="number">0</span>,
-            <span class="ident">Cmd</span>::<span class="ident">new</span>(<span class="number">0</span>, <span class="ident">RaftCmdRequest</span>::<span class="ident">default</span>(), <span class="ident">query_resp</span>),
+            <span class="ident">Cmd</span>::<span class="ident">new</span>(<span class="number">0</span>, <span class="ident">RaftCmdRequest</span>::<span class="ident">default</span>(), <span class="ident">RaftCmdResponse</span>::<span class="ident">default</span>()),
         );
         <span class="macro">assert_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">78</span>]);
         <span class="ident">host</span>.<span class="ident">on_flush_apply</span>(<span class="ident">Vec</span>::<span class="ident">default</span>(), <span class="ident">PanicEngine</span>);
@@ -1498,7 +1490,7 @@
 
         <span class="kw">let</span> <span class="ident">cases</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[(<span class="number">0</span>, <span class="ident">admin_req</span>, <span class="ident">admin_resp</span>), (<span class="number">3</span>, <span class="ident">query_req</span>, <span class="ident">query_resp</span>)];
 
-        <span class="kw">for</span> (<span class="ident">base_score</span>, <span class="kw-2">mut</span> <span class="ident">req</span>, <span class="kw-2">mut</span> <span class="ident">resp</span>) <span class="kw">in</span> <span class="ident">cases</span> {
+        <span class="kw">for</span> (<span class="ident">base_score</span>, <span class="kw-2">mut</span> <span class="ident">req</span>, <span class="ident">resp</span>) <span class="kw">in</span> <span class="ident">cases</span> {
             <span class="macro">set_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob1</span>.<span class="ident">return_err</span>, <span class="kw-2">&amp;</span><span class="ident">ob2</span>.<span class="ident">return_err</span>], <span class="bool-val">false</span>);
             <span class="macro">set_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob1</span>.<span class="ident">called</span>, <span class="kw-2">&amp;</span><span class="ident">ob2</span>.<span class="ident">called</span>], <span class="number">0</span>);
             <span class="macro">set_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob1</span>.<span class="ident">bypass</span>, <span class="kw-2">&amp;</span><span class="ident">ob2</span>.<span class="ident">bypass</span>], <span class="bool-val">true</span>);
@@ -1511,7 +1503,7 @@
             <span class="ident">host</span>.<span class="ident">pre_apply</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="kw-2">&amp;</span><span class="ident">req</span>);
             <span class="macro">assert_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob1</span>.<span class="ident">called</span>, <span class="kw-2">&amp;</span><span class="ident">ob2</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">0</span>, <span class="ident">base_score</span> <span class="op">*</span> <span class="number">2</span> <span class="op">+</span> <span class="number">3</span>]);
 
-            <span class="ident">host</span>.<span class="ident">post_apply</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">resp</span>);
+            <span class="ident">host</span>.<span class="ident">post_apply</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Cmd</span>::<span class="ident">new</span>(<span class="number">0</span>, <span class="ident">req</span>.<span class="ident">clone</span>(), <span class="ident">resp</span>.<span class="ident">clone</span>()));
             <span class="macro">assert_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob1</span>.<span class="ident">called</span>, <span class="kw-2">&amp;</span><span class="ident">ob2</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">0</span>, <span class="ident">base_score</span> <span class="op">*</span> <span class="number">3</span> <span class="op">+</span> <span class="number">6</span>]);
 
             <span class="macro">set_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob2</span>.<span class="ident">bypass</span>], <span class="bool-val">false</span>);

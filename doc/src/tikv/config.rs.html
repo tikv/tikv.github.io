@@ -3133,6 +3133,29 @@
 <span id="3133">3133</span>
 <span id="3134">3134</span>
 <span id="3135">3135</span>
+<span id="3136">3136</span>
+<span id="3137">3137</span>
+<span id="3138">3138</span>
+<span id="3139">3139</span>
+<span id="3140">3140</span>
+<span id="3141">3141</span>
+<span id="3142">3142</span>
+<span id="3143">3143</span>
+<span id="3144">3144</span>
+<span id="3145">3145</span>
+<span id="3146">3146</span>
+<span id="3147">3147</span>
+<span id="3148">3148</span>
+<span id="3149">3149</span>
+<span id="3150">3150</span>
+<span id="3151">3151</span>
+<span id="3152">3152</span>
+<span id="3153">3153</span>
+<span id="3154">3154</span>
+<span id="3155">3155</span>
+<span id="3156">3156</span>
+<span id="3157">3157</span>
+<span id="3158">3158</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2017 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -3300,7 +3323,7 @@
     <span class="comment">// By default, rocksdb assign (max_background_jobs / 4) threads dedicated for flush, and</span>
     <span class="comment">// the rest shared by flush and compaction.</span>
     <span class="kw">let</span> <span class="ident">max_background_jobs</span>: <span class="ident">i32</span> <span class="op">=</span>
-        <span class="ident">cmp</span>::<span class="ident">max</span>(<span class="number">2</span>, <span class="ident">cmp</span>::<span class="ident">min</span>(<span class="ident">default_background_jobs</span>, (<span class="ident">cpu_num</span> <span class="op">-</span> <span class="number">1</span>) <span class="kw">as</span> <span class="ident">i32</span>));
+        <span class="ident">cmp</span>::<span class="ident">max</span>(<span class="number">2</span>, <span class="ident">cmp</span>::<span class="ident">min</span>(<span class="ident">default_background_jobs</span>, (<span class="ident">cpu_num</span> <span class="op">-</span> <span class="number">1.0</span>) <span class="kw">as</span> <span class="ident">i32</span>));
     <span class="comment">// Cap max_sub_compactions to allow at least two compactions.</span>
     <span class="kw">let</span> <span class="ident">max_compactions</span> <span class="op">=</span> <span class="ident">max_background_jobs</span> <span class="op">-</span> <span class="ident">max_background_jobs</span> <span class="op">/</span> <span class="number">4</span>;
     <span class="kw">let</span> <span class="ident">max_sub_compactions</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="ident">cmp</span>::<span class="ident">max</span>(
@@ -3975,6 +3998,8 @@
     <span class="attribute">#[<span class="ident">config</span>(<span class="ident">skip</span>)]</span>
     <span class="kw">pub</span> <span class="ident">info_log_dir</span>: <span class="ident">String</span>,
     <span class="kw">pub</span> <span class="ident">rate_bytes_per_sec</span>: <span class="ident">ReadableSize</span>,
+    <span class="attribute">#[<span class="ident">config</span>(<span class="ident">skip</span>)]</span>
+    <span class="kw">pub</span> <span class="ident">rate_limiter_refill_period</span>: <span class="ident">ReadableDuration</span>,
     <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">with</span> <span class="op">=</span> <span class="string">&quot;rocks_config::rate_limiter_mode_serde&quot;</span>)]</span>
     <span class="attribute">#[<span class="ident">config</span>(<span class="ident">skip</span>)]</span>
     <span class="kw">pub</span> <span class="ident">rate_limiter_mode</span>: <span class="ident">DBRateLimiterMode</span>,
@@ -4032,6 +4057,7 @@
             <span class="ident">info_log_dir</span>: <span class="string">&quot;&quot;</span>.<span class="ident">to_owned</span>(),
             <span class="ident">info_log_level</span>: <span class="ident">LogLevel</span>::<span class="ident">Info</span>,
             <span class="ident">rate_bytes_per_sec</span>: <span class="ident">ReadableSize</span>::<span class="ident">kb</span>(<span class="number">0</span>),
+            <span class="ident">rate_limiter_refill_period</span>: <span class="ident">ReadableDuration</span>::<span class="ident">millis</span>(<span class="number">100</span>),
             <span class="ident">rate_limiter_mode</span>: <span class="ident">DBRateLimiterMode</span>::<span class="ident">WriteOnly</span>,
             <span class="ident">auto_tuned</span>: <span class="bool-val">false</span>,
             <span class="ident">bytes_per_sync</span>: <span class="ident">ReadableSize</span>::<span class="ident">mb</span>(<span class="number">1</span>),
@@ -4075,6 +4101,7 @@
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">rate_bytes_per_sec</span>.<span class="number">0</span> <span class="op">&gt;</span> <span class="number">0</span> {
             <span class="ident">opts</span>.<span class="ident">set_ratelimiter_with_auto_tuned</span>(
                 <span class="self">self</span>.<span class="ident">rate_bytes_per_sec</span>.<span class="number">0</span> <span class="kw">as</span> <span class="ident">i64</span>,
+                (<span class="self">self</span>.<span class="ident">rate_limiter_refill_period</span>.<span class="ident">as_millis</span>() <span class="op">*</span> <span class="number">1000</span>) <span class="kw">as</span> <span class="ident">i64</span>,
                 <span class="self">self</span>.<span class="ident">rate_limiter_mode</span>,
                 <span class="self">self</span>.<span class="ident">auto_tuned</span>,
             );
@@ -4625,7 +4652,7 @@
 <span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">UnifiedReadPoolConfig</span> {
     <span class="kw">fn</span> <span class="ident">default</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">UnifiedReadPoolConfig</span> {
         <span class="kw">let</span> <span class="ident">cpu_num</span> <span class="op">=</span> <span class="ident">SysQuota</span>::<span class="ident">new</span>().<span class="ident">cpu_cores_quota</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">concurrency</span> <span class="op">=</span> (<span class="ident">cpu_num</span> <span class="kw">as</span> <span class="ident">f64</span> <span class="op">*</span> <span class="number">0.8</span>) <span class="kw">as</span> <span class="ident">usize</span>;
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">concurrency</span> <span class="op">=</span> (<span class="ident">cpu_num</span> <span class="op">*</span> <span class="number">0.8</span>) <span class="kw">as</span> <span class="ident">usize</span>;
         <span class="ident">concurrency</span> <span class="op">=</span> <span class="ident">cmp</span>::<span class="ident">max</span>(<span class="ident">UNIFIED_READPOOL_MIN_CONCURRENCY</span>, <span class="ident">concurrency</span>);
         <span class="self">Self</span> {
             <span class="ident">min_thread_count</span>: <span class="number">1</span>,
@@ -4861,7 +4888,7 @@
 <span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">StorageReadPoolConfig</span> {
     <span class="kw">fn</span> <span class="ident">default</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="kw">let</span> <span class="ident">cpu_num</span> <span class="op">=</span> <span class="ident">SysQuota</span>::<span class="ident">new</span>().<span class="ident">cpu_cores_quota</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">concurrency</span> <span class="op">=</span> (<span class="ident">cpu_num</span> <span class="kw">as</span> <span class="ident">f64</span> <span class="op">*</span> <span class="number">0.5</span>) <span class="kw">as</span> <span class="ident">usize</span>;
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">concurrency</span> <span class="op">=</span> (<span class="ident">cpu_num</span> <span class="op">*</span> <span class="number">0.5</span>) <span class="kw">as</span> <span class="ident">usize</span>;
         <span class="ident">concurrency</span> <span class="op">=</span> <span class="ident">cmp</span>::<span class="ident">max</span>(<span class="ident">DEFAULT_STORAGE_READPOOL_MIN_CONCURRENCY</span>, <span class="ident">concurrency</span>);
         <span class="ident">concurrency</span> <span class="op">=</span> <span class="ident">cmp</span>::<span class="ident">min</span>(<span class="ident">DEFAULT_STORAGE_READPOOL_MAX_CONCURRENCY</span>, <span class="ident">concurrency</span>);
         <span class="self">Self</span> {
@@ -4903,7 +4930,7 @@
 <span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">CoprReadPoolConfig</span> {
     <span class="kw">fn</span> <span class="ident">default</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="kw">let</span> <span class="ident">cpu_num</span> <span class="op">=</span> <span class="ident">SysQuota</span>::<span class="ident">new</span>().<span class="ident">cpu_cores_quota</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">concurrency</span> <span class="op">=</span> (<span class="ident">cpu_num</span> <span class="kw">as</span> <span class="ident">f64</span> <span class="op">*</span> <span class="number">0.8</span>) <span class="kw">as</span> <span class="ident">usize</span>;
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">concurrency</span> <span class="op">=</span> (<span class="ident">cpu_num</span> <span class="op">*</span> <span class="number">0.8</span>) <span class="kw">as</span> <span class="ident">usize</span>;
         <span class="ident">concurrency</span> <span class="op">=</span> <span class="ident">cmp</span>::<span class="ident">max</span>(<span class="ident">DEFAULT_COPROCESSOR_READPOOL_MIN_CONCURRENCY</span>, <span class="ident">concurrency</span>);
         <span class="self">Self</span> {
             <span class="ident">use_unified_pool</span>: <span class="prelude-val">None</span>,
@@ -5133,7 +5160,22 @@
         <span class="kw">let</span> <span class="ident">cpu_num</span> <span class="op">=</span> <span class="ident">SysQuota</span>::<span class="ident">new</span>().<span class="ident">cpu_cores_quota</span>();
         <span class="self">Self</span> {
             <span class="comment">// use at most 75% of vCPU by default</span>
-            <span class="ident">num_threads</span>: (<span class="ident">cpu_num</span> <span class="op">-</span> <span class="ident">cpu_num</span> <span class="op">/</span> <span class="number">4</span>).<span class="ident">clamp</span>(<span class="number">1</span>, <span class="number">32</span>),
+            <span class="ident">num_threads</span>: (<span class="ident">cpu_num</span> <span class="op">*</span> <span class="number">0.75</span>).<span class="ident">clamp</span>(<span class="number">1.0</span>, <span class="number">32.0</span>) <span class="kw">as</span> <span class="ident">usize</span>,
+        }
+    }
+}
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">PartialEq</span>, <span class="ident">Debug</span>, <span class="ident">Configuration</span>)]</span>
+<span class="attribute">#[<span class="ident">serde</span>(<span class="ident">default</span>)]</span>
+<span class="attribute">#[<span class="ident">serde</span>(<span class="ident">rename_all</span> <span class="op">=</span> <span class="string">&quot;kebab-case&quot;</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CdcConfig</span> {
+    <span class="kw">pub</span> <span class="ident">min_ts_interval</span>: <span class="ident">ReadableDuration</span>,
+}
+
+<span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">CdcConfig</span> {
+    <span class="kw">fn</span> <span class="ident">default</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+        <span class="self">Self</span> {
+            <span class="ident">min_ts_interval</span>: <span class="ident">ReadableDuration</span>::<span class="ident">secs</span>(<span class="number">1</span>),
         }
     }
 }
@@ -5217,6 +5259,9 @@
 
     <span class="attribute">#[<span class="ident">config</span>(<span class="ident">submodule</span>)]</span>
     <span class="kw">pub</span> <span class="ident">split</span>: <span class="ident">SplitConfig</span>,
+
+    <span class="attribute">#[<span class="ident">config</span>(<span class="ident">submodule</span>)]</span>
+    <span class="kw">pub</span> <span class="ident">cdc</span>: <span class="ident">CdcConfig</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">TiKvConfig</span> {
@@ -5246,6 +5291,7 @@
             <span class="ident">pessimistic_txn</span>: <span class="ident">PessimisticTxnConfig</span>::<span class="ident">default</span>(),
             <span class="ident">gc</span>: <span class="ident">GcConfig</span>::<span class="ident">default</span>(),
             <span class="ident">split</span>: <span class="ident">SplitConfig</span>::<span class="ident">default</span>(),
+            <span class="ident">cdc</span>: <span class="ident">CdcConfig</span>::<span class="ident">default</span>(),
         }
     }
 }

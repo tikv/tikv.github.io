@@ -1,1 +1,1 @@
-initSidebarItems({"trait":[["KvEngine","A TiKV key-value store"],["WriteBatchVecExt",""]]});
+initSidebarItems({"trait":[["KvEngine","A TiKV key-value store"]]});

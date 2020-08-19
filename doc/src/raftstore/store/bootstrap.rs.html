@@ -179,6 +179,9 @@
 <span id="179">179</span>
 <span id="180">180</span>
 <span id="181">181</span>
+<span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -188,11 +191,12 @@
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">util</span>::<span class="ident">new_peer</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="prelude-ty">Result</span>;
 <span class="kw">use</span> <span class="ident">engine_rocks</span>::<span class="ident">RocksEngine</span>;
-<span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">Iterable</span>, <span class="ident">KvEngines</span>, <span class="ident">Mutable</span>, <span class="ident">SyncMutable</span>, <span class="ident">WriteBatchExt</span>};
+<span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">Engines</span>, <span class="ident">Iterable</span>, <span class="ident">Mutable</span>, <span class="ident">SyncMutable</span>, <span class="ident">WriteBatchExt</span>};
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">CF_DEFAULT</span>, <span class="ident">CF_RAFT</span>};
+<span class="kw">use</span> <span class="ident">raft_engine</span>::<span class="ident">RaftEngine</span>;
 
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">metapb</span>;
-<span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">raft_serverpb</span>::{<span class="ident">RegionLocalState</span>, <span class="ident">StoreIdent</span>};
+<span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">raft_serverpb</span>::{<span class="ident">RaftLocalState</span>, <span class="ident">RegionLocalState</span>, <span class="ident">StoreIdent</span>};
 
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">initial_region</span>(<span class="ident">store_id</span>: <span class="ident">u64</span>, <span class="ident">region_id</span>: <span class="ident">u64</span>, <span class="ident">peer_id</span>: <span class="ident">u64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">metapb</span>::<span class="ident">Region</span> {
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">region</span> <span class="op">=</span> <span class="ident">metapb</span>::<span class="ident">Region</span>::<span class="ident">default</span>();
@@ -223,7 +227,7 @@
 
 <span class="comment">// Bootstrap the store, the DB for this store must be empty and has no data.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">bootstrap_store</span>(
-    <span class="ident">engines</span>: <span class="kw-2">&amp;</span><span class="ident">KvEngines</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span>,
+    <span class="ident">engines</span>: <span class="kw-2">&amp;</span><span class="ident">Engines</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span>,
     <span class="ident">cluster_id</span>: <span class="ident">u64</span>,
     <span class="ident">store_id</span>: <span class="ident">u64</span>,
 ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
@@ -251,7 +255,7 @@
 <span class="doccomment">///</span>
 <span class="doccomment">/// Write the first region meta and prepare state.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">prepare_bootstrap_cluster</span>(
-    <span class="ident">engines</span>: <span class="kw-2">&amp;</span><span class="ident">KvEngines</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span>,
+    <span class="ident">engines</span>: <span class="kw-2">&amp;</span><span class="ident">Engines</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span>,
     <span class="ident">region</span>: <span class="kw-2">&amp;</span><span class="ident">metapb</span>::<span class="ident">Region</span>,
 ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">state</span> <span class="op">=</span> <span class="ident">RegionLocalState</span>::<span class="ident">default</span>();
@@ -264,20 +268,22 @@
     <span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">write</span>(<span class="kw-2">&amp;</span><span class="ident">wb</span>)<span class="question-mark">?</span>;
     <span class="ident">engines</span>.<span class="ident">sync_kv</span>()<span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">raft_wb</span> <span class="op">=</span> <span class="ident">engines</span>.<span class="ident">raft</span>.<span class="ident">write_batch</span>();
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">raft_wb</span> <span class="op">=</span> <span class="ident">engines</span>.<span class="ident">raft</span>.<span class="ident">log_batch</span>(<span class="number">1024</span>);
     <span class="ident">write_initial_raft_state</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">raft_wb</span>, <span class="ident">region</span>.<span class="ident">get_id</span>())<span class="question-mark">?</span>;
-    <span class="ident">engines</span>.<span class="ident">raft</span>.<span class="ident">write</span>(<span class="kw-2">&amp;</span><span class="ident">raft_wb</span>)<span class="question-mark">?</span>;
-    <span class="ident">engines</span>.<span class="ident">sync_raft</span>()<span class="question-mark">?</span>;
+    <span class="macro">box_try</span><span class="macro">!</span>(<span class="ident">engines</span>.<span class="ident">raft</span>.<span class="ident">consume</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">raft_wb</span>, <span class="bool-val">true</span>));
     <span class="prelude-val">Ok</span>(())
 }
 
 <span class="comment">// Clear first region meta and prepare key.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">clear_prepare_bootstrap_cluster</span>(
-    <span class="ident">engines</span>: <span class="kw-2">&amp;</span><span class="ident">KvEngines</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span>,
+    <span class="ident">engines</span>: <span class="kw-2">&amp;</span><span class="ident">Engines</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span>,
     <span class="ident">region_id</span>: <span class="ident">u64</span>,
 ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-    <span class="macro">box_try</span><span class="macro">!</span>(<span class="ident">engines</span>.<span class="ident">raft</span>.<span class="ident">delete</span>(<span class="kw-2">&amp;</span><span class="ident">keys</span>::<span class="ident">raft_state_key</span>(<span class="ident">region_id</span>)));
-    <span class="ident">engines</span>.<span class="ident">sync_raft</span>()<span class="question-mark">?</span>;
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">wb</span> <span class="op">=</span> <span class="ident">engines</span>.<span class="ident">raft</span>.<span class="ident">log_batch</span>(<span class="number">1024</span>);
+    <span class="macro">box_try</span><span class="macro">!</span>(<span class="ident">engines</span>
+        .<span class="ident">raft</span>
+        .<span class="ident">clean</span>(<span class="ident">region_id</span>, <span class="kw-2">&amp;</span><span class="ident">RaftLocalState</span>::<span class="ident">default</span>(), <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">wb</span>));
+    <span class="macro">box_try</span><span class="macro">!</span>(<span class="ident">engines</span>.<span class="ident">raft</span>.<span class="ident">consume</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">wb</span>, <span class="bool-val">true</span>));
 
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">wb</span> <span class="op">=</span> <span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">write_batch</span>();
     <span class="macro">box_try</span><span class="macro">!</span>(<span class="ident">wb</span>.<span class="ident">delete</span>(<span class="ident">keys</span>::<span class="ident">PREPARE_BOOTSTRAP_KEY</span>));
@@ -290,7 +296,7 @@
 }
 
 <span class="comment">// Clear prepare key</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">clear_prepare_bootstrap_key</span>(<span class="ident">engines</span>: <span class="kw-2">&amp;</span><span class="ident">KvEngines</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">clear_prepare_bootstrap_key</span>(<span class="ident">engines</span>: <span class="kw-2">&amp;</span><span class="ident">Engines</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
     <span class="macro">box_try</span><span class="macro">!</span>(<span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">delete</span>(<span class="ident">keys</span>::<span class="ident">PREPARE_BOOTSTRAP_KEY</span>));
     <span class="ident">engines</span>.<span class="ident">sync_kv</span>()<span class="question-mark">?</span>;
     <span class="prelude-val">Ok</span>(())
@@ -301,7 +307,7 @@
     <span class="kw">use</span> <span class="ident">tempfile</span>::<span class="ident">Builder</span>;
 
     <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
-    <span class="kw">use</span> <span class="ident">engine_traits</span>::<span class="ident">KvEngines</span>;
+    <span class="kw">use</span> <span class="ident">engine_traits</span>::<span class="ident">Engines</span>;
     <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">Peekable</span>, <span class="ident">CF_DEFAULT</span>};
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
@@ -319,7 +325,7 @@
             <span class="ident">engine_rocks</span>::<span class="ident">util</span>::<span class="ident">new_engine</span>(<span class="ident">raft_path</span>.<span class="ident">to_str</span>().<span class="ident">unwrap</span>(), <span class="prelude-val">None</span>, <span class="kw-2">&amp;</span>[<span class="ident">CF_DEFAULT</span>], <span class="prelude-val">None</span>)
                 .<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">shared_block_cache</span> <span class="op">=</span> <span class="bool-val">false</span>;
-        <span class="kw">let</span> <span class="ident">engines</span> <span class="op">=</span> <span class="ident">KvEngines</span>::<span class="ident">new</span>(<span class="ident">kv_engine</span>.<span class="ident">clone</span>(), <span class="ident">raft_engine</span>.<span class="ident">clone</span>(), <span class="ident">shared_block_cache</span>);
+        <span class="kw">let</span> <span class="ident">engines</span> <span class="op">=</span> <span class="ident">Engines</span>::<span class="ident">new</span>(<span class="ident">kv_engine</span>.<span class="ident">clone</span>(), <span class="ident">raft_engine</span>.<span class="ident">clone</span>(), <span class="ident">shared_block_cache</span>);
         <span class="kw">let</span> <span class="ident">region</span> <span class="op">=</span> <span class="ident">initial_region</span>(<span class="number">1</span>, <span class="number">1</span>, <span class="number">1</span>);
 
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">bootstrap_store</span>(<span class="kw-2">&amp;</span><span class="ident">engines</span>, <span class="number">1</span>, <span class="number">1</span>).<span class="ident">is_ok</span>());

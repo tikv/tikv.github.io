@@ -716,6 +716,11 @@
 <span id="716">716</span>
 <span id="717">717</span>
 <span id="718">718</span>
+<span id="719">719</span>
+<span id="720">720</span>
+<span id="721">721</span>
+<span id="722">722</span>
+<span id="723">723</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2017 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -724,12 +729,14 @@
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">thread</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">time</span>::{<span class="ident">Duration</span>, <span class="ident">Instant</span>};
 
-<span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">sync</span>::<span class="ident">mpsc</span>;
-<span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">sync</span>::<span class="ident">oneshot</span>;
-<span class="kw">use</span> <span class="ident">futures</span>::{<span class="ident">future</span>, <span class="ident">Future</span>, <span class="ident">Sink</span>, <span class="ident">Stream</span>};
-<span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">compat</span>::{<span class="ident">Compat</span>, <span class="ident">Future01CompatExt</span>};
-<span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">executor</span>::<span class="ident">block_on</span>;
-<span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">future</span>::<span class="ident">FutureExt</span>;
+<span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">channel</span>::{<span class="ident">mpsc</span>, <span class="ident">oneshot</span>};
+<span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">compat</span>::{<span class="ident">Compat</span>, <span class="ident">Future01CompatExt</span>, <span class="ident">Sink01CompatExt</span>, <span class="ident">Stream01CompatExt</span>};
+<span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">executor</span>::<span class="ident">block_on</span>;
+<span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">future</span>::{<span class="self">self</span>, <span class="ident">FutureExt</span>};
+<span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">sink</span>::<span class="ident">SinkExt</span>;
+<span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">stream</span>::<span class="ident">StreamExt</span>;
+<span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">stream</span>::<span class="ident">TryStreamExt</span>;
+
 <span class="kw">use</span> <span class="ident">grpcio</span>::{<span class="ident">CallOption</span>, <span class="ident">EnvBuilder</span>, <span class="ident">WriteFlags</span>};
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">metapb</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">pdpb</span>::{<span class="self">self</span>, <span class="ident">Member</span>};
@@ -1051,7 +1058,8 @@
                 .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
                     <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;fail to request PD {} err {:?}&quot;</span>, <span class="string">&quot;get_region_by_id&quot;</span>, <span class="ident">e</span>)
                 });
-            <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">handler</span>.<span class="ident">map_err</span>(<span class="ident">Error</span>::<span class="ident">Grpc</span>).<span class="ident">and_then</span>(<span class="kw">move</span> <span class="op">|</span><span class="kw-2">mut</span> <span class="ident">resp</span><span class="op">|</span> {
+            <span class="ident">Box</span>::<span class="ident">pin</span>(<span class="kw">async</span> <span class="kw">move</span> {
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">handler</span>.<span class="ident">compat</span>().<span class="kw">await</span><span class="question-mark">?</span>;
                 <span class="ident">PD_REQUEST_HISTOGRAM_VEC</span>
                     .<span class="ident">with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="string">&quot;get_region_by_id&quot;</span>])
                     .<span class="ident">observe</span>(<span class="ident">duration_to_sec</span>(<span class="ident">timer</span>.<span class="ident">elapsed</span>()));
@@ -1061,7 +1069,7 @@
                 } <span class="kw">else</span> {
                     <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
                 }
-            })) <span class="kw">as</span> <span class="ident">PdFuture</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span>
+            }) <span class="kw">as</span> <span class="ident">PdFuture</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span>
         };
 
         <span class="self">self</span>.<span class="ident">leader_client</span>
@@ -1103,11 +1111,10 @@
         <span class="kw">let</span> <span class="ident">executor</span> <span class="op">=</span> <span class="op">|</span><span class="ident">client</span>: <span class="kw-2">&amp;</span><span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">Inner</span><span class="op">&gt;</span>, <span class="ident">req</span>: <span class="ident">pdpb</span>::<span class="ident">RegionHeartbeatRequest</span><span class="op">|</span> {
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">inner</span> <span class="op">=</span> <span class="ident">client</span>.<span class="ident">wl</span>();
             <span class="kw">if</span> <span class="kw">let</span> <span class="ident">Either</span>::<span class="ident">Right</span>(<span class="kw-2">ref</span> <span class="ident">sender</span>) <span class="op">=</span> <span class="ident">inner</span>.<span class="ident">hb_sender</span> {
-                <span class="kw">return</span> <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">future</span>::<span class="ident">result</span>(
-                    <span class="ident">sender</span>
-                        .<span class="ident">unbounded_send</span>(<span class="ident">req</span>)
-                        .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">Error</span>::<span class="ident">Other</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">e</span>))),
-                )) <span class="kw">as</span> <span class="ident">PdFuture</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span>;
+                <span class="kw">let</span> <span class="ident">ret</span> <span class="op">=</span> <span class="ident">sender</span>
+                    .<span class="ident">unbounded_send</span>(<span class="ident">req</span>)
+                    .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">Error</span>::<span class="ident">Other</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">e</span>)));
+                <span class="kw">return</span> <span class="ident">Box</span>::<span class="ident">pin</span>(<span class="ident">future</span>::<span class="ident">ready</span>(<span class="ident">ret</span>)) <span class="kw">as</span> <span class="ident">PdFuture</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span>;
             }
 
             <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;heartbeat sender is refreshed&quot;</span>);
@@ -1117,25 +1124,23 @@
             <span class="ident">tx</span>.<span class="ident">unbounded_send</span>(<span class="ident">req</span>)
                 .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;send request to unbounded channel failed {:?}&quot;</span>, <span class="ident">e</span>));
             <span class="ident">inner</span>.<span class="ident">hb_sender</span> <span class="op">=</span> <span class="ident">Either</span>::<span class="ident">Right</span>(<span class="ident">tx</span>);
-            <span class="ident">Box</span>::<span class="ident">new</span>(
-                <span class="ident">sender</span>
-                    .<span class="ident">sink_map_err</span>(<span class="ident">Error</span>::<span class="ident">Grpc</span>)
-                    .<span class="ident">send_all</span>(<span class="ident">rx</span>.<span class="ident">then</span>(<span class="op">|</span><span class="ident">r</span><span class="op">|</span> <span class="kw">match</span> <span class="ident">r</span> {
-                        <span class="prelude-val">Ok</span>(<span class="ident">r</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>((<span class="ident">r</span>, <span class="ident">WriteFlags</span>::<span class="ident">default</span>())),
-                        <span class="prelude-val">Err</span>(()) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">Other</span>(<span class="macro">box_err</span><span class="macro">!</span>(<span class="string">&quot;failed to recv heartbeat&quot;</span>))),
-                    }))
-                    .<span class="ident">then</span>(<span class="op">|</span><span class="ident">result</span><span class="op">|</span> <span class="kw">match</span> <span class="ident">result</span> {
-                        <span class="prelude-val">Ok</span>((<span class="kw-2">mut</span> <span class="ident">sender</span>, <span class="kw">_</span>)) <span class="op">=</span><span class="op">&gt;</span> {
-                            <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;cancel region heartbeat sender&quot;</span>);
-                            <span class="ident">sender</span>.<span class="ident">get_mut</span>().<span class="ident">cancel</span>();
-                            <span class="prelude-val">Ok</span>(())
-                        }
-                        <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                            <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;failed to send heartbeat&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
-                            <span class="prelude-val">Err</span>(<span class="ident">e</span>)
-                        }
-                    }),
-            ) <span class="kw">as</span> <span class="ident">PdFuture</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span>
+            <span class="ident">Box</span>::<span class="ident">pin</span>(<span class="kw">async</span> <span class="kw">move</span> {
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">sender</span> <span class="op">=</span> <span class="ident">sender</span>.<span class="ident">sink_compat</span>().<span class="ident">sink_map_err</span>(<span class="ident">Error</span>::<span class="ident">Grpc</span>);
+                <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">sender</span>
+                    .<span class="ident">send_all</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">rx</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">r</span><span class="op">|</span> <span class="prelude-val">Ok</span>((<span class="ident">r</span>, <span class="ident">WriteFlags</span>::<span class="ident">default</span>()))))
+                    .<span class="kw">await</span>;
+                <span class="kw">match</span> <span class="ident">result</span> {
+                    <span class="prelude-val">Ok</span>(()) <span class="op">=</span><span class="op">&gt;</span> {
+                        <span class="ident">sender</span>.<span class="ident">get_mut</span>().<span class="ident">get_mut</span>().<span class="ident">cancel</span>();
+                        <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;cancel region heartbeat sender&quot;</span>);
+                        <span class="prelude-val">Ok</span>(())
+                    }
+                    <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                        <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;failed to send heartbeat&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
+                        <span class="prelude-val">Err</span>(<span class="ident">e</span>)
+                    }
+                }
+            }) <span class="kw">as</span> <span class="ident">PdFuture</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span>
         };
 
         <span class="self">self</span>.<span class="ident">leader_client</span>
@@ -1163,13 +1168,15 @@
                 .<span class="ident">client_stub</span>
                 .<span class="ident">ask_split_async_opt</span>(<span class="kw-2">&amp;</span><span class="ident">req</span>, <span class="self">Self</span>::<span class="ident">call_option</span>())
                 .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;fail to request PD {} err {:?}&quot;</span>, <span class="string">&quot;ask_split&quot;</span>, <span class="ident">e</span>));
-            <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">handler</span>.<span class="ident">map_err</span>(<span class="ident">Error</span>::<span class="ident">Grpc</span>).<span class="ident">and_then</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">resp</span><span class="op">|</span> {
+
+            <span class="ident">Box</span>::<span class="ident">pin</span>(<span class="kw">async</span> <span class="kw">move</span> {
+                <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">handler</span>.<span class="ident">compat</span>().<span class="kw">await</span><span class="question-mark">?</span>;
                 <span class="ident">PD_REQUEST_HISTOGRAM_VEC</span>
                     .<span class="ident">with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="string">&quot;ask_split&quot;</span>])
                     .<span class="ident">observe</span>(<span class="ident">duration_to_sec</span>(<span class="ident">timer</span>.<span class="ident">elapsed</span>()));
                 <span class="ident">check_resp_header</span>(<span class="ident">resp</span>.<span class="ident">get_header</span>())<span class="question-mark">?</span>;
                 <span class="prelude-val">Ok</span>(<span class="ident">resp</span>)
-            })) <span class="kw">as</span> <span class="ident">PdFuture</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span>
+            }) <span class="kw">as</span> <span class="ident">PdFuture</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span>
         };
 
         <span class="self">self</span>.<span class="ident">leader_client</span>
@@ -1195,13 +1202,15 @@
                 .<span class="ident">client_stub</span>
                 .<span class="ident">ask_batch_split_async_opt</span>(<span class="kw-2">&amp;</span><span class="ident">req</span>, <span class="self">Self</span>::<span class="ident">call_option</span>())
                 .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;fail to request PD {} err {:?}&quot;</span>, <span class="string">&quot;ask_batch_split&quot;</span>, <span class="ident">e</span>));
-            <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">handler</span>.<span class="ident">map_err</span>(<span class="ident">Error</span>::<span class="ident">Grpc</span>).<span class="ident">and_then</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">resp</span><span class="op">|</span> {
+
+            <span class="ident">Box</span>::<span class="ident">pin</span>(<span class="kw">async</span> <span class="kw">move</span> {
+                <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">handler</span>.<span class="ident">compat</span>().<span class="kw">await</span><span class="question-mark">?</span>;
                 <span class="ident">PD_REQUEST_HISTOGRAM_VEC</span>
                     .<span class="ident">with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="string">&quot;ask_batch_split&quot;</span>])
                     .<span class="ident">observe</span>(<span class="ident">duration_to_sec</span>(<span class="ident">timer</span>.<span class="ident">elapsed</span>()));
                 <span class="ident">check_resp_header</span>(<span class="ident">resp</span>.<span class="ident">get_header</span>())<span class="question-mark">?</span>;
                 <span class="prelude-val">Ok</span>(<span class="ident">resp</span>)
-            })) <span class="kw">as</span> <span class="ident">PdFuture</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span>
+            }) <span class="kw">as</span> <span class="ident">PdFuture</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span>
         };
 
         <span class="self">self</span>.<span class="ident">leader_client</span>
@@ -1228,7 +1237,8 @@
                 .<span class="ident">client_stub</span>
                 .<span class="ident">store_heartbeat_async_opt</span>(<span class="kw-2">&amp;</span><span class="ident">req</span>, <span class="self">Self</span>::<span class="ident">call_option</span>())
                 .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;fail to request PD {} err {:?}&quot;</span>, <span class="string">&quot;store_heartbeat&quot;</span>, <span class="ident">e</span>));
-            <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">handler</span>.<span class="ident">map_err</span>(<span class="ident">Error</span>::<span class="ident">Grpc</span>).<span class="ident">and_then</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">resp</span><span class="op">|</span> {
+            <span class="ident">Box</span>::<span class="ident">pin</span>(<span class="kw">async</span> <span class="kw">move</span> {
+                <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">handler</span>.<span class="ident">compat</span>().<span class="kw">await</span><span class="question-mark">?</span>;
                 <span class="ident">PD_REQUEST_HISTOGRAM_VEC</span>
                     .<span class="ident">with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="string">&quot;store_heartbeat&quot;</span>])
                     .<span class="ident">observe</span>(<span class="ident">duration_to_sec</span>(<span class="ident">timer</span>.<span class="ident">elapsed</span>()));
@@ -1239,7 +1249,7 @@
                     <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> {}
                 };
                 <span class="prelude-val">Ok</span>(<span class="ident">resp</span>)
-            })) <span class="kw">as</span> <span class="ident">PdFuture</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span>
+            }) <span class="kw">as</span> <span class="ident">PdFuture</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span>
         };
 
         <span class="self">self</span>.<span class="ident">leader_client</span>
@@ -1262,13 +1272,14 @@
                 .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
                     <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;fail to request PD {} err {:?}&quot;</span>, <span class="string">&quot;report_batch_split&quot;</span>, <span class="ident">e</span>)
                 });
-            <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">handler</span>.<span class="ident">map_err</span>(<span class="ident">Error</span>::<span class="ident">Grpc</span>).<span class="ident">and_then</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">resp</span><span class="op">|</span> {
+            <span class="ident">Box</span>::<span class="ident">pin</span>(<span class="kw">async</span> <span class="kw">move</span> {
+                <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">handler</span>.<span class="ident">compat</span>().<span class="kw">await</span><span class="question-mark">?</span>;
                 <span class="ident">PD_REQUEST_HISTOGRAM_VEC</span>
                     .<span class="ident">with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="string">&quot;report_batch_split&quot;</span>])
                     .<span class="ident">observe</span>(<span class="ident">duration_to_sec</span>(<span class="ident">timer</span>.<span class="ident">elapsed</span>()));
                 <span class="ident">check_resp_header</span>(<span class="ident">resp</span>.<span class="ident">get_header</span>())<span class="question-mark">?</span>;
                 <span class="prelude-val">Ok</span>(())
-            })) <span class="kw">as</span> <span class="ident">PdFuture</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span>
+            }) <span class="kw">as</span> <span class="ident">PdFuture</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span>
         };
 
         <span class="self">self</span>.<span class="ident">leader_client</span>
@@ -1314,13 +1325,14 @@
                 .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
                     <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;fail to request PD {} err {:?}&quot;</span>, <span class="string">&quot;get_gc_saft_point&quot;</span>, <span class="ident">e</span>)
                 });
-            <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">handler</span>.<span class="ident">map_err</span>(<span class="ident">Error</span>::<span class="ident">Grpc</span>).<span class="ident">and_then</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">resp</span><span class="op">|</span> {
+            <span class="ident">Box</span>::<span class="ident">pin</span>(<span class="kw">async</span> <span class="kw">move</span> {
+                <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">handler</span>.<span class="ident">compat</span>().<span class="kw">await</span><span class="question-mark">?</span>;
                 <span class="ident">PD_REQUEST_HISTOGRAM_VEC</span>
                     .<span class="ident">with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="string">&quot;get_gc_safe_point&quot;</span>])
                     .<span class="ident">observe</span>(<span class="ident">duration_to_sec</span>(<span class="ident">timer</span>.<span class="ident">elapsed</span>()));
                 <span class="ident">check_resp_header</span>(<span class="ident">resp</span>.<span class="ident">get_header</span>())<span class="question-mark">?</span>;
                 <span class="prelude-val">Ok</span>(<span class="ident">resp</span>.<span class="ident">get_safe_point</span>())
-            })) <span class="kw">as</span> <span class="ident">PdFuture</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span>
+            }) <span class="kw">as</span> <span class="ident">PdFuture</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span>
         };
 
         <span class="self">self</span>.<span class="ident">leader_client</span>
@@ -1381,35 +1393,33 @@
                 .<span class="ident">client_stub</span>
                 .<span class="ident">tso</span>()
                 .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;fail to request PD {} err {:?}&quot;</span>, <span class="string">&quot;tso&quot;</span>, <span class="ident">e</span>));
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">req_sink</span> <span class="op">=</span> <span class="ident">req_sink</span>.<span class="ident">sink_compat</span>();
             <span class="kw">let</span> (<span class="ident">keep_req_tx</span>, <span class="kw-2">mut</span> <span class="ident">keep_req_rx</span>) <span class="op">=</span> <span class="ident">oneshot</span>::<span class="ident">channel</span>();
-            <span class="kw">let</span> <span class="ident">send_once</span> <span class="op">=</span> <span class="ident">req_sink</span>.<span class="ident">send</span>((<span class="ident">req</span>, <span class="ident">WriteFlags</span>::<span class="ident">default</span>())).<span class="ident">then</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> {
-                <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="ident">keep_req_tx</span>.<span class="ident">send</span>(<span class="ident">s</span>);
-                <span class="prelude-val">Ok</span>(())
-            });
-            <span class="ident">cli</span>.<span class="ident">client_stub</span>.<span class="ident">spawn</span>(<span class="ident">send_once</span>);
-            <span class="ident">Box</span>::<span class="ident">new</span>(
-                <span class="ident">resp_stream</span>
-                    .<span class="ident">into_future</span>()
-                    .<span class="ident">map_err</span>(<span class="op">|</span>(<span class="ident">err</span>, <span class="kw">_</span>)<span class="op">|</span> <span class="ident">Error</span>::<span class="ident">Grpc</span>(<span class="ident">err</span>))
-                    .<span class="ident">and_then</span>(<span class="kw">move</span> <span class="op">|</span>(<span class="ident">resp</span>, <span class="kw">_</span>)<span class="op">|</span> {
-                        <span class="comment">// Now we can safely drop sink without</span>
-                        <span class="comment">// causing a Cancel error.</span>
-                        <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="ident">keep_req_rx</span>
-                            .<span class="ident">try_recv</span>()
-                            .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;fail to receive tso sender err {:?}&quot;</span>, <span class="ident">e</span>));
-                        <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">resp</span> {
-                            <span class="prelude-val">Some</span>(<span class="ident">r</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">r</span>,
-                            <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">TimeStamp</span>::<span class="ident">zero</span>()),
-                        };
-                        <span class="ident">PD_REQUEST_HISTOGRAM_VEC</span>
-                            .<span class="ident">with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="string">&quot;tso&quot;</span>])
-                            .<span class="ident">observe</span>(<span class="ident">duration_to_sec</span>(<span class="ident">timer</span>.<span class="ident">elapsed</span>()));
-                        <span class="ident">check_resp_header</span>(<span class="ident">resp</span>.<span class="ident">get_header</span>())<span class="question-mark">?</span>;
-                        <span class="kw">let</span> <span class="ident">ts</span> <span class="op">=</span> <span class="ident">resp</span>.<span class="ident">get_timestamp</span>();
-                        <span class="kw">let</span> <span class="ident">encoded</span> <span class="op">=</span> <span class="ident">TimeStamp</span>::<span class="ident">compose</span>(<span class="ident">ts</span>.<span class="ident">physical</span> <span class="kw">as</span> <span class="kw">_</span>, <span class="ident">ts</span>.<span class="ident">logical</span> <span class="kw">as</span> <span class="kw">_</span>);
-                        <span class="prelude-val">Ok</span>(<span class="ident">encoded</span>)
-                    }),
-            ) <span class="kw">as</span> <span class="ident">PdFuture</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span>
+            <span class="kw">let</span> <span class="ident">send_once</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
+                <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="ident">req_sink</span>.<span class="ident">send</span>((<span class="ident">req</span>, <span class="ident">WriteFlags</span>::<span class="ident">default</span>())).<span class="kw">await</span>;
+                <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="ident">keep_req_tx</span>.<span class="ident">send</span>(<span class="ident">req_sink</span>);
+            };
+            <span class="ident">cli</span>.<span class="ident">client_stub</span>
+                .<span class="ident">spawn</span>(<span class="ident">Compat</span>::<span class="ident">new</span>(<span class="ident">send_once</span>.<span class="ident">unit_error</span>().<span class="ident">boxed</span>()));
+            <span class="ident">Box</span>::<span class="ident">pin</span>(<span class="kw">async</span> <span class="kw">move</span> {
+                <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">resp_stream</span>.<span class="ident">compat</span>().<span class="ident">try_next</span>().<span class="kw">await</span><span class="question-mark">?</span>;
+                <span class="comment">// Now we can safely drop sink without</span>
+                <span class="comment">// causing a Cancel error.</span>
+                <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="ident">keep_req_rx</span>
+                    .<span class="ident">try_recv</span>()
+                    .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;fail to receive tso sender err {:?}&quot;</span>, <span class="ident">e</span>));
+                <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">resp</span> {
+                    <span class="prelude-val">Some</span>(<span class="ident">r</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">r</span>,
+                    <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">TimeStamp</span>::<span class="ident">zero</span>()),
+                };
+                <span class="ident">PD_REQUEST_HISTOGRAM_VEC</span>
+                    .<span class="ident">with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="string">&quot;tso&quot;</span>])
+                    .<span class="ident">observe</span>(<span class="ident">duration_to_sec</span>(<span class="ident">timer</span>.<span class="ident">elapsed</span>()));
+                <span class="ident">check_resp_header</span>(<span class="ident">resp</span>.<span class="ident">get_header</span>())<span class="question-mark">?</span>;
+                <span class="kw">let</span> <span class="ident">ts</span> <span class="op">=</span> <span class="ident">resp</span>.<span class="ident">get_timestamp</span>();
+                <span class="kw">let</span> <span class="ident">encoded</span> <span class="op">=</span> <span class="ident">TimeStamp</span>::<span class="ident">compose</span>(<span class="ident">ts</span>.<span class="ident">physical</span> <span class="kw">as</span> <span class="kw">_</span>, <span class="ident">ts</span>.<span class="ident">logical</span> <span class="kw">as</span> <span class="kw">_</span>);
+                <span class="prelude-val">Ok</span>(<span class="ident">encoded</span>)
+            }) <span class="kw">as</span> <span class="ident">PdFuture</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span>
         };
 
         <span class="self">self</span>.<span class="ident">leader_client</span>
@@ -1432,7 +1442,7 @@
 
 <span class="kw">impl</span> <span class="ident">PdClient</span> <span class="kw">for</span> <span class="ident">DummyPdClient</span> {
     <span class="kw">fn</span> <span class="ident">get_tso</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PdFuture</span><span class="op">&lt;</span><span class="ident">TimeStamp</span><span class="op">&gt;</span> {
-        <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">future</span>::<span class="ident">ok</span>(<span class="self">self</span>.<span class="ident">next_ts</span>))
+        <span class="ident">Box</span>::<span class="ident">pin</span>(<span class="ident">future</span>::<span class="ident">ok</span>(<span class="self">self</span>.<span class="ident">next_ts</span>))
     }
 }
 </pre></div>

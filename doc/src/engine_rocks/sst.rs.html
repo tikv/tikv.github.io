@@ -351,6 +351,19 @@
 <span id="351">351</span>
 <span id="352">352</span>
 <span id="353">353</span>
+<span id="354">354</span>
+<span id="355">355</span>
+<span id="356">356</span>
+<span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
+<span id="361">361</span>
+<span id="362">362</span>
+<span id="363">363</span>
+<span id="364">364</span>
+<span id="365">365</span>
+<span id="366">366</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -476,6 +489,7 @@
     <span class="ident">db</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">DB</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">in_memory</span>: <span class="ident">bool</span>,
     <span class="ident">compression_type</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">DBCompressionType</span><span class="op">&gt;</span>,
+    <span class="ident">compression_level</span>: <span class="ident">i32</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">SstWriterBuilder</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">RocksSstWriterBuilder</span> {
@@ -485,6 +499,7 @@
             <span class="ident">in_memory</span>: <span class="bool-val">false</span>,
             <span class="ident">db</span>: <span class="prelude-val">None</span>,
             <span class="ident">compression_type</span>: <span class="prelude-val">None</span>,
+            <span class="ident">compression_level</span>: <span class="number">0</span>,
         }
     }
 
@@ -505,6 +520,11 @@
 
     <span class="kw">fn</span> <span class="ident">set_compression_type</span>(<span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">compression</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">SstCompressionType</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="self">self</span>.<span class="ident">compression_type</span> <span class="op">=</span> <span class="ident">compression</span>.<span class="ident">map</span>(<span class="ident">to_rocks_compression_type</span>);
+        <span class="self">self</span>
+    }
+
+    <span class="kw">fn</span> <span class="ident">set_compression_level</span>(<span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">level</span>: <span class="ident">i32</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+        <span class="self">self</span>.<span class="ident">compression_level</span> <span class="op">=</span> <span class="ident">level</span>;
         <span class="self">self</span>
     }
 
@@ -542,6 +562,12 @@
         } <span class="kw">else</span> {
             <span class="ident">get_fastest_supported_compression_type</span>()
         };
+        <span class="comment">// TODO: 0 is a valid value for compression_level</span>
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">compression_level</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
+            <span class="comment">// other three fields are default value.</span>
+            <span class="comment">// see: https://github.com/facebook/rocksdb/blob/8cb278d11a43773a3ac22e523f4d183b06d37d88/include/rocksdb/advanced_options.h#L146-L153</span>
+            <span class="ident">io_options</span>.<span class="ident">set_compression_options</span>(<span class="op">-</span><span class="number">14</span>, <span class="self">self</span>.<span class="ident">compression_level</span>, <span class="number">0</span>, <span class="number">0</span>);
+        }
         <span class="ident">io_options</span>.<span class="ident">compression</span>(<span class="ident">compress_type</span>);
         <span class="comment">// in rocksdb 5.5.1, SstFileWriter will try to use bottommost_compression and</span>
         <span class="comment">// compression_per_level first, so to make sure our specified compression type</span>

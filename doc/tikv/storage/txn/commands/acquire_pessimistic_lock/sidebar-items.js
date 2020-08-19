@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["AcquirePessimisticLock","Acquire a Pessimistic lock on the keys."]]});
+initSidebarItems({"fn":[["extract_lock_from_result",""]],"struct":[["AcquirePessimisticLock","Acquire a Pessimistic lock on the keys."]]});

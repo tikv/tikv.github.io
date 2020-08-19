@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["StoreState",""]],"struct":[["Cluster",""],["Peer",""],["Region",""],["RegionEpoch",""],["Store",""],["StoreLabel",""]]});
+initSidebarItems({"enum":[["PeerRole",""],["StoreState",""]],"struct":[["Cluster",""],["Peer",""],["Region",""],["RegionEpoch",""],["Store",""],["StoreLabel",""]]});

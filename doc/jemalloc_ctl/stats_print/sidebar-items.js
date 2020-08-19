@@ -1,1 +1,0 @@
-initSidebarItems({"fn":[["stats_print","Writes allocator statistics."]],"struct":[["Options","Statistics configuration."]]});
