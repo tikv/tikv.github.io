@@ -1251,6 +1251,60 @@
 <span id="1251">1251</span>
 <span id="1252">1252</span>
 <span id="1253">1253</span>
+<span id="1254">1254</span>
+<span id="1255">1255</span>
+<span id="1256">1256</span>
+<span id="1257">1257</span>
+<span id="1258">1258</span>
+<span id="1259">1259</span>
+<span id="1260">1260</span>
+<span id="1261">1261</span>
+<span id="1262">1262</span>
+<span id="1263">1263</span>
+<span id="1264">1264</span>
+<span id="1265">1265</span>
+<span id="1266">1266</span>
+<span id="1267">1267</span>
+<span id="1268">1268</span>
+<span id="1269">1269</span>
+<span id="1270">1270</span>
+<span id="1271">1271</span>
+<span id="1272">1272</span>
+<span id="1273">1273</span>
+<span id="1274">1274</span>
+<span id="1275">1275</span>
+<span id="1276">1276</span>
+<span id="1277">1277</span>
+<span id="1278">1278</span>
+<span id="1279">1279</span>
+<span id="1280">1280</span>
+<span id="1281">1281</span>
+<span id="1282">1282</span>
+<span id="1283">1283</span>
+<span id="1284">1284</span>
+<span id="1285">1285</span>
+<span id="1286">1286</span>
+<span id="1287">1287</span>
+<span id="1288">1288</span>
+<span id="1289">1289</span>
+<span id="1290">1290</span>
+<span id="1291">1291</span>
+<span id="1292">1292</span>
+<span id="1293">1293</span>
+<span id="1294">1294</span>
+<span id="1295">1295</span>
+<span id="1296">1296</span>
+<span id="1297">1297</span>
+<span id="1298">1298</span>
+<span id="1299">1299</span>
+<span id="1300">1300</span>
+<span id="1301">1301</span>
+<span id="1302">1302</span>
+<span id="1303">1303</span>
+<span id="1304">1304</span>
+<span id="1305">1305</span>
+<span id="1306">1306</span>
+<span id="1307">1307</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1266,6 +1320,7 @@
 <span class="kw">use</span> <span class="ident">protobuf</span>::{<span class="self">self</span>, <span class="ident">Message</span>};
 <span class="kw">use</span> <span class="ident">raft</span>::<span class="ident">eraftpb</span>::{<span class="self">self</span>, <span class="ident">ConfChangeType</span>, <span class="ident">ConfState</span>, <span class="ident">MessageType</span>};
 <span class="kw">use</span> <span class="ident">raft</span>::<span class="ident">INVALID_INDEX</span>;
+<span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">collections</span>::<span class="ident">HashMap</span>;
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">time</span>::<span class="ident">monotonic_raw_now</span>;
 <span class="kw">use</span> <span class="ident">time</span>::{<span class="ident">Duration</span>, <span class="ident">Timespec</span>};
 
@@ -1402,33 +1457,77 @@
         <span class="op">|</span><span class="op">|</span> <span class="ident">epoch</span>.<span class="ident">get_conf_ver</span>() <span class="op">&lt;</span> <span class="ident">check_epoch</span>.<span class="ident">get_conf_ver</span>()
 }
 
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Copy</span>, <span class="ident">Clone</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">AdminCmdEpochState</span> {
+    <span class="kw">pub</span> <span class="ident">check_ver</span>: <span class="ident">bool</span>,
+    <span class="kw">pub</span> <span class="ident">check_conf_ver</span>: <span class="ident">bool</span>,
+    <span class="kw">pub</span> <span class="ident">change_ver</span>: <span class="ident">bool</span>,
+    <span class="kw">pub</span> <span class="ident">change_conf_ver</span>: <span class="ident">bool</span>,
+}
+
+<span class="kw">impl</span> <span class="ident">AdminCmdEpochState</span> {
+    <span class="kw">fn</span> <span class="ident">new</span>(
+        <span class="ident">check_ver</span>: <span class="ident">bool</span>,
+        <span class="ident">check_conf_ver</span>: <span class="ident">bool</span>,
+        <span class="ident">change_ver</span>: <span class="ident">bool</span>,
+        <span class="ident">change_conf_ver</span>: <span class="ident">bool</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">AdminCmdEpochState</span> {
+        <span class="ident">AdminCmdEpochState</span> {
+            <span class="ident">check_ver</span>,
+            <span class="ident">check_conf_ver</span>,
+            <span class="ident">change_ver</span>,
+            <span class="ident">change_conf_ver</span>,
+        }
+    }
+}
+
+<span class="macro">lazy_static</span><span class="macro">!</span> {
+    <span class="doccomment">/// WARNING: the existing settings in `ADMIN_CMD_EPOCH_MAP` **MUST NOT** be changed!!!</span>
+    <span class="doccomment">/// Changing any admin cmd&#39;s `AdminCmdEpochState` or the epoch-change behavior during applying</span>
+    <span class="doccomment">/// will break upgrade compatibility and correctness dependency of `CmdEpochChecker`.</span>
+    <span class="doccomment">/// Please remember it is very difficult to fix the issues arising from not following this rule.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// If you really want to change an admin cmd behavior, please add a new admin cmd and **do not**</span>
+    <span class="doccomment">/// delete the old one.</span>
+    <span class="kw">pub</span> <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">ADMIN_CMD_EPOCH_MAP</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">AdminCmdType</span>, <span class="ident">AdminCmdEpochState</span><span class="op">&gt;</span> <span class="op">=</span> [
+        (<span class="ident">AdminCmdType</span>::<span class="ident">InvalidAdmin</span>, <span class="ident">AdminCmdEpochState</span>::<span class="ident">new</span>(<span class="bool-val">false</span>, <span class="bool-val">false</span>, <span class="bool-val">false</span>, <span class="bool-val">false</span>)),
+        (<span class="ident">AdminCmdType</span>::<span class="ident">CompactLog</span>, <span class="ident">AdminCmdEpochState</span>::<span class="ident">new</span>(<span class="bool-val">false</span>, <span class="bool-val">false</span>, <span class="bool-val">false</span>, <span class="bool-val">false</span>)),
+        (<span class="ident">AdminCmdType</span>::<span class="ident">ComputeHash</span>, <span class="ident">AdminCmdEpochState</span>::<span class="ident">new</span>(<span class="bool-val">false</span>, <span class="bool-val">false</span>, <span class="bool-val">false</span>, <span class="bool-val">false</span>)),
+        (<span class="ident">AdminCmdType</span>::<span class="ident">VerifyHash</span>, <span class="ident">AdminCmdEpochState</span>::<span class="ident">new</span>(<span class="bool-val">false</span>, <span class="bool-val">false</span>, <span class="bool-val">false</span>, <span class="bool-val">false</span>)),
+        <span class="comment">// Change peer</span>
+        (<span class="ident">AdminCmdType</span>::<span class="ident">ChangePeer</span>, <span class="ident">AdminCmdEpochState</span>::<span class="ident">new</span>(<span class="bool-val">false</span>, <span class="bool-val">true</span>, <span class="bool-val">false</span>, <span class="bool-val">true</span>)),
+        (<span class="ident">AdminCmdType</span>::<span class="ident">ChangePeerV2</span>, <span class="ident">AdminCmdEpochState</span>::<span class="ident">new</span>(<span class="bool-val">false</span>, <span class="bool-val">true</span>, <span class="bool-val">false</span>, <span class="bool-val">true</span>)),
+        <span class="comment">// Split</span>
+        (<span class="ident">AdminCmdType</span>::<span class="ident">Split</span>, <span class="ident">AdminCmdEpochState</span>::<span class="ident">new</span>(<span class="bool-val">true</span>, <span class="bool-val">true</span>, <span class="bool-val">true</span>, <span class="bool-val">false</span>)),
+        (<span class="ident">AdminCmdType</span>::<span class="ident">BatchSplit</span>, <span class="ident">AdminCmdEpochState</span>::<span class="ident">new</span>(<span class="bool-val">true</span>, <span class="bool-val">true</span>, <span class="bool-val">true</span>, <span class="bool-val">false</span>)),
+        <span class="comment">// Merge</span>
+        (<span class="ident">AdminCmdType</span>::<span class="ident">PrepareMerge</span>, <span class="ident">AdminCmdEpochState</span>::<span class="ident">new</span>(<span class="bool-val">true</span>, <span class="bool-val">true</span>, <span class="bool-val">true</span>, <span class="bool-val">true</span>)),
+        (<span class="ident">AdminCmdType</span>::<span class="ident">CommitMerge</span>, <span class="ident">AdminCmdEpochState</span>::<span class="ident">new</span>(<span class="bool-val">true</span>, <span class="bool-val">true</span>, <span class="bool-val">true</span>, <span class="bool-val">false</span>)),
+        (<span class="ident">AdminCmdType</span>::<span class="ident">RollbackMerge</span>, <span class="ident">AdminCmdEpochState</span>::<span class="ident">new</span>(<span class="bool-val">true</span>, <span class="bool-val">true</span>, <span class="bool-val">true</span>, <span class="bool-val">false</span>)),
+        <span class="comment">// Transfer leader</span>
+        (<span class="ident">AdminCmdType</span>::<span class="ident">TransferLeader</span>, <span class="ident">AdminCmdEpochState</span>::<span class="ident">new</span>(<span class="bool-val">true</span>, <span class="bool-val">true</span>, <span class="bool-val">false</span>, <span class="bool-val">false</span>)),
+    ].<span class="ident">iter</span>().<span class="ident">copied</span>().<span class="ident">collect</span>();
+}
+
+<span class="doccomment">/// WARNING: `NORMAL_REQ_CHECK_VER` and `NORMAL_REQ_CHECK_CONF_VER` **MUST NOT** be changed.</span>
+<span class="doccomment">/// The reason is the same as `ADMIN_CMD_EPOCH_MAP`.</span>
+<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">NORMAL_REQ_CHECK_VER</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="bool-val">true</span>;
+<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">NORMAL_REQ_CHECK_CONF_VER</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="bool-val">false</span>;
+
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">check_region_epoch</span>(
     <span class="ident">req</span>: <span class="kw-2">&amp;</span><span class="ident">RaftCmdRequest</span>,
     <span class="ident">region</span>: <span class="kw-2">&amp;</span><span class="ident">metapb</span>::<span class="ident">Region</span>,
     <span class="ident">include_region</span>: <span class="ident">bool</span>,
 ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-    <span class="kw">let</span> (<span class="kw-2">mut</span> <span class="ident">check_ver</span>, <span class="kw-2">mut</span> <span class="ident">check_conf_ver</span>) <span class="op">=</span> (<span class="bool-val">false</span>, <span class="bool-val">false</span>);
-    <span class="kw">if</span> <span class="op">!</span><span class="ident">req</span>.<span class="ident">has_admin_request</span>() {
+    <span class="kw">let</span> (<span class="ident">check_ver</span>, <span class="ident">check_conf_ver</span>) <span class="op">=</span> <span class="kw">if</span> <span class="op">!</span><span class="ident">req</span>.<span class="ident">has_admin_request</span>() {
         <span class="comment">// for get/set/delete, we don&#39;t care conf_version.</span>
-        <span class="ident">check_ver</span> <span class="op">=</span> <span class="bool-val">true</span>;
+        (<span class="ident">NORMAL_REQ_CHECK_VER</span>, <span class="ident">NORMAL_REQ_CHECK_CONF_VER</span>)
     } <span class="kw">else</span> {
-        <span class="kw">match</span> <span class="ident">req</span>.<span class="ident">get_admin_request</span>().<span class="ident">get_cmd_type</span>() {
-            <span class="ident">AdminCmdType</span>::<span class="ident">CompactLog</span>
-            <span class="op">|</span> <span class="ident">AdminCmdType</span>::<span class="ident">InvalidAdmin</span>
-            <span class="op">|</span> <span class="ident">AdminCmdType</span>::<span class="ident">ComputeHash</span>
-            <span class="op">|</span> <span class="ident">AdminCmdType</span>::<span class="ident">VerifyHash</span> <span class="op">=</span><span class="op">&gt;</span> {}
-            <span class="ident">AdminCmdType</span>::<span class="ident">ChangePeer</span> <span class="op">|</span> <span class="ident">AdminCmdType</span>::<span class="ident">ChangePeerV2</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">check_conf_ver</span> <span class="op">=</span> <span class="bool-val">true</span>,
-            <span class="ident">AdminCmdType</span>::<span class="ident">Split</span>
-            <span class="op">|</span> <span class="ident">AdminCmdType</span>::<span class="ident">BatchSplit</span>
-            <span class="op">|</span> <span class="ident">AdminCmdType</span>::<span class="ident">PrepareMerge</span>
-            <span class="op">|</span> <span class="ident">AdminCmdType</span>::<span class="ident">CommitMerge</span>
-            <span class="op">|</span> <span class="ident">AdminCmdType</span>::<span class="ident">RollbackMerge</span>
-            <span class="op">|</span> <span class="ident">AdminCmdType</span>::<span class="ident">TransferLeader</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="ident">check_ver</span> <span class="op">=</span> <span class="bool-val">true</span>;
-                <span class="ident">check_conf_ver</span> <span class="op">=</span> <span class="bool-val">true</span>;
-            }
-        };
-    }
+        <span class="kw">let</span> <span class="ident">epoch_state</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">ADMIN_CMD_EPOCH_MAP</span>
+            .<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">req</span>.<span class="ident">get_admin_request</span>().<span class="ident">get_cmd_type</span>())
+            .<span class="ident">unwrap</span>();
+        (<span class="ident">epoch_state</span>.<span class="ident">check_ver</span>, <span class="ident">epoch_state</span>.<span class="ident">check_conf_ver</span>)
+    };
 
     <span class="kw">if</span> <span class="op">!</span><span class="ident">check_ver</span> <span class="kw-2">&amp;</span><span class="op">&amp;</span> <span class="op">!</span><span class="ident">check_conf_ver</span> {
         <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
@@ -2499,10 +2598,19 @@
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_is_region_initialized</span>() {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">region</span> <span class="op">=</span> <span class="ident">metapb</span>::<span class="ident">Region</span>::<span class="ident">default</span>();
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">is_region_initialized</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>), <span class="bool-val">false</span>);
+        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">is_region_initialized</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>));
         <span class="kw">let</span> <span class="ident">peers</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">new_peer</span>(<span class="number">1</span>, <span class="number">2</span>)];
         <span class="ident">region</span>.<span class="ident">set_peers</span>(<span class="ident">peers</span>.<span class="ident">into</span>());
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">is_region_initialized</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>), <span class="bool-val">true</span>);
+        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">is_region_initialized</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>));
+    }
+
+    <span class="attribute">#[<span class="ident">test</span>]</span>
+    <span class="kw">fn</span> <span class="ident">test_admin_cmd_epoch_map_include_all_cmd_type</span>() {
+        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;protobuf-codec&quot;</span>)]</span>
+        <span class="kw">use</span> <span class="ident">protobuf</span>::<span class="ident">ProtobufEnum</span>;
+        <span class="kw">for</span> <span class="ident">cmd_type</span> <span class="kw">in</span> <span class="ident">AdminCmdType</span>::<span class="ident">values</span>() {
+            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">ADMIN_CMD_EPOCH_MAP</span>.<span class="ident">contains_key</span>(<span class="ident">cmd_type</span>));
+        }
     }
 }
 </pre></div>
