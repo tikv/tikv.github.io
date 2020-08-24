@@ -3965,16 +3965,6 @@
 <span id="3965">3965</span>
 <span id="3966">3966</span>
 <span id="3967">3967</span>
-<span id="3968">3968</span>
-<span id="3969">3969</span>
-<span id="3970">3970</span>
-<span id="3971">3971</span>
-<span id="3972">3972</span>
-<span id="3973">3973</span>
-<span id="3974">3974</span>
-<span id="3975">3975</span>
-<span id="3976">3976</span>
-<span id="3977">3977</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -4045,7 +4035,6 @@
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">DestroyPeerJob</span> {
     <span class="kw">pub</span> <span class="ident">initialized</span>: <span class="ident">bool</span>,
-    <span class="kw">pub</span> <span class="ident">async_remove</span>: <span class="ident">bool</span>,
     <span class="kw">pub</span> <span class="ident">region_id</span>: <span class="ident">u64</span>,
     <span class="kw">pub</span> <span class="ident">peer</span>: <span class="ident">metapb</span>::<span class="ident">Peer</span>,
 }
@@ -5712,24 +5701,15 @@
     }
 
     <span class="kw">fn</span> <span class="ident">handle_destroy_peer</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">job</span>: <span class="ident">DestroyPeerJob</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+        <span class="comment">// The initialized flag implicitly means whether apply fsm exists or not.</span>
         <span class="kw">if</span> <span class="ident">job</span>.<span class="ident">initialized</span> {
-            <span class="comment">// When initialized is true and async_remove is false, apply fsm doesn&#39;t need to</span>
-            <span class="comment">// send destroy msg to peer fsm because peer fsm has already destroyed.</span>
-            <span class="comment">// In this case, if apply fsm sends destroy msg, peer fsm may be destroyed twice</span>
-            <span class="comment">// because there are some msgs in channel so peer fsm still need to handle them (e.g. callback)</span>
-            <span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">apply_router</span>.<span class="ident">schedule_task</span>(
-                <span class="ident">job</span>.<span class="ident">region_id</span>,
-                <span class="ident">ApplyTask</span>::<span class="ident">destroy</span>(<span class="ident">job</span>.<span class="ident">region_id</span>, <span class="ident">job</span>.<span class="ident">async_remove</span>, <span class="bool-val">false</span>),
-            );
-        }
-        <span class="kw">if</span> <span class="ident">job</span>.<span class="ident">async_remove</span> {
-            <span class="macro">info</span><span class="macro">!</span>(
-                <span class="string">&quot;peer is destroyed asynchronously&quot;</span>;
-                <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">job</span>.<span class="ident">region_id</span>,
-                <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">job</span>.<span class="ident">peer</span>.<span class="ident">get_id</span>(),
-            );
+            <span class="comment">// Destroy the apply fsm first, wait for the reply msg from apply fsm</span>
+            <span class="self">self</span>.<span class="ident">ctx</span>
+                .<span class="ident">apply_router</span>
+                .<span class="ident">schedule_task</span>(<span class="ident">job</span>.<span class="ident">region_id</span>, <span class="ident">ApplyTask</span>::<span class="ident">destroy</span>(<span class="ident">job</span>.<span class="ident">region_id</span>, <span class="bool-val">false</span>));
             <span class="bool-val">false</span>
         } <span class="kw">else</span> {
+            <span class="comment">// Destroy the peer fsm directly</span>
             <span class="self">self</span>.<span class="ident">destroy_peer</span>(<span class="bool-val">false</span>);
             <span class="bool-val">true</span>
         }
@@ -6706,7 +6686,7 @@
                 <span class="comment">// Destroy apply fsm at first</span>
                 <span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">apply_router</span>.<span class="ident">schedule_task</span>(
                     <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">region_id</span>(),
-                    <span class="ident">ApplyTask</span>::<span class="ident">destroy</span>(<span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">region_id</span>(), <span class="bool-val">true</span>, <span class="bool-val">true</span>),
+                    <span class="ident">ApplyTask</span>::<span class="ident">destroy</span>(<span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">region_id</span>(), <span class="bool-val">true</span>),
                 );
             }
             <span class="ident">MergeResultKind</span>::<span class="ident">FromTargetSnapshotStep2</span> <span class="op">=</span><span class="op">&gt;</span> {

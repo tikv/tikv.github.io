@@ -5004,7 +5004,6 @@
 <span id="5004">5004</span>
 <span id="5005">5005</span>
 <span id="5006">5006</span>
-<span id="5007">5007</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2017 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -7538,7 +7537,6 @@
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Destroy</span> {
     <span class="ident">region_id</span>: <span class="ident">u64</span>,
-    <span class="ident">async_remove</span>: <span class="ident">bool</span>,
     <span class="ident">merge_from_snapshot</span>: <span class="ident">bool</span>,
 }
 
@@ -7689,10 +7687,9 @@
         <span class="ident">Msg</span>::<span class="ident">Registration</span>(<span class="ident">Registration</span>::<span class="ident">new</span>(<span class="ident">peer</span>))
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">destroy</span>(<span class="ident">region_id</span>: <span class="ident">u64</span>, <span class="ident">async_remove</span>: <span class="ident">bool</span>, <span class="ident">merge_from_snapshot</span>: <span class="ident">bool</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Msg</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">destroy</span>(<span class="ident">region_id</span>: <span class="ident">u64</span>, <span class="ident">merge_from_snapshot</span>: <span class="ident">bool</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Msg</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span> {
         <span class="ident">Msg</span>::<span class="ident">Destroy</span>(<span class="ident">Destroy</span> {
             <span class="ident">region_id</span>,
-            <span class="ident">async_remove</span>,
             <span class="ident">merge_from_snapshot</span>,
         })
     }
@@ -7930,18 +7927,16 @@
         }
         <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">delegate</span>.<span class="ident">stopped</span> {
             <span class="self">self</span>.<span class="ident">destroy</span>(<span class="ident">ctx</span>);
-            <span class="kw">if</span> <span class="ident">d</span>.<span class="ident">async_remove</span> {
-                <span class="ident">ctx</span>.<span class="ident">notifier</span>.<span class="ident">notify</span>(
-                    <span class="self">self</span>.<span class="ident">delegate</span>.<span class="ident">region_id</span>(),
-                    <span class="ident">PeerMsg</span>::<span class="ident">ApplyRes</span> {
-                        <span class="ident">res</span>: <span class="ident">TaskRes</span>::<span class="ident">Destroy</span> {
-                            <span class="ident">region_id</span>: <span class="self">self</span>.<span class="ident">delegate</span>.<span class="ident">region_id</span>(),
-                            <span class="ident">peer_id</span>: <span class="self">self</span>.<span class="ident">delegate</span>.<span class="ident">id</span>,
-                            <span class="ident">merge_from_snapshot</span>: <span class="ident">d</span>.<span class="ident">merge_from_snapshot</span>,
-                        },
+            <span class="ident">ctx</span>.<span class="ident">notifier</span>.<span class="ident">notify</span>(
+                <span class="self">self</span>.<span class="ident">delegate</span>.<span class="ident">region_id</span>(),
+                <span class="ident">PeerMsg</span>::<span class="ident">ApplyRes</span> {
+                    <span class="ident">res</span>: <span class="ident">TaskRes</span>::<span class="ident">Destroy</span> {
+                        <span class="ident">region_id</span>: <span class="self">self</span>.<span class="ident">delegate</span>.<span class="ident">region_id</span>(),
+                        <span class="ident">peer_id</span>: <span class="self">self</span>.<span class="ident">delegate</span>.<span class="ident">id</span>,
+                        <span class="ident">merge_from_snapshot</span>: <span class="ident">d</span>.<span class="ident">merge_from_snapshot</span>,
                     },
-                );
-            }
+                },
+            );
         }
     }
 
@@ -8312,6 +8307,9 @@
             }
             <span class="ident">expected_msg_count</span> <span class="op">=</span> <span class="prelude-val">None</span>;
         }
+        <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;before_handle_normal_3&quot;</span>, <span class="ident">normal</span>.<span class="ident">delegate</span>.<span class="ident">id</span>() <span class="op">=</span><span class="op">=</span> <span class="number">3</span>, <span class="op">|</span><span class="kw">_</span><span class="op">|</span> {
+            <span class="prelude-val">None</span>
+        });
         <span class="kw">while</span> <span class="self">self</span>.<span class="ident">msg_buf</span>.<span class="ident">len</span>() <span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">messages_per_tick</span> {
             <span class="kw">match</span> <span class="ident">normal</span>.<span class="ident">receiver</span>.<span class="ident">try_recv</span>() {
                 <span class="prelude-val">Ok</span>(<span class="ident">msg</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">msg_buf</span>.<span class="ident">push</span>(<span class="ident">msg</span>),
@@ -8902,7 +8900,7 @@
             );
         });
 
-        <span class="ident">router</span>.<span class="ident">schedule_task</span>(<span class="number">2</span>, <span class="ident">Msg</span>::<span class="ident">destroy</span>(<span class="number">2</span>, <span class="bool-val">true</span>, <span class="bool-val">false</span>));
+        <span class="ident">router</span>.<span class="ident">schedule_task</span>(<span class="number">2</span>, <span class="ident">Msg</span>::<span class="ident">destroy</span>(<span class="number">2</span>, <span class="bool-val">false</span>));
         <span class="kw">let</span> (<span class="ident">region_id</span>, <span class="ident">peer_id</span>) <span class="op">=</span> <span class="kw">match</span> <span class="ident">rx</span>.<span class="ident">recv_timeout</span>(<span class="ident">Duration</span>::<span class="ident">from_secs</span>(<span class="number">3</span>)) {
             <span class="prelude-val">Ok</span>(<span class="ident">PeerMsg</span>::<span class="ident">ApplyRes</span> { <span class="ident">res</span>, .. }) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">match</span> <span class="ident">res</span> {
                 <span class="ident">TaskRes</span>::<span class="ident">Destroy</span> {
