@@ -328,10 +328,41 @@
 <span id="328">328</span>
 <span id="329">329</span>
 <span id="330">330</span>
+<span id="331">331</span>
+<span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
+<span id="336">336</span>
+<span id="337">337</span>
+<span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+<span id="341">341</span>
+<span id="342">342</span>
+<span id="343">343</span>
+<span id="344">344</span>
+<span id="345">345</span>
+<span id="346">346</span>
+<span id="347">347</span>
+<span id="348">348</span>
+<span id="349">349</span>
+<span id="350">350</span>
+<span id="351">351</span>
+<span id="352">352</span>
+<span id="353">353</span>
+<span id="354">354</span>
+<span id="355">355</span>
+<span id="356">356</span>
+<span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">kvrpcpb</span>;
+<span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">kvrpcpb</span>::<span class="ident">ScanDetailV2</span>;
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">kv</span>::{<span class="ident">PerfStatisticsDelta</span>, <span class="ident">PerfStatisticsInstant</span>};
 
@@ -384,7 +415,7 @@
     <span class="ident">schedule_wait_time</span>: <span class="ident">Duration</span>, <span class="comment">// Wait time spent on waiting for scheduling</span>
     <span class="ident">snapshot_wait_time</span>: <span class="ident">Duration</span>, <span class="comment">// Wait time spent on waiting for a snapshot</span>
     <span class="ident">handler_build_time</span>: <span class="ident">Duration</span>, <span class="comment">// Time spent on building the handler (not included in total wait time)</span>
-    <span class="ident">req_time</span>: <span class="ident">Duration</span>,
+    <span class="ident">req_lifetime</span>: <span class="ident">Duration</span>,
     <span class="ident">item_process_time</span>: <span class="ident">Duration</span>,
     <span class="ident">total_process_time</span>: <span class="ident">Duration</span>,
     <span class="ident">total_storage_stats</span>: <span class="ident">Statistics</span>,
@@ -410,7 +441,7 @@
             <span class="ident">schedule_wait_time</span>: <span class="ident">Duration</span>::<span class="ident">default</span>(),
             <span class="ident">snapshot_wait_time</span>: <span class="ident">Duration</span>::<span class="ident">default</span>(),
             <span class="ident">handler_build_time</span>: <span class="ident">Duration</span>::<span class="ident">default</span>(),
-            <span class="ident">req_time</span>: <span class="ident">Duration</span>::<span class="ident">default</span>(),
+            <span class="ident">req_lifetime</span>: <span class="ident">Duration</span>::<span class="ident">default</span>(),
             <span class="ident">item_process_time</span>: <span class="ident">Duration</span>::<span class="ident">default</span>(),
             <span class="ident">total_process_time</span>: <span class="ident">Duration</span>::<span class="ident">default</span>(),
             <span class="ident">total_storage_stats</span>: <span class="ident">Statistics</span>::<span class="ident">default</span>(),
@@ -471,6 +502,7 @@
             <span class="self">self</span>.<span class="ident">total_perf_stats</span> <span class="op">+</span><span class="op">=</span> <span class="ident">perf_stats</span>.<span class="ident">delta</span>();
         }
         <span class="self">self</span>.<span class="ident">current_stage</span> <span class="op">=</span> <span class="ident">TrackerState</span>::<span class="ident">ItemFinished</span>;
+        <span class="comment">// TODO: Need to record time between Finish -&gt; Begin Next?</span>
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">collect_storage_statistics</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">storage_stats</span>: <span class="ident">Statistics</span>) {
@@ -479,6 +511,7 @@
 
     <span class="doccomment">/// Get current item&#39;s ExecDetail according to previous collected metrics.</span>
     <span class="doccomment">/// TiDB asks for ExecDetail to be printed in its log.</span>
+    <span class="doccomment">/// WARN: TRY BEST NOT TO USE THIS FUNCTION.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_item_exec_details</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">kvrpcpb</span>::<span class="ident">ExecDetails</span> {
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="self">self</span>.<span class="ident">current_stage</span>, <span class="ident">TrackerState</span>::<span class="ident">ItemFinished</span>);
         <span class="self">self</span>.<span class="ident">exec_details</span>(<span class="self">self</span>.<span class="ident">item_process_time</span>)
@@ -493,16 +526,32 @@
 
     <span class="kw">fn</span> <span class="ident">exec_details</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">measure</span>: <span class="ident">Duration</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">kvrpcpb</span>::<span class="ident">ExecDetails</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">exec_details</span> <span class="op">=</span> <span class="ident">kvrpcpb</span>::<span class="ident">ExecDetails</span>::<span class="ident">default</span>();
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">req_ctx</span>.<span class="ident">context</span>.<span class="ident">get_handle_time</span>() {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">handle</span> <span class="op">=</span> <span class="ident">kvrpcpb</span>::<span class="ident">HandleTime</span>::<span class="ident">default</span>();
-            <span class="ident">handle</span>.<span class="ident">set_process_ms</span>((<span class="ident">time</span>::<span class="ident">duration_to_sec</span>(<span class="ident">measure</span>) <span class="op">*</span> <span class="number">1000.0</span>) <span class="kw">as</span> <span class="ident">i64</span>);
-            <span class="ident">handle</span>.<span class="ident">set_wait_ms</span>((<span class="ident">time</span>::<span class="ident">duration_to_sec</span>(<span class="self">self</span>.<span class="ident">wait_time</span>) <span class="op">*</span> <span class="number">1000.0</span>) <span class="kw">as</span> <span class="ident">i64</span>);
-            <span class="ident">exec_details</span>.<span class="ident">set_handle_time</span>(<span class="ident">handle</span>);
-        }
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">req_ctx</span>.<span class="ident">context</span>.<span class="ident">get_scan_detail</span>() {
-            <span class="kw">let</span> <span class="ident">detail</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">total_storage_stats</span>.<span class="ident">scan_detail</span>();
-            <span class="ident">exec_details</span>.<span class="ident">set_scan_detail</span>(<span class="ident">detail</span>);
-        }
+
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">handle</span> <span class="op">=</span> <span class="ident">kvrpcpb</span>::<span class="ident">HandleTime</span>::<span class="ident">default</span>();
+        <span class="ident">handle</span>.<span class="ident">set_process_ms</span>((<span class="ident">time</span>::<span class="ident">duration_to_sec</span>(<span class="ident">measure</span>) <span class="op">*</span> <span class="number">1000.0</span>) <span class="kw">as</span> <span class="ident">i64</span>);
+        <span class="ident">handle</span>.<span class="ident">set_wait_ms</span>((<span class="ident">time</span>::<span class="ident">duration_to_sec</span>(<span class="self">self</span>.<span class="ident">wait_time</span>) <span class="op">*</span> <span class="number">1000.0</span>) <span class="kw">as</span> <span class="ident">i64</span>);
+        <span class="ident">exec_details</span>.<span class="ident">set_handle_time</span>(<span class="ident">handle</span>);
+
+        <span class="kw">let</span> <span class="ident">detail</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">total_storage_stats</span>.<span class="ident">scan_detail</span>();
+
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">detail_v2</span> <span class="op">=</span> <span class="ident">ScanDetailV2</span>::<span class="ident">default</span>();
+        <span class="ident">detail_v2</span>.<span class="ident">set_processed_versions</span>(<span class="self">self</span>.<span class="ident">total_storage_stats</span>.<span class="ident">write</span>.<span class="ident">processed_keys</span> <span class="kw">as</span> <span class="ident">u64</span>);
+        <span class="ident">detail_v2</span>.<span class="ident">set_total_versions</span>(<span class="self">self</span>.<span class="ident">total_storage_stats</span>.<span class="ident">write</span>.<span class="ident">total_op_count</span>() <span class="kw">as</span> <span class="ident">u64</span>);
+        <span class="ident">detail_v2</span>.<span class="ident">set_rocksdb_delete_skipped_count</span>(
+            <span class="self">self</span>.<span class="ident">total_perf_stats</span>.<span class="number">0</span>.<span class="ident">internal_delete_skipped_count</span> <span class="kw">as</span> <span class="ident">u64</span>,
+        );
+        <span class="ident">detail_v2</span>.<span class="ident">set_rocksdb_key_skipped_count</span>(
+            <span class="self">self</span>.<span class="ident">total_perf_stats</span>.<span class="number">0</span>.<span class="ident">internal_key_skipped_count</span> <span class="kw">as</span> <span class="ident">u64</span>,
+        );
+        <span class="ident">detail_v2</span>.<span class="ident">set_rocksdb_block_cache_hit_count</span>(
+            <span class="self">self</span>.<span class="ident">total_perf_stats</span>.<span class="number">0</span>.<span class="ident">block_cache_hit_count</span> <span class="kw">as</span> <span class="ident">u64</span>,
+        );
+        <span class="ident">detail_v2</span>.<span class="ident">set_rocksdb_block_read_count</span>(<span class="self">self</span>.<span class="ident">total_perf_stats</span>.<span class="number">0</span>.<span class="ident">block_read_count</span> <span class="kw">as</span> <span class="ident">u64</span>);
+        <span class="ident">detail_v2</span>.<span class="ident">set_rocksdb_block_read_byte</span>(<span class="self">self</span>.<span class="ident">total_perf_stats</span>.<span class="number">0</span>.<span class="ident">block_read_byte</span> <span class="kw">as</span> <span class="ident">u64</span>);
+
+        <span class="ident">exec_details</span>.<span class="ident">set_use_scan_detail_v2</span>(<span class="bool-val">true</span>);
+        <span class="ident">exec_details</span>.<span class="ident">set_scan_detail</span>(<span class="ident">detail</span>);
+        <span class="ident">exec_details</span>.<span class="ident">set_scan_detail_v2</span>(<span class="ident">detail_v2</span>);
         <span class="ident">exec_details</span>
     }
 
@@ -511,7 +560,7 @@
             <span class="self">self</span>.<span class="ident">current_stage</span> <span class="op">=</span><span class="op">=</span> <span class="ident">TrackerState</span>::<span class="ident">AllItemsBegan</span>
                 <span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">current_stage</span> <span class="op">=</span><span class="op">=</span> <span class="ident">TrackerState</span>::<span class="ident">ItemFinished</span>
         );
-        <span class="self">self</span>.<span class="ident">req_time</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now_coarse</span>() <span class="op">-</span> <span class="self">self</span>.<span class="ident">request_begin_at</span>;
+        <span class="self">self</span>.<span class="ident">req_lifetime</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now_coarse</span>() <span class="op">-</span> <span class="self">self</span>.<span class="ident">request_begin_at</span>;
         <span class="self">self</span>.<span class="ident">current_stage</span> <span class="op">=</span> <span class="ident">TrackerState</span>::<span class="ident">AllItemFinished</span>;
         <span class="self">self</span>.<span class="ident">track</span>();
     }
@@ -521,8 +570,9 @@
             <span class="kw">return</span>;
         }
 
-        <span class="comment">// Print slow log if *process* time is long.</span>
-        <span class="kw">if</span> <span class="ident">time</span>::<span class="ident">duration_to_sec</span>(<span class="self">self</span>.<span class="ident">total_process_time</span>) <span class="op">&gt;</span> <span class="ident">SLOW_QUERY_LOWER_BOUND</span> {
+        <span class="kw">let</span> <span class="ident">total_storage_stats</span> <span class="op">=</span> <span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">take</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">total_storage_stats</span>);
+
+        <span class="kw">if</span> <span class="ident">time</span>::<span class="ident">duration_to_sec</span>(<span class="self">self</span>.<span class="ident">req_lifetime</span>) <span class="op">&gt;</span> <span class="ident">SLOW_QUERY_LOWER_BOUND</span> {
             <span class="kw">let</span> <span class="ident">some_table_id</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">req_ctx</span>.<span class="ident">first_range</span>.<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">range</span><span class="op">|</span> {
                 <span class="ident">tidb_query_datatype</span>::<span class="ident">codec</span>::<span class="ident">table</span>::<span class="ident">decode_table_id</span>(<span class="ident">range</span>.<span class="ident">get_start</span>())
                     .<span class="ident">unwrap_or_default</span>()
@@ -530,58 +580,68 @@
 
             <span class="macro">info</span><span class="macro">!</span>(#<span class="string">&quot;slow_log&quot;</span>, <span class="string">&quot;slow-query&quot;</span>;
                 <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">req_ctx</span>.<span class="ident">context</span>.<span class="ident">get_region_id</span>(),
-                <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">req_ctx</span>.<span class="ident">peer</span>,
-                <span class="string">&quot;req_time&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="self">self</span>.<span class="ident">req_time</span>,
-                <span class="string">&quot;total_process_time&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="self">self</span>.<span class="ident">total_process_time</span>,
+                <span class="string">&quot;remote_host&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">req_ctx</span>.<span class="ident">peer</span>,
+                <span class="string">&quot;total_lifetime&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="self">self</span>.<span class="ident">req_lifetime</span>,
                 <span class="string">&quot;wait_time&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="self">self</span>.<span class="ident">wait_time</span>,
-                <span class="string">&quot;schedule_wait_time&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="self">self</span>.<span class="ident">schedule_wait_time</span>,
-                <span class="string">&quot;snapshot_wait_time&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="self">self</span>.<span class="ident">snapshot_wait_time</span>,
+                <span class="string">&quot;wait_time.schedule&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="self">self</span>.<span class="ident">schedule_wait_time</span>,
+                <span class="string">&quot;wait_time.snapshot&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="self">self</span>.<span class="ident">snapshot_wait_time</span>,
                 <span class="string">&quot;handler_build_time&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="self">self</span>.<span class="ident">handler_build_time</span>,
+                <span class="string">&quot;total_process_time&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="self">self</span>.<span class="ident">total_process_time</span>,
                 <span class="string">&quot;txn_start_ts&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">req_ctx</span>.<span class="ident">txn_start_ts</span>,
                 <span class="string">&quot;table_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">some_table_id</span>,
                 <span class="string">&quot;tag&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">req_ctx</span>.<span class="ident">tag</span>.<span class="ident">get_str</span>(),
-                <span class="string">&quot;scan_is_desc&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">req_ctx</span>.<span class="ident">is_desc_scan</span>,
-                <span class="string">&quot;scan_iter_ops&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">total_storage_stats</span>.<span class="ident">total_op_count</span>(),
-                <span class="string">&quot;scan_iter_processed&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">total_storage_stats</span>.<span class="ident">total_processed</span>(),
-                <span class="string">&quot;scan_ranges&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">req_ctx</span>.<span class="ident">ranges_len</span>,
-                <span class="string">&quot;scan_first_range&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="self">self</span>.<span class="ident">req_ctx</span>.<span class="ident">first_range</span>,
+                <span class="string">&quot;scan.is_desc&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">req_ctx</span>.<span class="ident">is_desc_scan</span>,
+                <span class="string">&quot;scan.processed&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">total_storage_stats</span>.<span class="ident">write</span>.<span class="ident">processed_keys</span>,
+                <span class="string">&quot;scan.total&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">total_storage_stats</span>.<span class="ident">write</span>.<span class="ident">total_op_count</span>(),
+                <span class="string">&quot;scan.ranges&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">req_ctx</span>.<span class="ident">ranges_len</span>,
+                <span class="string">&quot;scan.range.first&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="self">self</span>.<span class="ident">req_ctx</span>.<span class="ident">first_range</span>,
                 <span class="self">self</span>.<span class="ident">total_perf_stats</span>,
             );
         }
 
-        <span class="kw">let</span> <span class="ident">total_storage_stats</span> <span class="op">=</span> <span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">take</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">total_storage_stats</span>);
-
         <span class="comment">// req time</span>
         <span class="ident">COPR_REQ_HISTOGRAM_STATIC</span>
             .<span class="ident">get</span>(<span class="self">self</span>.<span class="ident">req_ctx</span>.<span class="ident">tag</span>)
-            .<span class="ident">observe</span>(<span class="ident">time</span>::<span class="ident">duration_to_sec</span>(<span class="self">self</span>.<span class="ident">req_time</span>));
+            .<span class="ident">observe</span>(<span class="ident">time</span>::<span class="ident">duration_to_sec</span>(<span class="self">self</span>.<span class="ident">req_lifetime</span>));
+
         <span class="comment">// wait time</span>
         <span class="ident">COPR_REQ_WAIT_TIME_STATIC</span>
             .<span class="ident">get</span>(<span class="self">self</span>.<span class="ident">req_ctx</span>.<span class="ident">tag</span>)
             .<span class="ident">all</span>
             .<span class="ident">observe</span>(<span class="ident">time</span>::<span class="ident">duration_to_sec</span>(<span class="self">self</span>.<span class="ident">wait_time</span>));
+
         <span class="comment">// schedule wait time</span>
         <span class="ident">COPR_REQ_WAIT_TIME_STATIC</span>
             .<span class="ident">get</span>(<span class="self">self</span>.<span class="ident">req_ctx</span>.<span class="ident">tag</span>)
             .<span class="ident">schedule</span>
             .<span class="ident">observe</span>(<span class="ident">time</span>::<span class="ident">duration_to_sec</span>(<span class="self">self</span>.<span class="ident">schedule_wait_time</span>));
+
         <span class="comment">// snapshot wait time</span>
         <span class="ident">COPR_REQ_WAIT_TIME_STATIC</span>
             .<span class="ident">get</span>(<span class="self">self</span>.<span class="ident">req_ctx</span>.<span class="ident">tag</span>)
             .<span class="ident">snapshot</span>
             .<span class="ident">observe</span>(<span class="ident">time</span>::<span class="ident">duration_to_sec</span>(<span class="self">self</span>.<span class="ident">snapshot_wait_time</span>));
-        <span class="comment">// handle time</span>
-        <span class="ident">COPR_REQ_HANDLE_TIME_STATIC</span>
-            .<span class="ident">get</span>(<span class="self">self</span>.<span class="ident">req_ctx</span>.<span class="ident">tag</span>)
-            .<span class="ident">observe</span>(<span class="ident">time</span>::<span class="ident">duration_to_sec</span>(<span class="self">self</span>.<span class="ident">total_process_time</span>));
+
         <span class="comment">// handler build time</span>
         <span class="ident">COPR_REQ_HANDLER_BUILD_TIME_STATIC</span>
             .<span class="ident">get</span>(<span class="self">self</span>.<span class="ident">req_ctx</span>.<span class="ident">tag</span>)
             .<span class="ident">observe</span>(<span class="ident">time</span>::<span class="ident">duration_to_sec</span>(<span class="self">self</span>.<span class="ident">handler_build_time</span>));
+
+        <span class="comment">// handle time</span>
+        <span class="ident">COPR_REQ_HANDLE_TIME_STATIC</span>
+            .<span class="ident">get</span>(<span class="self">self</span>.<span class="ident">req_ctx</span>.<span class="ident">tag</span>)
+            .<span class="ident">observe</span>(<span class="ident">time</span>::<span class="ident">duration_to_sec</span>(<span class="self">self</span>.<span class="ident">total_process_time</span>));
+
         <span class="comment">// scan keys</span>
         <span class="ident">COPR_SCAN_KEYS_STATIC</span>
             .<span class="ident">get</span>(<span class="self">self</span>.<span class="ident">req_ctx</span>.<span class="ident">tag</span>)
-            .<span class="ident">observe</span>(<span class="ident">total_storage_stats</span>.<span class="ident">total_processed</span>() <span class="kw">as</span> <span class="ident">f64</span>);
+            .<span class="ident">total</span>
+            .<span class="ident">observe</span>(<span class="ident">total_storage_stats</span>.<span class="ident">write</span>.<span class="ident">total_op_count</span>() <span class="kw">as</span> <span class="ident">f64</span>);
+        <span class="ident">COPR_SCAN_KEYS_STATIC</span>
+            .<span class="ident">get</span>(<span class="self">self</span>.<span class="ident">req_ctx</span>.<span class="ident">tag</span>)
+            .<span class="ident">processed_keys</span>
+            .<span class="ident">observe</span>(<span class="ident">total_storage_stats</span>.<span class="ident">write</span>.<span class="ident">processed_keys</span> <span class="kw">as</span> <span class="ident">f64</span>);
+
         <span class="comment">// RocksDB perf stats</span>
         <span class="ident">COPR_ROCKSDB_PERF_COUNTER_STATIC</span>
             .<span class="ident">get</span>(<span class="self">self</span>.<span class="ident">req_ctx</span>.<span class="ident">tag</span>)

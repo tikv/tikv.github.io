@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["CoprScanDetails",""],["CoprScanDetails2Delegator",""],["CoprScanDetails2Inner",""],["CoprScanDetails3Delegator",""],["CoprScanDetails3Inner",""],["CoprScanDetailsDelegator",""],["CoprScanDetailsInner",""]]});
+initSidebarItems({"struct":[["CoprScanKeysHistogram",""],["CoprScanKeysHistogram2Delegator",""],["CoprScanKeysHistogram2Inner",""],["CoprScanKeysHistogramDelegator",""],["CoprScanKeysHistogramInner",""]]});

@@ -284,6 +284,14 @@
 <span id="284">284</span>
 <span id="285">285</span>
 <span id="286">286</span>
+<span id="287">287</span>
+<span id="288">288</span>
+<span id="289">289</span>
+<span id="290">290</span>
+<span id="291">291</span>
+<span id="292">292</span>
+<span id="293">293</span>
+<span id="294">294</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -317,9 +325,13 @@
         <span class="ident">write</span>,
     }
 
-    <span class="kw">pub</span> <span class="ident">label_enum</span> <span class="ident">StatDetail</span> {
+    <span class="kw">pub</span> <span class="ident">label_enum</span> <span class="ident">ScanKeysKind</span> {
+        <span class="ident">processed_keys</span>,
         <span class="ident">total</span>,
-        <span class="ident">processed</span>,
+    }
+
+    <span class="kw">pub</span> <span class="ident">label_enum</span> <span class="ident">ScanKind</span> {
+        <span class="ident">processed_keys</span>,
         <span class="ident">get</span>,
         <span class="ident">next</span>,
         <span class="ident">prev</span>,
@@ -358,10 +370,15 @@
         <span class="string">&quot;metric&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">PerfMetric</span>,
     }
 
+    <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CoprScanKeysHistogram</span>: <span class="ident">LocalHistogram</span> {
+        <span class="string">&quot;req&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">ReqTag</span>,
+        <span class="string">&quot;kind&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">ScanKeysKind</span>,
+    }
+
     <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CoprScanDetails</span> : <span class="ident">LocalIntCounter</span> {
         <span class="string">&quot;req&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">ReqTag</span>,
         <span class="string">&quot;cf&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">CF</span>,
-        <span class="string">&quot;tag&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">StatDetail</span>,
+        <span class="string">&quot;tag&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">ScanKind</span>,
     }
 }
 
@@ -411,12 +428,12 @@
     <span class="kw">pub</span> <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">COPR_SCAN_KEYS</span>: <span class="ident">HistogramVec</span> <span class="op">=</span> <span class="macro">register_histogram_vec</span><span class="macro">!</span>(
         <span class="string">&quot;tikv_coprocessor_scan_keys&quot;</span>,
         <span class="string">&quot;Bucketed histogram of coprocessor per request scan keys&quot;</span>,
-        <span class="kw-2">&amp;</span>[<span class="string">&quot;req&quot;</span>],
+        <span class="kw-2">&amp;</span>[<span class="string">&quot;req&quot;</span>, <span class="string">&quot;kind&quot;</span>],
         <span class="ident">exponential_buckets</span>(<span class="number">1.0</span>, <span class="number">2.0</span>, <span class="number">20</span>).<span class="ident">unwrap</span>()
     )
     .<span class="ident">unwrap</span>();
-    <span class="kw">pub</span> <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">COPR_SCAN_KEYS_STATIC</span>: <span class="ident">CoprReqHistogram</span> <span class="op">=</span>
-        <span class="macro">auto_flush_from</span><span class="macro">!</span>(<span class="ident">COPR_SCAN_KEYS</span>, <span class="ident">CoprReqHistogram</span>);
+    <span class="kw">pub</span> <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">COPR_SCAN_KEYS_STATIC</span>: <span class="ident">CoprScanKeysHistogram</span> <span class="op">=</span>
+        <span class="macro">auto_flush_from</span><span class="macro">!</span>(<span class="ident">COPR_SCAN_KEYS</span>, <span class="ident">CoprScanKeysHistogram</span>);
     <span class="kw">pub</span> <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">COPR_SCAN_DETAILS</span>: <span class="ident">IntCounterVec</span> <span class="op">=</span> <span class="macro">register_int_counter_vec</span><span class="macro">!</span>(
         <span class="string">&quot;tikv_coprocessor_scan_details&quot;</span>,
         <span class="string">&quot;Bucketed counter of coprocessor scan details for each CF&quot;</span>,
@@ -496,17 +513,16 @@
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">StatDetail</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">GcKeysDetail</span> {
-    <span class="kw">fn</span> <span class="ident">into</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">StatDetail</span> {
+<span class="kw">impl</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">ScanKind</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">GcKeysDetail</span> {
+    <span class="kw">fn</span> <span class="ident">into</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ScanKind</span> {
         <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">GcKeysDetail</span>::<span class="ident">total</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">StatDetail</span>::<span class="ident">total</span>,
-            <span class="ident">GcKeysDetail</span>::<span class="ident">processed</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">StatDetail</span>::<span class="ident">processed</span>,
-            <span class="ident">GcKeysDetail</span>::<span class="ident">get</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">StatDetail</span>::<span class="ident">get</span>,
-            <span class="ident">GcKeysDetail</span>::<span class="ident">next</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">StatDetail</span>::<span class="ident">next</span>,
-            <span class="ident">GcKeysDetail</span>::<span class="ident">prev</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">StatDetail</span>::<span class="ident">prev</span>,
-            <span class="ident">GcKeysDetail</span>::<span class="ident">seek</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">StatDetail</span>::<span class="ident">seek</span>,
-            <span class="ident">GcKeysDetail</span>::<span class="ident">seek_for_prev</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">StatDetail</span>::<span class="ident">seek_for_prev</span>,
-            <span class="ident">GcKeysDetail</span>::<span class="ident">over_seek_bound</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">StatDetail</span>::<span class="ident">over_seek_bound</span>,
+            <span class="ident">GcKeysDetail</span>::<span class="ident">processed_keys</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">ScanKind</span>::<span class="ident">processed_keys</span>,
+            <span class="ident">GcKeysDetail</span>::<span class="ident">get</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">ScanKind</span>::<span class="ident">get</span>,
+            <span class="ident">GcKeysDetail</span>::<span class="ident">next</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">ScanKind</span>::<span class="ident">next</span>,
+            <span class="ident">GcKeysDetail</span>::<span class="ident">prev</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">ScanKind</span>::<span class="ident">prev</span>,
+            <span class="ident">GcKeysDetail</span>::<span class="ident">seek</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">ScanKind</span>::<span class="ident">seek</span>,
+            <span class="ident">GcKeysDetail</span>::<span class="ident">seek_for_prev</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">ScanKind</span>::<span class="ident">seek_for_prev</span>,
+            <span class="ident">GcKeysDetail</span>::<span class="ident">over_seek_bound</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">ScanKind</span>::<span class="ident">over_seek_bound</span>,
         }
     }
 }

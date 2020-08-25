@@ -143,14 +143,6 @@
 <span id="143">143</span>
 <span id="144">144</span>
 <span id="145">145</span>
-<span id="146">146</span>
-<span id="147">147</span>
-<span id="148">148</span>
-<span id="149">149</span>
-<span id="150">150</span>
-<span id="151">151</span>
-<span id="152">152</span>
-<span id="153">153</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -159,8 +151,7 @@
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">kvrpcpb</span>::{<span class="ident">ScanDetail</span>, <span class="ident">ScanInfo</span>};
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">store</span>::{<span class="ident">FlowStatistics</span>, <span class="ident">FlowStatsReporter</span>};
 
-<span class="kw">const</span> <span class="ident">STAT_TOTAL</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;total&quot;</span>;
-<span class="kw">const</span> <span class="ident">STAT_PROCESSED</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;processed&quot;</span>;
+<span class="kw">const</span> <span class="ident">STAT_PROCESSED_KEYS</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;processed_keys&quot;</span>;
 <span class="kw">const</span> <span class="ident">STAT_GET</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;get&quot;</span>;
 <span class="kw">const</span> <span class="ident">STAT_NEXT</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;next&quot;</span>;
 <span class="kw">const</span> <span class="ident">STAT_PREV</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;prev&quot;</span>;
@@ -171,15 +162,16 @@
 <span class="doccomment">/// Statistics collects the ops taken when fetching data.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Default</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CfStatistics</span> {
-    <span class="comment">// How many keys that&#39;s effective to user. This counter should be increased</span>
-    <span class="comment">// by the caller.</span>
-    <span class="kw">pub</span> <span class="ident">processed</span>: <span class="ident">usize</span>,
+    <span class="comment">// How many keys that&#39;s visible to user</span>
+    <span class="kw">pub</span> <span class="ident">processed_keys</span>: <span class="ident">usize</span>,
+
     <span class="kw">pub</span> <span class="ident">get</span>: <span class="ident">usize</span>,
     <span class="kw">pub</span> <span class="ident">next</span>: <span class="ident">usize</span>,
     <span class="kw">pub</span> <span class="ident">prev</span>: <span class="ident">usize</span>,
     <span class="kw">pub</span> <span class="ident">seek</span>: <span class="ident">usize</span>,
     <span class="kw">pub</span> <span class="ident">seek_for_prev</span>: <span class="ident">usize</span>,
     <span class="kw">pub</span> <span class="ident">over_seek_bound</span>: <span class="ident">usize</span>,
+
     <span class="kw">pub</span> <span class="ident">flow_stats</span>: <span class="ident">FlowStatistics</span>,
 }
 
@@ -189,10 +181,9 @@
         <span class="self">self</span>.<span class="ident">get</span> <span class="op">+</span> <span class="self">self</span>.<span class="ident">next</span> <span class="op">+</span> <span class="self">self</span>.<span class="ident">prev</span> <span class="op">+</span> <span class="self">self</span>.<span class="ident">seek</span> <span class="op">+</span> <span class="self">self</span>.<span class="ident">seek_for_prev</span>
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">details</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> [(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>, <span class="ident">usize</span>); <span class="number">8</span>] {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">details</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> [(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>, <span class="ident">usize</span>); <span class="number">7</span>] {
         [
-            (<span class="ident">STAT_TOTAL</span>, <span class="self">self</span>.<span class="ident">total_op_count</span>()),
-            (<span class="ident">STAT_PROCESSED</span>, <span class="self">self</span>.<span class="ident">processed</span>),
+            (<span class="ident">STAT_PROCESSED_KEYS</span>, <span class="self">self</span>.<span class="ident">processed_keys</span>),
             (<span class="ident">STAT_GET</span>, <span class="self">self</span>.<span class="ident">get</span>),
             (<span class="ident">STAT_NEXT</span>, <span class="self">self</span>.<span class="ident">next</span>),
             (<span class="ident">STAT_PREV</span>, <span class="self">self</span>.<span class="ident">prev</span>),
@@ -202,10 +193,9 @@
         ]
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">details_enum</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> [(<span class="ident">GcKeysDetail</span>, <span class="ident">usize</span>); <span class="number">8</span>] {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">details_enum</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> [(<span class="ident">GcKeysDetail</span>, <span class="ident">usize</span>); <span class="number">7</span>] {
         [
-            (<span class="ident">GcKeysDetail</span>::<span class="ident">total</span>, <span class="self">self</span>.<span class="ident">total_op_count</span>()),
-            (<span class="ident">GcKeysDetail</span>::<span class="ident">processed</span>, <span class="self">self</span>.<span class="ident">processed</span>),
+            (<span class="ident">GcKeysDetail</span>::<span class="ident">processed_keys</span>, <span class="self">self</span>.<span class="ident">processed_keys</span>),
             (<span class="ident">GcKeysDetail</span>::<span class="ident">get</span>, <span class="self">self</span>.<span class="ident">get</span>),
             (<span class="ident">GcKeysDetail</span>::<span class="ident">next</span>, <span class="self">self</span>.<span class="ident">next</span>),
             (<span class="ident">GcKeysDetail</span>::<span class="ident">prev</span>, <span class="self">self</span>.<span class="ident">prev</span>),
@@ -216,7 +206,7 @@
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) {
-        <span class="self">self</span>.<span class="ident">processed</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">processed</span>.<span class="ident">saturating_add</span>(<span class="ident">other</span>.<span class="ident">processed</span>);
+        <span class="self">self</span>.<span class="ident">processed_keys</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">processed_keys</span>.<span class="ident">saturating_add</span>(<span class="ident">other</span>.<span class="ident">processed_keys</span>);
         <span class="self">self</span>.<span class="ident">get</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get</span>.<span class="ident">saturating_add</span>(<span class="ident">other</span>.<span class="ident">get</span>);
         <span class="self">self</span>.<span class="ident">next</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">next</span>.<span class="ident">saturating_add</span>(<span class="ident">other</span>.<span class="ident">next</span>);
         <span class="self">self</span>.<span class="ident">prev</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">prev</span>.<span class="ident">saturating_add</span>(<span class="ident">other</span>.<span class="ident">prev</span>);
@@ -226,9 +216,10 @@
         <span class="self">self</span>.<span class="ident">flow_stats</span>.<span class="ident">add</span>(<span class="kw-2">&amp;</span><span class="ident">other</span>.<span class="ident">flow_stats</span>);
     }
 
+    <span class="doccomment">/// Deprecated</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">scan_info</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ScanInfo</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">info</span> <span class="op">=</span> <span class="ident">ScanInfo</span>::<span class="ident">default</span>();
-        <span class="ident">info</span>.<span class="ident">set_processed</span>(<span class="self">self</span>.<span class="ident">processed</span> <span class="kw">as</span> <span class="ident">i64</span>);
+        <span class="ident">info</span>.<span class="ident">set_processed</span>(<span class="self">self</span>.<span class="ident">processed_keys</span> <span class="kw">as</span> <span class="ident">i64</span>);
         <span class="ident">info</span>.<span class="ident">set_total</span>(<span class="self">self</span>.<span class="ident">total_op_count</span>() <span class="kw">as</span> <span class="ident">i64</span>);
         <span class="ident">info</span>
     }
@@ -242,15 +233,7 @@
 }
 
 <span class="kw">impl</span> <span class="ident">Statistics</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">total_op_count</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">lock</span>.<span class="ident">total_op_count</span>() <span class="op">+</span> <span class="self">self</span>.<span class="ident">write</span>.<span class="ident">total_op_count</span>() <span class="op">+</span> <span class="self">self</span>.<span class="ident">data</span>.<span class="ident">total_op_count</span>()
-    }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">total_processed</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">lock</span>.<span class="ident">processed</span> <span class="op">+</span> <span class="self">self</span>.<span class="ident">write</span>.<span class="ident">processed</span> <span class="op">+</span> <span class="self">self</span>.<span class="ident">data</span>.<span class="ident">processed</span>
-    }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">details</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> [(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>, [(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>, <span class="ident">usize</span>); <span class="number">8</span>]); <span class="number">3</span>] {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">details</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> [(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>, [(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>, <span class="ident">usize</span>); <span class="number">7</span>]); <span class="number">3</span>] {
         [
             (<span class="ident">CF_DEFAULT</span>, <span class="self">self</span>.<span class="ident">data</span>.<span class="ident">details</span>()),
             (<span class="ident">CF_LOCK</span>, <span class="self">self</span>.<span class="ident">lock</span>.<span class="ident">details</span>()),
@@ -258,7 +241,7 @@
         ]
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">details_enum</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> [(<span class="ident">GcKeysCF</span>, [(<span class="ident">GcKeysDetail</span>, <span class="ident">usize</span>); <span class="number">8</span>]); <span class="number">3</span>] {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">details_enum</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> [(<span class="ident">GcKeysCF</span>, [(<span class="ident">GcKeysDetail</span>, <span class="ident">usize</span>); <span class="number">7</span>]); <span class="number">3</span>] {
         [
             (<span class="ident">GcKeysCF</span>::<span class="ident">default</span>, <span class="self">self</span>.<span class="ident">data</span>.<span class="ident">details_enum</span>()),
             (<span class="ident">GcKeysCF</span>::<span class="ident">lock</span>, <span class="self">self</span>.<span class="ident">lock</span>.<span class="ident">details_enum</span>()),
@@ -272,6 +255,7 @@
         <span class="self">self</span>.<span class="ident">data</span>.<span class="ident">add</span>(<span class="kw-2">&amp;</span><span class="ident">other</span>.<span class="ident">data</span>);
     }
 
+    <span class="doccomment">/// Deprecated</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">scan_detail</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ScanDetail</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">detail</span> <span class="op">=</span> <span class="ident">ScanDetail</span>::<span class="ident">default</span>();
         <span class="ident">detail</span>.<span class="ident">set_data</span>(<span class="self">self</span>.<span class="ident">data</span>.<span class="ident">scan_info</span>());

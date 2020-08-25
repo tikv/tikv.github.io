@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["KvCommandKeysWrittenVec",""],["KvCommandKeysWrittenVecDelegator",""],["KvCommandKeysWrittenVecInner",""]]});
+initSidebarItems({"struct":[["SchedLatchDurationVec",""],["SchedLatchDurationVecDelegator",""],["SchedLatchDurationVecInner",""]]});

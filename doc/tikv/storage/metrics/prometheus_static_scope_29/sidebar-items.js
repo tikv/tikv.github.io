@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["SchedTooBusyVec",""],["SchedTooBusyVecDelegator",""],["SchedTooBusyVecInner",""]]});
+initSidebarItems({"struct":[["KvCommandKeysWrittenVec",""],["KvCommandKeysWrittenVecDelegator",""],["KvCommandKeysWrittenVecInner",""]]});

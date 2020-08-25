@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["KvCommandCounterVec",""],["KvCommandCounterVecDelegator",""],["KvCommandCounterVecInner",""]]});
+initSidebarItems({"struct":[["KReadVec",""],["KReadVecDelegator",""],["KReadVecInner",""]]});

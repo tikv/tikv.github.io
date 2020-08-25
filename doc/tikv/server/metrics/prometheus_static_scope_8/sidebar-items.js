@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["GcTaskFailCounterVec",""],["GcTaskFailCounterVecDelegator",""],["GcTaskFailCounterVecInner",""]]});
+initSidebarItems({"struct":[["GcTaskCounterVec",""],["GcTaskCounterVecDelegator",""],["GcTaskCounterVecInner",""]]});

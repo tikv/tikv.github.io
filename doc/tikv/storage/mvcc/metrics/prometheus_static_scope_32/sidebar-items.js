@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["MvccDuplicateCmdCounterVec",""]]});
+initSidebarItems({"struct":[["MvccConflictCounterVec",""]]});
