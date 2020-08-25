@@ -1,1 +1,1 @@
-initSidebarItems({"trait":[["WriteBatch",""],["WriteBatchExt",""],["WriteBatchVecExt",""]]});
+initSidebarItems({"trait":[["Mutable",""],["WriteBatch",""],["WriteBatchExt",""]]});

@@ -1,1 +1,1 @@
-initSidebarItems({"trait":[["Mutable",""],["SyncMutable",""]]});
+initSidebarItems({"trait":[["SyncMutable",""]]});
