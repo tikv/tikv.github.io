@@ -1299,6 +1299,19 @@
 <span id="1299">1299</span>
 <span id="1300">1300</span>
 <span id="1301">1301</span>
+<span id="1302">1302</span>
+<span id="1303">1303</span>
+<span id="1304">1304</span>
+<span id="1305">1305</span>
+<span id="1306">1306</span>
+<span id="1307">1307</span>
+<span id="1308">1308</span>
+<span id="1309">1309</span>
+<span id="1310">1310</span>
+<span id="1311">1311</span>
+<span id="1312">1312</span>
+<span id="1313">1313</span>
+<span id="1314">1314</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1915,6 +1928,7 @@
     <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">mpsc</span>;
     <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">time</span>::<span class="ident">Duration</span>;
 
+    <span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">executor</span>::<span class="ident">block_on</span>;
     <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">kvrpcpb</span>::<span class="ident">LockInfo</span>;
     <span class="kw">use</span> <span class="ident">rand</span>::<span class="ident">prelude</span>::<span class="kw-2">*</span>;
     <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">config</span>::<span class="ident">ReadableDuration</span>;
@@ -2000,7 +2014,7 @@
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">type</span> <span class="ident">WaiterCtx</span> <span class="op">=</span> (
         <span class="ident">Waiter</span>,
         <span class="ident">LockInfo</span>,
-        <span class="ident">tokio_sync</span>::<span class="ident">oneshot</span>::<span class="ident">Receiver</span><span class="op">&lt;</span>
+        <span class="ident">futures03</span>::<span class="ident">channel</span>::<span class="ident">oneshot</span>::<span class="ident">Receiver</span><span class="op">&lt;</span>
             <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">PessimisticLockRes</span>, <span class="ident">StorageError</span><span class="op">&gt;</span>, <span class="ident">StorageError</span><span class="op">&gt;</span>,
         <span class="op">&gt;</span>,
     );
@@ -2120,7 +2134,7 @@
     <span class="kw">fn</span> <span class="ident">test_waiter_notify</span>() {
         <span class="kw">let</span> (<span class="ident">waiter</span>, <span class="ident">lock_info</span>, <span class="ident">f</span>) <span class="op">=</span> <span class="ident">new_test_waiter</span>(<span class="number">10</span>.<span class="ident">into</span>(), <span class="number">20</span>.<span class="ident">into</span>(), <span class="number">20</span>);
         <span class="ident">waiter</span>.<span class="ident">notify</span>();
-        <span class="ident">expect_key_is_locked</span>(<span class="ident">f</span>.<span class="ident">wait</span>().<span class="ident">unwrap</span>().<span class="ident">unwrap</span>(), <span class="ident">lock_info</span>);
+        <span class="ident">expect_key_is_locked</span>(<span class="ident">block_on</span>(<span class="ident">f</span>).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>(), <span class="ident">lock_info</span>);
 
         <span class="comment">// A waiter can conflict with other transactions more than once.</span>
         <span class="kw">for</span> <span class="ident">conflict_times</span> <span class="kw">in</span> <span class="number">1</span>..<span class="op">=</span><span class="number">3</span> {
@@ -2133,7 +2147,12 @@
                 <span class="ident">lock_info</span>.<span class="ident">set_lock_version</span>(<span class="ident">lock_ts</span>.<span class="ident">into_inner</span>());
             }
             <span class="ident">waiter</span>.<span class="ident">notify</span>();
-            <span class="ident">expect_write_conflict</span>(<span class="ident">f</span>.<span class="ident">wait</span>().<span class="ident">unwrap</span>(), <span class="ident">waiter_ts</span>, <span class="ident">lock_info</span>, <span class="ident">conflict_commit_ts</span>);
+            <span class="ident">expect_write_conflict</span>(
+                <span class="ident">block_on</span>(<span class="ident">f</span>).<span class="ident">unwrap</span>(),
+                <span class="ident">waiter_ts</span>,
+                <span class="ident">lock_info</span>,
+                <span class="ident">conflict_commit_ts</span>,
+            );
         }
 
         <span class="comment">// Deadlock</span>
@@ -2141,7 +2160,7 @@
         <span class="kw">let</span> (<span class="kw-2">mut</span> <span class="ident">waiter</span>, <span class="ident">lock_info</span>, <span class="ident">f</span>) <span class="op">=</span> <span class="ident">new_test_waiter</span>(<span class="ident">waiter_ts</span>, <span class="number">20</span>.<span class="ident">into</span>(), <span class="number">20</span>);
         <span class="ident">waiter</span>.<span class="ident">deadlock_with</span>(<span class="number">111</span>);
         <span class="ident">waiter</span>.<span class="ident">notify</span>();
-        <span class="ident">expect_deadlock</span>(<span class="ident">f</span>.<span class="ident">wait</span>().<span class="ident">unwrap</span>(), <span class="ident">waiter_ts</span>, <span class="ident">lock_info</span>, <span class="number">111</span>);
+        <span class="ident">expect_deadlock</span>(<span class="ident">block_on</span>(<span class="ident">f</span>).<span class="ident">unwrap</span>(), <span class="ident">waiter_ts</span>, <span class="ident">lock_info</span>, <span class="number">111</span>);
 
         <span class="comment">// Conflict then deadlock.</span>
         <span class="kw">let</span> <span class="ident">waiter_ts</span> <span class="op">=</span> <span class="ident">TimeStamp</span>::<span class="ident">new</span>(<span class="number">10</span>);
@@ -2149,7 +2168,7 @@
         <span class="ident">waiter</span>.<span class="ident">conflict_with</span>(<span class="number">20</span>.<span class="ident">into</span>(), <span class="number">30</span>.<span class="ident">into</span>());
         <span class="ident">waiter</span>.<span class="ident">deadlock_with</span>(<span class="number">111</span>);
         <span class="ident">waiter</span>.<span class="ident">notify</span>();
-        <span class="ident">expect_deadlock</span>(<span class="ident">f</span>.<span class="ident">wait</span>().<span class="ident">unwrap</span>(), <span class="ident">waiter_ts</span>, <span class="ident">lock_info</span>, <span class="number">111</span>);
+        <span class="ident">expect_deadlock</span>(<span class="ident">block_on</span>(<span class="ident">f</span>).<span class="ident">unwrap</span>(), <span class="ident">waiter_ts</span>, <span class="ident">lock_info</span>, <span class="number">111</span>);
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
@@ -2352,7 +2371,7 @@
             <span class="ident">WaitTimeout</span>::<span class="ident">Millis</span>(<span class="number">1000</span>),
         );
         <span class="ident">assert_elapsed</span>(
-            <span class="op">|</span><span class="op">|</span> <span class="ident">expect_key_is_locked</span>(<span class="ident">f</span>.<span class="ident">wait</span>().<span class="ident">unwrap</span>().<span class="ident">unwrap</span>(), <span class="ident">lock_info</span>),
+            <span class="op">|</span><span class="op">|</span> <span class="ident">expect_key_is_locked</span>(<span class="ident">block_on</span>(<span class="ident">f</span>).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>(), <span class="ident">lock_info</span>),
             <span class="number">900</span>,
             <span class="number">1200</span>,
         );
@@ -2367,7 +2386,7 @@
             <span class="ident">WaitTimeout</span>::<span class="ident">Millis</span>(<span class="number">100</span>),
         );
         <span class="ident">assert_elapsed</span>(
-            <span class="op">|</span><span class="op">|</span> <span class="ident">expect_key_is_locked</span>(<span class="ident">f</span>.<span class="ident">wait</span>().<span class="ident">unwrap</span>().<span class="ident">unwrap</span>(), <span class="ident">lock_info</span>),
+            <span class="op">|</span><span class="op">|</span> <span class="ident">expect_key_is_locked</span>(<span class="ident">block_on</span>(<span class="ident">f</span>).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>(), <span class="ident">lock_info</span>),
             <span class="number">50</span>,
             <span class="number">300</span>,
         );
@@ -2382,7 +2401,7 @@
             <span class="ident">WaitTimeout</span>::<span class="ident">Millis</span>(<span class="number">3000</span>),
         );
         <span class="ident">assert_elapsed</span>(
-            <span class="op">|</span><span class="op">|</span> <span class="ident">expect_key_is_locked</span>(<span class="ident">f</span>.<span class="ident">wait</span>().<span class="ident">unwrap</span>().<span class="ident">unwrap</span>(), <span class="ident">lock_info</span>),
+            <span class="op">|</span><span class="op">|</span> <span class="ident">expect_key_is_locked</span>(<span class="ident">block_on</span>(<span class="ident">f</span>).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>(), <span class="ident">lock_info</span>),
             <span class="number">900</span>,
             <span class="number">1200</span>,
         );
@@ -2416,7 +2435,7 @@
         <span class="ident">scheduler</span>.<span class="ident">wake_up</span>(<span class="ident">lock_ts</span>, <span class="ident">lock_hashes</span>, <span class="ident">commit_ts</span>);
         <span class="kw">for</span> (<span class="ident">waiter_ts</span>, <span class="ident">lock_info</span>, <span class="ident">f</span>) <span class="kw">in</span> <span class="ident">waiters_info</span> {
             <span class="ident">assert_elapsed</span>(
-                <span class="op">|</span><span class="op">|</span> <span class="ident">expect_write_conflict</span>(<span class="ident">f</span>.<span class="ident">wait</span>().<span class="ident">unwrap</span>(), <span class="ident">waiter_ts</span>, <span class="ident">lock_info</span>, <span class="ident">commit_ts</span>),
+                <span class="op">|</span><span class="op">|</span> <span class="ident">expect_write_conflict</span>(<span class="ident">block_on</span>(<span class="ident">f</span>).<span class="ident">unwrap</span>(), <span class="ident">waiter_ts</span>, <span class="ident">lock_info</span>, <span class="ident">commit_ts</span>),
                 <span class="number">0</span>,
                 <span class="number">200</span>,
             );
@@ -2449,7 +2468,7 @@
             <span class="ident">scheduler</span>.<span class="ident">wake_up</span>(<span class="ident">lock</span>.<span class="ident">ts</span>, <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">lock</span>.<span class="ident">hash</span>], <span class="ident">commit_ts</span>);
             <span class="ident">lock_info</span>.<span class="ident">set_lock_version</span>(<span class="ident">lock</span>.<span class="ident">ts</span>.<span class="ident">into_inner</span>());
             <span class="ident">assert_elapsed</span>(
-                <span class="op">|</span><span class="op">|</span> <span class="ident">expect_write_conflict</span>(<span class="ident">f</span>.<span class="ident">wait</span>().<span class="ident">unwrap</span>(), <span class="ident">waiter_ts</span>, <span class="ident">lock_info</span>, <span class="ident">commit_ts</span>),
+                <span class="op">|</span><span class="op">|</span> <span class="ident">expect_write_conflict</span>(<span class="ident">block_on</span>(<span class="ident">f</span>).<span class="ident">unwrap</span>(), <span class="ident">waiter_ts</span>, <span class="ident">lock_info</span>, <span class="ident">commit_ts</span>),
                 <span class="number">0</span>,
                 <span class="number">200</span>,
             );
@@ -2463,7 +2482,14 @@
         <span class="comment">// It conflicts with the last transaction.</span>
         <span class="ident">lock_info</span>.<span class="ident">set_lock_version</span>(<span class="ident">lock</span>.<span class="ident">ts</span>.<span class="ident">into_inner</span>() <span class="op">-</span> <span class="number">1</span>);
         <span class="ident">assert_elapsed</span>(
-            <span class="op">|</span><span class="op">|</span> <span class="ident">expect_write_conflict</span>(<span class="ident">f</span>.<span class="ident">wait</span>().<span class="ident">unwrap</span>(), <span class="ident">waiter_ts</span>, <span class="ident">lock_info</span>, <span class="kw-2">*</span><span class="ident">commit_ts</span>.<span class="ident">decr</span>()),
+            <span class="op">|</span><span class="op">|</span> {
+                <span class="ident">expect_write_conflict</span>(
+                    <span class="ident">block_on</span>(<span class="ident">f</span>).<span class="ident">unwrap</span>(),
+                    <span class="ident">waiter_ts</span>,
+                    <span class="ident">lock_info</span>,
+                    <span class="kw-2">*</span><span class="ident">commit_ts</span>.<span class="ident">decr</span>(),
+                )
+            },
             <span class="ident">wake_up_delay_duration</span> <span class="op">-</span> <span class="number">50</span>,
             <span class="ident">wake_up_delay_duration</span> <span class="op">+</span> <span class="number">200</span>,
         );
@@ -2495,7 +2521,7 @@
         <span class="ident">std</span>::<span class="ident">thread</span>::<span class="ident">spawn</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
             <span class="comment">// Waiters2&#39;s lifetime can&#39;t exceed it timeout.</span>
             <span class="ident">assert_elapsed</span>(
-                <span class="op">|</span><span class="op">|</span> <span class="ident">expect_write_conflict</span>(<span class="ident">f2</span>.<span class="ident">wait</span>().<span class="ident">unwrap</span>(), <span class="number">30</span>.<span class="ident">into</span>(), <span class="ident">lock_info2</span>, <span class="number">15</span>.<span class="ident">into</span>()),
+                <span class="op">|</span><span class="op">|</span> <span class="ident">expect_write_conflict</span>(<span class="ident">block_on</span>(<span class="ident">f2</span>).<span class="ident">unwrap</span>(), <span class="number">30</span>.<span class="ident">into</span>(), <span class="ident">lock_info2</span>, <span class="number">15</span>.<span class="ident">into</span>()),
                 <span class="number">30</span>,
                 <span class="number">100</span>,
             );
@@ -2504,7 +2530,7 @@
         <span class="comment">// It will increase waiter2&#39;s timeout to wake_up_delay_duration.</span>
         <span class="ident">scheduler</span>.<span class="ident">wake_up</span>(<span class="ident">lock</span>.<span class="ident">ts</span>, <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">lock</span>.<span class="ident">hash</span>], <span class="ident">commit_ts</span>);
         <span class="ident">assert_elapsed</span>(
-            <span class="op">|</span><span class="op">|</span> <span class="ident">expect_write_conflict</span>(<span class="ident">f1</span>.<span class="ident">wait</span>().<span class="ident">unwrap</span>(), <span class="number">20</span>.<span class="ident">into</span>(), <span class="ident">lock_info1</span>, <span class="ident">commit_ts</span>),
+            <span class="op">|</span><span class="op">|</span> <span class="ident">expect_write_conflict</span>(<span class="ident">block_on</span>(<span class="ident">f1</span>).<span class="ident">unwrap</span>(), <span class="number">20</span>.<span class="ident">into</span>(), <span class="ident">lock_info1</span>, <span class="ident">commit_ts</span>),
             <span class="number">0</span>,
             <span class="number">200</span>,
         );
@@ -2533,7 +2559,7 @@
         );
         <span class="ident">scheduler</span>.<span class="ident">deadlock</span>(<span class="ident">waiter_ts</span>, <span class="ident">lock</span>, <span class="number">30</span>);
         <span class="ident">assert_elapsed</span>(
-            <span class="op">|</span><span class="op">|</span> <span class="ident">expect_deadlock</span>(<span class="ident">f</span>.<span class="ident">wait</span>().<span class="ident">unwrap</span>(), <span class="ident">waiter_ts</span>, <span class="ident">lock_info</span>, <span class="number">30</span>),
+            <span class="op">|</span><span class="op">|</span> <span class="ident">expect_deadlock</span>(<span class="ident">block_on</span>(<span class="ident">f</span>).<span class="ident">unwrap</span>(), <span class="ident">waiter_ts</span>, <span class="ident">lock_info</span>, <span class="number">30</span>),
             <span class="number">0</span>,
             <span class="number">200</span>,
         );
@@ -2568,13 +2594,13 @@
         );
         <span class="comment">// Should notify duplicated waiter immediately.</span>
         <span class="ident">assert_elapsed</span>(
-            <span class="op">|</span><span class="op">|</span> <span class="ident">expect_key_is_locked</span>(<span class="ident">f1</span>.<span class="ident">wait</span>().<span class="ident">unwrap</span>().<span class="ident">unwrap</span>(), <span class="ident">lock_info1</span>),
+            <span class="op">|</span><span class="op">|</span> <span class="ident">expect_key_is_locked</span>(<span class="ident">block_on</span>(<span class="ident">f1</span>).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>(), <span class="ident">lock_info1</span>),
             <span class="number">0</span>,
             <span class="number">200</span>,
         );
         <span class="comment">// The new waiter will be wake up after timeout.</span>
         <span class="ident">assert_elapsed</span>(
-            <span class="op">|</span><span class="op">|</span> <span class="ident">expect_key_is_locked</span>(<span class="ident">f2</span>.<span class="ident">wait</span>().<span class="ident">unwrap</span>().<span class="ident">unwrap</span>(), <span class="ident">lock_info2</span>),
+            <span class="op">|</span><span class="op">|</span> <span class="ident">expect_key_is_locked</span>(<span class="ident">block_on</span>(<span class="ident">f2</span>).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>(), <span class="ident">lock_info2</span>),
             <span class="number">900</span>,
             <span class="number">1200</span>,
         );

@@ -753,7 +753,7 @@
     <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">thread</span>;
     <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">time</span>::<span class="ident">Duration</span>;
 
-    <span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">Future</span>;
+    <span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">executor</span>::<span class="ident">block_on</span>;
     <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">metapb</span>::{<span class="ident">Peer</span>, <span class="ident">Region</span>};
     <span class="kw">use</span> <span class="ident">raft</span>::<span class="ident">StateRole</span>;
 
@@ -807,7 +807,7 @@
         );
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">lock_mgr</span>.<span class="ident">has_waiter</span>());
         <span class="ident">assert_elapsed</span>(
-            <span class="op">|</span><span class="op">|</span> <span class="ident">expect_key_is_locked</span>(<span class="ident">f</span>.<span class="ident">wait</span>().<span class="ident">unwrap</span>().<span class="ident">unwrap</span>(), <span class="ident">lock_info</span>),
+            <span class="op">|</span><span class="op">|</span> <span class="ident">expect_key_is_locked</span>(<span class="ident">block_on</span>(<span class="ident">f</span>).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>(), <span class="ident">lock_info</span>),
             <span class="number">2500</span>,
             <span class="number">3500</span>,
         );
@@ -833,7 +833,7 @@
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">lock_mgr</span>.<span class="ident">has_waiter</span>());
         <span class="ident">lock_mgr</span>.<span class="ident">wake_up</span>(<span class="ident">lock</span>.<span class="ident">ts</span>, <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">lock</span>.<span class="ident">hash</span>], <span class="number">30</span>.<span class="ident">into</span>(), <span class="bool-val">false</span>);
         <span class="ident">assert_elapsed</span>(
-            <span class="op">|</span><span class="op">|</span> <span class="ident">expect_write_conflict</span>(<span class="ident">f</span>.<span class="ident">wait</span>().<span class="ident">unwrap</span>(), <span class="ident">waiter_ts</span>, <span class="ident">lock_info</span>, <span class="number">30</span>.<span class="ident">into</span>()),
+            <span class="op">|</span><span class="op">|</span> <span class="ident">expect_write_conflict</span>(<span class="ident">block_on</span>(<span class="ident">f</span>).<span class="ident">unwrap</span>(), <span class="ident">waiter_ts</span>, <span class="ident">lock_info</span>, <span class="number">30</span>.<span class="ident">into</span>()),
             <span class="number">0</span>,
             <span class="number">500</span>,
         );
@@ -861,14 +861,14 @@
         );
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">lock_mgr</span>.<span class="ident">has_waiter</span>());
         <span class="ident">assert_elapsed</span>(
-            <span class="op">|</span><span class="op">|</span> <span class="ident">expect_deadlock</span>(<span class="ident">f2</span>.<span class="ident">wait</span>().<span class="ident">unwrap</span>(), <span class="number">20</span>.<span class="ident">into</span>(), <span class="ident">lock_info2</span>, <span class="number">20</span>),
+            <span class="op">|</span><span class="op">|</span> <span class="ident">expect_deadlock</span>(<span class="ident">block_on</span>(<span class="ident">f2</span>).<span class="ident">unwrap</span>(), <span class="number">20</span>.<span class="ident">into</span>(), <span class="ident">lock_info2</span>, <span class="number">20</span>),
             <span class="number">0</span>,
             <span class="number">500</span>,
         );
         <span class="comment">// Waiter2 releases its lock.</span>
         <span class="ident">lock_mgr</span>.<span class="ident">wake_up</span>(<span class="number">20</span>.<span class="ident">into</span>(), <span class="macro">vec</span><span class="macro">!</span>[<span class="number">20</span>], <span class="number">20</span>.<span class="ident">into</span>(), <span class="bool-val">true</span>);
         <span class="ident">assert_elapsed</span>(
-            <span class="op">|</span><span class="op">|</span> <span class="ident">expect_write_conflict</span>(<span class="ident">f1</span>.<span class="ident">wait</span>().<span class="ident">unwrap</span>(), <span class="number">10</span>.<span class="ident">into</span>(), <span class="ident">lock_info1</span>, <span class="number">20</span>.<span class="ident">into</span>()),
+            <span class="op">|</span><span class="op">|</span> <span class="ident">expect_write_conflict</span>(<span class="ident">block_on</span>(<span class="ident">f1</span>).<span class="ident">unwrap</span>(), <span class="number">10</span>.<span class="ident">into</span>(), <span class="ident">lock_info1</span>, <span class="number">20</span>.<span class="ident">into</span>()),
             <span class="number">0</span>,
             <span class="number">500</span>,
         );
@@ -889,7 +889,7 @@
             <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">lock_mgr</span>.<span class="ident">has_waiter</span>());
             <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">lock_mgr</span>.<span class="ident">remove_from_detected</span>(<span class="number">30</span>.<span class="ident">into</span>()), <span class="op">!</span><span class="ident">is_first_lock</span>);
             <span class="ident">lock_mgr</span>.<span class="ident">wake_up</span>(<span class="number">40</span>.<span class="ident">into</span>(), <span class="macro">vec</span><span class="macro">!</span>[<span class="number">40</span>], <span class="number">40</span>.<span class="ident">into</span>(), <span class="bool-val">false</span>);
-            <span class="ident">f</span>.<span class="ident">wait</span>().<span class="ident">unwrap</span>().<span class="ident">unwrap_err</span>();
+            <span class="ident">block_on</span>(<span class="ident">f</span>).<span class="ident">unwrap</span>().<span class="ident">unwrap_err</span>();
         }
         <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">lock_mgr</span>.<span class="ident">has_waiter</span>());
 
@@ -920,7 +920,7 @@
             <span class="prelude-val">None</span>,
         );
         <span class="ident">assert_elapsed</span>(
-            <span class="op">|</span><span class="op">|</span> <span class="ident">expect_key_is_locked</span>(<span class="ident">f</span>.<span class="ident">wait</span>().<span class="ident">unwrap</span>().<span class="ident">unwrap</span>(), <span class="ident">lock_info</span>),
+            <span class="op">|</span><span class="op">|</span> <span class="ident">expect_key_is_locked</span>(<span class="ident">block_on</span>(<span class="ident">f</span>).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>(), <span class="ident">lock_info</span>),
             <span class="number">0</span>,
             <span class="number">500</span>,
         );
