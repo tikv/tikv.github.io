@@ -255,6 +255,10 @@
 <span id="255">255</span>
 <span id="256">256</span>
 <span id="257">257</span>
+<span id="258">258</span>
+<span id="259">259</span>
+<span id="260">260</span>
+<span id="261">261</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -267,9 +271,9 @@
     <span class="ident">Callback</span>, <span class="ident">CasualMessage</span>, <span class="ident">LocalReader</span>, <span class="ident">PeerMsg</span>, <span class="ident">RaftCommand</span>, <span class="ident">SignificantMsg</span>, <span class="ident">StoreMsg</span>,
 };
 <span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">DiscardReason</span>, <span class="ident">Error</span> <span class="kw">as</span> <span class="ident">RaftStoreError</span>, <span class="prelude-ty">Result</span> <span class="kw">as</span> <span class="ident">RaftStoreResult</span>};
-<span class="kw">use</span> <span class="ident">engine_rocks</span>::<span class="ident">RocksEngine</span>;
 <span class="kw">use</span> <span class="ident">engine_traits</span>::<span class="ident">KvEngine</span>;
 <span class="kw">use</span> <span class="ident">raft</span>::<span class="ident">SnapshotStatus</span>;
+<span class="kw">use</span> <span class="ident">raft_engine</span>::<span class="ident">RaftEngine</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">cell</span>::<span class="ident">RefCell</span>;
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">time</span>::<span class="ident">ThreadReadId</span>;
 <span class="kw">use</span> <span class="ident">txn_types</span>::<span class="ident">TxnExtra</span>;
@@ -382,17 +386,19 @@
 }
 
 <span class="doccomment">/// A router that routes messages to the raftstore</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ServerRaftStoreRouter</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ServerRaftStoreRouter</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>
 <span class="kw">where</span>
     <span class="ident">EK</span>: <span class="ident">KvEngine</span>,
+    <span class="ident">ER</span>: <span class="ident">RaftEngine</span>,
 {
-    <span class="ident">router</span>: <span class="ident">RaftRouter</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span>,
-    <span class="ident">local_reader</span>: <span class="ident">RefCell</span><span class="op">&lt;</span><span class="ident">LocalReader</span><span class="op">&lt;</span><span class="ident">RaftRouter</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span>, <span class="ident">EK</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">router</span>: <span class="ident">RaftRouter</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>,
+    <span class="ident">local_reader</span>: <span class="ident">RefCell</span><span class="op">&lt;</span><span class="ident">LocalReader</span><span class="op">&lt;</span><span class="ident">RaftRouter</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>, <span class="ident">EK</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span> <span class="ident">Clone</span> <span class="kw">for</span> <span class="ident">ServerRaftStoreRouter</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span> <span class="ident">Clone</span> <span class="kw">for</span> <span class="ident">ServerRaftStoreRouter</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>
 <span class="kw">where</span>
     <span class="ident">EK</span>: <span class="ident">KvEngine</span>,
+    <span class="ident">ER</span>: <span class="ident">RaftEngine</span>,
 {
     <span class="kw">fn</span> <span class="ident">clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="ident">ServerRaftStoreRouter</span> {
@@ -402,15 +408,16 @@
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span> <span class="ident">ServerRaftStoreRouter</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span> <span class="ident">ServerRaftStoreRouter</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>
 <span class="kw">where</span>
     <span class="ident">EK</span>: <span class="ident">KvEngine</span>,
+    <span class="ident">ER</span>: <span class="ident">RaftEngine</span>,
 {
     <span class="doccomment">/// Creates a new router.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
-        <span class="ident">router</span>: <span class="ident">RaftRouter</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span>,
-        <span class="ident">reader</span>: <span class="ident">LocalReader</span><span class="op">&lt;</span><span class="ident">RaftRouter</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span>, <span class="ident">EK</span><span class="op">&gt;</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ServerRaftStoreRouter</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span> {
+        <span class="ident">router</span>: <span class="ident">RaftRouter</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>,
+        <span class="ident">reader</span>: <span class="ident">LocalReader</span><span class="op">&lt;</span><span class="ident">RaftRouter</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>, <span class="ident">EK</span><span class="op">&gt;</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ServerRaftStoreRouter</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">local_reader</span> <span class="op">=</span> <span class="ident">RefCell</span>::<span class="ident">new</span>(<span class="ident">reader</span>);
         <span class="ident">ServerRaftStoreRouter</span> {
             <span class="ident">router</span>,
@@ -436,9 +443,10 @@
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span> <span class="ident">RaftStoreRouter</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ServerRaftStoreRouter</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span> <span class="ident">RaftStoreRouter</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ServerRaftStoreRouter</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>
 <span class="kw">where</span>
     <span class="ident">EK</span>: <span class="ident">KvEngine</span>,
+    <span class="ident">ER</span>: <span class="ident">RaftEngine</span>,
 {
     <span class="kw">fn</span> <span class="ident">send_raft_msg</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">msg</span>: <span class="ident">RaftMessage</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">RaftStoreResult</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">region_id</span> <span class="op">=</span> <span class="ident">msg</span>.<span class="ident">get_region_id</span>();

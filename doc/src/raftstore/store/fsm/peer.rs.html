@@ -3971,7 +3971,6 @@
 <span id="3971">3971</span>
 <span id="3972">3972</span>
 <span id="3973">3973</span>
-<span id="3974">3974</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -3982,9 +3981,8 @@
 <span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">cmp</span>, <span class="ident">u64</span>};
 
 <span class="kw">use</span> <span class="ident">batch_system</span>::{<span class="ident">BasicMailbox</span>, <span class="ident">Fsm</span>};
-<span class="kw">use</span> <span class="ident">engine_rocks</span>::<span class="ident">RocksEngine</span>;
 <span class="kw">use</span> <span class="ident">engine_traits</span>::<span class="ident">CF_RAFT</span>;
-<span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">Engines</span>, <span class="ident">KvEngine</span>, <span class="ident">Snapshot</span>, <span class="ident">WriteBatchExt</span>};
+<span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">Engines</span>, <span class="ident">KvEngine</span>, <span class="ident">WriteBatchExt</span>};
 <span class="kw">use</span> <span class="ident">error_code</span>::<span class="ident">ErrorCodeExt</span>;
 <span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">Future</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">errorpb</span>;
@@ -4087,17 +4085,17 @@
     <span class="ident">skip_split_count</span>: <span class="ident">usize</span>,
 
     <span class="comment">// Batch raft command which has the same header into an entry</span>
-    <span class="ident">batch_req_builder</span>: <span class="ident">BatchRaftCmdRequestBuilder</span><span class="op">&lt;</span><span class="ident">EK</span>::<span class="ident">Snapshot</span><span class="op">&gt;</span>,
+    <span class="ident">batch_req_builder</span>: <span class="ident">BatchRaftCmdRequestBuilder</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>,
 }
 
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">BatchRaftCmdRequestBuilder</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">BatchRaftCmdRequestBuilder</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>
 <span class="kw">where</span>
-    <span class="ident">S</span>: <span class="ident">Snapshot</span>,
+    <span class="ident">E</span>: <span class="ident">KvEngine</span>,
 {
     <span class="ident">raft_entry_max_size</span>: <span class="ident">f64</span>,
     <span class="ident">batch_req_size</span>: <span class="ident">u32</span>,
     <span class="ident">request</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RaftCmdRequest</span><span class="op">&gt;</span>,
-    <span class="ident">callbacks</span>: <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">Callback</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>, <span class="ident">usize</span>)<span class="op">&gt;</span>,
+    <span class="ident">callbacks</span>: <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">Callback</span><span class="op">&lt;</span><span class="ident">E</span>::<span class="ident">Snapshot</span><span class="op">&gt;</span>, <span class="ident">usize</span>)<span class="op">&gt;</span>,
     <span class="ident">txn_extra</span>: <span class="ident">TxnExtra</span>,
 }
 
@@ -4250,11 +4248,11 @@
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span> <span class="ident">BatchRaftCmdRequestBuilder</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> <span class="ident">BatchRaftCmdRequestBuilder</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>
 <span class="kw">where</span>
-    <span class="ident">S</span>: <span class="ident">Snapshot</span>,
+    <span class="ident">E</span>: <span class="ident">KvEngine</span>,
 {
-    <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">raft_entry_max_size</span>: <span class="ident">f64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">BatchRaftCmdRequestBuilder</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">raft_entry_max_size</span>: <span class="ident">f64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">BatchRaftCmdRequestBuilder</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
         <span class="ident">BatchRaftCmdRequestBuilder</span> {
             <span class="ident">raft_entry_max_size</span>,
             <span class="ident">request</span>: <span class="prelude-val">None</span>,
@@ -4288,7 +4286,7 @@
         <span class="bool-val">true</span>
     }
 
-    <span class="kw">fn</span> <span class="ident">add</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">cmd</span>: <span class="ident">RaftCommand</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>, <span class="ident">req_size</span>: <span class="ident">u32</span>) {
+    <span class="kw">fn</span> <span class="ident">add</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">cmd</span>: <span class="ident">RaftCommand</span><span class="op">&lt;</span><span class="ident">E</span>::<span class="ident">Snapshot</span><span class="op">&gt;</span>, <span class="ident">req_size</span>: <span class="ident">u32</span>) {
         <span class="kw">let</span> <span class="ident">req_num</span> <span class="op">=</span> <span class="ident">cmd</span>.<span class="ident">request</span>.<span class="ident">get_requests</span>().<span class="ident">len</span>();
         <span class="kw">let</span> <span class="ident">RaftCommand</span> {
             <span class="kw-2">mut</span> <span class="ident">request</span>,
@@ -4316,14 +4314,14 @@
             <span class="kw">if</span> <span class="ident">f64</span>::<span class="ident">from</span>(<span class="self">self</span>.<span class="ident">batch_req_size</span>) <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">raft_entry_max_size</span> <span class="op">*</span> <span class="number">0.4</span> {
                 <span class="kw">return</span> <span class="bool-val">true</span>;
             }
-            <span class="kw">if</span> <span class="ident">batch_req</span>.<span class="ident">get_requests</span>().<span class="ident">len</span>() <span class="op">&gt;</span> <span class="ident">RocksEngine</span>::<span class="ident">WRITE_BATCH_MAX_KEYS</span> {
+            <span class="kw">if</span> <span class="ident">batch_req</span>.<span class="ident">get_requests</span>().<span class="ident">len</span>() <span class="op">&gt;</span> <span class="op">&lt;</span><span class="ident">E</span> <span class="kw">as</span> <span class="ident">WriteBatchExt</span><span class="op">&gt;</span>::<span class="ident">WRITE_BATCH_MAX_KEYS</span> {
                 <span class="kw">return</span> <span class="bool-val">true</span>;
             }
         }
         <span class="bool-val">false</span>
     }
 
-    <span class="kw">fn</span> <span class="ident">build</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">metric</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">RaftProposeMetrics</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RaftCommand</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">build</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">metric</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">RaftProposeMetrics</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RaftCommand</span><span class="op">&lt;</span><span class="ident">E</span>::<span class="ident">Snapshot</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">req</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">request</span>.<span class="ident">take</span>() {
             <span class="self">self</span>.<span class="ident">batch_req_size</span> <span class="op">=</span> <span class="number">0</span>;
             <span class="kw">if</span> <span class="self">self</span>.<span class="ident">callbacks</span>.<span class="ident">len</span>() <span class="op">=</span><span class="op">=</span> <span class="number">1</span> {
@@ -7862,7 +7860,7 @@
     <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">local_metrics</span>::<span class="ident">RaftProposeMetrics</span>;
     <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">msg</span>::{<span class="ident">Callback</span>, <span class="ident">RaftCommand</span>};
 
-    <span class="kw">use</span> <span class="ident">engine_rocks</span>::<span class="ident">RocksSnapshot</span>;
+    <span class="kw">use</span> <span class="ident">engine_rocks</span>::<span class="ident">RocksEngine</span>;
     <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">raft_cmdpb</span>::{
         <span class="ident">AdminRequest</span>, <span class="ident">CmdType</span>, <span class="ident">PutRequest</span>, <span class="ident">RaftCmdRequest</span>, <span class="ident">RaftCmdResponse</span>, <span class="ident">Request</span>, <span class="ident">Response</span>,
         <span class="ident">StatusRequest</span>,
@@ -7874,7 +7872,7 @@
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_batch_raft_cmd_request_builder</span>() {
         <span class="kw">let</span> <span class="ident">max_batch_size</span> <span class="op">=</span> <span class="number">1000.0</span>;
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">builder</span> <span class="op">=</span> <span class="ident">BatchRaftCmdRequestBuilder</span>::<span class="op">&lt;</span><span class="ident">RocksSnapshot</span><span class="op">&gt;</span>::<span class="ident">new</span>(<span class="ident">max_batch_size</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">builder</span> <span class="op">=</span> <span class="ident">BatchRaftCmdRequestBuilder</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>::<span class="ident">new</span>(<span class="ident">max_batch_size</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">q</span> <span class="op">=</span> <span class="ident">Request</span>::<span class="ident">default</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">metric</span> <span class="op">=</span> <span class="ident">RaftProposeMetrics</span>::<span class="ident">default</span>();
 

@@ -345,6 +345,11 @@
 <span id="345">345</span>
 <span id="346">346</span>
 <span id="347">347</span>
+<span id="348">348</span>
+<span id="349">349</span>
+<span id="350">350</span>
+<span id="351">351</span>
+<span id="352">352</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -353,7 +358,6 @@
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">fmt</span>::{<span class="self">self</span>, <span class="ident">Display</span>, <span class="ident">Formatter</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">mem</span>;
 
-<span class="kw">use</span> <span class="ident">engine_rocks</span>::<span class="ident">RocksEngine</span>;
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">CfName</span>, <span class="ident">IterOptions</span>, <span class="ident">Iterable</span>, <span class="ident">Iterator</span>, <span class="ident">KvEngine</span>, <span class="ident">CF_WRITE</span>, <span class="ident">LARGE_CFS</span>};
 <span class="kw">use</span> <span class="ident">error_code</span>::<span class="ident">ErrorCodeExt</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">metapb</span>::<span class="ident">Region</span>;
@@ -511,20 +515,22 @@
     }
 }
 
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Runner</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span> {
-    <span class="ident">engine</span>: <span class="ident">RocksEngine</span>,
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Runner</span><span class="op">&lt;</span><span class="ident">E</span>, <span class="ident">S</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">E</span>: <span class="ident">KvEngine</span>,
+{
+    <span class="ident">engine</span>: <span class="ident">E</span>,
     <span class="ident">router</span>: <span class="ident">S</span>,
-    <span class="ident">coprocessor</span>: <span class="ident">CoprocessorHost</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>,
+    <span class="ident">coprocessor</span>: <span class="ident">CoprocessorHost</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>,
     <span class="ident">cfg</span>: <span class="ident">Config</span>,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">CasualRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">Runner</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
-        <span class="ident">engine</span>: <span class="ident">RocksEngine</span>,
-        <span class="ident">router</span>: <span class="ident">S</span>,
-        <span class="ident">coprocessor</span>: <span class="ident">CoprocessorHost</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>,
-        <span class="ident">cfg</span>: <span class="ident">Config</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Runner</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>, <span class="ident">S</span><span class="op">&gt;</span> <span class="ident">Runner</span><span class="op">&lt;</span><span class="ident">E</span>, <span class="ident">S</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">E</span>: <span class="ident">KvEngine</span>,
+    <span class="ident">S</span>: <span class="ident">CasualRouter</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>,
+{
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">engine</span>: <span class="ident">E</span>, <span class="ident">router</span>: <span class="ident">S</span>, <span class="ident">coprocessor</span>: <span class="ident">CoprocessorHost</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>, <span class="ident">cfg</span>: <span class="ident">Config</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Runner</span><span class="op">&lt;</span><span class="ident">E</span>, <span class="ident">S</span><span class="op">&gt;</span> {
         <span class="ident">Runner</span> {
             <span class="ident">engine</span>,
             <span class="ident">router</span>,
@@ -614,13 +620,13 @@
     <span class="doccomment">/// Gets the split keys by scanning the range.</span>
     <span class="kw">fn</span> <span class="ident">scan_split_keys</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">host</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">SplitCheckerHost</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span>,
+        <span class="ident">host</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">SplitCheckerHost</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="ident">E</span><span class="op">&gt;</span>,
         <span class="ident">region</span>: <span class="kw-2">&amp;</span><span class="ident">Region</span>,
         <span class="ident">start_key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>],
         <span class="ident">end_key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>],
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">timer</span> <span class="op">=</span> <span class="ident">CHECK_SPILT_HISTOGRAM</span>.<span class="ident">start_coarse_timer</span>();
-        <span class="ident">MergedIterator</span>::<span class="op">&lt;</span><span class="op">&lt;</span><span class="ident">RocksEngine</span> <span class="kw">as</span> <span class="ident">Iterable</span><span class="op">&gt;</span>::<span class="ident">Iterator</span><span class="op">&gt;</span>::<span class="ident">new</span>(
+        <span class="ident">MergedIterator</span>::<span class="op">&lt;</span><span class="op">&lt;</span><span class="ident">E</span> <span class="kw">as</span> <span class="ident">Iterable</span><span class="op">&gt;</span>::<span class="ident">Iterator</span><span class="op">&gt;</span>::<span class="ident">new</span>(
             <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">engine</span>,
             <span class="ident">LARGE_CFS</span>,
             <span class="ident">start_key</span>,
@@ -668,7 +674,11 @@
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">CasualRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">Runnable</span><span class="op">&lt;</span><span class="ident">Task</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Runner</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>, <span class="ident">S</span><span class="op">&gt;</span> <span class="ident">Runnable</span><span class="op">&lt;</span><span class="ident">Task</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Runner</span><span class="op">&lt;</span><span class="ident">E</span>, <span class="ident">S</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">E</span>: <span class="ident">KvEngine</span>,
+    <span class="ident">S</span>: <span class="ident">CasualRouter</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>,
+{
     <span class="kw">fn</span> <span class="ident">run</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">task</span>: <span class="ident">Task</span>) {
         <span class="kw">match</span> <span class="ident">task</span> {
             <span class="ident">Task</span>::<span class="ident">SplitCheckTask</span> {
@@ -683,10 +693,10 @@
     }
 }
 
-<span class="kw">fn</span> <span class="ident">new_split_region</span>(
-    <span class="ident">region_epoch</span>: <span class="ident">RegionEpoch</span>,
-    <span class="ident">split_keys</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">CasualMessage</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span> {
+<span class="kw">fn</span> <span class="ident">new_split_region</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>(<span class="ident">region_epoch</span>: <span class="ident">RegionEpoch</span>, <span class="ident">split_keys</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">CasualMessage</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">E</span>: <span class="ident">KvEngine</span>,
+{
     <span class="ident">CasualMessage</span>::<span class="ident">SplitRegion</span> {
         <span class="ident">region_epoch</span>,
         <span class="ident">split_keys</span>,
