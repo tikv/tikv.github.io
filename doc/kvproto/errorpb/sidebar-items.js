@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["EpochNotMatch",""],["Error",""],["KeyNotInRegion",""],["NotLeader",""],["RaftEntryTooLarge",""],["RegionNotFound",""],["ServerIsBusy",""],["StaleCommand",""],["StoreNotMatch",""]]});
+initSidebarItems({"struct":[["EpochNotMatch",""],["Error",""],["KeyNotInRegion",""],["MaxTimestampNotSynced",""],["NotLeader",""],["RaftEntryTooLarge",""],["RegionNotFound",""],["ServerIsBusy",""],["StaleCommand",""],["StoreNotMatch",""]]});
