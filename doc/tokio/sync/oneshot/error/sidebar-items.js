@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["TryRecvError","Error returned by the `try_recv` function on `Receiver`."]],"struct":[["RecvError","Error returned by the `Future` implementation for `Receiver`."]]});
+initSidebarItems({"struct":[["RecvError","Error returned by the `Future` implementation for `Receiver`."],["TryRecvError","Error returned by the `try_recv` function on `Receiver`."]]});
