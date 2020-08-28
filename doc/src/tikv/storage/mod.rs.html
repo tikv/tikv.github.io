@@ -5451,6 +5451,32 @@
 <span id="5451">5451</span>
 <span id="5452">5452</span>
 <span id="5453">5453</span>
+<span id="5454">5454</span>
+<span id="5455">5455</span>
+<span id="5456">5456</span>
+<span id="5457">5457</span>
+<span id="5458">5458</span>
+<span id="5459">5459</span>
+<span id="5460">5460</span>
+<span id="5461">5461</span>
+<span id="5462">5462</span>
+<span id="5463">5463</span>
+<span id="5464">5464</span>
+<span id="5465">5465</span>
+<span id="5466">5466</span>
+<span id="5467">5467</span>
+<span id="5468">5468</span>
+<span id="5469">5469</span>
+<span id="5470">5470</span>
+<span id="5471">5471</span>
+<span id="5472">5472</span>
+<span id="5473">5473</span>
+<span id="5474">5474</span>
+<span id="5475">5475</span>
+<span id="5476">5476</span>
+<span id="5477">5477</span>
+<span id="5478">5478</span>
+<span id="5479">5479</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -9852,8 +9878,8 @@
         <span class="ident">storage</span>
             .<span class="ident">sched_txn_command</span>(
                 <span class="ident">commands</span>::<span class="ident">Prewrite</span>::<span class="ident">with_lock_ttl</span>(
-                    <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">Mutation</span>::<span class="ident">Put</span>((<span class="ident">k</span>.<span class="ident">clone</span>(), <span class="ident">v</span>))],
-                    <span class="ident">k</span>.<span class="ident">as_encoded</span>().<span class="ident">to_vec</span>(),
+                    <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">Mutation</span>::<span class="ident">Put</span>((<span class="ident">k</span>.<span class="ident">clone</span>(), <span class="ident">v</span>.<span class="ident">clone</span>()))],
+                    <span class="string">b&quot;k&quot;</span>.<span class="ident">to_vec</span>(),
                     <span class="number">10</span>.<span class="ident">into</span>(),
                     <span class="number">100</span>,
                 ),
@@ -9862,15 +9888,24 @@
             .<span class="ident">unwrap</span>();
         <span class="ident">rx</span>.<span class="ident">recv</span>().<span class="ident">unwrap</span>();
 
+        <span class="kw">let</span> <span class="ident">lock_with_ttl</span> <span class="op">=</span> <span class="op">|</span><span class="ident">ttl</span><span class="op">|</span> {
+            <span class="ident">txn_types</span>::<span class="ident">Lock</span>::<span class="ident">new</span>(
+                <span class="ident">LockType</span>::<span class="ident">Put</span>,
+                <span class="string">b&quot;k&quot;</span>.<span class="ident">to_vec</span>(),
+                <span class="number">10</span>.<span class="ident">into</span>(),
+                <span class="ident">ttl</span>,
+                <span class="prelude-val">Some</span>(<span class="ident">v</span>.<span class="ident">clone</span>()),
+                <span class="number">0</span>.<span class="ident">into</span>(),
+                <span class="number">0</span>,
+                <span class="number">0</span>.<span class="ident">into</span>(),
+            )
+        };
+
         <span class="comment">// `advise_ttl` = 90, which is less than current ttl 100. The lock&#39;s ttl will remains 100.</span>
         <span class="ident">storage</span>
             .<span class="ident">sched_txn_command</span>(
                 <span class="ident">commands</span>::<span class="ident">TxnHeartBeat</span>::<span class="ident">new</span>(<span class="ident">k</span>.<span class="ident">clone</span>(), <span class="number">10</span>.<span class="ident">into</span>(), <span class="number">90</span>, <span class="ident">Context</span>::<span class="ident">default</span>()),
-                <span class="ident">expect_value_callback</span>(
-                    <span class="ident">tx</span>.<span class="ident">clone</span>(),
-                    <span class="number">0</span>,
-                    <span class="ident">uncommitted</span>(<span class="number">100</span>, <span class="ident">TimeStamp</span>::<span class="ident">zero</span>(), <span class="bool-val">false</span>, <span class="macro">vec</span><span class="macro">!</span>[]),
-                ),
+                <span class="ident">expect_value_callback</span>(<span class="ident">tx</span>.<span class="ident">clone</span>(), <span class="number">0</span>, <span class="ident">uncommitted</span>(<span class="ident">lock_with_ttl</span>(<span class="number">100</span>))),
             )
             .<span class="ident">unwrap</span>();
         <span class="ident">rx</span>.<span class="ident">recv</span>().<span class="ident">unwrap</span>();
@@ -9880,11 +9915,7 @@
         <span class="ident">storage</span>
             .<span class="ident">sched_txn_command</span>(
                 <span class="ident">commands</span>::<span class="ident">TxnHeartBeat</span>::<span class="ident">new</span>(<span class="ident">k</span>.<span class="ident">clone</span>(), <span class="number">10</span>.<span class="ident">into</span>(), <span class="number">110</span>, <span class="ident">Context</span>::<span class="ident">default</span>()),
-                <span class="ident">expect_value_callback</span>(
-                    <span class="ident">tx</span>.<span class="ident">clone</span>(),
-                    <span class="number">0</span>,
-                    <span class="ident">uncommitted</span>(<span class="number">110</span>, <span class="ident">TimeStamp</span>::<span class="ident">zero</span>(), <span class="bool-val">false</span>, <span class="macro">vec</span><span class="macro">!</span>[]),
-                ),
+                <span class="ident">expect_value_callback</span>(<span class="ident">tx</span>.<span class="ident">clone</span>(), <span class="number">0</span>, <span class="ident">uncommitted</span>(<span class="ident">lock_with_ttl</span>(<span class="number">110</span>))),
             )
             .<span class="ident">unwrap</span>();
         <span class="ident">rx</span>.<span class="ident">recv</span>().<span class="ident">unwrap</span>();
@@ -9984,7 +10015,7 @@
                     <span class="number">100</span>,
                     <span class="bool-val">false</span>,
                     <span class="number">3</span>,
-                    <span class="ident">TimeStamp</span>::<span class="ident">zero</span>(),
+                    <span class="ident">ts</span>(<span class="number">10</span>, <span class="number">1</span>),
                     <span class="prelude-val">Some</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="string">b&quot;k1&quot;</span>.<span class="ident">to_vec</span>(), <span class="string">b&quot;k2&quot;</span>.<span class="ident">to_vec</span>()]),
                     <span class="ident">Context</span>::<span class="ident">default</span>(),
                 ),
@@ -9993,7 +10024,7 @@
             .<span class="ident">unwrap</span>();
         <span class="ident">rx</span>.<span class="ident">recv</span>().<span class="ident">unwrap</span>();
 
-        <span class="comment">// If lock exists and not expired, returns the lock&#39;s TTL.</span>
+        <span class="comment">// If lock exists and not expired, returns the lock&#39;s information.</span>
         <span class="ident">storage</span>
             .<span class="ident">sched_txn_command</span>(
                 <span class="ident">commands</span>::<span class="ident">CheckTxnStatus</span>::<span class="ident">new</span>(
@@ -10007,7 +10038,19 @@
                 <span class="ident">expect_value_callback</span>(
                     <span class="ident">tx</span>.<span class="ident">clone</span>(),
                     <span class="number">0</span>,
-                    <span class="ident">uncommitted</span>(<span class="number">100</span>, <span class="ident">ts</span>(<span class="number">10</span>, <span class="number">1</span>), <span class="bool-val">true</span>, <span class="macro">vec</span><span class="macro">!</span>[<span class="string">b&quot;k1&quot;</span>.<span class="ident">to_vec</span>(), <span class="string">b&quot;k2&quot;</span>.<span class="ident">to_vec</span>()]),
+                    <span class="ident">uncommitted</span>(
+                        <span class="ident">txn_types</span>::<span class="ident">Lock</span>::<span class="ident">new</span>(
+                            <span class="ident">LockType</span>::<span class="ident">Put</span>,
+                            <span class="string">b&quot;k&quot;</span>.<span class="ident">to_vec</span>(),
+                            <span class="ident">ts</span>(<span class="number">10</span>, <span class="number">0</span>),
+                            <span class="number">100</span>,
+                            <span class="prelude-val">Some</span>(<span class="ident">v</span>.<span class="ident">clone</span>()),
+                            <span class="number">0</span>.<span class="ident">into</span>(),
+                            <span class="number">3</span>,
+                            <span class="ident">ts</span>(<span class="number">10</span>, <span class="number">1</span>),
+                        )
+                        .<span class="ident">use_async_commit</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="string">b&quot;k1&quot;</span>.<span class="ident">to_vec</span>(), <span class="string">b&quot;k2&quot;</span>.<span class="ident">to_vec</span>()]),
+                    ),
                 ),
             )
             .<span class="ident">unwrap</span>();
@@ -10808,7 +10851,16 @@
                 <span class="ident">expect_value_callback</span>(
                     <span class="ident">tx</span>.<span class="ident">clone</span>(),
                     <span class="number">0</span>,
-                    <span class="ident">TxnStatus</span>::<span class="ident">uncommitted</span>(<span class="number">100</span>, <span class="number">0</span>.<span class="ident">into</span>(), <span class="bool-val">false</span>, <span class="macro">vec</span><span class="macro">!</span>[]),
+                    <span class="ident">TxnStatus</span>::<span class="ident">uncommitted</span>(<span class="ident">txn_types</span>::<span class="ident">Lock</span>::<span class="ident">new</span>(
+                        <span class="ident">LockType</span>::<span class="ident">Put</span>,
+                        <span class="string">b&quot;k&quot;</span>.<span class="ident">to_vec</span>(),
+                        <span class="ident">start_ts</span>,
+                        <span class="number">100</span>,
+                        <span class="prelude-val">Some</span>(<span class="string">b&quot;v&quot;</span>.<span class="ident">to_vec</span>()),
+                        <span class="number">0</span>.<span class="ident">into</span>(),
+                        <span class="number">0</span>,
+                        <span class="number">0</span>.<span class="ident">into</span>(),
+                    )),
                 ),
             )
             .<span class="ident">unwrap</span>();
