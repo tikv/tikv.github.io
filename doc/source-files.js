@@ -243,6 +243,7 @@ sourcesIndex["semver"] = {"name":"","files":["lib.rs","version.rs","version_req.
 sourcesIndex["semver_parser"] = {"name":"","files":["common.rs","lib.rs","range.rs","recognize.rs","version.rs"]};
 sourcesIndex["serde"] = {"name":"","dirs":[{"name":"de","files":["from_primitive.rs","ignored_any.rs","impls.rs","mod.rs","utf8.rs","value.rs"]},{"name":"private","files":["de.rs","macros.rs","mod.rs","ser.rs"]},{"name":"ser","files":["impls.rs","impossible.rs","mod.rs"]}],"files":["export.rs","integer128.rs","lib.rs","macros.rs"]};
 sourcesIndex["serde_derive"] = {"name":"","dirs":[{"name":"internals","files":["ast.rs","attr.rs","case.rs","check.rs","ctxt.rs","mod.rs","symbol.rs"]}],"files":["bound.rs","de.rs","dummy.rs","fragment.rs","lib.rs","pretend.rs","ser.rs","try.rs"]};
+sourcesIndex["serde_ignored"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["serde_json"] = {"name":"","dirs":[{"name":"features_check","files":["mod.rs"]},{"name":"io","files":["mod.rs"]},{"name":"value","files":["de.rs","from.rs","index.rs","mod.rs","partial_eq.rs","ser.rs"]}],"files":["de.rs","error.rs","iter.rs","lib.rs","macros.rs","map.rs","number.rs","read.rs","ser.rs"]};
 sourcesIndex["serde_urlencoded"] = {"name":"","dirs":[{"name":"ser","files":["key.rs","mod.rs","pair.rs","part.rs","value.rs"]}],"files":["de.rs","lib.rs"]};
 sourcesIndex["serde_with"] = {"name":"","dirs":[{"name":"duplicate_key_impls","files":["error_on_duplicate.rs","first_value_wins.rs","mod.rs"]}],"files":["flatten_maybe.rs","lib.rs","rust.rs","with_prefix.rs"]};
