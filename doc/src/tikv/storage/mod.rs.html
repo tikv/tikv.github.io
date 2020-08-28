@@ -5477,17 +5477,18 @@
 <span id="5477">5477</span>
 <span id="5478">5478</span>
 <span id="5479">5479</span>
+<span id="5480">5480</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
 <span class="doccomment">//! Interact with persistent storage.</span>
 <span class="doccomment">//!</span>
-<span class="doccomment">//! The [`Storage`](storage::Storage) structure provides raw and transactional APIs on top of</span>
-<span class="doccomment">//! a lower-level [`Engine`](storage::kv::Engine).</span>
+<span class="doccomment">//! The [`Storage`](Storage) structure provides raw and transactional APIs on top of</span>
+<span class="doccomment">//! a lower-level [`Engine`](kv::Engine).</span>
 <span class="doccomment">//!</span>
-<span class="doccomment">//! There are multiple [`Engine`](storage::kv::Engine) implementations, [`RaftKv`](server::raftkv::RaftKv)</span>
-<span class="doccomment">//! is used by the [`Server`](server::Server). The [`BTreeEngine`](storage::kv::BTreeEngine) and</span>
-<span class="doccomment">//! [`RocksEngine`](storage::RocksEngine) are used for testing only.</span>
+<span class="doccomment">//! There are multiple [`Engine`](kv::Engine) implementations, [`RaftKv`](crate::server::raftkv::RaftKv)</span>
+<span class="doccomment">//! is used by the [`Server`](crate::server::Server). The [`BTreeEngine`](kv::BTreeEngine) and</span>
+<span class="doccomment">//! [`RocksEngine`](RocksEngine) are used for testing only.</span>
 
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">config</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">errors</span>;
@@ -5542,21 +5543,22 @@
 <span class="kw">pub</span> <span class="kw">type</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">std</span>::<span class="ident">result</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">Error</span><span class="op">&gt;</span>;
 <span class="kw">pub</span> <span class="kw">type</span> <span class="ident">Callback</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">FnOnce</span>(<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>) <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span>;
 
-<span class="doccomment">/// [`Storage`] implements transactional KV APIs and raw KV APIs on a given [`Engine`]. An [`Engine`]</span>
-<span class="doccomment">/// provides low level KV functionality. [`Engine`] has multiple implementations. When a TiKV server</span>
-<span class="doccomment">/// is running, a [`RaftKv`] will be the underlying [`Engine`] of [`Storage`]. The other two types of</span>
-<span class="doccomment">/// engines are for test purpose.</span>
+<span class="doccomment">/// [`Storage`](Storage) implements transactional KV APIs and raw KV APIs on a given [`Engine`].</span>
+<span class="doccomment">/// An [`Engine`] provides low level KV functionality. [`Engine`] has multiple implementations.</span>
+<span class="doccomment">/// When a TiKV server is running, a [`RaftKv`](crate::server::raftkv::RaftKv) will be the</span>
+<span class="doccomment">/// underlying [`Engine`] of [`Storage`]. The other two types of engines are for test purpose.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">///[`Storage`] is reference counted and cloning [`Storage`] will just increase the reference counter.</span>
 <span class="doccomment">/// Storage resources (i.e. threads, engine) will be released when all references are dropped.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Notice that read and write methods may not be performed over full data in most cases, i.e. when</span>
-<span class="doccomment">/// underlying engine is [`RaftKv`], which limits data access in the range of a single region</span>
+<span class="doccomment">/// underlying engine is [`RaftKv`](crate::server::raftkv::RaftKv),</span>
+<span class="doccomment">/// which limits data access in the range of a single region</span>
 <span class="doccomment">/// according to specified `ctx` parameter. However,</span>
-<span class="doccomment">/// [`unsafe_destroy_range`](Storage::unsafe_destroy_range) is the only exception. It&#39;s</span>
-<span class="doccomment">/// always performed on the whole TiKV.</span>
+<span class="doccomment">/// [`unsafe_destroy_range`](crate::server::gc_worker::GcTask::UnsafeDestroyRange) is the only exception.</span>
+<span class="doccomment">/// It&#39;s always performed on the whole TiKV.</span>
 <span class="doccomment">///</span>
-<span class="doccomment">/// Operations of [`Storage`] can be divided into two types: MVCC operations and raw operations.</span>
+<span class="doccomment">/// Operations of [`Storage`](Storage) can be divided into two types: MVCC operations and raw operations.</span>
 <span class="doccomment">/// MVCC operations uses MVCC keys, which usually consist of several physical keys in different</span>
 <span class="doccomment">/// CFs. In default CF and write CF, the key will be memcomparable-encoded and append the timestamp</span>
 <span class="doccomment">/// to it, so that multiple versions can be saved at the same time.</span>
@@ -6173,7 +6175,7 @@
     <span class="doccomment">/// This means that deleted keys will not be retrievable by specifying an older timestamp.</span>
     <span class="doccomment">/// If `notify_only` is set, the data will not be immediately deleted, but the operation will</span>
     <span class="doccomment">/// still be replicated via Raft. This is used to notify that the data will be deleted by</span>
-    <span class="doccomment">/// `unsafe_destroy_range` soon.</span>
+    <span class="doccomment">/// [`unsafe_destroy_range`](crate::server::gc_worker::GcTask::UnsafeDestroyRange) soon.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">delete_range</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">ctx</span>: <span class="ident">Context</span>,
