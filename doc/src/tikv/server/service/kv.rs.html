@@ -1797,6 +1797,10 @@
 <span id="1797">1797</span>
 <span id="1798">1798</span>
 <span id="1799">1799</span>
+<span id="1800">1800</span>
+<span id="1801">1801</span>
+<span id="1802">1802</span>
+<span id="1803">1803</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2017 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1825,9 +1829,10 @@
 <span class="kw">use</span> <span class="ident">futures</span>::{<span class="ident">future</span>, <span class="ident">Async</span>, <span class="ident">Future</span>, <span class="ident">Sink</span>, <span class="ident">Stream</span>};
 <span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">compat</span>::{<span class="ident">Compat</span>, <span class="ident">Future01CompatExt</span>};
 <span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">future</span>::{<span class="self">self</span> <span class="kw">as</span> <span class="ident">future03</span>, <span class="ident">Future</span> <span class="kw">as</span> <span class="ident">Future03</span>, <span class="ident">FutureExt</span>, <span class="ident">TryFutureExt</span>};
+<span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">stream</span>::{<span class="ident">StreamExt</span>, <span class="ident">TryStreamExt</span>};
 <span class="kw">use</span> <span class="ident">grpcio</span>::{
-    <span class="ident">ClientStreamingSink</span>, <span class="ident">DuplexSink</span>, <span class="ident">Error</span> <span class="kw">as</span> <span class="ident">GrpcError</span>, <span class="ident">RequestStream</span>, <span class="ident">RpcContext</span>, <span class="ident">RpcStatus</span>,
-    <span class="ident">RpcStatusCode</span>, <span class="ident">ServerStreamingSink</span>, <span class="ident">UnarySink</span>, <span class="ident">WriteFlags</span>,
+    <span class="ident">ClientStreamingSink</span>, <span class="ident">DuplexSink</span>, <span class="ident">Error</span> <span class="kw">as</span> <span class="ident">GrpcError</span>, <span class="ident">RequestStream</span>, <span class="prelude-ty">Result</span> <span class="kw">as</span> <span class="ident">GrpcResult</span>,
+    <span class="ident">RpcContext</span>, <span class="ident">RpcStatus</span>, <span class="ident">RpcStatusCode</span>, <span class="ident">ServerStreamingSink</span>, <span class="ident">UnarySink</span>, <span class="ident">WriteFlags</span>,
 };
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">coprocessor</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">kvrpcpb</span>::<span class="kw-2">*</span>;
@@ -2686,19 +2691,22 @@
             .<span class="ident">inspect</span>(<span class="op">|</span><span class="ident">r</span><span class="op">|</span> <span class="ident">GRPC_RESP_BATCH_COMMANDS_SIZE</span>.<span class="ident">observe</span>(<span class="ident">r</span>.<span class="ident">request_ids</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">f64</span>))
             .<span class="ident">map</span>(<span class="kw">move</span> <span class="op">|</span><span class="kw-2">mut</span> <span class="ident">r</span><span class="op">|</span> {
                 <span class="ident">r</span>.<span class="ident">set_transport_layer_load</span>(<span class="ident">thread_load</span>.<span class="ident">load</span>() <span class="kw">as</span> <span class="ident">u64</span>);
-                (<span class="ident">r</span>, <span class="ident">WriteFlags</span>::<span class="ident">default</span>().<span class="ident">buffer_hint</span>(<span class="bool-val">false</span>))
-            })
-            .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
-                <span class="kw">let</span> <span class="ident">msg</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;{:?}&quot;</span>, <span class="ident">e</span>));
-                <span class="ident">GrpcError</span>::<span class="ident">RpcFailure</span>(<span class="ident">RpcStatus</span>::<span class="ident">new</span>(<span class="ident">RpcStatusCode</span>::<span class="ident">UNKNOWN</span>, <span class="ident">msg</span>))
+                <span class="ident">GrpcResult</span>::<span class="op">&lt;</span>(<span class="ident">BatchCommandsResponse</span>, <span class="ident">WriteFlags</span>)<span class="op">&gt;</span>::<span class="prelude-val">Ok</span>((
+                    <span class="ident">r</span>,
+                    <span class="ident">WriteFlags</span>::<span class="ident">default</span>().<span class="ident">buffer_hint</span>(<span class="bool-val">false</span>),
+                ))
             });
 
-        <span class="ident">ctx</span>.<span class="ident">spawn</span>(<span class="ident">sink</span>.<span class="ident">send_all</span>(<span class="ident">response_retriever</span>).<span class="ident">map</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> ()).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
-            <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;kv rpc failed&quot;</span>;
-                <span class="string">&quot;request&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;batch_commands&quot;</span>,
-                <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>
-            );
-        }));
+        <span class="ident">ctx</span>.<span class="ident">spawn</span>(
+            <span class="ident">sink</span>.<span class="ident">send_all</span>(<span class="ident">response_retriever</span>.<span class="ident">compat</span>())
+                .<span class="ident">map</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> ())
+                .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
+                    <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;kv rpc failed&quot;</span>;
+                        <span class="string">&quot;request&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;batch_commands&quot;</span>,
+                        <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>
+                    );
+                }),
+        );
     }
 
     <span class="kw">fn</span> <span class="ident">ver_get</span>(

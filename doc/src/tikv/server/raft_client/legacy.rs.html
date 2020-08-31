@@ -287,6 +287,11 @@
 <span id="287">287</span>
 <span id="288">288</span>
 <span id="289">289</span>
+<span id="290">290</span>
+<span id="291">291</span>
+<span id="292">292</span>
+<span id="293">293</span>
+<span id="294">294</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2017 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -302,6 +307,8 @@
 <span class="kw">use</span> <span class="ident">crossbeam</span>::<span class="ident">channel</span>::<span class="ident">SendError</span>;
 <span class="kw">use</span> <span class="ident">engine_rocks</span>::<span class="ident">RocksEngine</span>;
 <span class="kw">use</span> <span class="ident">futures</span>::{<span class="ident">future</span>, <span class="ident">stream</span>, <span class="ident">Future</span>, <span class="ident">Poll</span>, <span class="ident">Sink</span>, <span class="ident">Stream</span>};
+<span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">compat</span>::<span class="ident">Compat</span>;
+<span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">stream</span>::<span class="ident">StreamExt</span>;
 <span class="kw">use</span> <span class="ident">grpcio</span>::{<span class="ident">ChannelBuilder</span>, <span class="ident">Environment</span>, <span class="ident">Error</span> <span class="kw">as</span> <span class="ident">GrpcError</span>, <span class="ident">WriteFlags</span>};
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">raft_serverpb</span>::<span class="ident">RaftMessage</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">tikvpb</span>::{<span class="ident">BatchRaftMessage</span>, <span class="ident">TikvClient</span>};
@@ -352,11 +359,14 @@
         <span class="kw">let</span> <span class="ident">client2</span> <span class="op">=</span> <span class="ident">client1</span>.<span class="ident">clone</span>();
 
         <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">batch</span>::<span class="ident">unbounded</span>::<span class="op">&lt;</span><span class="ident">RaftMessage</span><span class="op">&gt;</span>(<span class="ident">RAFT_MSG_NOTIFY_SIZE</span>);
-        <span class="kw">let</span> <span class="ident">rx</span> <span class="op">=</span> <span class="ident">batch</span>::<span class="ident">BatchReceiver</span>::<span class="ident">new</span>(
-            <span class="ident">rx</span>,
-            <span class="ident">RAFT_MSG_MAX_BATCH_SIZE</span>,
-            <span class="ident">Vec</span>::<span class="ident">new</span>,
-            <span class="ident">RaftMsgCollector</span>::<span class="ident">new</span>(<span class="ident">cfg</span>.<span class="ident">max_grpc_send_msg_len</span> <span class="kw">as</span> <span class="ident">usize</span>),
+        <span class="kw">let</span> <span class="ident">rx</span> <span class="op">=</span> <span class="ident">Compat</span>::<span class="ident">new</span>(
+            <span class="ident">batch</span>::<span class="ident">BatchReceiver</span>::<span class="ident">new</span>(
+                <span class="ident">rx</span>,
+                <span class="ident">RAFT_MSG_MAX_BATCH_SIZE</span>,
+                <span class="ident">Vec</span>::<span class="ident">new</span>,
+                <span class="ident">RaftMsgCollector</span>::<span class="ident">new</span>(<span class="ident">cfg</span>.<span class="ident">max_grpc_send_msg_len</span> <span class="kw">as</span> <span class="ident">usize</span>),
+            )
+            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">item</span><span class="op">|</span> <span class="ident">std</span>::<span class="ident">result</span>::<span class="prelude-ty">Result</span>::<span class="op">&lt;</span><span class="kw">_</span>, ()<span class="op">&gt;</span>::<span class="prelude-val">Ok</span>(<span class="ident">item</span>)),
         );
 
         <span class="comment">// Use a mutex to make compiler happy.</span>
