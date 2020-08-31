@@ -2444,6 +2444,13 @@
 <span id="2444">2444</span>
 <span id="2445">2445</span>
 <span id="2446">2446</span>
+<span id="2447">2447</span>
+<span id="2448">2448</span>
+<span id="2449">2449</span>
+<span id="2450">2450</span>
+<span id="2451">2451</span>
+<span id="2452">2452</span>
+<span id="2453">2453</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -3594,7 +3601,7 @@
             <span class="ident">consistency_check_worker</span>: <span class="ident">Worker</span>::<span class="ident">new</span>(<span class="string">&quot;consistency-check&quot;</span>),
             <span class="ident">cleanup_worker</span>: <span class="ident">Worker</span>::<span class="ident">new</span>(<span class="string">&quot;cleanup-worker&quot;</span>),
             <span class="ident">raftlog_gc_worker</span>: <span class="ident">Worker</span>::<span class="ident">new</span>(<span class="string">&quot;raft-gc-worker&quot;</span>),
-            <span class="ident">coprocessor_host</span>,
+            <span class="ident">coprocessor_host</span>: <span class="ident">coprocessor_host</span>.<span class="ident">clone</span>(),
             <span class="ident">future_poller</span>: <span class="ident">tokio_threadpool</span>::<span class="ident">Builder</span>::<span class="ident">new</span>()
                 .<span class="ident">name_prefix</span>(<span class="string">&quot;future-poller&quot;</span>)
                 .<span class="ident">pool_size</span>(<span class="ident">cfg</span>.<span class="ident">value</span>().<span class="ident">future_poll_size</span>)
@@ -3614,7 +3621,7 @@
             <span class="ident">apply_router</span>: <span class="self">self</span>.<span class="ident">apply_router</span>.<span class="ident">clone</span>(),
             <span class="ident">trans</span>,
             <span class="ident">pd_client</span>,
-            <span class="ident">coprocessor_host</span>: <span class="ident">workers</span>.<span class="ident">coprocessor_host</span>.<span class="ident">clone</span>(),
+            <span class="ident">coprocessor_host</span>: <span class="ident">coprocessor_host</span>.<span class="ident">clone</span>(),
             <span class="ident">importer</span>,
             <span class="ident">snap_mgr</span>: <span class="ident">mgr</span>,
             <span class="ident">global_replication_state</span>,
@@ -3632,6 +3639,7 @@
                 <span class="ident">region_peers</span>,
                 <span class="ident">builder</span>,
                 <span class="ident">auto_split_controller</span>,
+                <span class="ident">coprocessor_host</span>,
                 <span class="ident">concurrency_manager</span>,
             )<span class="question-mark">?</span>;
         } <span class="kw">else</span> {
@@ -3640,6 +3648,7 @@
                 <span class="ident">region_peers</span>,
                 <span class="ident">builder</span>,
                 <span class="ident">auto_split_controller</span>,
+                <span class="ident">coprocessor_host</span>,
                 <span class="ident">concurrency_manager</span>,
             )<span class="question-mark">?</span>;
         }
@@ -3652,6 +3661,7 @@
         <span class="ident">region_peers</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SenderFsmPair</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">builder</span>: <span class="ident">RaftPollerBuilder</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">T</span>, <span class="ident">C</span><span class="op">&gt;</span>,
         <span class="ident">auto_split_controller</span>: <span class="ident">AutoSplitController</span>,
+        <span class="ident">coprocessor_host</span>: <span class="ident">CoprocessorHost</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>,
         <span class="ident">concurrency_manager</span>: <span class="ident">ConcurrencyManager</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="ident">builder</span>.<span class="ident">snap_mgr</span>.<span class="ident">init</span>()<span class="question-mark">?</span>;
@@ -3747,7 +3757,8 @@
         );
         <span class="macro">box_try</span><span class="macro">!</span>(<span class="ident">workers</span>.<span class="ident">pd_worker</span>.<span class="ident">start</span>(<span class="ident">pd_runner</span>));
 
-        <span class="kw">let</span> <span class="ident">consistency_check_runner</span> <span class="op">=</span> <span class="ident">ConsistencyCheckRunner</span>::<span class="op">&lt;</span><span class="ident">EK</span>, <span class="kw">_</span><span class="op">&gt;</span>::<span class="ident">new</span>(<span class="self">self</span>.<span class="ident">router</span>.<span class="ident">clone</span>());
+        <span class="kw">let</span> <span class="ident">consistency_check_runner</span> <span class="op">=</span>
+            <span class="ident">ConsistencyCheckRunner</span>::<span class="op">&lt;</span><span class="ident">EK</span>, <span class="kw">_</span><span class="op">&gt;</span>::<span class="ident">new</span>(<span class="self">self</span>.<span class="ident">router</span>.<span class="ident">clone</span>(), <span class="ident">coprocessor_host</span>);
         <span class="macro">box_try</span><span class="macro">!</span>(<span class="ident">workers</span>
             .<span class="ident">consistency_check_worker</span>
             .<span class="ident">start</span>(<span class="ident">consistency_check_runner</span>));
@@ -4701,6 +4712,9 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">request</span> <span class="op">=</span> <span class="ident">new_admin_request</span>(<span class="ident">target_region_id</span>, <span class="ident">target_peer</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">admin</span> <span class="op">=</span> <span class="ident">AdminRequest</span>::<span class="ident">default</span>();
         <span class="ident">admin</span>.<span class="ident">set_cmd_type</span>(<span class="ident">AdminCmdType</span>::<span class="ident">ComputeHash</span>);
+        <span class="self">self</span>.<span class="ident">ctx</span>
+            .<span class="ident">coprocessor_host</span>
+            .<span class="ident">on_prepropose_compute_hash</span>(<span class="ident">admin</span>.<span class="ident">mut_compute_hash</span>());
         <span class="ident">request</span>.<span class="ident">set_admin_request</span>(<span class="ident">admin</span>);
 
         <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">router</span>.<span class="ident">send</span>(

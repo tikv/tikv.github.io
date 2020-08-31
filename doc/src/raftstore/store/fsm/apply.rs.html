@@ -4961,6 +4961,14 @@
 <span id="4961">4961</span>
 <span id="4962">4962</span>
 <span id="4963">4963</span>
+<span id="4964">4964</span>
+<span id="4965">4965</span>
+<span id="4966">4966</span>
+<span id="4967">4967</span>
+<span id="4968">4968</span>
+<span id="4969">4969</span>
+<span id="4970">4970</span>
+<span id="4971">4971</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2017 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -5187,10 +5195,12 @@
     <span class="ident">ComputeHash</span> {
         <span class="ident">region</span>: <span class="ident">Region</span>,
         <span class="ident">index</span>: <span class="ident">u64</span>,
+        <span class="ident">context</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
         <span class="ident">snap</span>: <span class="ident">S</span>,
     },
     <span class="ident">VerifyHash</span> {
         <span class="ident">index</span>: <span class="ident">u64</span>,
+        <span class="ident">context</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
         <span class="ident">hash</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
     },
     <span class="ident">DeleteRange</span> {
@@ -7233,7 +7243,7 @@
     <span class="kw">fn</span> <span class="ident">exec_compute_hash</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">WriteBatch</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="ident">ApplyContext</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">W</span><span class="op">&gt;</span>,
-        <span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="ident">AdminRequest</span>,
+        <span class="ident">req</span>: <span class="kw-2">&amp;</span><span class="ident">AdminRequest</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">AdminResponse</span>, <span class="ident">ApplyResult</span><span class="op">&lt;</span><span class="ident">EK</span>::<span class="ident">Snapshot</span><span class="op">&gt;</span>)<span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">AdminResponse</span>::<span class="ident">default</span>();
         <span class="prelude-val">Ok</span>((
@@ -7241,6 +7251,7 @@
             <span class="ident">ApplyResult</span>::<span class="ident">Res</span>(<span class="ident">ExecResult</span>::<span class="ident">ComputeHash</span> {
                 <span class="ident">region</span>: <span class="self">self</span>.<span class="ident">region</span>.<span class="ident">clone</span>(),
                 <span class="ident">index</span>: <span class="ident">ctx</span>.<span class="ident">exec_ctx</span>.<span class="ident">as_ref</span>().<span class="ident">unwrap</span>().<span class="ident">index</span>,
+                <span class="ident">context</span>: <span class="ident">req</span>.<span class="ident">get_compute_hash</span>().<span class="ident">get_context</span>().<span class="ident">to_vec</span>(),
                 <span class="comment">// This snapshot may be held for a long time, which may cause too many</span>
                 <span class="comment">// open files in rocksdb.</span>
                 <span class="comment">// TODO: figure out another way to do consistency check without snapshot</span>
@@ -7257,11 +7268,16 @@
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">AdminResponse</span>, <span class="ident">ApplyResult</span><span class="op">&lt;</span><span class="ident">EK</span>::<span class="ident">Snapshot</span><span class="op">&gt;</span>)<span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">verify_req</span> <span class="op">=</span> <span class="ident">req</span>.<span class="ident">get_verify_hash</span>();
         <span class="kw">let</span> <span class="ident">index</span> <span class="op">=</span> <span class="ident">verify_req</span>.<span class="ident">get_index</span>();
+        <span class="kw">let</span> <span class="ident">context</span> <span class="op">=</span> <span class="ident">verify_req</span>.<span class="ident">get_context</span>().<span class="ident">to_vec</span>();
         <span class="kw">let</span> <span class="ident">hash</span> <span class="op">=</span> <span class="ident">verify_req</span>.<span class="ident">get_hash</span>().<span class="ident">to_vec</span>();
         <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">AdminResponse</span>::<span class="ident">default</span>();
         <span class="prelude-val">Ok</span>((
             <span class="ident">resp</span>,
-            <span class="ident">ApplyResult</span>::<span class="ident">Res</span>(<span class="ident">ExecResult</span>::<span class="ident">VerifyHash</span> { <span class="ident">index</span>, <span class="ident">hash</span> }),
+            <span class="ident">ApplyResult</span>::<span class="ident">Res</span>(<span class="ident">ExecResult</span>::<span class="ident">VerifyHash</span> {
+                <span class="ident">index</span>,
+                <span class="ident">context</span>,
+                <span class="ident">hash</span>,
+            }),
         ))
     }
 }

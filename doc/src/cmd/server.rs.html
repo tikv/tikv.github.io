@@ -999,6 +999,32 @@
 <span id="999"> 999</span>
 <span id="1000">1000</span>
 <span id="1001">1001</span>
+<span id="1002">1002</span>
+<span id="1003">1003</span>
+<span id="1004">1004</span>
+<span id="1005">1005</span>
+<span id="1006">1006</span>
+<span id="1007">1007</span>
+<span id="1008">1008</span>
+<span id="1009">1009</span>
+<span id="1010">1010</span>
+<span id="1011">1011</span>
+<span id="1012">1012</span>
+<span id="1013">1013</span>
+<span id="1014">1014</span>
+<span id="1015">1015</span>
+<span id="1016">1016</span>
+<span id="1017">1017</span>
+<span id="1018">1018</span>
+<span id="1019">1019</span>
+<span id="1020">1020</span>
+<span id="1021">1021</span>
+<span id="1022">1022</span>
+<span id="1023">1023</span>
+<span id="1024">1024</span>
+<span id="1025">1025</span>
+<span id="1026">1026</span>
+<span id="1027">1027</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! This module startups all the components of a TiKV server.</span>
 <span class="doccomment">//!</span>
@@ -1025,7 +1051,10 @@
 };
 <span class="kw">use</span> <span class="ident">pd_client</span>::{<span class="ident">PdClient</span>, <span class="ident">RpcClient</span>};
 <span class="kw">use</span> <span class="ident">raftstore</span>::{
-    <span class="ident">coprocessor</span>::{<span class="ident">config</span>::<span class="ident">SplitCheckConfigManager</span>, <span class="ident">CoprocessorHost</span>, <span class="ident">RegionInfoAccessor</span>},
+    <span class="ident">coprocessor</span>::{
+        <span class="ident">config</span>::<span class="ident">SplitCheckConfigManager</span>, <span class="ident">BoxConsistencyCheckObserver</span>, <span class="ident">ConsistencyCheckMethod</span>,
+        <span class="ident">CoprocessorHost</span>, <span class="ident">RawConsistencyCheckObserver</span>, <span class="ident">RegionInfoAccessor</span>,
+    },
     <span class="ident">router</span>::<span class="ident">ServerRaftStoreRouter</span>,
     <span class="ident">store</span>::{
         <span class="ident">config</span>::<span class="ident">RaftstoreConfigManager</span>,
@@ -1173,6 +1202,29 @@
                 .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">fatal</span><span class="macro">!</span>(<span class="string">&quot;failed to start address resolver: {}&quot;</span>, <span class="ident">e</span>));
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">coprocessor_host</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">CoprocessorHost</span>::<span class="ident">new</span>(<span class="ident">router</span>.<span class="ident">clone</span>()));
+        <span class="kw">match</span> <span class="ident">config</span>.<span class="ident">coprocessor</span>.<span class="ident">consistency_check_method</span> {
+            <span class="ident">ConsistencyCheckMethod</span>::<span class="ident">Mvcc</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="comment">// TODO: use mvcc consistency checker.</span>
+                <span class="ident">coprocessor_host</span>
+                    .<span class="ident">as_mut</span>()
+                    .<span class="ident">unwrap</span>()
+                    .<span class="ident">registry</span>
+                    .<span class="ident">register_consistency_check_observer</span>(
+                        <span class="number">100</span>,
+                        <span class="ident">BoxConsistencyCheckObserver</span>::<span class="ident">new</span>(<span class="ident">RawConsistencyCheckObserver</span>::<span class="ident">default</span>()),
+                    );
+            }
+            <span class="ident">ConsistencyCheckMethod</span>::<span class="ident">Raw</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="ident">coprocessor_host</span>
+                    .<span class="ident">as_mut</span>()
+                    .<span class="ident">unwrap</span>()
+                    .<span class="ident">registry</span>
+                    .<span class="ident">register_consistency_check_observer</span>(
+                        <span class="number">100</span>,
+                        <span class="ident">BoxConsistencyCheckObserver</span>::<span class="ident">new</span>(<span class="ident">RawConsistencyCheckObserver</span>::<span class="ident">default</span>()),
+                    );
+            }
+        }
         <span class="kw">let</span> <span class="ident">region_info_accessor</span> <span class="op">=</span> <span class="ident">RegionInfoAccessor</span>::<span class="ident">new</span>(<span class="ident">coprocessor_host</span>.<span class="ident">as_mut</span>().<span class="ident">unwrap</span>());
         <span class="ident">region_info_accessor</span>.<span class="ident">start</span>();
 
