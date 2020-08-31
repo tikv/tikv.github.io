@@ -1365,12 +1365,22 @@
 <span id="1365">1365</span>
 <span id="1366">1366</span>
 <span id="1367">1367</span>
+<span id="1368">1368</span>
+<span id="1369">1369</span>
+<span id="1370">1370</span>
+<span id="1371">1371</span>
+<span id="1372">1372</span>
+<span id="1373">1373</span>
+<span id="1374">1374</span>
+<span id="1375">1375</span>
+<span id="1376">1376</span>
+<span id="1377">1377</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">collections</span>::<span class="ident">BTreeMap</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">collections</span>::<span class="ident">Bound</span>::{<span class="ident">Excluded</span>, <span class="ident">Unbounded</span>};
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::{<span class="ident">AtomicBool</span>, <span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>};
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::{<span class="ident">AtomicBool</span>, <span class="ident">AtomicU64</span>, <span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::{<span class="ident">Arc</span>, <span class="ident">RwLock</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">time</span>::{<span class="ident">Duration</span>, <span class="ident">Instant</span>};
 <span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">cmp</span>, <span class="ident">thread</span>};
@@ -2100,7 +2110,7 @@
     <span class="ident">cluster</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">Cluster</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">timer</span>: <span class="ident">Handle</span>,
     <span class="ident">is_incompatible</span>: <span class="ident">bool</span>,
-    <span class="ident">tso</span>: <span class="ident">AtomicUsize</span>,
+    <span class="ident">tso</span>: <span class="ident">AtomicU64</span>,
     <span class="ident">trigger_tso_failure</span>: <span class="ident">AtomicBool</span>,
 }
 
@@ -2111,7 +2121,7 @@
             <span class="ident">cluster</span>: <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">RwLock</span>::<span class="ident">new</span>(<span class="ident">Cluster</span>::<span class="ident">new</span>(<span class="ident">cluster_id</span>))),
             <span class="ident">timer</span>: <span class="ident">GLOBAL_TIMER_HANDLE</span>.<span class="ident">clone</span>(),
             <span class="ident">is_incompatible</span>,
-            <span class="ident">tso</span>: <span class="ident">AtomicUsize</span>::<span class="ident">new</span>(<span class="number">1</span>),
+            <span class="ident">tso</span>: <span class="ident">AtomicU64</span>::<span class="ident">new</span>(<span class="number">1</span>),
             <span class="ident">trigger_tso_failure</span>: <span class="ident">AtomicBool</span>::<span class="ident">new</span>(<span class="bool-val">false</span>),
         }
     }
@@ -2453,6 +2463,16 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">ignore_merge_target_integrity</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="self">self</span>.<span class="ident">cluster</span>.<span class="ident">wl</span>().<span class="ident">check_merge_target_integrity</span> <span class="op">=</span> <span class="bool-val">false</span>;
     }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_tso</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ts</span>: <span class="ident">TimeStamp</span>) {
+        <span class="kw">let</span> <span class="ident">old</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">tso</span>.<span class="ident">swap</span>(<span class="ident">ts</span>.<span class="ident">into_inner</span>(), <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
+        <span class="kw">if</span> <span class="ident">old</span> <span class="op">&gt;</span> <span class="ident">ts</span>.<span class="ident">into_inner</span>() {
+            <span class="macro">panic</span><span class="macro">!</span>(
+                <span class="string">&quot;cannot decrease tso. current tso: {}; trying to set to: {}&quot;</span>,
+                <span class="ident">old</span>, <span class="ident">ts</span>
+            );
+        }
+    }
 }
 
 <span class="kw">impl</span> <span class="ident">PdClient</span> <span class="kw">for</span> <span class="ident">TestPdClient</span> {
@@ -2730,7 +2750,7 @@
             )));
         }
         <span class="kw">let</span> <span class="ident">tso</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">tso</span>.<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
-        <span class="ident">Box</span>::<span class="ident">pin</span>(<span class="ident">ok</span>(<span class="ident">TimeStamp</span>::<span class="ident">new</span>(<span class="ident">tso</span> <span class="kw">as</span> <span class="kw">_</span>)))
+        <span class="ident">Box</span>::<span class="ident">pin</span>(<span class="ident">ok</span>(<span class="ident">TimeStamp</span>::<span class="ident">new</span>(<span class="ident">tso</span>)))
     }
 }
 </pre></div>
