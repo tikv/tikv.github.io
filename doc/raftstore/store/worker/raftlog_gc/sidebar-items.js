@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["Error",""]],"struct":[["Runner",""],["Task",""],["TaskRes",""]]});
+initSidebarItems({"enum":[["Error",""],["Task",""]],"struct":[["Runner",""]]});
