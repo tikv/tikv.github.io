@@ -1236,6 +1236,16 @@
 <span id="1236">1236</span>
 <span id="1237">1237</span>
 <span id="1238">1238</span>
+<span id="1239">1239</span>
+<span id="1240">1240</span>
+<span id="1241">1241</span>
+<span id="1242">1242</span>
+<span id="1243">1243</span>
+<span id="1244">1244</span>
+<span id="1245">1245</span>
+<span id="1246">1246</span>
+<span id="1247">1247</span>
+<span id="1248">1248</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1248,8 +1258,8 @@
 <span class="kw">use</span> <span class="ident">concurrency_manager</span>::<span class="ident">ConcurrencyManager</span>;
 <span class="kw">use</span> <span class="ident">crossbeam</span>::<span class="ident">atomic</span>::<span class="ident">AtomicCell</span>;
 <span class="kw">use</span> <span class="ident">engine_rocks</span>::{<span class="ident">RocksEngine</span>, <span class="ident">RocksSnapshot</span>};
-<span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">future</span>::<span class="ident">Future</span>;
-<span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">compat</span>::<span class="ident">Compat</span>;
+<span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">compat</span>::<span class="ident">Future01CompatExt</span>;
+<span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">future</span>::<span class="ident">TryFutureExt</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">cdcpb</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">kvrpcpb</span>::<span class="ident">ExtraOp</span> <span class="kw">as</span> <span class="ident">TxnExtraOp</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">metapb</span>::<span class="ident">Region</span>;
@@ -1268,7 +1278,7 @@
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">time</span>::<span class="ident">Instant</span>;
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">timer</span>::{<span class="ident">SteadyTimer</span>, <span class="ident">Timer</span>};
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">worker</span>::{<span class="ident">Runnable</span>, <span class="ident">RunnableWithTimer</span>, <span class="ident">ScheduleError</span>, <span class="ident">Scheduler</span>};
-<span class="kw">use</span> <span class="ident">tokio_threadpool</span>::{<span class="ident">Builder</span>, <span class="ident">ThreadPool</span>};
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">runtime</span>::{<span class="ident">Builder</span>, <span class="ident">Runtime</span>};
 <span class="kw">use</span> <span class="ident">txn_types</span>::{<span class="ident">Key</span>, <span class="ident">Lock</span>, <span class="ident">LockType</span>, <span class="ident">TimeStamp</span>};
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">delegate</span>::{<span class="ident">Delegate</span>, <span class="ident">Downstream</span>, <span class="ident">DownstreamID</span>, <span class="ident">DownstreamState</span>};
@@ -1459,13 +1469,13 @@
     <span class="ident">timer</span>: <span class="ident">SteadyTimer</span>,
     <span class="ident">min_ts_interval</span>: <span class="ident">Duration</span>,
     <span class="ident">scan_batch_size</span>: <span class="ident">usize</span>,
-    <span class="ident">tso_worker</span>: <span class="ident">ThreadPool</span>,
+    <span class="ident">tso_worker</span>: <span class="ident">Runtime</span>,
     <span class="ident">store_meta</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">StoreMeta</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="doccomment">/// The concurrency manager for transactions. It&#39;s needed for CDC to check locks when</span>
     <span class="doccomment">/// calculating resolved_ts.</span>
     <span class="ident">concurrency_manager</span>: <span class="ident">ConcurrencyManager</span>,
 
-    <span class="ident">workers</span>: <span class="ident">ThreadPool</span>,
+    <span class="ident">workers</span>: <span class="ident">Runtime</span>,
 
     <span class="ident">min_resolved_ts</span>: <span class="ident">TimeStamp</span>,
     <span class="ident">min_ts_region_id</span>: <span class="ident">u64</span>,
@@ -1481,8 +1491,18 @@
         <span class="ident">store_meta</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">StoreMeta</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">concurrency_manager</span>: <span class="ident">ConcurrencyManager</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Endpoint</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">workers</span> <span class="op">=</span> <span class="ident">Builder</span>::<span class="ident">new</span>().<span class="ident">name_prefix</span>(<span class="string">&quot;cdcwkr&quot;</span>).<span class="ident">pool_size</span>(<span class="number">4</span>).<span class="ident">build</span>();
-        <span class="kw">let</span> <span class="ident">tso_worker</span> <span class="op">=</span> <span class="ident">Builder</span>::<span class="ident">new</span>().<span class="ident">name_prefix</span>(<span class="string">&quot;tso&quot;</span>).<span class="ident">pool_size</span>(<span class="number">1</span>).<span class="ident">build</span>();
+        <span class="kw">let</span> <span class="ident">workers</span> <span class="op">=</span> <span class="ident">Builder</span>::<span class="ident">new</span>()
+            .<span class="ident">threaded_scheduler</span>()
+            .<span class="ident">thread_name</span>(<span class="string">&quot;cdcwkr&quot;</span>)
+            .<span class="ident">core_threads</span>(<span class="number">4</span>)
+            .<span class="ident">build</span>()
+            .<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">tso_worker</span> <span class="op">=</span> <span class="ident">Builder</span>::<span class="ident">new</span>()
+            .<span class="ident">threaded_scheduler</span>()
+            .<span class="ident">thread_name</span>(<span class="string">&quot;tso&quot;</span>)
+            .<span class="ident">core_threads</span>(<span class="number">1</span>)
+            .<span class="ident">build</span>()
+            .<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">ep</span> <span class="op">=</span> <span class="ident">Endpoint</span> {
             <span class="ident">capture_regions</span>: <span class="ident">HashMap</span>::<span class="ident">default</span>(),
             <span class="ident">connections</span>: <span class="ident">HashMap</span>::<span class="ident">default</span>(),
@@ -1747,13 +1767,12 @@
             <span class="ident">deregister_downstream</span>(<span class="ident">Error</span>::<span class="ident">Request</span>(<span class="ident">e</span>.<span class="ident">into</span>()));
             <span class="kw">return</span>;
         }
-        <span class="self">self</span>.<span class="ident">workers</span>.<span class="ident">spawn</span>(<span class="ident">Compat</span>::<span class="ident">new</span>(<span class="ident">fut</span>).<span class="ident">then</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">res</span><span class="op">|</span> {
-            <span class="kw">match</span> <span class="ident">res</span> {
+        <span class="self">self</span>.<span class="ident">workers</span>.<span class="ident">spawn</span>(<span class="kw">async</span> <span class="kw">move</span> {
+            <span class="kw">match</span> <span class="ident">fut</span>.<span class="kw">await</span> {
                 <span class="prelude-val">Ok</span>(<span class="ident">resp</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">init</span>.<span class="ident">on_change_cmd</span>(<span class="ident">resp</span>),
                 <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">deregister_downstream</span>(<span class="ident">Error</span>::<span class="ident">Other</span>(<span class="macro">box_err</span><span class="macro">!</span>(<span class="ident">e</span>))),
-            };
-            <span class="prelude-val">Ok</span>(())
-        }));
+            }
+        });
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">on_multi_batch</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">multi</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">CmdBatch</span><span class="op">&gt;</span>, <span class="ident">old_value_cb</span>: <span class="ident">OldValueCallback</span>) {
@@ -1831,7 +1850,7 @@
 
     <span class="kw">fn</span> <span class="ident">register_min_ts_event</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="kw">let</span> <span class="ident">timeout</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">timer</span>.<span class="ident">delay</span>(<span class="self">self</span>.<span class="ident">min_ts_interval</span>);
-        <span class="kw">let</span> <span class="ident">tso</span> <span class="op">=</span> <span class="ident">Compat</span>::<span class="ident">new</span>(<span class="self">self</span>.<span class="ident">pd_client</span>.<span class="ident">get_tso</span>());
+        <span class="kw">let</span> <span class="ident">tso</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pd_client</span>.<span class="ident">get_tso</span>();
         <span class="kw">let</span> <span class="ident">scheduler</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">scheduler</span>.<span class="ident">clone</span>();
         <span class="kw">let</span> <span class="ident">raft_router</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">raft_router</span>.<span class="ident">clone</span>();
         <span class="kw">let</span> <span class="ident">regions</span>: <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">u64</span>, <span class="ident">ObserveID</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="self">self</span>
@@ -1840,67 +1859,66 @@
             .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">region_id</span>, <span class="ident">delegate</span>)<span class="op">|</span> (<span class="kw-2">*</span><span class="ident">region_id</span>, <span class="ident">delegate</span>.<span class="ident">id</span>))
             .<span class="ident">collect</span>();
         <span class="kw">let</span> <span class="ident">cm</span>: <span class="ident">ConcurrencyManager</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">concurrency_manager</span>.<span class="ident">clone</span>();
-        <span class="kw">let</span> <span class="ident">fut</span> <span class="op">=</span> <span class="ident">tso</span>.<span class="ident">join</span>(<span class="ident">timeout</span>.<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="macro">unreachable</span><span class="macro">!</span>())).<span class="ident">then</span>(
-            <span class="kw">move</span> <span class="op">|</span><span class="ident">tso</span>: <span class="ident">pd_client</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">TimeStamp</span>, ())<span class="op">&gt;</span><span class="op">|</span> {
-                <span class="comment">// Ignore get tso errors since we will retry every `min_ts_interval`.</span>
-                <span class="kw">let</span> (<span class="kw-2">mut</span> <span class="ident">min_ts</span>, <span class="kw">_</span>) <span class="op">=</span> <span class="ident">tso</span>.<span class="ident">unwrap_or</span>((<span class="ident">TimeStamp</span>::<span class="ident">default</span>(), ()));
+        <span class="kw">let</span> <span class="ident">fut</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
+            <span class="kw">let</span> (<span class="ident">tso</span>, <span class="kw">_</span>) <span class="op">=</span>
+                <span class="ident">futures03</span>::<span class="ident">future</span>::<span class="ident">join</span>(<span class="ident">tso</span>, <span class="ident">timeout</span>.<span class="ident">compat</span>().<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="macro">unreachable</span><span class="macro">!</span>())).<span class="kw">await</span>;
+            <span class="comment">// Ignore get tso errors since we will retry every `min_ts_interval`.</span>
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">min_ts</span> <span class="op">=</span> <span class="ident">tso</span>.<span class="ident">unwrap_or_default</span>();
 
-                <span class="comment">// Sync with concurrency manager so that it can work correctly when optimizations</span>
-                <span class="comment">// like async commit is enabled.</span>
-                <span class="comment">// Note: This step must be done before scheduling `Task::MinTS` task, and the</span>
-                <span class="comment">// resolver must be checked in or after `Task::MinTS`&#39; execution.</span>
-                <span class="ident">cm</span>.<span class="ident">update_max_read_ts</span>(<span class="ident">min_ts</span>);
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">min_mem_lock_ts</span>) <span class="op">=</span> <span class="ident">cm</span>.<span class="ident">global_min_lock_ts</span>() {
-                    <span class="kw">if</span> <span class="ident">min_mem_lock_ts</span> <span class="op">&lt;</span> <span class="ident">min_ts</span> {
-                        <span class="ident">min_ts</span> <span class="op">=</span> <span class="ident">min_mem_lock_ts</span>;
-                    }
+            <span class="comment">// Sync with concurrency manager so that it can work correctly when optimizations</span>
+            <span class="comment">// like async commit is enabled.</span>
+            <span class="comment">// Note: This step must be done before scheduling `Task::MinTS` task, and the</span>
+            <span class="comment">// resolver must be checked in or after `Task::MinTS`&#39; execution.</span>
+            <span class="ident">cm</span>.<span class="ident">update_max_read_ts</span>(<span class="ident">min_ts</span>);
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">min_mem_lock_ts</span>) <span class="op">=</span> <span class="ident">cm</span>.<span class="ident">global_min_lock_ts</span>() {
+                <span class="kw">if</span> <span class="ident">min_mem_lock_ts</span> <span class="op">&lt;</span> <span class="ident">min_ts</span> {
+                    <span class="ident">min_ts</span> <span class="op">=</span> <span class="ident">min_mem_lock_ts</span>;
                 }
+            }
 
-                <span class="comment">// TODO: send a message to raftstore would consume too much cpu time,</span>
-                <span class="comment">// try to handle it outside raftstore.</span>
-                <span class="kw">for</span> (<span class="ident">region_id</span>, <span class="ident">observe_id</span>) <span class="kw">in</span> <span class="ident">regions</span> {
-                    <span class="kw">let</span> <span class="ident">scheduler_clone</span> <span class="op">=</span> <span class="ident">scheduler</span>.<span class="ident">clone</span>();
-                    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">raft_router</span>.<span class="ident">significant_send</span>(
-                        <span class="ident">region_id</span>,
-                        <span class="ident">SignificantMsg</span>::<span class="ident">LeaderCallback</span>(<span class="ident">Callback</span>::<span class="ident">Read</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">resp</span><span class="op">|</span> {
-                            <span class="kw">if</span> <span class="op">!</span><span class="ident">resp</span>.<span class="ident">response</span>.<span class="ident">get_header</span>().<span class="ident">has_error</span>() {
-                                <span class="kw">match</span> <span class="ident">scheduler_clone</span>.<span class="ident">schedule</span>(<span class="ident">Task</span>::<span class="ident">MinTS</span> { <span class="ident">region_id</span>, <span class="ident">min_ts</span> }) {
-                                    <span class="prelude-val">Ok</span>(<span class="kw">_</span>) <span class="op">|</span> <span class="prelude-val">Err</span>(<span class="ident">ScheduleError</span>::<span class="ident">Stopped</span>(<span class="kw">_</span>)) <span class="op">=</span><span class="op">&gt;</span> (),
-                                    <span class="prelude-val">Err</span>(<span class="ident">err</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(
-                                        <span class="string">&quot;failed to schedule min_ts event, min_ts: {}, error: {:?}&quot;</span>,
-                                        <span class="ident">min_ts</span>, <span class="ident">err</span>
-                                    ),
-                                }
+            <span class="comment">// TODO: send a message to raftstore would consume too much cpu time,</span>
+            <span class="comment">// try to handle it outside raftstore.</span>
+            <span class="kw">for</span> (<span class="ident">region_id</span>, <span class="ident">observe_id</span>) <span class="kw">in</span> <span class="ident">regions</span> {
+                <span class="kw">let</span> <span class="ident">scheduler_clone</span> <span class="op">=</span> <span class="ident">scheduler</span>.<span class="ident">clone</span>();
+                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">raft_router</span>.<span class="ident">significant_send</span>(
+                    <span class="ident">region_id</span>,
+                    <span class="ident">SignificantMsg</span>::<span class="ident">LeaderCallback</span>(<span class="ident">Callback</span>::<span class="ident">Read</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">resp</span><span class="op">|</span> {
+                        <span class="kw">if</span> <span class="op">!</span><span class="ident">resp</span>.<span class="ident">response</span>.<span class="ident">get_header</span>().<span class="ident">has_error</span>() {
+                            <span class="kw">match</span> <span class="ident">scheduler_clone</span>.<span class="ident">schedule</span>(<span class="ident">Task</span>::<span class="ident">MinTS</span> { <span class="ident">region_id</span>, <span class="ident">min_ts</span> }) {
+                                <span class="prelude-val">Ok</span>(<span class="kw">_</span>) <span class="op">|</span> <span class="prelude-val">Err</span>(<span class="ident">ScheduleError</span>::<span class="ident">Stopped</span>(<span class="kw">_</span>)) <span class="op">=</span><span class="op">&gt;</span> (),
+                                <span class="prelude-val">Err</span>(<span class="ident">err</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(
+                                    <span class="string">&quot;failed to schedule min_ts event, min_ts: {}, error: {:?}&quot;</span>,
+                                    <span class="ident">min_ts</span>, <span class="ident">err</span>
+                                ),
                             }
-                        }))),
-                    ) {
-                        <span class="macro">warn</span><span class="macro">!</span>(
-                            <span class="string">&quot;send LeaderCallback for advancing resolved ts failed&quot;</span>;
-                            <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>,
-                            <span class="string">&quot;min_ts&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">min_ts</span>,
-                        );
-                        <span class="kw">let</span> <span class="ident">deregister</span> <span class="op">=</span> <span class="ident">Deregister</span>::<span class="ident">Region</span> {
-                            <span class="ident">observe_id</span>,
-                            <span class="ident">region_id</span>,
-                            <span class="ident">err</span>: <span class="ident">Error</span>::<span class="ident">Request</span>(<span class="ident">e</span>.<span class="ident">into</span>()),
-                        };
-                        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">scheduler</span>.<span class="ident">schedule</span>(<span class="ident">Task</span>::<span class="ident">Deregister</span>(<span class="ident">deregister</span>)) {
-                            <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;schedule cdc task failed&quot;</span>; <span class="string">&quot;error&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
                         }
+                    }))),
+                ) {
+                    <span class="macro">warn</span><span class="macro">!</span>(
+                        <span class="string">&quot;send LeaderCallback for advancing resolved ts failed&quot;</span>;
+                        <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>,
+                        <span class="string">&quot;min_ts&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">min_ts</span>,
+                    );
+                    <span class="kw">let</span> <span class="ident">deregister</span> <span class="op">=</span> <span class="ident">Deregister</span>::<span class="ident">Region</span> {
+                        <span class="ident">observe_id</span>,
+                        <span class="ident">region_id</span>,
+                        <span class="ident">err</span>: <span class="ident">Error</span>::<span class="ident">Request</span>(<span class="ident">e</span>.<span class="ident">into</span>()),
+                    };
+                    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">scheduler</span>.<span class="ident">schedule</span>(<span class="ident">Task</span>::<span class="ident">Deregister</span>(<span class="ident">deregister</span>)) {
+                        <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;schedule cdc task failed&quot;</span>; <span class="string">&quot;error&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
                     }
                 }
-                <span class="kw">match</span> <span class="ident">scheduler</span>.<span class="ident">schedule</span>(<span class="ident">Task</span>::<span class="ident">RegisterMinTsEvent</span>) {
-                    <span class="prelude-val">Ok</span>(<span class="kw">_</span>) <span class="op">|</span> <span class="prelude-val">Err</span>(<span class="ident">ScheduleError</span>::<span class="ident">Stopped</span>(<span class="kw">_</span>)) <span class="op">=</span><span class="op">&gt;</span> (),
-                    <span class="comment">// Must schedule `RegisterMinTsEvent` event otherwise resolved ts can not</span>
-                    <span class="comment">// advance normally.</span>
-                    <span class="prelude-val">Err</span>(<span class="ident">err</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(
-                        <span class="string">&quot;failed to schedule regiester min ts event, error: {:?}&quot;</span>,
-                        <span class="ident">err</span>
-                    ),
-                }
-                <span class="prelude-val">Ok</span>(())
-            },
-        );
+            }
+            <span class="kw">match</span> <span class="ident">scheduler</span>.<span class="ident">schedule</span>(<span class="ident">Task</span>::<span class="ident">RegisterMinTsEvent</span>) {
+                <span class="prelude-val">Ok</span>(<span class="kw">_</span>) <span class="op">|</span> <span class="prelude-val">Err</span>(<span class="ident">ScheduleError</span>::<span class="ident">Stopped</span>(<span class="kw">_</span>)) <span class="op">=</span><span class="op">&gt;</span> (),
+                <span class="comment">// Must schedule `RegisterMinTsEvent` event otherwise resolved ts can not</span>
+                <span class="comment">// advance normally.</span>
+                <span class="prelude-val">Err</span>(<span class="ident">err</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(
+                    <span class="string">&quot;failed to schedule regiester min ts event, error: {:?}&quot;</span>,
+                    <span class="ident">err</span>
+                ),
+            }
+        };
         <span class="self">self</span>.<span class="ident">tso_worker</span>.<span class="ident">spawn</span>(<span class="ident">fut</span>);
     }
 
@@ -2199,13 +2217,15 @@
         (<span class="ident">worker</span>, <span class="ident">rx</span>)
     }
 
-    <span class="kw">fn</span> <span class="ident">mock_initializer</span>() <span class="op">-</span><span class="op">&gt;</span> (<span class="ident">Worker</span><span class="op">&lt;</span><span class="ident">Task</span><span class="op">&gt;</span>, <span class="ident">ThreadPool</span>, <span class="ident">Initializer</span>, <span class="ident">Receiver</span><span class="op">&lt;</span><span class="ident">Task</span><span class="op">&gt;</span>) {
+    <span class="kw">fn</span> <span class="ident">mock_initializer</span>() <span class="op">-</span><span class="op">&gt;</span> (<span class="ident">Worker</span><span class="op">&lt;</span><span class="ident">Task</span><span class="op">&gt;</span>, <span class="ident">Runtime</span>, <span class="ident">Initializer</span>, <span class="ident">Receiver</span><span class="op">&lt;</span><span class="ident">Task</span><span class="op">&gt;</span>) {
         <span class="kw">let</span> (<span class="ident">receiver_worker</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">new_receiver_worker</span>();
 
         <span class="kw">let</span> <span class="ident">pool</span> <span class="op">=</span> <span class="ident">Builder</span>::<span class="ident">new</span>()
-            .<span class="ident">name_prefix</span>(<span class="string">&quot;test-initializer-worker&quot;</span>)
-            .<span class="ident">pool_size</span>(<span class="number">4</span>)
-            .<span class="ident">build</span>();
+            .<span class="ident">threaded_scheduler</span>()
+            .<span class="ident">thread_name</span>(<span class="string">&quot;test-initializer-worker&quot;</span>)
+            .<span class="ident">core_threads</span>(<span class="number">4</span>)
+            .<span class="ident">build</span>()
+            .<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">downstream_state</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">AtomicCell</span>::<span class="ident">new</span>(<span class="ident">DownstreamState</span>::<span class="ident">Normal</span>));
         <span class="kw">let</span> <span class="ident">initializer</span> <span class="op">=</span> <span class="ident">Initializer</span> {
             <span class="ident">sched</span>: <span class="ident">receiver_worker</span>.<span class="ident">scheduler</span>(),
