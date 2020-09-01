@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["Config",""]]});
+initSidebarItems({"enum":[["RecoveryMode",""]],"struct":[["Config",""]]});

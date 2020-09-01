@@ -1454,11 +1454,13 @@
         )
         .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="macro">fatal</span><span class="macro">!</span>(<span class="string">&quot;failed to create kv engine: {}&quot;</span>, <span class="ident">s</span>));
 
-        <span class="kw">let</span> <span class="ident">engines</span> <span class="op">=</span> <span class="ident">Engines</span>::<span class="ident">new</span>(
-            <span class="ident">RocksEngine</span>::<span class="ident">from_db</span>(<span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">kv_engine</span>)),
-            <span class="ident">RocksEngine</span>::<span class="ident">from_db</span>(<span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">raft_engine</span>)),
-            <span class="ident">block_cache</span>.<span class="ident">is_some</span>(),
-        );
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">kv_engine</span> <span class="op">=</span> <span class="ident">RocksEngine</span>::<span class="ident">from_db</span>(<span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">kv_engine</span>));
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">raft_engine</span> <span class="op">=</span> <span class="ident">RocksEngine</span>::<span class="ident">from_db</span>(<span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">raft_engine</span>));
+        <span class="kw">let</span> <span class="ident">shared_block_cache</span> <span class="op">=</span> <span class="ident">block_cache</span>.<span class="ident">is_some</span>();
+        <span class="ident">kv_engine</span>.<span class="ident">set_shared_block_cache</span>(<span class="ident">shared_block_cache</span>);
+        <span class="ident">raft_engine</span>.<span class="ident">set_shared_block_cache</span>(<span class="ident">shared_block_cache</span>);
+        <span class="kw">let</span> <span class="ident">engines</span> <span class="op">=</span> <span class="ident">Engines</span>::<span class="ident">new</span>(<span class="ident">kv_engine</span>, <span class="ident">raft_engine</span>);
+
         <span class="kw">let</span> <span class="ident">store_meta</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">StoreMeta</span>::<span class="ident">new</span>(<span class="ident">PENDING_VOTES_CAP</span>)));
         <span class="kw">let</span> <span class="ident">local_reader</span> <span class="op">=</span>
             <span class="ident">LocalReader</span>::<span class="ident">new</span>(<span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">clone</span>(), <span class="ident">store_meta</span>.<span class="ident">clone</span>(), <span class="self">self</span>.<span class="ident">router</span>.<span class="ident">clone</span>());
@@ -1852,11 +1854,9 @@
     }
 
     <span class="kw">fn</span> <span class="ident">init_metrics_flusher</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">metrics_flusher</span> <span class="op">=</span> <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">MetricsFlusher</span>::<span class="ident">new</span>(<span class="ident">Engines</span>::<span class="ident">new</span>(
-            <span class="self">self</span>.<span class="ident">engines</span>.<span class="ident">as_ref</span>().<span class="ident">unwrap</span>().<span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">clone</span>(),
-            <span class="self">self</span>.<span class="ident">engines</span>.<span class="ident">as_ref</span>().<span class="ident">unwrap</span>().<span class="ident">engines</span>.<span class="ident">raft</span>.<span class="ident">clone</span>(),
-            <span class="self">self</span>.<span class="ident">engines</span>.<span class="ident">as_ref</span>().<span class="ident">unwrap</span>().<span class="ident">engines</span>.<span class="ident">shared_block_cache</span>,
-        )));
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">metrics_flusher</span> <span class="op">=</span> <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">MetricsFlusher</span>::<span class="ident">new</span>(
+            <span class="self">self</span>.<span class="ident">engines</span>.<span class="ident">as_ref</span>().<span class="ident">unwrap</span>().<span class="ident">engines</span>.<span class="ident">clone</span>(),
+        ));
 
         <span class="comment">// Start metrics flusher</span>
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">metrics_flusher</span>.<span class="ident">start</span>() {

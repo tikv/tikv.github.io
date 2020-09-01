@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["RecoveryMode",""]],"struct":[["FileEngine",""],["SharedCacheStats",""]]});
+initSidebarItems({"struct":[["FileEngine",""],["MemTableAccessor",""],["SharedCacheStats",""]]});
