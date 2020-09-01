@@ -1192,6 +1192,7 @@
 <span id="1192">1192</span>
 <span id="1193">1193</span>
 <span id="1194">1194</span>
+<span id="1195">1195</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1209,7 +1210,8 @@
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">kvrpcpb</span>::{<span class="ident">Context</span>, <span class="ident">IsolationLevel</span>, <span class="ident">LockInfo</span>};
 <span class="kw">use</span> <span class="ident">pd_client</span>::{<span class="ident">ClusterVersion</span>, <span class="ident">PdClient</span>};
 <span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">coprocessor</span>::{<span class="ident">CoprocessorHost</span>, <span class="ident">RegionInfoProvider</span>};
-<span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">router</span>::<span class="ident">ServerRaftStoreRouter</span>;
+<span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">router</span>::<span class="ident">RaftStoreRouter</span>;
+<span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">store</span>::<span class="ident">fsm</span>::<span class="ident">RaftRouter</span>;
 <span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">store</span>::<span class="ident">msg</span>::<span class="ident">StoreMsg</span>;
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">config</span>::{<span class="ident">Tracker</span>, <span class="ident">VersionTrack</span>};
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">time</span>::{<span class="ident">duration_to_sec</span>, <span class="ident">Limiter</span>, <span class="ident">SlowTimer</span>};
@@ -1323,7 +1325,7 @@
 <span class="kw">struct</span> <span class="ident">GcRunner</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">Engine</span><span class="op">&gt;</span> {
     <span class="ident">engine</span>: <span class="ident">E</span>,
 
-    <span class="ident">raft_store_router</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ServerRaftStoreRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">raft_store_router</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RaftRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 
     <span class="doccomment">/// Used to limit the write flow of GC.</span>
     <span class="ident">limiter</span>: <span class="ident">Limiter</span>,
@@ -1337,7 +1339,7 @@
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">Engine</span><span class="op">&gt;</span> <span class="ident">GcRunner</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
         <span class="ident">engine</span>: <span class="ident">E</span>,
-        <span class="ident">raft_store_router</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ServerRaftStoreRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+        <span class="ident">raft_store_router</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RaftRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">cfg_tracker</span>: <span class="ident">Tracker</span><span class="op">&lt;</span><span class="ident">GcConfig</span><span class="op">&gt;</span>,
         <span class="ident">cfg</span>: <span class="ident">GcConfig</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
@@ -1530,7 +1532,7 @@
 
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">router</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">raft_store_router</span>.<span class="ident">as_ref</span>() {
             <span class="ident">router</span>
-                .<span class="ident">send_store</span>(<span class="ident">StoreMsg</span>::<span class="ident">ClearRegionSizeInRange</span> {
+                .<span class="ident">send_store_msg</span>(<span class="ident">StoreMsg</span>::<span class="ident">ClearRegionSizeInRange</span> {
                     <span class="ident">start_key</span>: <span class="ident">start_key</span>.<span class="ident">as_encoded</span>().<span class="ident">to_vec</span>(),
                     <span class="ident">end_key</span>: <span class="ident">end_key</span>.<span class="ident">as_encoded</span>().<span class="ident">to_vec</span>(),
                 })
@@ -1726,7 +1728,7 @@
     <span class="ident">engine</span>: <span class="ident">E</span>,
 
     <span class="doccomment">/// `raft_store_router` is useful to signal raftstore clean region size informations.</span>
-    <span class="ident">raft_store_router</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ServerRaftStoreRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">raft_store_router</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RaftRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 
     <span class="ident">config_manager</span>: <span class="ident">GcWorkerConfigManager</span>,
 
@@ -1784,7 +1786,7 @@
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">Engine</span><span class="op">&gt;</span> <span class="ident">GcWorker</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
         <span class="ident">engine</span>: <span class="ident">E</span>,
-        <span class="ident">raft_store_router</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ServerRaftStoreRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+        <span class="ident">raft_store_router</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RaftRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">cfg</span>: <span class="ident">GcConfig</span>,
         <span class="ident">cluster_version</span>: <span class="ident">ClusterVersion</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">GcWorker</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {

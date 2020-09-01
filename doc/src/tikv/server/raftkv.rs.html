@@ -566,6 +566,21 @@
 <span id="566">566</span>
 <span id="567">567</span>
 <span id="568">568</span>
+<span id="569">569</span>
+<span id="570">570</span>
+<span id="571">571</span>
+<span id="572">572</span>
+<span id="573">573</span>
+<span id="574">574</span>
+<span id="575">575</span>
+<span id="576">576</span>
+<span id="577">577</span>
+<span id="578">578</span>
+<span id="579">579</span>
+<span id="580">580</span>
+<span id="581">581</span>
+<span id="582">582</span>
+<span id="583">583</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -593,7 +608,7 @@
 };
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::{<span class="self">self</span>, <span class="ident">kv</span>};
 <span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">errors</span>::<span class="ident">Error</span> <span class="kw">as</span> <span class="ident">RaftServerError</span>;
-<span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">router</span>::<span class="ident">RaftStoreRouter</span>;
+<span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">router</span>::{<span class="ident">LocalReadRouter</span>, <span class="ident">RaftStoreRouter</span>};
 <span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">store</span>::{<span class="ident">Callback</span> <span class="kw">as</span> <span class="ident">StoreCallback</span>, <span class="ident">ReadResponse</span>, <span class="ident">WriteResponse</span>};
 <span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">store</span>::{<span class="ident">RegionIterator</span>, <span class="ident">RegionSnapshot</span>};
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">time</span>::<span class="ident">Instant</span>;
@@ -674,7 +689,10 @@
 
 <span class="doccomment">/// `RaftKv` is a storage engine base on `RaftStore`.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">RaftKv</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">RaftStoreRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">RaftKv</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">S</span>: <span class="ident">RaftStoreRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">LocalReadRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+{
     <span class="ident">router</span>: <span class="ident">S</span>,
     <span class="ident">engine</span>: <span class="ident">RocksEngine</span>,
 }
@@ -731,7 +749,10 @@
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">RaftStoreRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">RaftKv</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span> <span class="ident">RaftKv</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">S</span>: <span class="ident">RaftStoreRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">LocalReadRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+{
     <span class="doccomment">/// Create a RaftKv using specified configuration.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">router</span>: <span class="ident">S</span>, <span class="ident">engine</span>: <span class="ident">RocksEngine</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">RaftKv</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span> {
         <span class="ident">RaftKv</span> { <span class="ident">router</span>, <span class="ident">engine</span> }
@@ -828,19 +849,28 @@
     ))
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">RaftStoreRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">Display</span> <span class="kw">for</span> <span class="ident">RaftKv</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span> <span class="ident">Display</span> <span class="kw">for</span> <span class="ident">RaftKv</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">S</span>: <span class="ident">RaftStoreRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">LocalReadRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+{
     <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="prelude-ty">Result</span> {
         <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;RaftKv&quot;</span>)
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">RaftStoreRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">Debug</span> <span class="kw">for</span> <span class="ident">RaftKv</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span> <span class="ident">Debug</span> <span class="kw">for</span> <span class="ident">RaftKv</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">S</span>: <span class="ident">RaftStoreRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">LocalReadRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+{
     <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="prelude-ty">Result</span> {
         <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;RaftKv&quot;</span>)
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">RaftStoreRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">Engine</span> <span class="kw">for</span> <span class="ident">RaftKv</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span> <span class="ident">Engine</span> <span class="kw">for</span> <span class="ident">RaftKv</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">S</span>: <span class="ident">RaftStoreRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">LocalReadRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+{
     <span class="kw">type</span> <span class="ident">Snap</span> <span class="op">=</span> <span class="ident">RegionSnapshot</span><span class="op">&lt;</span><span class="ident">RocksSnapshot</span><span class="op">&gt;</span>;
     <span class="kw">type</span> <span class="ident">Local</span> <span class="op">=</span> <span class="ident">RocksEngine</span>;
 
