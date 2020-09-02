@@ -4000,25 +4000,6 @@
 <span id="4000">4000</span>
 <span id="4001">4001</span>
 <span id="4002">4002</span>
-<span id="4003">4003</span>
-<span id="4004">4004</span>
-<span id="4005">4005</span>
-<span id="4006">4006</span>
-<span id="4007">4007</span>
-<span id="4008">4008</span>
-<span id="4009">4009</span>
-<span id="4010">4010</span>
-<span id="4011">4011</span>
-<span id="4012">4012</span>
-<span id="4013">4013</span>
-<span id="4014">4014</span>
-<span id="4015">4015</span>
-<span id="4016">4016</span>
-<span id="4017">4017</span>
-<span id="4018">4018</span>
-<span id="4019">4019</span>
-<span id="4020">4020</span>
-<span id="4021">4021</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -4057,7 +4038,6 @@
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">time</span>::<span class="ident">duration_to_sec</span>;
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">worker</span>::{<span class="ident">Scheduler</span>, <span class="ident">Stopped</span>};
 <span class="kw">use</span> <span class="ident">tikv_util</span>::{<span class="ident">escape</span>, <span class="ident">is_zero_duration</span>, <span class="ident">Either</span>};
-<span class="kw">use</span> <span class="ident">txn_types</span>::<span class="ident">TxnExtra</span>;
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">coprocessor</span>::<span class="ident">RegionChangeEvent</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">cmd_resp</span>::{<span class="ident">bind_term</span>, <span class="ident">new_error</span>};
@@ -4148,7 +4128,6 @@
     <span class="ident">batch_req_size</span>: <span class="ident">u32</span>,
     <span class="ident">request</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RaftCmdRequest</span><span class="op">&gt;</span>,
     <span class="ident">callbacks</span>: <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">Callback</span><span class="op">&lt;</span><span class="ident">E</span>::<span class="ident">Snapshot</span><span class="op">&gt;</span>, <span class="ident">usize</span>)<span class="op">&gt;</span>,
-    <span class="ident">txn_extra</span>: <span class="ident">TxnExtra</span>,
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">PeerFsm</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>
@@ -4312,7 +4291,6 @@
             <span class="ident">request</span>: <span class="prelude-val">None</span>,
             <span class="ident">batch_req_size</span>: <span class="number">0</span>,
             <span class="ident">callbacks</span>: <span class="macro">vec</span><span class="macro">!</span>[],
-            <span class="ident">txn_extra</span>: <span class="ident">TxnExtra</span>::<span class="ident">default</span>(),
         }
     }
 
@@ -4345,7 +4323,6 @@
         <span class="kw">let</span> <span class="ident">RaftCommand</span> {
             <span class="kw-2">mut</span> <span class="ident">request</span>,
             <span class="ident">callback</span>,
-            <span class="kw-2">mut</span> <span class="ident">txn_extra</span>,
             ..
         } <span class="op">=</span> <span class="ident">cmd</span>;
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">batch_req</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">request</span>.<span class="ident">as_mut</span>() {
@@ -4358,7 +4335,6 @@
         };
         <span class="self">self</span>.<span class="ident">callbacks</span>.<span class="ident">push</span>((<span class="ident">callback</span>, <span class="ident">req_num</span>));
         <span class="self">self</span>.<span class="ident">batch_req_size</span> <span class="op">+</span><span class="op">=</span> <span class="ident">req_size</span>;
-        <span class="self">self</span>.<span class="ident">txn_extra</span>.<span class="ident">extend</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">txn_extra</span>);
     }
 
     <span class="kw">fn</span> <span class="ident">should_finish</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
@@ -4380,11 +4356,7 @@
             <span class="self">self</span>.<span class="ident">batch_req_size</span> <span class="op">=</span> <span class="number">0</span>;
             <span class="kw">if</span> <span class="self">self</span>.<span class="ident">callbacks</span>.<span class="ident">len</span>() <span class="op">=</span><span class="op">=</span> <span class="number">1</span> {
                 <span class="kw">let</span> (<span class="ident">cb</span>, <span class="kw">_</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">callbacks</span>.<span class="ident">pop</span>().<span class="ident">unwrap</span>();
-                <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">RaftCommand</span>::<span class="ident">with_txn_extra</span>(
-                    <span class="ident">req</span>,
-                    <span class="ident">cb</span>,
-                    <span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">take</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">txn_extra</span>),
-                ));
+                <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">RaftCommand</span>::<span class="ident">new</span>(<span class="ident">req</span>, <span class="ident">cb</span>));
             }
             <span class="ident">metric</span>.<span class="ident">batch</span> <span class="op">+</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">callbacks</span>.<span class="ident">len</span>() <span class="op">-</span> <span class="number">1</span>;
             <span class="kw">let</span> <span class="ident">cbs</span> <span class="op">=</span> <span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">replace</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">callbacks</span>, <span class="macro">vec</span><span class="macro">!</span>[]);
@@ -4404,11 +4376,7 @@
                     <span class="ident">last_index</span> <span class="op">=</span> <span class="ident">next_index</span>;
                 }
             }));
-            <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">RaftCommand</span>::<span class="ident">with_txn_extra</span>(
-                <span class="ident">req</span>,
-                <span class="ident">cb</span>,
-                <span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">take</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">txn_extra</span>),
-            ));
+            <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">RaftCommand</span>::<span class="ident">new</span>(<span class="ident">req</span>, <span class="ident">cb</span>));
         }
         <span class="prelude-val">None</span>
     }
@@ -4495,7 +4463,7 @@
                         }
                     } <span class="kw">else</span> {
                         <span class="self">self</span>.<span class="ident">propose_batch_raft_command</span>();
-                        <span class="self">self</span>.<span class="ident">propose_raft_command</span>(<span class="ident">cmd</span>.<span class="ident">request</span>, <span class="ident">cmd</span>.<span class="ident">callback</span>, <span class="ident">cmd</span>.<span class="ident">txn_extra</span>)
+                        <span class="self">self</span>.<span class="ident">propose_raft_command</span>(<span class="ident">cmd</span>.<span class="ident">request</span>, <span class="ident">cmd</span>.<span class="ident">callback</span>)
                     }
                 }
                 <span class="ident">PeerMsg</span>::<span class="ident">Tick</span>(<span class="ident">tick</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">on_tick</span>(<span class="ident">tick</span>),
@@ -4524,7 +4492,7 @@
             .<span class="ident">batch_req_builder</span>
             .<span class="ident">build</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">raft_metrics</span>.<span class="ident">propose</span>)
         {
-            <span class="self">self</span>.<span class="ident">propose_raft_command</span>(<span class="ident">cmd</span>.<span class="ident">request</span>, <span class="ident">cmd</span>.<span class="ident">callback</span>, <span class="ident">cmd</span>.<span class="ident">txn_extra</span>)
+            <span class="self">self</span>.<span class="ident">propose_raft_command</span>(<span class="ident">cmd</span>.<span class="ident">request</span>, <span class="ident">cmd</span>.<span class="ident">callback</span>)
         }
     }
 
@@ -4760,7 +4728,6 @@
                     },
                 )
             })),
-            <span class="ident">TxnExtra</span>::<span class="ident">default</span>(),
         );
     }
 
@@ -4858,7 +4825,7 @@
             <span class="self">self</span>.<span class="ident">region</span>().<span class="ident">get_region_epoch</span>().<span class="ident">clone</span>(),
             <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">peer</span>.<span class="ident">clone</span>(),
         );
-        <span class="self">self</span>.<span class="ident">propose_raft_command</span>(<span class="ident">msg</span>, <span class="ident">cb</span>, <span class="ident">TxnExtra</span>::<span class="ident">default</span>());
+        <span class="self">self</span>.<span class="ident">propose_raft_command</span>(<span class="ident">msg</span>, <span class="ident">cb</span>);
     }
 
     <span class="kw">fn</span> <span class="ident">on_role_changed</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">ready</span>: <span class="kw-2">&amp;</span><span class="ident">Ready</span>) {
@@ -6439,7 +6406,7 @@
             <span class="ident">request</span>.<span class="ident">set_admin_request</span>(<span class="ident">admin</span>);
             <span class="ident">request</span>
         };
-        <span class="self">self</span>.<span class="ident">propose_raft_command</span>(<span class="ident">req</span>, <span class="ident">Callback</span>::<span class="prelude-val">None</span>, <span class="ident">TxnExtra</span>::<span class="ident">default</span>());
+        <span class="self">self</span>.<span class="ident">propose_raft_command</span>(<span class="ident">req</span>, <span class="ident">Callback</span>::<span class="prelude-val">None</span>);
     }
 
     <span class="kw">fn</span> <span class="ident">on_check_merge</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
@@ -7104,12 +7071,7 @@
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">propose_raft_command</span>(
-        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
-        <span class="kw-2">mut</span> <span class="ident">msg</span>: <span class="ident">RaftCmdRequest</span>,
-        <span class="ident">cb</span>: <span class="ident">Callback</span><span class="op">&lt;</span><span class="ident">EK</span>::<span class="ident">Snapshot</span><span class="op">&gt;</span>,
-        <span class="ident">txn_extra</span>: <span class="ident">TxnExtra</span>,
-    ) {
+    <span class="kw">fn</span> <span class="ident">propose_raft_command</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="kw-2">mut</span> <span class="ident">msg</span>: <span class="ident">RaftCmdRequest</span>, <span class="ident">cb</span>: <span class="ident">Callback</span><span class="op">&lt;</span><span class="ident">EK</span>::<span class="ident">Snapshot</span><span class="op">&gt;</span>) {
         <span class="kw">match</span> <span class="self">self</span>.<span class="ident">pre_propose_raft_command</span>(<span class="kw-2">&amp;</span><span class="ident">msg</span>) {
             <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">resp</span>)) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="ident">cb</span>.<span class="ident">invoke_with_response</span>(<span class="ident">resp</span>);
@@ -7155,7 +7117,7 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">RaftCmdResponse</span>::<span class="ident">default</span>();
         <span class="kw">let</span> <span class="ident">term</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">term</span>();
         <span class="ident">bind_term</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">resp</span>, <span class="ident">term</span>);
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">propose</span>(<span class="self">self</span>.<span class="ident">ctx</span>, <span class="ident">cb</span>, <span class="ident">msg</span>, <span class="ident">resp</span>, <span class="ident">txn_extra</span>) {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">propose</span>(<span class="self">self</span>.<span class="ident">ctx</span>, <span class="ident">cb</span>, <span class="ident">msg</span>, <span class="ident">resp</span>) {
             <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">has_ready</span> <span class="op">=</span> <span class="bool-val">true</span>;
         }
 
@@ -7297,7 +7259,7 @@
         <span class="kw">let</span> <span class="ident">peer</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">peer</span>.<span class="ident">clone</span>();
         <span class="kw">let</span> <span class="ident">term</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">get_index_term</span>(<span class="ident">compact_idx</span>);
         <span class="kw">let</span> <span class="ident">request</span> <span class="op">=</span> <span class="ident">new_compact_log_request</span>(<span class="ident">region_id</span>, <span class="ident">peer</span>, <span class="ident">compact_idx</span>, <span class="ident">term</span>);
-        <span class="self">self</span>.<span class="ident">propose_raft_command</span>(<span class="ident">request</span>, <span class="ident">Callback</span>::<span class="prelude-val">None</span>, <span class="ident">TxnExtra</span>::<span class="ident">default</span>());
+        <span class="self">self</span>.<span class="ident">propose_raft_command</span>(<span class="ident">request</span>, <span class="ident">Callback</span>::<span class="prelude-val">None</span>);
 
         <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">skip_gc_raft_log_ticks</span> <span class="op">=</span> <span class="number">0</span>;
         <span class="self">self</span>.<span class="ident">register_raft_gc_log_tick</span>();
@@ -7703,7 +7665,7 @@
             <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">peer</span>.<span class="ident">clone</span>(),
             <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">consistency_state</span>,
         );
-        <span class="self">self</span>.<span class="ident">propose_raft_command</span>(<span class="ident">req</span>, <span class="ident">Callback</span>::<span class="prelude-val">None</span>, <span class="ident">TxnExtra</span>::<span class="ident">default</span>());
+        <span class="self">self</span>.<span class="ident">propose_raft_command</span>(<span class="ident">req</span>, <span class="ident">Callback</span>::<span class="prelude-val">None</span>);
     }
 
     <span class="kw">fn</span> <span class="ident">on_ingest_sst_result</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">ssts</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SstMeta</span><span class="op">&gt;</span>) {

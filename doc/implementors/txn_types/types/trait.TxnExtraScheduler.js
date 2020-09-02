@@ -1,0 +1,3 @@
+(function() {var implementors = {};
+implementors["cdc"] = [{"text":"impl <a class=\"trait\" href=\"txn_types/types/trait.TxnExtraScheduler.html\" title=\"trait txn_types::types::TxnExtraScheduler\">TxnExtraScheduler</a> for <a class=\"struct\" href=\"cdc/struct.CdcTxnExtraScheduler.html\" title=\"struct cdc::CdcTxnExtraScheduler\">CdcTxnExtraScheduler</a>","synthetic":false,"types":["cdc::endpoint::CdcTxnExtraScheduler"]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

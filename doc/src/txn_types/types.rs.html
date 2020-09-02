@@ -464,6 +464,12 @@
 <span id="464">464</span>
 <span id="465">465</span>
 <span id="466">466</span>
+<span id="467">467</span>
+<span id="468">468</span>
+<span id="469">469</span>
+<span id="470">470</span>
+<span id="471">471</span>
+<span id="472">472</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">timestamp</span>::<span class="ident">TimeStamp</span>;
 <span class="kw">use</span> <span class="ident">byteorder</span>::{<span class="ident">ByteOrder</span>, <span class="ident">NativeEndian</span>};
@@ -785,6 +791,16 @@
     <span class="kw">pub</span> <span class="ident">start_ts</span>: <span class="ident">TimeStamp</span>,
 }
 
+<span class="kw">impl</span> <span class="ident">OldValue</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">size</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+        <span class="kw">let</span> <span class="ident">value_size</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">short_value</span> {
+            <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">v</span>.<span class="ident">len</span>(),
+            <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0</span>,
+        };
+        <span class="ident">value_size</span> <span class="op">+</span> <span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">size_of</span>::<span class="op">&lt;</span><span class="ident">TimeStamp</span><span class="op">&gt;</span>()
+    }
+}
+
 <span class="comment">// Returned by MvccTxn when extra_op is set to kvrpcpb::ExtraOp::ReadOldValue.</span>
 <span class="comment">// key with current ts -&gt; (short value of the prev txn, start ts of the prev txn).</span>
 <span class="comment">// The value of the map will be None when the mutation is `Insert`.</span>
@@ -794,7 +810,7 @@
 <span class="comment">// Extra data fields filled by kvrpcpb::ExtraOp.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Default</span>, <span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">TxnExtra</span> {
-    <span class="ident">old_values</span>: <span class="ident">OldValues</span>,
+    <span class="kw">pub</span> <span class="ident">old_values</span>: <span class="ident">OldValues</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">TxnExtra</span> {
@@ -807,7 +823,7 @@
         <span class="self">self</span>.<span class="ident">old_values</span>.<span class="ident">insert</span>(<span class="ident">key</span>, (<span class="ident">value</span>, <span class="ident">mutation_type</span>));
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_empty</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_empty</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
         <span class="self">self</span>.<span class="ident">old_values</span>.<span class="ident">is_empty</span>()
     }
 
@@ -815,14 +831,10 @@
         <span class="self">self</span>.<span class="ident">old_values</span>
             .<span class="ident">extend</span>(<span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">take</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">other</span>.<span class="ident">old_values</span>))
     }
+}
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">mut_old_values</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">OldValues</span> {
-        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">old_values</span>
-    }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_old_values</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">OldValues</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">old_values</span>
-    }
+<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">TxnExtraScheduler</span>: <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span> {
+    <span class="kw">fn</span> <span class="ident">schedule</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">txn_extra</span>: <span class="ident">TxnExtra</span>);
 }
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
