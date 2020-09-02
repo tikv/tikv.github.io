@@ -550,6 +550,23 @@
 <span id="550">550</span>
 <span id="551">551</span>
 <span id="552">552</span>
+<span id="553">553</span>
+<span id="554">554</span>
+<span id="555">555</span>
+<span id="556">556</span>
+<span id="557">557</span>
+<span id="558">558</span>
+<span id="559">559</span>
+<span id="560">560</span>
+<span id="561">561</span>
+<span id="562">562</span>
+<span id="563">563</span>
+<span id="564">564</span>
+<span id="565">565</span>
+<span id="566">566</span>
+<span id="567">567</span>
+<span id="568">568</span>
+<span id="569">569</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -622,16 +639,18 @@ Briefly speaking, this is a mpsc (multiple-producer-single-consumer) model.
     }
 }
 
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Runnable</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Display</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Runnable</span> {
+    <span class="kw">type</span> <span class="ident">Task</span>: <span class="ident">Display</span>;
+
     <span class="doccomment">/// Runs a task.</span>
-    <span class="kw">fn</span> <span class="ident">run</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="kw">_</span>: <span class="ident">T</span>) {
+    <span class="kw">fn</span> <span class="ident">run</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="kw">_</span>: <span class="self">Self</span>::<span class="ident">Task</span>) {
         <span class="macro">unimplemented</span><span class="macro">!</span>()
     }
 
     <span class="doccomment">/// Runs a batch of tasks.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// Please note that ts will be clear after invoking this method.</span>
-    <span class="kw">fn</span> <span class="ident">run_batch</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">ts</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>) {
+    <span class="kw">fn</span> <span class="ident">run_batch</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">ts</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Task</span><span class="op">&gt;</span>) {
         <span class="kw">for</span> <span class="ident">t</span> <span class="kw">in</span> <span class="ident">ts</span>.<span class="ident">drain</span>(..) {
             <span class="kw">let</span> <span class="ident">task_str</span> <span class="op">=</span> <span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">t</span>);
             <span class="kw">let</span> <span class="ident">timer</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now_coarse</span>();
@@ -644,17 +663,21 @@ Briefly speaking, this is a mpsc (multiple-producer-single-consumer) model.
     <span class="kw">fn</span> <span class="ident">shutdown</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {}
 }
 
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">RunnableWithTimer</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Display</span>, <span class="ident">U</span><span class="op">&gt;</span>: <span class="ident">Runnable</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">on_timeout</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Timer</span><span class="op">&lt;</span><span class="ident">U</span><span class="op">&gt;</span>, <span class="kw">_</span>: <span class="ident">U</span>);
+<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">RunnableWithTimer</span>: <span class="ident">Runnable</span> {
+    <span class="kw">type</span> <span class="ident">TimeoutTask</span>;
+
+    <span class="kw">fn</span> <span class="ident">on_timeout</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Timer</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">TimeoutTask</span><span class="op">&gt;</span>, <span class="kw">_</span>: <span class="self">Self</span>::<span class="ident">TimeoutTask</span>);
 }
 
 <span class="kw">struct</span> <span class="ident">DefaultRunnerWithTimer</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;</span>(<span class="ident">R</span>);
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Display</span>, <span class="ident">R</span>: <span class="ident">Runnable</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">Runnable</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">DefaultRunnerWithTimer</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">run</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">t</span>: <span class="ident">T</span>) {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">Runnable</span><span class="op">&gt;</span> <span class="ident">Runnable</span> <span class="kw">for</span> <span class="ident">DefaultRunnerWithTimer</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;</span> {
+    <span class="kw">type</span> <span class="ident">Task</span> <span class="op">=</span> <span class="ident">R</span>::<span class="ident">Task</span>;
+
+    <span class="kw">fn</span> <span class="ident">run</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">t</span>: <span class="self">Self</span>::<span class="ident">Task</span>) {
         <span class="self">self</span>.<span class="number">0</span>.<span class="ident">run</span>(<span class="ident">t</span>)
     }
-    <span class="kw">fn</span> <span class="ident">run_batch</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">ts</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>) {
+    <span class="kw">fn</span> <span class="ident">run_batch</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">ts</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Task</span><span class="op">&gt;</span>) {
         <span class="self">self</span>.<span class="number">0</span>.<span class="ident">run_batch</span>(<span class="ident">ts</span>)
     }
     <span class="kw">fn</span> <span class="ident">on_tick</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
@@ -665,7 +688,9 @@ Briefly speaking, this is a mpsc (multiple-producer-single-consumer) model.
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Display</span>, <span class="ident">R</span>: <span class="ident">Runnable</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">RunnableWithTimer</span><span class="op">&lt;</span><span class="ident">T</span>, ()<span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">DefaultRunnerWithTimer</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">Runnable</span><span class="op">&gt;</span> <span class="ident">RunnableWithTimer</span> <span class="kw">for</span> <span class="ident">DefaultRunnerWithTimer</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;</span> {
+    <span class="kw">type</span> <span class="ident">TimeoutTask</span> <span class="op">=</span> ();
+
     <span class="kw">fn</span> <span class="ident">on_timeout</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Timer</span><span class="op">&lt;</span>()<span class="op">&gt;</span>, <span class="kw">_</span>: ()) {}
 }
 
@@ -765,9 +790,9 @@ Briefly speaking, this is a mpsc (multiple-producer-single-consumer) model.
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Display</span><span class="op">&gt;</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Worker</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
         <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">pending_capacity</span> <span class="op">=</span><span class="op">=</span> <span class="ident">usize</span>::<span class="ident">MAX</span> {
-            <span class="ident">mpsc</span>::<span class="ident">unbounded</span>::<span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>()
+            <span class="ident">mpsc</span>::<span class="ident">unbounded</span>()
         } <span class="kw">else</span> {
-            <span class="ident">mpsc</span>::<span class="ident">bounded</span>::<span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">pending_capacity</span>)
+            <span class="ident">mpsc</span>::<span class="ident">bounded</span>(<span class="self">self</span>.<span class="ident">pending_capacity</span>)
         };
 
         <span class="ident">Worker</span> {
@@ -780,24 +805,20 @@ Briefly speaking, this is a mpsc (multiple-producer-single-consumer) model.
 }
 
 <span class="doccomment">/// A worker that can schedule time consuming tasks.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Worker</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Display</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Worker</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
     <span class="ident">scheduler</span>: <span class="ident">Scheduler</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
     <span class="ident">receiver</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Receiver</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">handle</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">JoinHandle</span><span class="op">&lt;</span>()<span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">batch_size</span>: <span class="ident">usize</span>,
 }
 
-<span class="kw">fn</span> <span class="ident">poll</span><span class="op">&lt;</span><span class="ident">R</span>, <span class="ident">T</span>, <span class="ident">U</span><span class="op">&gt;</span>(
+<span class="kw">fn</span> <span class="ident">poll</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">RunnableWithTimer</span><span class="op">&gt;</span>(
     <span class="kw-2">mut</span> <span class="ident">runner</span>: <span class="ident">R</span>,
-    <span class="ident">rx</span>: <span class="ident">Receiver</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">rx</span>: <span class="ident">Receiver</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">R</span>::<span class="ident">Task</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">counter</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicUsize</span><span class="op">&gt;</span>,
     <span class="ident">batch_size</span>: <span class="ident">usize</span>,
-    <span class="kw-2">mut</span> <span class="ident">timer</span>: <span class="ident">Timer</span><span class="op">&lt;</span><span class="ident">U</span><span class="op">&gt;</span>,
-) <span class="kw">where</span>
-    <span class="ident">R</span>: <span class="ident">RunnableWithTimer</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">U</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
-    <span class="ident">T</span>: <span class="ident">Display</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
-    <span class="ident">U</span>: <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
-{
+    <span class="kw-2">mut</span> <span class="ident">timer</span>: <span class="ident">Timer</span><span class="op">&lt;</span><span class="ident">R</span>::<span class="ident">TimeoutTask</span><span class="op">&gt;</span>,
+) {
     <span class="ident">tikv_alloc</span>::<span class="ident">add_thread_memory_accessor</span>();
     <span class="kw">let</span> <span class="ident">current_thread</span> <span class="op">=</span> <span class="ident">thread</span>::<span class="ident">current</span>();
     <span class="kw">let</span> <span class="ident">name</span> <span class="op">=</span> <span class="ident">current_thread</span>.<span class="ident">name</span>().<span class="ident">unwrap</span>();
@@ -872,16 +893,23 @@ Briefly speaking, this is a mpsc (multiple-producer-single-consumer) model.
     }
 
     <span class="doccomment">/// Starts the worker.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">Runnable</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">runner</span>: <span class="ident">R</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">io</span>::<span class="ident">Error</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">runner</span>: <span class="ident">R</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">io</span>::<span class="ident">Error</span><span class="op">&gt;</span>
+    <span class="kw">where</span>
+        <span class="ident">R</span>: <span class="ident">Runnable</span><span class="op">&lt;</span><span class="ident">Task</span> <span class="op">=</span> <span class="ident">T</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+    {
         <span class="kw">let</span> <span class="ident">runner</span> <span class="op">=</span> <span class="ident">DefaultRunnerWithTimer</span>(<span class="ident">runner</span>);
         <span class="kw">let</span> <span class="ident">timer</span>: <span class="ident">Timer</span><span class="op">&lt;</span>()<span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Timer</span>::<span class="ident">new</span>(<span class="number">0</span>);
         <span class="self">self</span>.<span class="ident">start_with_timer</span>(<span class="ident">runner</span>, <span class="ident">timer</span>)
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start_with_timer</span><span class="op">&lt;</span><span class="ident">R</span>, <span class="ident">U</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">runner</span>: <span class="ident">R</span>, <span class="ident">timer</span>: <span class="ident">Timer</span><span class="op">&lt;</span><span class="ident">U</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">io</span>::<span class="ident">Error</span><span class="op">&gt;</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start_with_timer</span><span class="op">&lt;</span><span class="ident">RT</span><span class="op">&gt;</span>(
+        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
+        <span class="ident">runner</span>: <span class="ident">RT</span>,
+        <span class="ident">timer</span>: <span class="ident">Timer</span><span class="op">&lt;</span><span class="ident">RT</span>::<span class="ident">TimeoutTask</span><span class="op">&gt;</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">io</span>::<span class="ident">Error</span><span class="op">&gt;</span>
     <span class="kw">where</span>
-        <span class="ident">R</span>: <span class="ident">RunnableWithTimer</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">U</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
-        <span class="ident">U</span>: <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+        <span class="ident">RT</span>: <span class="ident">RunnableWithTimer</span><span class="op">&lt;</span><span class="ident">Task</span> <span class="op">=</span> <span class="ident">T</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+        <span class="op">&lt;</span><span class="ident">RT</span> <span class="kw">as</span> <span class="ident">RunnableWithTimer</span><span class="op">&gt;</span>::<span class="ident">TimeoutTask</span>: <span class="ident">Send</span>,
     {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">receiver</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">receiver</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
         <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;starting working thread&quot;</span>; <span class="string">&quot;worker&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">scheduler</span>.<span class="ident">name</span>);
@@ -945,7 +973,9 @@ Briefly speaking, this is a mpsc (multiple-producer-single-consumer) model.
         <span class="ident">ch</span>: <span class="ident">mpsc</span>::<span class="ident">Sender</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>,
     }
 
-    <span class="kw">impl</span> <span class="ident">Runnable</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">StepRunner</span> {
+    <span class="kw">impl</span> <span class="ident">Runnable</span> <span class="kw">for</span> <span class="ident">StepRunner</span> {
+        <span class="kw">type</span> <span class="ident">Task</span> <span class="op">=</span> <span class="ident">u64</span>;
+
         <span class="kw">fn</span> <span class="ident">run</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">step</span>: <span class="ident">u64</span>) {
             <span class="self">self</span>.<span class="ident">ch</span>.<span class="ident">send</span>(<span class="ident">step</span>).<span class="ident">unwrap</span>();
             <span class="ident">thread</span>::<span class="ident">sleep</span>(<span class="ident">Duration</span>::<span class="ident">from_millis</span>(<span class="ident">step</span>));
@@ -960,7 +990,9 @@ Briefly speaking, this is a mpsc (multiple-producer-single-consumer) model.
         <span class="ident">ch</span>: <span class="ident">mpsc</span>::<span class="ident">Sender</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     }
 
-    <span class="kw">impl</span> <span class="ident">Runnable</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">BatchRunner</span> {
+    <span class="kw">impl</span> <span class="ident">Runnable</span> <span class="kw">for</span> <span class="ident">BatchRunner</span> {
+        <span class="kw">type</span> <span class="ident">Task</span> <span class="op">=</span> <span class="ident">u64</span>;
+
         <span class="kw">fn</span> <span class="ident">run_batch</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">ms</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>) {
             <span class="self">self</span>.<span class="ident">ch</span>.<span class="ident">send</span>(<span class="ident">ms</span>.<span class="ident">to_vec</span>()).<span class="ident">unwrap</span>();
         }
@@ -974,7 +1006,9 @@ Briefly speaking, this is a mpsc (multiple-producer-single-consumer) model.
         <span class="ident">ch</span>: <span class="ident">mpsc</span>::<span class="ident">Sender</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span>,
     }
 
-    <span class="kw">impl</span> <span class="ident">Runnable</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">TickRunner</span> {
+    <span class="kw">impl</span> <span class="ident">Runnable</span> <span class="kw">for</span> <span class="ident">TickRunner</span> {
+        <span class="kw">type</span> <span class="ident">Task</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>;
+
         <span class="kw">fn</span> <span class="ident">run</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">msg</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>) {
             <span class="self">self</span>.<span class="ident">ch</span>.<span class="ident">send</span>(<span class="ident">msg</span>).<span class="ident">unwrap</span>();
         }
