@@ -1301,16 +1301,6 @@
 <span id="1301">1301</span>
 <span id="1302">1302</span>
 <span id="1303">1303</span>
-<span id="1304">1304</span>
-<span id="1305">1305</span>
-<span id="1306">1306</span>
-<span id="1307">1307</span>
-<span id="1308">1308</span>
-<span id="1309">1309</span>
-<span id="1310">1310</span>
-<span id="1311">1311</span>
-<span id="1312">1312</span>
-<span id="1313">1313</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -2063,7 +2053,7 @@
         <span class="kw">let</span> <span class="ident">downstream_id</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">downstream_id</span>;
         <span class="kw">let</span> <span class="ident">conn_id</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">conn_id</span>;
         <span class="kw">let</span> <span class="ident">region_id</span> <span class="op">=</span> <span class="ident">region</span>.<span class="ident">get_id</span>();
-        <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;async incremental scan&quot;</span>;
+        <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;async incremental scan&quot;</span>;
             <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>,
             <span class="string">&quot;downstream_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">downstream_id</span>,
             <span class="string">&quot;observe_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="self">self</span>.<span class="ident">observe_id</span>);
@@ -2126,11 +2116,12 @@
             }
         }
 
+        <span class="kw">let</span> <span class="ident">takes</span> <span class="op">=</span> <span class="ident">start</span>.<span class="ident">elapsed</span>();
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">resolver</span>) <span class="op">=</span> <span class="ident">resolver</span> {
-            <span class="self">Self</span>::<span class="ident">finish_building_resolver</span>(<span class="self">self</span>.<span class="ident">observe_id</span>, <span class="ident">resolver</span>, <span class="ident">region</span>, <span class="self">self</span>.<span class="ident">sched</span>.<span class="ident">clone</span>());
+            <span class="self">self</span>.<span class="ident">finish_building_resolver</span>(<span class="ident">resolver</span>, <span class="ident">region</span>, <span class="ident">takes</span>);
         }
 
-        <span class="ident">CDC_SCAN_DURATION_HISTOGRAM</span>.<span class="ident">observe</span>(<span class="ident">start</span>.<span class="ident">elapsed</span>().<span class="ident">as_secs_f64</span>());
+        <span class="ident">CDC_SCAN_DURATION_HISTOGRAM</span>.<span class="ident">observe</span>(<span class="ident">takes</span>.<span class="ident">as_secs_f64</span>());
     }
 
     <span class="kw">fn</span> <span class="ident">scan_batch</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">Snapshot</span><span class="op">&gt;</span>(
@@ -2169,32 +2160,21 @@
         <span class="prelude-val">Ok</span>(<span class="ident">entries</span>)
     }
 
-    <span class="kw">fn</span> <span class="ident">finish_building_resolver</span>(
-        <span class="ident">observe_id</span>: <span class="ident">ObserveID</span>,
-        <span class="kw-2">mut</span> <span class="ident">resolver</span>: <span class="ident">Resolver</span>,
-        <span class="ident">region</span>: <span class="ident">Region</span>,
-        <span class="ident">sched</span>: <span class="ident">Scheduler</span><span class="op">&lt;</span><span class="ident">Task</span><span class="op">&gt;</span>,
-    ) {
+    <span class="kw">fn</span> <span class="ident">finish_building_resolver</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw-2">mut</span> <span class="ident">resolver</span>: <span class="ident">Resolver</span>, <span class="ident">region</span>: <span class="ident">Region</span>, <span class="ident">takes</span>: <span class="ident">Duration</span>) {
+        <span class="kw">let</span> <span class="ident">observe_id</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">observe_id</span>;
         <span class="ident">resolver</span>.<span class="ident">init</span>();
-        <span class="kw">if</span> <span class="ident">resolver</span>.<span class="ident">locks</span>().<span class="ident">is_empty</span>() {
-            <span class="macro">info</span><span class="macro">!</span>(
-                <span class="string">&quot;no lock found&quot;</span>;
-                <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region</span>.<span class="ident">get_id</span>()
-            );
-        } <span class="kw">else</span> {
-            <span class="kw">let</span> <span class="ident">rts</span> <span class="op">=</span> <span class="ident">resolver</span>.<span class="ident">resolve</span>(<span class="ident">TimeStamp</span>::<span class="ident">zero</span>());
-            <span class="macro">info</span><span class="macro">!</span>(
-                <span class="string">&quot;resolver initialized&quot;</span>;
-                <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region</span>.<span class="ident">get_id</span>(),
-                <span class="string">&quot;resolved_ts&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">rts</span>,
-                <span class="string">&quot;lock_count&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">resolver</span>.<span class="ident">locks</span>().<span class="ident">len</span>(),
-                <span class="string">&quot;observe_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">observe_id</span>,
-            );
-        }
+        <span class="kw">let</span> <span class="ident">rts</span> <span class="op">=</span> <span class="ident">resolver</span>.<span class="ident">resolve</span>(<span class="ident">TimeStamp</span>::<span class="ident">zero</span>());
+        <span class="macro">info</span><span class="macro">!</span>(
+            <span class="string">&quot;resolver initialized and schedule resolver ready&quot;</span>;
+            <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region</span>.<span class="ident">get_id</span>(),
+            <span class="string">&quot;resolved_ts&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">rts</span>,
+            <span class="string">&quot;lock_count&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">resolver</span>.<span class="ident">locks</span>().<span class="ident">len</span>(),
+            <span class="string">&quot;observe_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">observe_id</span>,
+            <span class="string">&quot;takes&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">takes</span>,
+        );
 
         <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;before_schedule_resolver_ready&quot;</span>);
-        <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;schedule resolver ready&quot;</span>; <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region</span>.<span class="ident">get_id</span>(), <span class="string">&quot;observe_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">observe_id</span>);
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">sched</span>.<span class="ident">schedule</span>(<span class="ident">Task</span>::<span class="ident">ResolverReady</span> {
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">sched</span>.<span class="ident">schedule</span>(<span class="ident">Task</span>::<span class="ident">ResolverReady</span> {
             <span class="ident">observe_id</span>,
             <span class="ident">resolver</span>,
             <span class="ident">region</span>,
