@@ -1035,6 +1035,8 @@
 <span id="1035">1035</span>
 <span id="1036">1036</span>
 <span id="1037">1037</span>
+<span id="1038">1038</span>
+<span id="1039">1039</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! This module startups all the components of a TiKV server.</span>
 <span class="doccomment">//!</span>
@@ -1176,13 +1178,12 @@
     <span class="ident">engines</span>: <span class="ident">Engines</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span>,
     <span class="ident">store_meta</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">StoreMeta</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">engine</span>: <span class="ident">RaftKv</span><span class="op">&lt;</span><span class="ident">ServerRaftStoreRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">raft_router</span>: <span class="ident">ServerRaftStoreRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">struct</span> <span class="ident">Servers</span> {
     <span class="ident">lock_mgr</span>: <span class="ident">LockManager</span>,
-    <span class="ident">server</span>: <span class="ident">Server</span><span class="op">&lt;</span><span class="ident">ServerRaftStoreRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span>, <span class="ident">resolve</span>::<span class="ident">PdStoreAddrResolver</span><span class="op">&gt;</span>,
-    <span class="ident">node</span>: <span class="ident">Node</span><span class="op">&lt;</span><span class="ident">RpcClient</span><span class="op">&gt;</span>,
+    <span class="ident">server</span>: <span class="ident">Server</span><span class="op">&lt;</span><span class="ident">RaftRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span>, <span class="ident">resolve</span>::<span class="ident">PdStoreAddrResolver</span><span class="op">&gt;</span>,
+    <span class="ident">node</span>: <span class="ident">Node</span><span class="op">&lt;</span><span class="ident">RpcClient</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span>,
     <span class="ident">importer</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">SSTImporter</span><span class="op">&gt;</span>,
     <span class="ident">cdc_scheduler</span>: <span class="ident">tikv_util</span>::<span class="ident">worker</span>::<span class="ident">Scheduler</span><span class="op">&lt;</span><span class="ident">cdc</span>::<span class="ident">Task</span><span class="op">&gt;</span>,
 }
@@ -1474,6 +1475,7 @@
         <span class="kw">let</span> <span class="ident">local_reader</span> <span class="op">=</span>
             <span class="ident">LocalReader</span>::<span class="ident">new</span>(<span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">clone</span>(), <span class="ident">store_meta</span>.<span class="ident">clone</span>(), <span class="self">self</span>.<span class="ident">router</span>.<span class="ident">clone</span>());
         <span class="kw">let</span> <span class="ident">raft_router</span> <span class="op">=</span> <span class="ident">ServerRaftStoreRouter</span>::<span class="ident">new</span>(<span class="self">self</span>.<span class="ident">router</span>.<span class="ident">clone</span>(), <span class="ident">local_reader</span>);
+        <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span> <span class="ident">RaftKv</span>::<span class="ident">new</span>(<span class="ident">raft_router</span>, <span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">clone</span>());
 
         <span class="kw">let</span> <span class="ident">cfg_controller</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">cfg_controller</span>.<span class="ident">as_mut</span>().<span class="ident">unwrap</span>();
         <span class="ident">cfg_controller</span>.<span class="ident">register</span>(
@@ -1500,23 +1502,23 @@
             )),
         );
 
-        <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span> <span class="ident">RaftKv</span>::<span class="ident">new</span>(<span class="ident">raft_router</span>.<span class="ident">clone</span>(), <span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">clone</span>());
-
         <span class="self">self</span>.<span class="ident">engines</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">TiKVEngines</span> {
             <span class="ident">engines</span>,
             <span class="ident">store_meta</span>,
             <span class="ident">engine</span>,
-            <span class="ident">raft_router</span>,
         });
     }
 
     <span class="kw">fn</span> <span class="ident">init_gc_worker</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">GcWorker</span><span class="op">&lt;</span><span class="ident">RaftKv</span><span class="op">&lt;</span><span class="ident">ServerRaftStoreRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">GcWorker</span><span class="op">&lt;</span>
+        <span class="ident">RaftKv</span><span class="op">&lt;</span><span class="ident">ServerRaftStoreRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+        <span class="ident">RaftRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span>,
+    <span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">engines</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">engines</span>.<span class="ident">as_ref</span>().<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">gc_worker</span> <span class="op">=</span> <span class="ident">GcWorker</span>::<span class="ident">new</span>(
             <span class="ident">engines</span>.<span class="ident">engine</span>.<span class="ident">clone</span>(),
-            <span class="prelude-val">Some</span>(<span class="self">self</span>.<span class="ident">router</span>.<span class="ident">clone</span>()),
+            <span class="self">self</span>.<span class="ident">router</span>.<span class="ident">clone</span>(),
             <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">gc</span>.<span class="ident">clone</span>(),
             <span class="self">self</span>.<span class="ident">pd_client</span>.<span class="ident">cluster_version</span>(),
         );
@@ -1532,7 +1534,10 @@
 
     <span class="kw">fn</span> <span class="ident">init_servers</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
-        <span class="ident">gc_worker</span>: <span class="kw-2">&amp;</span><span class="ident">GcWorker</span><span class="op">&lt;</span><span class="ident">RaftKv</span><span class="op">&lt;</span><span class="ident">ServerRaftStoreRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+        <span class="ident">gc_worker</span>: <span class="kw-2">&amp;</span><span class="ident">GcWorker</span><span class="op">&lt;</span>
+            <span class="ident">RaftKv</span><span class="op">&lt;</span><span class="ident">ServerRaftStoreRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+            <span class="ident">RaftRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span>,
+        <span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">ServerConfig</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">cfg_controller</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">cfg_controller</span>.<span class="ident">as_mut</span>().<span class="ident">unwrap</span>();
         <span class="ident">cfg_controller</span>.<span class="ident">register</span>(
@@ -1642,7 +1647,7 @@
                 <span class="ident">cop_read_pool_handle</span>,
                 <span class="self">self</span>.<span class="ident">concurrency_manager</span>.<span class="ident">clone</span>(),
             ),
-            <span class="ident">engines</span>.<span class="ident">raft_router</span>.<span class="ident">clone</span>(),
+            <span class="self">self</span>.<span class="ident">router</span>.<span class="ident">clone</span>(),
             <span class="self">self</span>.<span class="ident">resolver</span>.<span class="ident">clone</span>(),
             <span class="ident">snap_mgr</span>.<span class="ident">clone</span>(),
             <span class="ident">gc_worker</span>.<span class="ident">clone</span>(),
@@ -1721,12 +1726,11 @@
         }
 
         <span class="comment">// Start CDC.</span>
-        <span class="kw">let</span> <span class="ident">raft_router</span> <span class="op">=</span> <span class="ident">engines</span>.<span class="ident">raft_router</span>.<span class="ident">clone</span>();
         <span class="kw">let</span> <span class="ident">cdc_endpoint</span> <span class="op">=</span> <span class="ident">cdc</span>::<span class="ident">Endpoint</span>::<span class="ident">new</span>(
             <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">config</span>.<span class="ident">cdc</span>,
             <span class="self">self</span>.<span class="ident">pd_client</span>.<span class="ident">clone</span>(),
             <span class="ident">cdc_worker</span>.<span class="ident">scheduler</span>(),
-            <span class="ident">raft_router</span>,
+            <span class="self">self</span>.<span class="ident">router</span>.<span class="ident">clone</span>(),
             <span class="ident">cdc_ob</span>,
             <span class="ident">engines</span>.<span class="ident">store_meta</span>.<span class="ident">clone</span>(),
             <span class="self">self</span>.<span class="ident">concurrency_manager</span>.<span class="ident">clone</span>(),
@@ -1755,7 +1759,7 @@
         <span class="comment">// Import SST service.</span>
         <span class="kw">let</span> <span class="ident">import_service</span> <span class="op">=</span> <span class="ident">ImportSSTService</span>::<span class="ident">new</span>(
             <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">import</span>.<span class="ident">clone</span>(),
-            <span class="ident">engines</span>.<span class="ident">raft_router</span>.<span class="ident">clone</span>(),
+            <span class="self">self</span>.<span class="ident">router</span>.<span class="ident">clone</span>(),
             <span class="ident">engines</span>.<span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">clone</span>(),
             <span class="ident">servers</span>.<span class="ident">importer</span>.<span class="ident">clone</span>(),
             <span class="self">self</span>.<span class="ident">security_mgr</span>.<span class="ident">clone</span>(),
@@ -1780,7 +1784,7 @@
         <span class="kw">let</span> <span class="ident">debug_service</span> <span class="op">=</span> <span class="ident">DebugService</span>::<span class="ident">new</span>(
             <span class="ident">engines</span>.<span class="ident">engines</span>.<span class="ident">clone</span>(),
             <span class="ident">pool</span>.<span class="ident">clone</span>(),
-            <span class="ident">engines</span>.<span class="ident">raft_router</span>.<span class="ident">clone</span>(),
+            <span class="self">self</span>.<span class="ident">router</span>.<span class="ident">clone</span>(),
             <span class="self">self</span>.<span class="ident">cfg_controller</span>.<span class="ident">as_ref</span>().<span class="ident">unwrap</span>().<span class="ident">clone</span>(),
             <span class="self">self</span>.<span class="ident">security_mgr</span>.<span class="ident">clone</span>(),
         );
