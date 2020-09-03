@@ -1311,8 +1311,6 @@
 <span id="1311">1311</span>
 <span id="1312">1312</span>
 <span id="1313">1313</span>
-<span id="1314">1314</span>
-<span id="1315">1315</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1326,7 +1324,6 @@
 <span class="kw">use</span> <span class="ident">crossbeam</span>::<span class="ident">atomic</span>::<span class="ident">AtomicCell</span>;
 <span class="kw">use</span> <span class="ident">engine_rocks</span>::{<span class="ident">RocksEngine</span>, <span class="ident">RocksSnapshot</span>};
 <span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">compat</span>::<span class="ident">Future01CompatExt</span>;
-<span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">future</span>::<span class="ident">TryFutureExt</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">cdcpb</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">kvrpcpb</span>::<span class="ident">ExtraOp</span> <span class="kw">as</span> <span class="ident">TxnExtraOp</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">metapb</span>::<span class="ident">Region</span>;
@@ -1943,7 +1940,7 @@
 
     <span class="kw">fn</span> <span class="ident">register_min_ts_event</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="kw">let</span> <span class="ident">timeout</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">timer</span>.<span class="ident">delay</span>(<span class="self">self</span>.<span class="ident">min_ts_interval</span>);
-        <span class="kw">let</span> <span class="ident">tso</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pd_client</span>.<span class="ident">get_tso</span>();
+        <span class="kw">let</span> <span class="ident">pd_client</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pd_client</span>.<span class="ident">clone</span>();
         <span class="kw">let</span> <span class="ident">scheduler</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">scheduler</span>.<span class="ident">clone</span>();
         <span class="kw">let</span> <span class="ident">raft_router</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">raft_router</span>.<span class="ident">clone</span>();
         <span class="kw">let</span> <span class="ident">regions</span>: <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">u64</span>, <span class="ident">ObserveID</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="self">self</span>
@@ -1953,10 +1950,9 @@
             .<span class="ident">collect</span>();
         <span class="kw">let</span> <span class="ident">cm</span>: <span class="ident">ConcurrencyManager</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">concurrency_manager</span>.<span class="ident">clone</span>();
         <span class="kw">let</span> <span class="ident">fut</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
-            <span class="kw">let</span> (<span class="ident">tso</span>, <span class="kw">_</span>) <span class="op">=</span>
-                <span class="ident">futures03</span>::<span class="ident">future</span>::<span class="ident">join</span>(<span class="ident">tso</span>, <span class="ident">timeout</span>.<span class="ident">compat</span>().<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="macro">unreachable</span><span class="macro">!</span>())).<span class="kw">await</span>;
+            <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="ident">timeout</span>.<span class="ident">compat</span>().<span class="kw">await</span>;
             <span class="comment">// Ignore get tso errors since we will retry every `min_ts_interval`.</span>
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">min_ts</span> <span class="op">=</span> <span class="ident">tso</span>.<span class="ident">unwrap_or_default</span>();
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">min_ts</span> <span class="op">=</span> <span class="ident">pd_client</span>.<span class="ident">get_tso</span>().<span class="kw">await</span>.<span class="ident">unwrap_or_default</span>();
 
             <span class="comment">// Sync with concurrency manager so that it can work correctly when optimizations</span>
             <span class="comment">// like async commit is enabled.</span>
