@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["MAX_DELETE_BATCH_SIZE",""]],"trait":[["MiscExt",""]]});
+initSidebarItems({"constant":[["MAX_DELETE_BATCH_COUNT",""]],"trait":[["MiscExt",""]]});
