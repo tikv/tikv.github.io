@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `/rust/git/checkouts/raft-engine-35ec7b0b2c07ddd2/16f8a37/src/log_batch.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>log_batch.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css"><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="shortcut icon" href="../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../raft_engine/index.html'><div class='logo-container'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `/rust/git/checkouts/raft-engine-35ec7b0b2c07ddd2/5e305ec/src/log_batch.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>log_batch.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css"><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="shortcut icon" href="../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../raft_engine/index.html'><div class='logo-container'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
 <span id="2">  2</span>
 <span id="3">  3</span>
 <span id="4">  4</span>
@@ -725,24 +725,38 @@
 <span id="725">725</span>
 <span id="726">726</span>
 <span id="727">727</span>
+<span id="728">728</span>
+<span id="729">729</span>
+<span id="730">730</span>
+<span id="731">731</span>
+<span id="732">732</span>
+<span id="733">733</span>
+<span id="734">734</span>
+<span id="735">735</span>
+<span id="736">736</span>
+<span id="737">737</span>
+<span id="738">738</span>
+<span id="739">739</span>
+<span id="740">740</span>
+<span id="741">741</span>
+<span id="742">742</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">borrow</span>::{<span class="ident">Borrow</span>, <span class="ident">Cow</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">cell</span>::<span class="ident">RefCell</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">BufRead</span>;
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">marker</span>::<span class="ident">PhantomData</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::<span class="ident">AtomicUsize</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">Arc</span>;
 <span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">mem</span>, <span class="ident">u64</span>};
 
 <span class="kw">use</span> <span class="ident">byteorder</span>::{<span class="ident">BigEndian</span>, <span class="ident">ReadBytesExt</span>, <span class="ident">WriteBytesExt</span>};
 <span class="kw">use</span> <span class="ident">crc32fast</span>::<span class="ident">Hasher</span>;
-<span class="kw">use</span> <span class="ident">protobuf</span>::<span class="ident">Message</span> <span class="kw">as</span> <span class="ident">PbMsg</span>;
-<span class="kw">use</span> <span class="ident">raft</span>::<span class="ident">eraftpb</span>::<span class="ident">Entry</span>;
+<span class="kw">use</span> <span class="ident">protobuf</span>::<span class="ident">Message</span>;
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">cache_evict</span>::<span class="ident">CacheTracker</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">codec</span>::{<span class="self">self</span>, <span class="ident">Error</span> <span class="kw">as</span> <span class="ident">CodecError</span>, <span class="ident">NumberEncoder</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">memtable</span>::<span class="ident">EntryIndex</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">RAFT_LOG_STATE_KEY</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">Error</span>, <span class="ident">RaftLocalState</span>, <span class="ident">RaftLogBatch</span>, <span class="prelude-ty">Result</span>};
+<span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">Error</span>, <span class="prelude-ty">Result</span>};
 
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BATCH_MIN_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">HEADER_LEN</span> <span class="op">+</span> <span class="ident">CHECKSUM_LEN</span>;
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">HEADER_LEN</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">8</span>;
@@ -852,15 +866,28 @@
 
 <span class="kw">type</span> <span class="ident">SliceReader</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> [<span class="ident">u8</span>];
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">PartialEq</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Entries</span> {
-    <span class="kw">pub</span> <span class="ident">entries</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Entry</span><span class="op">&gt;</span>,
+<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">EntryExt</span><span class="op">&lt;</span><span class="ident">M</span>: <span class="ident">Message</span><span class="op">&gt;</span>: <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span> {
+    <span class="kw">fn</span> <span class="ident">index</span>(<span class="ident">m</span>: <span class="kw-2">&amp;</span><span class="ident">M</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u64</span>;
+}
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Entries</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">E</span>: <span class="ident">Message</span>,
+{
+    <span class="kw">pub</span> <span class="ident">entries</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>,
     <span class="comment">// EntryIndex may be update after write to file.</span>
     <span class="kw">pub</span> <span class="ident">entries_index</span>: <span class="ident">RefCell</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">EntryIndex</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 }
 
-<span class="kw">impl</span> <span class="ident">Entries</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">entries</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Entry</span><span class="op">&gt;</span>, <span class="ident">entries_index</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">EntryIndex</span><span class="op">&gt;</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Entries</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">Message</span> <span class="op">+</span> <span class="ident">PartialEq</span><span class="op">&gt;</span> <span class="ident">PartialEq</span> <span class="kw">for</span> <span class="ident">Entries</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">eq</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Entries</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+        <span class="self">self</span>.<span class="ident">entries</span> <span class="op">=</span><span class="op">=</span> <span class="ident">other</span>.<span class="ident">entries</span> <span class="kw-2">&amp;</span><span class="op">&amp;</span> <span class="self">self</span>.<span class="ident">entries_index</span> <span class="op">=</span><span class="op">=</span> <span class="ident">other</span>.<span class="ident">entries_index</span>
+    }
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">Message</span><span class="op">&gt;</span> <span class="ident">Entries</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">entries</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>, <span class="ident">entries_index</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">EntryIndex</span><span class="op">&gt;</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Entries</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">len</span> <span class="op">=</span> <span class="ident">entries</span>.<span class="ident">len</span>();
         <span class="ident">Entries</span> {
             <span class="ident">entries</span>,
@@ -871,23 +898,23 @@
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_bytes</span>(
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_bytes</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">EntryExt</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span><span class="op">&gt;</span>(
         <span class="ident">buf</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">SliceReader</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>,
         <span class="ident">file_num</span>: <span class="ident">u64</span>,
         <span class="ident">base_offset</span>: <span class="ident">u64</span>,  <span class="comment">// Offset of the batch from its log file.</span>
         <span class="ident">batch_offset</span>: <span class="ident">u64</span>, <span class="comment">// Offset of the item from in its batch.</span>
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Entries</span><span class="op">&gt;</span> {
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Entries</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">content_len</span> <span class="op">=</span> <span class="ident">buf</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">u64</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">count</span> <span class="op">=</span> <span class="ident">codec</span>::<span class="ident">decode_var_u64</span>(<span class="ident">buf</span>)<span class="question-mark">?</span> <span class="kw">as</span> <span class="ident">usize</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">entries</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">with_capacity</span>(<span class="ident">count</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">entries_index</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">with_capacity</span>(<span class="ident">count</span>);
         <span class="kw">while</span> <span class="ident">count</span> <span class="op">&gt;</span> <span class="number">0</span> {
             <span class="kw">let</span> <span class="ident">len</span> <span class="op">=</span> <span class="ident">codec</span>::<span class="ident">decode_var_u64</span>(<span class="ident">buf</span>)<span class="question-mark">?</span> <span class="kw">as</span> <span class="ident">usize</span>;
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">e</span> <span class="op">=</span> <span class="ident">Entry</span>::<span class="ident">new</span>();
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">e</span> <span class="op">=</span> <span class="ident">E</span>::<span class="ident">new</span>();
             <span class="ident">e</span>.<span class="ident">merge_from_bytes</span>(<span class="kw-2">&amp;</span><span class="ident">buf</span>[..<span class="ident">len</span>])<span class="question-mark">?</span>;
 
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">entry_index</span> <span class="op">=</span> <span class="ident">EntryIndex</span>::<span class="ident">default</span>();
-            <span class="ident">entry_index</span>.<span class="ident">index</span> <span class="op">=</span> <span class="ident">e</span>.<span class="ident">get_index</span>();
+            <span class="ident">entry_index</span>.<span class="ident">index</span> <span class="op">=</span> <span class="ident">W</span>::<span class="ident">index</span>(<span class="kw-2">&amp;</span><span class="ident">e</span>);
             <span class="ident">entry_index</span>.<span class="ident">file_num</span> <span class="op">=</span> <span class="ident">file_num</span>;
             <span class="ident">entry_index</span>.<span class="ident">base_offset</span> <span class="op">=</span> <span class="ident">base_offset</span>;
             <span class="ident">entry_index</span>.<span class="ident">offset</span> <span class="op">=</span> <span class="ident">batch_offset</span> <span class="op">+</span> <span class="ident">content_len</span> <span class="op">-</span> <span class="ident">buf</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">u64</span>;
@@ -902,7 +929,7 @@
         <span class="prelude-val">Ok</span>(<span class="ident">Entries</span>::<span class="ident">new</span>(<span class="ident">entries</span>, <span class="prelude-val">Some</span>(<span class="ident">entries_index</span>)))
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">encode_to</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">vec</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">encode_to</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">EntryExt</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">vec</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">entries</span>.<span class="ident">is_empty</span>() {
             <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
         }
@@ -918,7 +945,7 @@
             <span class="comment">// file_num = 0 means entry index is not initialized.</span>
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">entries_index</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">entries_index</span>.<span class="ident">borrow_mut</span>();
             <span class="kw">if</span> <span class="ident">entries_index</span>[<span class="ident">i</span>].<span class="ident">file_num</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
-                <span class="ident">entries_index</span>[<span class="ident">i</span>].<span class="ident">index</span> <span class="op">=</span> <span class="ident">e</span>.<span class="ident">get_index</span>();
+                <span class="ident">entries_index</span>[<span class="ident">i</span>].<span class="ident">index</span> <span class="op">=</span> <span class="ident">W</span>::<span class="ident">index</span>(<span class="kw-2">&amp;</span><span class="ident">e</span>);
                 <span class="comment">// This offset doesn&#39;t count the header.</span>
                 <span class="ident">entries_index</span>[<span class="ident">i</span>].<span class="ident">offset</span> <span class="op">=</span> <span class="ident">vec</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">u64</span>;
                 <span class="ident">entries_index</span>[<span class="ident">i</span>].<span class="ident">len</span> <span class="op">=</span> <span class="ident">content</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">u64</span>;
@@ -1061,27 +1088,33 @@
 }
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">PartialEq</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">LogItem</span> {
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">LogItem</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">E</span>: <span class="ident">Message</span>,
+{
     <span class="kw">pub</span> <span class="ident">raft_group_id</span>: <span class="ident">u64</span>,
-    <span class="kw">pub</span> <span class="ident">content</span>: <span class="ident">LogItemContent</span>,
+    <span class="kw">pub</span> <span class="ident">content</span>: <span class="ident">LogItemContent</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>,
 }
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">PartialEq</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">LogItemContent</span> {
-    <span class="ident">Entries</span>(<span class="ident">Entries</span>),
+<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">LogItemContent</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">E</span>: <span class="ident">Message</span>,
+{
+    <span class="ident">Entries</span>(<span class="ident">Entries</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>),
     <span class="ident">Command</span>(<span class="ident">Command</span>),
     <span class="ident">Kv</span>(<span class="ident">KeyValue</span>),
 }
 
-<span class="kw">impl</span> <span class="ident">LogItem</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_entries</span>(<span class="ident">raft_group_id</span>: <span class="ident">u64</span>, <span class="ident">entries</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Entry</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">LogItem</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">Message</span><span class="op">&gt;</span> <span class="ident">LogItem</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_entries</span>(<span class="ident">raft_group_id</span>: <span class="ident">u64</span>, <span class="ident">entries</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">LogItem</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
         <span class="ident">LogItem</span> {
             <span class="ident">raft_group_id</span>,
             <span class="ident">content</span>: <span class="ident">LogItemContent</span>::<span class="ident">Entries</span>(<span class="ident">Entries</span>::<span class="ident">new</span>(<span class="ident">entries</span>, <span class="prelude-val">None</span>)),
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_command</span>(<span class="ident">raft_group_id</span>: <span class="ident">u64</span>, <span class="ident">command</span>: <span class="ident">Command</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">LogItem</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_command</span>(<span class="ident">raft_group_id</span>: <span class="ident">u64</span>, <span class="ident">command</span>: <span class="ident">Command</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">LogItem</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
         <span class="ident">LogItem</span> {
             <span class="ident">raft_group_id</span>,
             <span class="ident">content</span>: <span class="ident">LogItemContent</span>::<span class="ident">Command</span>(<span class="ident">command</span>),
@@ -1093,20 +1126,20 @@
         <span class="ident">op_type</span>: <span class="ident">OpType</span>,
         <span class="ident">key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
         <span class="ident">value</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">LogItem</span> {
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">LogItem</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
         <span class="ident">LogItem</span> {
             <span class="ident">raft_group_id</span>,
             <span class="ident">content</span>: <span class="ident">LogItemContent</span>::<span class="ident">Kv</span>(<span class="ident">KeyValue</span>::<span class="ident">new</span>(<span class="ident">op_type</span>, <span class="ident">key</span>, <span class="ident">value</span>)),
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">encode_to</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">vec</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">encode_to</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">EntryExt</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">vec</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="comment">// layout = { 8 byte id | 1 byte type | item layout }</span>
         <span class="ident">vec</span>.<span class="ident">encode_var_u64</span>(<span class="self">self</span>.<span class="ident">raft_group_id</span>)<span class="question-mark">?</span>;
         <span class="kw">match</span> <span class="self">self</span>.<span class="ident">content</span> {
             <span class="ident">LogItemContent</span>::<span class="ident">Entries</span>(<span class="kw-2">ref</span> <span class="ident">entries</span>) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="ident">vec</span>.<span class="ident">push</span>(<span class="ident">TYPE_ENTRIES</span>);
-                <span class="ident">entries</span>.<span class="ident">encode_to</span>(<span class="ident">vec</span>)<span class="question-mark">?</span>;
+                <span class="ident">entries</span>.<span class="ident">encode_to</span>::<span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span>(<span class="ident">vec</span>)<span class="question-mark">?</span>;
             }
             <span class="ident">LogItemContent</span>::<span class="ident">Command</span>(<span class="kw-2">ref</span> <span class="ident">command</span>) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="ident">vec</span>.<span class="ident">push</span>(<span class="ident">TYPE_COMMAND</span>);
@@ -1120,12 +1153,12 @@
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_bytes</span>(
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_bytes</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">EntryExt</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span><span class="op">&gt;</span>(
         <span class="ident">buf</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">SliceReader</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>,
         <span class="ident">file_num</span>: <span class="ident">u64</span>,
         <span class="ident">base_offset</span>: <span class="ident">u64</span>,      <span class="comment">// Offset of the batch from its log file.</span>
         <span class="kw-2">mut</span> <span class="ident">batch_offset</span>: <span class="ident">u64</span>, <span class="comment">// Offset of the item from in its batch.</span>
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">LogItem</span><span class="op">&gt;</span> {
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">LogItem</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">buf_len</span> <span class="op">=</span> <span class="ident">buf</span>.<span class="ident">len</span>();
         <span class="kw">let</span> <span class="ident">raft_group_id</span> <span class="op">=</span> <span class="ident">codec</span>::<span class="ident">decode_var_u64</span>(<span class="ident">buf</span>)<span class="question-mark">?</span>;
         <span class="ident">batch_offset</span> <span class="op">+</span><span class="op">=</span> (<span class="ident">buf_len</span> <span class="op">-</span> <span class="ident">buf</span>.<span class="ident">len</span>()) <span class="kw">as</span> <span class="ident">u64</span>;
@@ -1133,7 +1166,7 @@
         <span class="ident">batch_offset</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
         <span class="kw">let</span> <span class="ident">content</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">item_type</span> {
             <span class="ident">TYPE_ENTRIES</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">let</span> <span class="ident">entries</span> <span class="op">=</span> <span class="ident">Entries</span>::<span class="ident">from_bytes</span>(<span class="ident">buf</span>, <span class="ident">file_num</span>, <span class="ident">base_offset</span>, <span class="ident">batch_offset</span>)<span class="question-mark">?</span>;
+                <span class="kw">let</span> <span class="ident">entries</span> <span class="op">=</span> <span class="ident">Entries</span>::<span class="ident">from_bytes</span>::<span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span>(<span class="ident">buf</span>, <span class="ident">file_num</span>, <span class="ident">base_offset</span>, <span class="ident">batch_offset</span>)<span class="question-mark">?</span>;
                 <span class="ident">LogItemContent</span>::<span class="ident">Entries</span>(<span class="ident">entries</span>)
             }
             <span class="ident">TYPE_COMMAND</span> <span class="op">=</span><span class="op">&gt;</span> {
@@ -1154,19 +1187,33 @@
 }
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">PartialEq</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">LogBatch</span> {
-    <span class="kw">pub</span> <span class="ident">items</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">LogItem</span><span class="op">&gt;</span>,
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">LogBatch</span><span class="op">&lt;</span><span class="ident">E</span>, <span class="ident">W</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">E</span>: <span class="ident">Message</span>,
+    <span class="ident">W</span>: <span class="ident">EntryExt</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>,
+{
+    <span class="kw">pub</span> <span class="ident">items</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">LogItem</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">_phantom</span>: <span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span>,
 }
 
-<span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">LogBatch</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>, <span class="ident">W</span><span class="op">&gt;</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">LogBatch</span><span class="op">&lt;</span><span class="ident">E</span>, <span class="ident">W</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">E</span>: <span class="ident">Message</span>,
+    <span class="ident">W</span>: <span class="ident">EntryExt</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>,
+{
     <span class="kw">fn</span> <span class="ident">default</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="self">Self</span> {
             <span class="ident">items</span>: <span class="ident">Vec</span>::<span class="ident">with_capacity</span>(<span class="number">16</span>),
+            <span class="ident">_phantom</span>: <span class="ident">PhantomData</span>,
         }
     }
 }
 
-<span class="kw">impl</span> <span class="ident">LogBatch</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>, <span class="ident">W</span><span class="op">&gt;</span> <span class="ident">LogBatch</span><span class="op">&lt;</span><span class="ident">E</span>, <span class="ident">W</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">E</span>: <span class="ident">Message</span>,
+    <span class="ident">W</span>: <span class="ident">EntryExt</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>,
+{
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="self">Self</span>::<span class="ident">default</span>()
     }
@@ -1174,10 +1221,11 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">with_capacity</span>(<span class="ident">cap</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="self">Self</span> {
             <span class="ident">items</span>: <span class="ident">Vec</span>::<span class="ident">with_capacity</span>(<span class="ident">cap</span>),
+            <span class="ident">_phantom</span>: <span class="ident">PhantomData</span>,
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add_entries</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">region_id</span>: <span class="ident">u64</span>, <span class="ident">entries</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Entry</span><span class="op">&gt;</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add_entries</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">region_id</span>: <span class="ident">u64</span>, <span class="ident">entries</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>) {
         <span class="kw">let</span> <span class="ident">item</span> <span class="op">=</span> <span class="ident">LogItem</span>::<span class="ident">from_entries</span>(<span class="ident">region_id</span>, <span class="ident">entries</span>);
         <span class="self">self</span>.<span class="ident">items</span>.<span class="ident">push</span>(<span class="ident">item</span>);
     }
@@ -1221,7 +1269,7 @@
         <span class="ident">file_num</span>: <span class="ident">u64</span>,
         <span class="comment">// The offset of the batch from its log file.</span>
         <span class="ident">base_offset</span>: <span class="ident">u64</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">LogBatch</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">LogBatch</span><span class="op">&lt;</span><span class="ident">E</span>, <span class="ident">W</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="ident">buf</span>.<span class="ident">is_empty</span>() {
             <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>);
         }
@@ -1247,7 +1295,8 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">log_batch</span> <span class="op">=</span> <span class="ident">LogBatch</span>::<span class="ident">with_capacity</span>(<span class="ident">items_count</span>);
         <span class="kw">while</span> <span class="ident">items_count</span> <span class="op">&gt;</span> <span class="number">0</span> {
             <span class="kw">let</span> <span class="ident">content_offset</span> <span class="op">=</span> (<span class="ident">content_len</span> <span class="op">-</span> <span class="ident">reader</span>.<span class="ident">len</span>()) <span class="kw">as</span> <span class="ident">u64</span>;
-            <span class="kw">let</span> <span class="ident">item</span> <span class="op">=</span> <span class="ident">LogItem</span>::<span class="ident">from_bytes</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">reader</span>, <span class="ident">file_num</span>, <span class="ident">base_offset</span>, <span class="ident">content_offset</span>)<span class="question-mark">?</span>;
+            <span class="kw">let</span> <span class="ident">item</span> <span class="op">=</span>
+                <span class="ident">LogItem</span>::<span class="ident">from_bytes</span>::<span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">reader</span>, <span class="ident">file_num</span>, <span class="ident">base_offset</span>, <span class="ident">content_offset</span>)<span class="question-mark">?</span>;
             <span class="ident">log_batch</span>.<span class="ident">items</span>.<span class="ident">push</span>(<span class="ident">item</span>);
             <span class="ident">items_count</span> <span class="op">-</span><span class="op">=</span> <span class="number">1</span>;
         }
@@ -1274,7 +1323,7 @@
         <span class="ident">vec</span>.<span class="ident">encode_u64</span>(<span class="number">0</span>).<span class="ident">unwrap</span>();
         <span class="ident">vec</span>.<span class="ident">encode_var_u64</span>(<span class="self">self</span>.<span class="ident">items</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">u64</span>).<span class="ident">unwrap</span>();
         <span class="kw">for</span> <span class="ident">item</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">items</span> {
-            <span class="ident">item</span>.<span class="ident">encode_to</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">vec</span>).<span class="ident">unwrap</span>();
+            <span class="ident">item</span>.<span class="ident">encode_to</span>::<span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">vec</span>).<span class="ident">unwrap</span>();
         }
 
         <span class="kw">let</span> <span class="ident">compression_type</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">vec</span>.<span class="ident">len</span>() <span class="op">&gt;</span> <span class="ident">COMPRESSION_SIZE</span> {
@@ -1316,25 +1365,6 @@
     }
 }
 
-<span class="kw">impl</span> <span class="ident">RaftLogBatch</span> <span class="kw">for</span> <span class="ident">LogBatch</span> {
-    <span class="kw">fn</span> <span class="ident">append</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">raft_group_id</span>: <span class="ident">u64</span>, <span class="ident">entries</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Entry</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">add_entries</span>(<span class="ident">raft_group_id</span>, <span class="ident">entries</span>);
-        <span class="prelude-val">Ok</span>(())
-    }
-
-    <span class="kw">fn</span> <span class="ident">cut_logs</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="kw">_</span>: <span class="ident">u64</span>, <span class="kw">_</span>: <span class="ident">u64</span>, <span class="kw">_</span>: <span class="ident">u64</span>) {
-        <span class="comment">// It&#39;s unnecessary because overlapped entries can be handled in `append`.</span>
-    }
-
-    <span class="kw">fn</span> <span class="ident">put_raft_state</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">raft_group_id</span>: <span class="ident">u64</span>, <span class="ident">state</span>: <span class="kw-2">&amp;</span><span class="ident">RaftLocalState</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">put_msg</span>(<span class="ident">raft_group_id</span>, <span class="ident">RAFT_LOG_STATE_KEY</span>.<span class="ident">to_vec</span>(), <span class="ident">state</span>)
-    }
-
-    <span class="kw">fn</span> <span class="ident">is_empty</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">items</span>.<span class="ident">is_empty</span>()
-    }
-}
-
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">test_batch_checksum</span>(<span class="ident">buf</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
     <span class="kw">if</span> <span class="ident">buf</span>.<span class="ident">len</span>() <span class="op">&lt;</span><span class="op">=</span> <span class="ident">CHECKSUM_LEN</span> {
         <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">TooShort</span>);
@@ -1368,12 +1398,12 @@
         <span class="kw">let</span> <span class="ident">entries</span> <span class="op">=</span> <span class="ident">Entries</span>::<span class="ident">new</span>(<span class="ident">pb_entries</span>, <span class="prelude-val">None</span>);
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">encoded</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[];
-        <span class="ident">entries</span>.<span class="ident">encode_to</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">encoded</span>).<span class="ident">unwrap</span>();
+        <span class="ident">entries</span>.<span class="ident">encode_to</span>::<span class="op">&lt;</span><span class="ident">Entry</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">encoded</span>).<span class="ident">unwrap</span>();
         <span class="kw">for</span> <span class="ident">idx</span> <span class="kw">in</span> <span class="ident">entries</span>.<span class="ident">entries_index</span>.<span class="ident">borrow_mut</span>().<span class="ident">iter_mut</span>() {
             <span class="ident">idx</span>.<span class="ident">file_num</span> <span class="op">=</span> <span class="ident">file_num</span>;
         }
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">s</span> <span class="op">=</span> <span class="ident">encoded</span>.<span class="ident">as_slice</span>();
-        <span class="kw">let</span> <span class="ident">decode_entries</span> <span class="op">=</span> <span class="ident">Entries</span>::<span class="ident">from_bytes</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">s</span>, <span class="ident">file_num</span>, <span class="number">0</span>, <span class="number">0</span>).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">decode_entries</span> <span class="op">=</span> <span class="ident">Entries</span>::<span class="ident">from_bytes</span>::<span class="op">&lt;</span><span class="ident">Entry</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">s</span>, <span class="ident">file_num</span>, <span class="number">0</span>, <span class="number">0</span>).<span class="ident">unwrap</span>();
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">s</span>.<span class="ident">len</span>(), <span class="number">0</span>);
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">entries</span>.<span class="ident">entries</span>, <span class="ident">decode_entries</span>.<span class="ident">entries</span>);
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">entries</span>.<span class="ident">entries_index</span>, <span class="ident">decode_entries</span>.<span class="ident">entries_index</span>);
@@ -1418,9 +1448,9 @@
 
         <span class="kw">for</span> <span class="ident">item</span> <span class="kw">in</span> <span class="ident">items</span> {
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">encoded</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[];
-            <span class="ident">item</span>.<span class="ident">encode_to</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">encoded</span>).<span class="ident">unwrap</span>();
+            <span class="ident">item</span>.<span class="ident">encode_to</span>::<span class="op">&lt;</span><span class="ident">Entry</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">encoded</span>).<span class="ident">unwrap</span>();
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">s</span> <span class="op">=</span> <span class="ident">encoded</span>.<span class="ident">as_slice</span>();
-            <span class="kw">let</span> <span class="ident">decoded_item</span> <span class="op">=</span> <span class="ident">LogItem</span>::<span class="ident">from_bytes</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">s</span>, <span class="ident">file_num</span>, <span class="number">0</span>, <span class="number">0</span>).<span class="ident">unwrap</span>();
+            <span class="kw">let</span> <span class="ident">decoded_item</span> <span class="op">=</span> <span class="ident">LogItem</span>::<span class="ident">from_bytes</span>::<span class="op">&lt;</span><span class="ident">Entry</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">s</span>, <span class="ident">file_num</span>, <span class="number">0</span>, <span class="number">0</span>).<span class="ident">unwrap</span>();
             <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">s</span>.<span class="ident">len</span>(), <span class="number">0</span>);
 
             <span class="kw">if</span> <span class="kw">let</span> <span class="ident">LogItemContent</span>::<span class="ident">Entries</span>(<span class="kw-2">ref</span> <span class="ident">entries</span>) <span class="op">=</span> <span class="ident">item</span>.<span class="ident">content</span> {
@@ -1434,7 +1464,7 @@
     <span class="kw">fn</span> <span class="ident">test_log_batch_enc_dec</span>() {
         <span class="kw">let</span> <span class="ident">region_id</span> <span class="op">=</span> <span class="number">8</span>;
         <span class="kw">let</span> <span class="ident">file_num</span> <span class="op">=</span> <span class="number">1</span>;
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">batch</span> <span class="op">=</span> <span class="ident">LogBatch</span>::<span class="ident">new</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">batch</span> <span class="op">=</span> <span class="ident">LogBatch</span>::<span class="op">&lt;</span><span class="ident">Entry</span>, <span class="ident">Entry</span><span class="op">&gt;</span>::<span class="ident">new</span>();
         <span class="ident">batch</span>.<span class="ident">add_entries</span>(<span class="ident">region_id</span>, <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">Entry</span>::<span class="ident">new</span>(); <span class="number">10</span>]);
         <span class="ident">batch</span>.<span class="ident">add_command</span>(<span class="ident">region_id</span>, <span class="ident">Command</span>::<span class="ident">Clean</span>);
         <span class="ident">batch</span>.<span class="ident">put</span>(<span class="ident">region_id</span>, <span class="string">b&quot;key&quot;</span>.<span class="ident">to_vec</span>(), <span class="string">b&quot;value&quot;</span>.<span class="ident">to_vec</span>());

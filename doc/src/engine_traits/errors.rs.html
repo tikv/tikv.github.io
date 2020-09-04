@@ -59,10 +59,35 @@
 <span id="59">59</span>
 <span id="60">60</span>
 <span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
 <span class="kw">use</span> <span class="ident">error_code</span>::{<span class="self">self</span>, <span class="ident">ErrorCode</span>, <span class="ident">ErrorCodeExt</span>};
+<span class="kw">use</span> <span class="ident">raft</span>::{<span class="ident">Error</span> <span class="kw">as</span> <span class="ident">RaftError</span>, <span class="ident">StorageError</span>};
 <span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">error</span>, <span class="ident">result</span>};
 
 <span class="macro">quick_error</span><span class="macro">!</span> {
@@ -103,6 +128,14 @@
             <span class="ident">cause</span>(<span class="ident">err</span>)
             <span class="ident">display</span>(<span class="string">&quot;Codec {}&quot;</span>, <span class="ident">err</span>)
         }
+        <span class="ident">EntriesUnavailable</span> {
+            <span class="ident">from</span>()
+            <span class="ident">display</span>(<span class="string">&quot;The entries of region is unavailable&quot;</span>)
+        }
+        <span class="ident">EntriesCompacted</span> {
+            <span class="ident">from</span>()
+            <span class="ident">display</span>(<span class="string">&quot;The entries of region is compacted&quot;</span>)
+        }
     }
 }
 
@@ -118,6 +151,21 @@
             <span class="ident">Error</span>::<span class="ident">CFName</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">error_code</span>::<span class="ident">engine</span>::<span class="ident">CF_NAME</span>,
             <span class="ident">Error</span>::<span class="ident">Codec</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">error_code</span>::<span class="ident">engine</span>::<span class="ident">CODEC</span>,
             <span class="ident">Error</span>::<span class="ident">Other</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">error_code</span>::<span class="ident">engine</span>::<span class="ident">UNKNOWN</span>,
+            <span class="ident">Error</span>::<span class="ident">EntriesUnavailable</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">error_code</span>::<span class="ident">engine</span>::<span class="ident">DATALOSS</span>,
+            <span class="ident">Error</span>::<span class="ident">EntriesCompacted</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">error_code</span>::<span class="ident">engine</span>::<span class="ident">DATACOMPACTED</span>,
+        }
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Error</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">RaftError</span> {
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">e</span>: <span class="ident">Error</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">RaftError</span> {
+        <span class="kw">match</span> <span class="ident">e</span> {
+            <span class="ident">Error</span>::<span class="ident">EntriesUnavailable</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">RaftError</span>::<span class="ident">Store</span>(<span class="ident">StorageError</span>::<span class="ident">Unavailable</span>),
+            <span class="ident">Error</span>::<span class="ident">EntriesCompacted</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">RaftError</span>::<span class="ident">Store</span>(<span class="ident">StorageError</span>::<span class="ident">Compacted</span>),
+            <span class="ident">e</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="kw">let</span> <span class="ident">boxed</span> <span class="op">=</span> <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">e</span>) <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">std</span>::<span class="ident">error</span>::<span class="ident">Error</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span>;
+                <span class="ident">raft</span>::<span class="ident">Error</span>::<span class="ident">Store</span>(<span class="ident">StorageError</span>::<span class="ident">Other</span>(<span class="ident">boxed</span>))
+            }
         }
     }
 }
