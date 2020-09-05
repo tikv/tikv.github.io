@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["RAFT_LOG_STATE_KEY",""]],"fn":[["transfer_error",""]],"struct":[["CacheStats",""],["EntryExtTyped",""],["RaftLogBatch",""],["RaftLogEngine",""]]});
+initSidebarItems({"constant":[["RAFT_LOG_STATE_KEY",""]],"fn":[["transfer_error",""]],"struct":[["EntryExtTyped",""],["RaftEngineConfig",""],["RaftLogBatch",""],["RaftLogEngine",""]]});

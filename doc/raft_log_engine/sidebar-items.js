@@ -1,1 +1,1 @@
-initSidebarItems({"mod":[["engine",""]]});
+initSidebarItems({"mod":[["engine",""]],"struct":[["RaftLogBatch",""],["RaftLogEngine",""]]});
