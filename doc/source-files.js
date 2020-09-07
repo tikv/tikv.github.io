@@ -283,6 +283,7 @@ sourcesIndex["tempfile"] = {"name":"","dirs":[{"name":"file","dirs":[{"name":"im
 sourcesIndex["term"] = {"name":"","dirs":[{"name":"terminfo","dirs":[{"name":"parser","files":["compiled.rs","names.rs"]}],"files":["mod.rs","parm.rs","searcher.rs"]}],"files":["lib.rs"]};
 sourcesIndex["test_coprocessor"] = {"name":"","files":["column.rs","dag.rs","fixture.rs","lib.rs","store.rs","table.rs","util.rs"]};
 sourcesIndex["test_engine_traits"] = {"name":"","files":["lib.rs"]};
+sourcesIndex["test_pd"] = {"name":"","dirs":[{"name":"mocker","files":["bootstrap.rs","incompatible.rs","leader_change.rs","mod.rs","retry.rs","service.rs","split.rs"]}],"files":["lib.rs","server.rs","util.rs"]};
 sourcesIndex["test_raftstore"] = {"name":"","files":["cluster.rs","lib.rs","node.rs","pd.rs","router.rs","server.rs","transport_simulate.rs","util.rs"]};
 sourcesIndex["test_sst_importer"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["test_storage"] = {"name":"","files":["assert_storage.rs","lib.rs","sync_storage.rs","util.rs"]};
