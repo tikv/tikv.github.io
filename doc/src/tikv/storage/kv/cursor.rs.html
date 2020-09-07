@@ -633,6 +633,31 @@
 <span id="633">633</span>
 <span id="634">634</span>
 <span id="635">635</span>
+<span id="636">636</span>
+<span id="637">637</span>
+<span id="638">638</span>
+<span id="639">639</span>
+<span id="640">640</span>
+<span id="641">641</span>
+<span id="642">642</span>
+<span id="643">643</span>
+<span id="644">644</span>
+<span id="645">645</span>
+<span id="646">646</span>
+<span id="647">647</span>
+<span id="648">648</span>
+<span id="649">649</span>
+<span id="650">650</span>
+<span id="651">651</span>
+<span id="652">652</span>
+<span id="653">653</span>
+<span id="654">654</span>
+<span id="655">655</span>
+<span id="656">656</span>
+<span id="657">657</span>
+<span id="658">658</span>
+<span id="659">659</span>
+<span id="660">660</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -640,6 +665,7 @@
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">cmp</span>::<span class="ident">Ordering</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">ops</span>::<span class="ident">Bound</span>;
 
+<span class="kw">use</span> <span class="ident">engine_rocks</span>::<span class="ident">PerfContext</span>;
 <span class="kw">use</span> <span class="ident">engine_traits</span>::<span class="ident">CfName</span>;
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">IterOptions</span>, <span class="ident">DATA_KEY_PREFIX_LEN</span>};
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">keybuilder</span>::<span class="ident">KeyBuilder</span>;
@@ -934,21 +960,33 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">seek_to_first</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">statistics</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">CfStatistics</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
         <span class="ident">statistics</span>.<span class="ident">seek</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
         <span class="self">self</span>.<span class="ident">mark_unread</span>();
-        <span class="self">self</span>.<span class="ident">iter</span>.<span class="ident">seek_to_first</span>().<span class="ident">expect</span>(<span class="string">&quot;Invalid Iterator&quot;</span>)
+        <span class="kw">let</span> <span class="ident">before</span> <span class="op">=</span> <span class="ident">PerfContext</span>::<span class="ident">get</span>().<span class="ident">internal_delete_skipped_count</span>() <span class="kw">as</span> <span class="ident">usize</span>;
+        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">iter</span>.<span class="ident">seek_to_first</span>().<span class="ident">expect</span>(<span class="string">&quot;Invalid Iterator&quot;</span>);
+        <span class="ident">statistics</span>.<span class="ident">seek_tombstone</span> <span class="op">+</span><span class="op">=</span>
+            <span class="ident">PerfContext</span>::<span class="ident">get</span>().<span class="ident">internal_delete_skipped_count</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">-</span> <span class="ident">before</span>;
+        <span class="ident">res</span>
     }
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">seek_to_last</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">statistics</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">CfStatistics</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
         <span class="ident">statistics</span>.<span class="ident">seek</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
         <span class="self">self</span>.<span class="ident">mark_unread</span>();
-        <span class="self">self</span>.<span class="ident">iter</span>.<span class="ident">seek_to_last</span>().<span class="ident">expect</span>(<span class="string">&quot;Invalid Iterator&quot;</span>)
+        <span class="kw">let</span> <span class="ident">before</span> <span class="op">=</span> <span class="ident">PerfContext</span>::<span class="ident">get</span>().<span class="ident">internal_delete_skipped_count</span>() <span class="kw">as</span> <span class="ident">usize</span>;
+        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">iter</span>.<span class="ident">seek_to_last</span>().<span class="ident">expect</span>(<span class="string">&quot;Invalid Iterator&quot;</span>);
+        <span class="ident">statistics</span>.<span class="ident">seek_tombstone</span> <span class="op">+</span><span class="op">=</span>
+            <span class="ident">PerfContext</span>::<span class="ident">get</span>().<span class="ident">internal_delete_skipped_count</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">-</span> <span class="ident">before</span>;
+        <span class="ident">res</span>
     }
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">internal_seek</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">key</span>: <span class="kw-2">&amp;</span><span class="ident">Key</span>, <span class="ident">statistics</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">CfStatistics</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">bool</span><span class="op">&gt;</span> {
         <span class="ident">statistics</span>.<span class="ident">seek</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
         <span class="self">self</span>.<span class="ident">mark_unread</span>();
-        <span class="self">self</span>.<span class="ident">iter</span>.<span class="ident">seek</span>(<span class="ident">key</span>)
+        <span class="kw">let</span> <span class="ident">before</span> <span class="op">=</span> <span class="ident">PerfContext</span>::<span class="ident">get</span>().<span class="ident">internal_delete_skipped_count</span>() <span class="kw">as</span> <span class="ident">usize</span>;
+        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">iter</span>.<span class="ident">seek</span>(<span class="ident">key</span>);
+        <span class="ident">statistics</span>.<span class="ident">seek_tombstone</span> <span class="op">+</span><span class="op">=</span>
+            <span class="ident">PerfContext</span>::<span class="ident">get</span>().<span class="ident">internal_delete_skipped_count</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">-</span> <span class="ident">before</span>;
+        <span class="ident">res</span>
     }
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
@@ -959,21 +997,33 @@
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">bool</span><span class="op">&gt;</span> {
         <span class="ident">statistics</span>.<span class="ident">seek_for_prev</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
         <span class="self">self</span>.<span class="ident">mark_unread</span>();
-        <span class="self">self</span>.<span class="ident">iter</span>.<span class="ident">seek_for_prev</span>(<span class="ident">key</span>)
+        <span class="kw">let</span> <span class="ident">before</span> <span class="op">=</span> <span class="ident">PerfContext</span>::<span class="ident">get</span>().<span class="ident">internal_delete_skipped_count</span>() <span class="kw">as</span> <span class="ident">usize</span>;
+        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">iter</span>.<span class="ident">seek_for_prev</span>(<span class="ident">key</span>);
+        <span class="ident">statistics</span>.<span class="ident">seek_for_prev_tombstone</span> <span class="op">+</span><span class="op">=</span>
+            <span class="ident">PerfContext</span>::<span class="ident">get</span>().<span class="ident">internal_delete_skipped_count</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">-</span> <span class="ident">before</span>;
+        <span class="ident">res</span>
     }
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">next</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">statistics</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">CfStatistics</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
         <span class="ident">statistics</span>.<span class="ident">next</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
         <span class="self">self</span>.<span class="ident">mark_unread</span>();
-        <span class="self">self</span>.<span class="ident">iter</span>.<span class="ident">next</span>().<span class="ident">expect</span>(<span class="string">&quot;Invalid Iterator&quot;</span>)
+        <span class="kw">let</span> <span class="ident">before</span> <span class="op">=</span> <span class="ident">PerfContext</span>::<span class="ident">get</span>().<span class="ident">internal_delete_skipped_count</span>() <span class="kw">as</span> <span class="ident">usize</span>;
+        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">iter</span>.<span class="ident">next</span>().<span class="ident">expect</span>(<span class="string">&quot;Invalid Iterator&quot;</span>);
+        <span class="ident">statistics</span>.<span class="ident">next_tombstone</span> <span class="op">+</span><span class="op">=</span>
+            <span class="ident">PerfContext</span>::<span class="ident">get</span>().<span class="ident">internal_delete_skipped_count</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">-</span> <span class="ident">before</span> <span class="kw">as</span> <span class="ident">usize</span>;
+        <span class="ident">res</span>
     }
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">prev</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">statistics</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">CfStatistics</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
         <span class="ident">statistics</span>.<span class="ident">prev</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
         <span class="self">self</span>.<span class="ident">mark_unread</span>();
-        <span class="self">self</span>.<span class="ident">iter</span>.<span class="ident">prev</span>().<span class="ident">expect</span>(<span class="string">&quot;Invalid Iterator&quot;</span>)
+        <span class="kw">let</span> <span class="ident">before</span> <span class="op">=</span> <span class="ident">PerfContext</span>::<span class="ident">get</span>().<span class="ident">internal_delete_skipped_count</span>() <span class="kw">as</span> <span class="ident">usize</span>;
+        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">iter</span>.<span class="ident">prev</span>().<span class="ident">expect</span>(<span class="string">&quot;Invalid Iterator&quot;</span>);
+        <span class="ident">statistics</span>.<span class="ident">prev_tombstone</span> <span class="op">+</span><span class="op">=</span>
+            <span class="ident">PerfContext</span>::<span class="ident">get</span>().<span class="ident">internal_delete_skipped_count</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">-</span> <span class="ident">before</span> <span class="kw">as</span> <span class="ident">usize</span>;
+        <span class="ident">res</span>
     }
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
