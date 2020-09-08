@@ -71,6 +71,7 @@ sourcesIndex["engine_rocks"] = {"name":"","files":["cf_handle.rs","cf_names.rs",
 sourcesIndex["engine_traits"] = {"name":"","files":["cf_defs.rs","cf_handle.rs","cf_names.rs","cf_options.rs","compact.rs","compaction_job.rs","db_options.rs","db_vector.rs","encryption.rs","engine.rs","engines.rs","errors.rs","import.rs","iterable.rs","lib.rs","metrics_flusher.rs","misc.rs","mutable.rs","options.rs","peekable.rs","properties.rs","raft_engine.rs","range.rs","range_properties.rs","snapshot.rs","sst.rs","table_properties.rs","util.rs","write_batch.rs"]};
 sourcesIndex["errno"] = {"name":"","files":["lib.rs","unix.rs"]};
 sourcesIndex["error_code"] = {"name":"","files":["codec.rs","coprocessor.rs","encryption.rs","engine.rs","lib.rs","pd.rs","raft.rs","raftstore.rs","sst_importer.rs","storage.rs"]};
+sourcesIndex["error_code_gen"] = {"name":"","files":["bin.rs"]};
 sourcesIndex["external_storage"] = {"name":"","files":["gcs.rs","lib.rs","local.rs","noop.rs","s3.rs","util.rs"]};
 sourcesIndex["fail"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["failure"] = {"name":"","dirs":[{"name":"backtrace","files":["internal.rs","mod.rs"]},{"name":"error","files":["error_impl.rs","mod.rs"]}],"files":["as_fail.rs","box_std.rs","compat.rs","context.rs","error_message.rs","lib.rs","macros.rs","result_ext.rs","sync_failure.rs"]};

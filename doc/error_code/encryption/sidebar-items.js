@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["BOTH_MASTER_KEY_FAIL",""],["CRYPTER",""],["IO",""],["PROTO",""],["ROCKS",""],["UNKNOWN",""],["UNKNOWN_ENCRYPTION",""],["WRONG_MASTER_KEY",""]]});
+initSidebarItems({"constant":[["BOTH_MASTER_KEY_FAIL",""],["CRYPTER",""],["IO",""],["PROTO",""],["ROCKS",""],["UNKNOWN",""],["UNKNOWN_ENCRYPTION",""],["WRONG_MASTER_KEY",""]],"struct":[["ALL_ERROR_CODES",""]]});

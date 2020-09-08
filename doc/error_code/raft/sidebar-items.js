@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["CODEC_ERROR",""],["CONFIG_INVALID",""],["EXISTS",""],["IO",""],["NOT_EXISTS",""],["PROPOSAL_DROPPED",""],["REQUEST_SNAPSHOT_DROPPED",""],["STEP_LOCAL_MSG",""],["STEP_PEER_NOT_FOUND",""],["STORE",""]]});
+initSidebarItems({"constant":[["CODEC_ERROR",""],["CONFIG_INVALID",""],["EXISTS",""],["IO",""],["NOT_EXISTS",""],["PROPOSAL_DROPPED",""],["REQUEST_SNAPSHOT_DROPPED",""],["STEP_LOCAL_MSG",""],["STEP_PEER_NOT_FOUND",""],["STORE",""]],"struct":[["ALL_ERROR_CODES",""]]});

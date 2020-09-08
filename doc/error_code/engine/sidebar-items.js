@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["CF_NAME",""],["CODEC",""],["DATACOMPACTED",""],["DATALOSS",""],["ENGINE",""],["IO",""],["NOT_IN_RANGE",""],["PROTOBUF",""],["UNKNOWN",""]]});
+initSidebarItems({"constant":[["CF_NAME",""],["CODEC",""],["DATACOMPACTED",""],["DATALOSS",""],["ENGINE",""],["IO",""],["NOT_IN_RANGE",""],["PROTOBUF",""],["UNKNOWN",""]],"struct":[["ALL_ERROR_CODES",""]]});
