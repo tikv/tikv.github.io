@@ -1,1 +1,1 @@
-initSidebarItems({"mod":[["engine",""]],"struct":[["RaftLogBatch",""],["RaftLogEngine",""]]});
+initSidebarItems({"enum":[["RecoveryMode",""]],"mod":[["engine",""]],"struct":[["RaftEngineConfig",""],["RaftLogBatch",""],["RaftLogEngine",""]]});

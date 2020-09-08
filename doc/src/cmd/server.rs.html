@@ -1042,6 +1042,74 @@
 <span id="1042">1042</span>
 <span id="1043">1043</span>
 <span id="1044">1044</span>
+<span id="1045">1045</span>
+<span id="1046">1046</span>
+<span id="1047">1047</span>
+<span id="1048">1048</span>
+<span id="1049">1049</span>
+<span id="1050">1050</span>
+<span id="1051">1051</span>
+<span id="1052">1052</span>
+<span id="1053">1053</span>
+<span id="1054">1054</span>
+<span id="1055">1055</span>
+<span id="1056">1056</span>
+<span id="1057">1057</span>
+<span id="1058">1058</span>
+<span id="1059">1059</span>
+<span id="1060">1060</span>
+<span id="1061">1061</span>
+<span id="1062">1062</span>
+<span id="1063">1063</span>
+<span id="1064">1064</span>
+<span id="1065">1065</span>
+<span id="1066">1066</span>
+<span id="1067">1067</span>
+<span id="1068">1068</span>
+<span id="1069">1069</span>
+<span id="1070">1070</span>
+<span id="1071">1071</span>
+<span id="1072">1072</span>
+<span id="1073">1073</span>
+<span id="1074">1074</span>
+<span id="1075">1075</span>
+<span id="1076">1076</span>
+<span id="1077">1077</span>
+<span id="1078">1078</span>
+<span id="1079">1079</span>
+<span id="1080">1080</span>
+<span id="1081">1081</span>
+<span id="1082">1082</span>
+<span id="1083">1083</span>
+<span id="1084">1084</span>
+<span id="1085">1085</span>
+<span id="1086">1086</span>
+<span id="1087">1087</span>
+<span id="1088">1088</span>
+<span id="1089">1089</span>
+<span id="1090">1090</span>
+<span id="1091">1091</span>
+<span id="1092">1092</span>
+<span id="1093">1093</span>
+<span id="1094">1094</span>
+<span id="1095">1095</span>
+<span id="1096">1096</span>
+<span id="1097">1097</span>
+<span id="1098">1098</span>
+<span id="1099">1099</span>
+<span id="1100">1100</span>
+<span id="1101">1101</span>
+<span id="1102">1102</span>
+<span id="1103">1103</span>
+<span id="1104">1104</span>
+<span id="1105">1105</span>
+<span id="1106">1106</span>
+<span id="1107">1107</span>
+<span id="1108">1108</span>
+<span id="1109">1109</span>
+<span id="1110">1110</span>
+<span id="1111">1111</span>
+<span id="1112">1112</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! This module startups all the components of a TiKV server.</span>
 <span class="doccomment">//!</span>
@@ -1053,12 +1121,22 @@
 <span class="doccomment">//! Components are often used to initialize other components, and/or must be explicitly stopped.</span>
 <span class="doccomment">//! We keep these components in the `TiKVServer` struct.</span>
 
-<span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">setup</span>::<span class="kw-2">*</span>, <span class="ident">signal_handler</span>};
+<span class="kw">use</span> <span class="ident">std</span>::{
+    <span class="ident">convert</span>::<span class="ident">TryFrom</span>,
+    <span class="ident">env</span>, <span class="ident">fmt</span>,
+    <span class="ident">fs</span>::{<span class="self">self</span>, <span class="ident">File</span>},
+    <span class="ident">net</span>::<span class="ident">SocketAddr</span>,
+    <span class="ident">path</span>::{<span class="ident">Path</span>, <span class="ident">PathBuf</span>},
+    <span class="ident">sync</span>::{<span class="ident">Arc</span>, <span class="ident">Mutex</span>},
+    <span class="ident">thread</span>::<span class="ident">JoinHandle</span>,
+};
+
 <span class="kw">use</span> <span class="ident">concurrency_manager</span>::<span class="ident">ConcurrencyManager</span>;
 <span class="kw">use</span> <span class="ident">encryption</span>::<span class="ident">DataKeyManager</span>;
 <span class="kw">use</span> <span class="ident">engine_rocks</span>::{<span class="ident">encryption</span>::<span class="ident">get_env</span>, <span class="ident">RocksEngine</span>};
-<span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">compaction_job</span>::<span class="ident">CompactionJobInfo</span>, <span class="ident">Engines</span>, <span class="ident">MetricsFlusher</span>};
-<span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">CF_DEFAULT</span>, <span class="ident">CF_WRITE</span>};
+<span class="kw">use</span> <span class="ident">engine_traits</span>::{
+    <span class="ident">compaction_job</span>::<span class="ident">CompactionJobInfo</span>, <span class="ident">Engines</span>, <span class="ident">MetricsFlusher</span>, <span class="ident">RaftEngine</span>, <span class="ident">CF_DEFAULT</span>, <span class="ident">CF_WRITE</span>,
+};
 <span class="kw">use</span> <span class="ident">fs2</span>::<span class="ident">FileExt</span>;
 <span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">executor</span>::<span class="ident">block_on</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::{
@@ -1066,6 +1144,7 @@
     <span class="ident">debugpb</span>::<span class="ident">create_debug</span>, <span class="ident">diagnosticspb</span>::<span class="ident">create_diagnostics</span>, <span class="ident">import_sstpb</span>::<span class="ident">create_import_sst</span>,
 };
 <span class="kw">use</span> <span class="ident">pd_client</span>::{<span class="ident">PdClient</span>, <span class="ident">RpcClient</span>};
+<span class="kw">use</span> <span class="ident">raft_log_engine</span>::<span class="ident">RaftLogEngine</span>;
 <span class="kw">use</span> <span class="ident">raftstore</span>::{
     <span class="ident">coprocessor</span>::{
         <span class="ident">config</span>::<span class="ident">SplitCheckConfigManager</span>, <span class="ident">BoxConsistencyCheckObserver</span>, <span class="ident">ConsistencyCheckMethod</span>,
@@ -1081,15 +1160,6 @@
     },
 };
 <span class="kw">use</span> <span class="ident">security</span>::<span class="ident">SecurityManager</span>;
-<span class="kw">use</span> <span class="ident">std</span>::{
-    <span class="ident">convert</span>::<span class="ident">TryFrom</span>,
-    <span class="ident">env</span>, <span class="ident">fmt</span>,
-    <span class="ident">fs</span>::{<span class="self">self</span>, <span class="ident">File</span>},
-    <span class="ident">net</span>::<span class="ident">SocketAddr</span>,
-    <span class="ident">path</span>::{<span class="ident">Path</span>, <span class="ident">PathBuf</span>},
-    <span class="ident">sync</span>::{<span class="ident">Arc</span>, <span class="ident">Mutex</span>},
-    <span class="ident">thread</span>::<span class="ident">JoinHandle</span>,
-};
 <span class="kw">use</span> <span class="ident">tikv</span>::{
     <span class="ident">config</span>::{<span class="ident">ConfigController</span>, <span class="ident">DBConfigManger</span>, <span class="ident">DBType</span>, <span class="ident">TiKvConfig</span>},
     <span class="ident">coprocessor</span>,
@@ -1117,6 +1187,8 @@
 };
 <span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">runtime</span>::<span class="ident">Builder</span>;
 
+<span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">setup</span>::<span class="kw-2">*</span>, <span class="ident">signal_handler</span>};
+
 <span class="doccomment">/// Run a TiKV server. Returns when the server is shutdown by the user, in which</span>
 <span class="doccomment">/// case the server will be properly stopped.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">run_tikv</span>(<span class="ident">config</span>: <span class="ident">TiKvConfig</span>) {
@@ -1135,43 +1207,52 @@
     <span class="comment">// Do some prepare works before start.</span>
     <span class="ident">pre_start</span>();
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tikv</span> <span class="op">=</span> <span class="ident">TiKVServer</span>::<span class="ident">init</span>(<span class="ident">config</span>);
-
     <span class="kw">let</span> <span class="ident">_m</span> <span class="op">=</span> <span class="ident">Monitor</span>::<span class="ident">default</span>();
 
-    <span class="ident">tikv</span>.<span class="ident">check_conflict_addr</span>();
-    <span class="ident">tikv</span>.<span class="ident">init_fs</span>();
-    <span class="ident">tikv</span>.<span class="ident">init_yatp</span>();
-    <span class="ident">tikv</span>.<span class="ident">init_encryption</span>();
-    <span class="ident">tikv</span>.<span class="ident">init_engines</span>();
-    <span class="kw">let</span> <span class="ident">gc_worker</span> <span class="op">=</span> <span class="ident">tikv</span>.<span class="ident">init_gc_worker</span>();
-    <span class="kw">let</span> <span class="ident">server_config</span> <span class="op">=</span> <span class="ident">tikv</span>.<span class="ident">init_servers</span>(<span class="kw-2">&amp;</span><span class="ident">gc_worker</span>);
-    <span class="ident">tikv</span>.<span class="ident">register_services</span>();
-    <span class="ident">tikv</span>.<span class="ident">init_metrics_flusher</span>();
-    <span class="ident">tikv</span>.<span class="ident">run_server</span>(<span class="ident">server_config</span>);
-    <span class="ident">tikv</span>.<span class="ident">run_status_server</span>();
+    <span class="macro">macro_rules</span><span class="macro">!</span> <span class="ident">run_impl</span> {
+        (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">ER</span>: <span class="ident">ty</span>) <span class="op">=</span><span class="op">&gt;</span> {{
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tikv</span> <span class="op">=</span> <span class="ident">TiKVServer</span>::<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">ER</span><span class="op">&gt;</span>::<span class="ident">init</span>(<span class="ident">config</span>);
+            <span class="ident">tikv</span>.<span class="ident">check_conflict_addr</span>();
+            <span class="ident">tikv</span>.<span class="ident">init_fs</span>();
+            <span class="ident">tikv</span>.<span class="ident">init_yatp</span>();
+            <span class="ident">tikv</span>.<span class="ident">init_encryption</span>();
+            <span class="kw">let</span> <span class="ident">engines</span> <span class="op">=</span> <span class="ident">tikv</span>.<span class="ident">init_raw_engines</span>();
+            <span class="ident">tikv</span>.<span class="ident">init_engines</span>(<span class="ident">engines</span>);
+            <span class="kw">let</span> <span class="ident">gc_worker</span> <span class="op">=</span> <span class="ident">tikv</span>.<span class="ident">init_gc_worker</span>();
+            <span class="kw">let</span> <span class="ident">server_config</span> <span class="op">=</span> <span class="ident">tikv</span>.<span class="ident">init_servers</span>(<span class="kw-2">&amp;</span><span class="ident">gc_worker</span>);
+            <span class="ident">tikv</span>.<span class="ident">register_services</span>();
+            <span class="ident">tikv</span>.<span class="ident">init_metrics_flusher</span>();
+            <span class="ident">tikv</span>.<span class="ident">run_server</span>(<span class="ident">server_config</span>);
+            <span class="ident">tikv</span>.<span class="ident">run_status_server</span>();
 
-    <span class="ident">signal_handler</span>::<span class="ident">wait_for_signal</span>(<span class="prelude-val">Some</span>(<span class="ident">tikv</span>.<span class="ident">engines</span>.<span class="ident">take</span>().<span class="ident">unwrap</span>().<span class="ident">engines</span>));
+            <span class="ident">signal_handler</span>::<span class="ident">wait_for_signal</span>(<span class="prelude-val">Some</span>(<span class="ident">tikv</span>.<span class="ident">engines</span>.<span class="ident">take</span>().<span class="ident">unwrap</span>().<span class="ident">engines</span>));
+            <span class="ident">tikv</span>.<span class="ident">stop</span>();
+        }};
+    }
 
-    <span class="ident">tikv</span>.<span class="ident">stop</span>();
+    <span class="kw">if</span> <span class="op">!</span><span class="ident">config</span>.<span class="ident">raft_engine</span>.<span class="ident">enable</span> {
+        <span class="macro">run_impl</span><span class="macro">!</span>(<span class="ident">RocksEngine</span>)
+    } <span class="kw">else</span> {
+        <span class="macro">run_impl</span><span class="macro">!</span>(<span class="ident">RaftLogEngine</span>)
+    }
 }
 
 <span class="kw">const</span> <span class="ident">RESERVED_OPEN_FDS</span>: <span class="ident">u64</span> <span class="op">=</span> <span class="number">1000</span>;
 
 <span class="doccomment">/// A complete TiKV server.</span>
-<span class="kw">struct</span> <span class="ident">TiKVServer</span> {
+<span class="kw">struct</span> <span class="ident">TiKVServer</span><span class="op">&lt;</span><span class="ident">ER</span>: <span class="ident">RaftEngine</span><span class="op">&gt;</span> {
     <span class="ident">config</span>: <span class="ident">TiKvConfig</span>,
     <span class="ident">cfg_controller</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ConfigController</span><span class="op">&gt;</span>,
     <span class="ident">security_mgr</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">SecurityManager</span><span class="op">&gt;</span>,
     <span class="ident">pd_client</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">RpcClient</span><span class="op">&gt;</span>,
-    <span class="ident">router</span>: <span class="ident">RaftRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span>,
-    <span class="ident">system</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RaftBatchSystem</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">router</span>: <span class="ident">RaftRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">ER</span><span class="op">&gt;</span>,
+    <span class="ident">system</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RaftBatchSystem</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">ER</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">resolver</span>: <span class="ident">resolve</span>::<span class="ident">PdStoreAddrResolver</span>,
     <span class="ident">state</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">GlobalReplicationState</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">store_path</span>: <span class="ident">PathBuf</span>,
     <span class="ident">encryption_key_manager</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">DataKeyManager</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">engines</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">TiKVEngines</span><span class="op">&gt;</span>,
-    <span class="ident">servers</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Servers</span><span class="op">&gt;</span>,
+    <span class="ident">engines</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">TiKVEngines</span><span class="op">&lt;</span><span class="ident">ER</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">servers</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Servers</span><span class="op">&lt;</span><span class="ident">ER</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">region_info_accessor</span>: <span class="ident">RegionInfoAccessor</span>,
     <span class="ident">coprocessor_host</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">CoprocessorHost</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">to_stop</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Stop</span><span class="op">&gt;</span><span class="op">&gt;</span>,
@@ -1179,22 +1260,22 @@
     <span class="ident">concurrency_manager</span>: <span class="ident">ConcurrencyManager</span>,
 }
 
-<span class="kw">struct</span> <span class="ident">TiKVEngines</span> {
-    <span class="ident">engines</span>: <span class="ident">Engines</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span>,
+<span class="kw">struct</span> <span class="ident">TiKVEngines</span><span class="op">&lt;</span><span class="ident">ER</span>: <span class="ident">RaftEngine</span><span class="op">&gt;</span> {
+    <span class="ident">engines</span>: <span class="ident">Engines</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">ER</span><span class="op">&gt;</span>,
     <span class="ident">store_meta</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">StoreMeta</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">engine</span>: <span class="ident">RaftKv</span><span class="op">&lt;</span><span class="ident">ServerRaftStoreRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">engine</span>: <span class="ident">RaftKv</span><span class="op">&lt;</span><span class="ident">ServerRaftStoreRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">ER</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 }
 
-<span class="kw">struct</span> <span class="ident">Servers</span> {
+<span class="kw">struct</span> <span class="ident">Servers</span><span class="op">&lt;</span><span class="ident">ER</span>: <span class="ident">RaftEngine</span><span class="op">&gt;</span> {
     <span class="ident">lock_mgr</span>: <span class="ident">LockManager</span>,
-    <span class="ident">server</span>: <span class="ident">Server</span><span class="op">&lt;</span><span class="ident">RaftRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span>, <span class="ident">resolve</span>::<span class="ident">PdStoreAddrResolver</span><span class="op">&gt;</span>,
-    <span class="ident">node</span>: <span class="ident">Node</span><span class="op">&lt;</span><span class="ident">RpcClient</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span>,
+    <span class="ident">server</span>: <span class="ident">Server</span><span class="op">&lt;</span><span class="ident">RaftRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">ER</span><span class="op">&gt;</span>, <span class="ident">resolve</span>::<span class="ident">PdStoreAddrResolver</span><span class="op">&gt;</span>,
+    <span class="ident">node</span>: <span class="ident">Node</span><span class="op">&lt;</span><span class="ident">RpcClient</span>, <span class="ident">ER</span><span class="op">&gt;</span>,
     <span class="ident">importer</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">SSTImporter</span><span class="op">&gt;</span>,
     <span class="ident">cdc_scheduler</span>: <span class="ident">tikv_util</span>::<span class="ident">worker</span>::<span class="ident">Scheduler</span><span class="op">&lt;</span><span class="ident">cdc</span>::<span class="ident">Task</span><span class="op">&gt;</span>,
 }
 
-<span class="kw">impl</span> <span class="ident">TiKVServer</span> {
-    <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">mut</span> <span class="ident">config</span>: <span class="ident">TiKvConfig</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">TiKVServer</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">ER</span>: <span class="ident">RaftEngine</span><span class="op">&gt;</span> <span class="ident">TiKVServer</span><span class="op">&lt;</span><span class="ident">ER</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">mut</span> <span class="ident">config</span>: <span class="ident">TiKvConfig</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">TiKVServer</span><span class="op">&lt;</span><span class="ident">ER</span><span class="op">&gt;</span> {
         <span class="comment">// It is okay use pd config and security config before `init_config`,</span>
         <span class="comment">// because these configs must be provided by command line, and only</span>
         <span class="comment">// used during startup process.</span>
@@ -1386,7 +1467,9 @@
             );
         }
 
-        <span class="comment">// We truncate a big file to make sure that both raftdb and kvdb of TiKV have enough space to compaction when TiKV recover. This file is created in data_dir rather than db_path, because we must not increase store size of db_path.</span>
+        <span class="comment">// We truncate a big file to make sure that both raftdb and kvdb of TiKV have enough space</span>
+        <span class="comment">// to compaction when TiKV recover. This file is created in data_dir rather than db_path,</span>
+        <span class="comment">// because we must not increase store size of db_path.</span>
         <span class="ident">tikv_util</span>::<span class="ident">reserve_space_for_recover</span>(
             <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">config</span>.<span class="ident">storage</span>.<span class="ident">data_dir</span>,
             <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">storage</span>.<span class="ident">reserve_space</span>.<span class="number">0</span>,
@@ -1439,70 +1522,21 @@
         <span class="ident">engine_rocks</span>::<span class="ident">CompactionListener</span>::<span class="ident">new</span>(<span class="ident">compacted_handler</span>, <span class="prelude-val">Some</span>(<span class="ident">size_change_filter</span>))
     }
 
-    <span class="kw">fn</span> <span class="ident">init_engines</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
-        <span class="kw">let</span> <span class="ident">env</span> <span class="op">=</span> <span class="ident">get_env</span>(<span class="self">self</span>.<span class="ident">encryption_key_manager</span>.<span class="ident">clone</span>(), <span class="prelude-val">None</span> <span class="comment">/*base_env*/</span>).<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">block_cache</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">storage</span>.<span class="ident">block_cache</span>.<span class="ident">build_shared_cache</span>();
-
-        <span class="kw">let</span> <span class="ident">raft_db_path</span> <span class="op">=</span> <span class="ident">Path</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">config</span>.<span class="ident">raft_store</span>.<span class="ident">raftdb_path</span>);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">raft_db_opts</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">raftdb</span>.<span class="ident">build_opt</span>();
-        <span class="ident">raft_db_opts</span>.<span class="ident">set_env</span>(<span class="ident">env</span>.<span class="ident">clone</span>());
-        <span class="kw">let</span> <span class="ident">raft_db_cf_opts</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">raftdb</span>.<span class="ident">build_cf_opts</span>(<span class="kw-2">&amp;</span><span class="ident">block_cache</span>);
-        <span class="kw">let</span> <span class="ident">raft_engine</span> <span class="op">=</span> <span class="ident">engine_rocks</span>::<span class="ident">raw_util</span>::<span class="ident">new_engine_opt</span>(
-            <span class="ident">raft_db_path</span>.<span class="ident">to_str</span>().<span class="ident">unwrap</span>(),
-            <span class="ident">raft_db_opts</span>,
-            <span class="ident">raft_db_cf_opts</span>,
-        )
-        .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="macro">fatal</span><span class="macro">!</span>(<span class="string">&quot;failed to create raft engine: {}&quot;</span>, <span class="ident">s</span>));
-
-        <span class="comment">// Create kv engine.</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">kv_db_opts</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">rocksdb</span>.<span class="ident">build_opt</span>();
-        <span class="ident">kv_db_opts</span>.<span class="ident">set_env</span>(<span class="ident">env</span>);
-        <span class="ident">kv_db_opts</span>.<span class="ident">add_event_listener</span>(<span class="self">self</span>.<span class="ident">create_raftstore_compaction_listener</span>());
-        <span class="kw">let</span> <span class="ident">kv_cfs_opts</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">rocksdb</span>.<span class="ident">build_cf_opts</span>(<span class="kw-2">&amp;</span><span class="ident">block_cache</span>);
-        <span class="kw">let</span> <span class="ident">db_path</span> <span class="op">=</span> <span class="self">self</span>
-            .<span class="ident">store_path</span>
-            .<span class="ident">join</span>(<span class="ident">Path</span>::<span class="ident">new</span>(<span class="ident">storage</span>::<span class="ident">config</span>::<span class="ident">DEFAULT_ROCKSDB_SUB_DIR</span>));
-        <span class="kw">let</span> <span class="ident">kv_engine</span> <span class="op">=</span> <span class="ident">engine_rocks</span>::<span class="ident">raw_util</span>::<span class="ident">new_engine_opt</span>(
-            <span class="ident">db_path</span>.<span class="ident">to_str</span>().<span class="ident">unwrap</span>(),
-            <span class="ident">kv_db_opts</span>,
-            <span class="ident">kv_cfs_opts</span>,
-        )
-        .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="macro">fatal</span><span class="macro">!</span>(<span class="string">&quot;failed to create kv engine: {}&quot;</span>, <span class="ident">s</span>));
-
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">kv_engine</span> <span class="op">=</span> <span class="ident">RocksEngine</span>::<span class="ident">from_db</span>(<span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">kv_engine</span>));
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">raft_engine</span> <span class="op">=</span> <span class="ident">RocksEngine</span>::<span class="ident">from_db</span>(<span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">raft_engine</span>));
-        <span class="kw">let</span> <span class="ident">shared_block_cache</span> <span class="op">=</span> <span class="ident">block_cache</span>.<span class="ident">is_some</span>();
-        <span class="ident">kv_engine</span>.<span class="ident">set_shared_block_cache</span>(<span class="ident">shared_block_cache</span>);
-        <span class="ident">raft_engine</span>.<span class="ident">set_shared_block_cache</span>(<span class="ident">shared_block_cache</span>);
-        <span class="kw">let</span> <span class="ident">engines</span> <span class="op">=</span> <span class="ident">Engines</span>::<span class="ident">new</span>(<span class="ident">kv_engine</span>, <span class="ident">raft_engine</span>);
-
+    <span class="kw">fn</span> <span class="ident">init_engines</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">engines</span>: <span class="ident">Engines</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">ER</span><span class="op">&gt;</span>) {
         <span class="kw">let</span> <span class="ident">store_meta</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">StoreMeta</span>::<span class="ident">new</span>(<span class="ident">PENDING_VOTES_CAP</span>)));
-        <span class="kw">let</span> <span class="ident">local_reader</span> <span class="op">=</span>
-            <span class="ident">LocalReader</span>::<span class="ident">new</span>(<span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">clone</span>(), <span class="ident">store_meta</span>.<span class="ident">clone</span>(), <span class="self">self</span>.<span class="ident">router</span>.<span class="ident">clone</span>());
-        <span class="kw">let</span> <span class="ident">raft_router</span> <span class="op">=</span> <span class="ident">ServerRaftStoreRouter</span>::<span class="ident">new</span>(<span class="self">self</span>.<span class="ident">router</span>.<span class="ident">clone</span>(), <span class="ident">local_reader</span>);
-        <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span> <span class="ident">RaftKv</span>::<span class="ident">new</span>(<span class="ident">raft_router</span>, <span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">clone</span>());
+        <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span> <span class="ident">RaftKv</span>::<span class="ident">new</span>(
+            <span class="ident">ServerRaftStoreRouter</span>::<span class="ident">new</span>(
+                <span class="self">self</span>.<span class="ident">router</span>.<span class="ident">clone</span>(),
+                <span class="ident">LocalReader</span>::<span class="ident">new</span>(<span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">clone</span>(), <span class="ident">store_meta</span>.<span class="ident">clone</span>(), <span class="self">self</span>.<span class="ident">router</span>.<span class="ident">clone</span>()),
+            ),
+            <span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">clone</span>(),
+        );
 
         <span class="kw">let</span> <span class="ident">cfg_controller</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">cfg_controller</span>.<span class="ident">as_mut</span>().<span class="ident">unwrap</span>();
         <span class="ident">cfg_controller</span>.<span class="ident">register</span>(
             <span class="ident">tikv</span>::<span class="ident">config</span>::<span class="ident">Module</span>::<span class="ident">Storage</span>,
             <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">StorageConfigManger</span>::<span class="ident">new</span>(
                 <span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">clone</span>(),
-                <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">storage</span>.<span class="ident">block_cache</span>.<span class="ident">shared</span>,
-            )),
-        );
-        <span class="ident">cfg_controller</span>.<span class="ident">register</span>(
-            <span class="ident">tikv</span>::<span class="ident">config</span>::<span class="ident">Module</span>::<span class="ident">Rocksdb</span>,
-            <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">DBConfigManger</span>::<span class="ident">new</span>(
-                <span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">clone</span>(),
-                <span class="ident">DBType</span>::<span class="ident">Kv</span>,
-                <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">storage</span>.<span class="ident">block_cache</span>.<span class="ident">shared</span>,
-            )),
-        );
-        <span class="ident">cfg_controller</span>.<span class="ident">register</span>(
-            <span class="ident">tikv</span>::<span class="ident">config</span>::<span class="ident">Module</span>::<span class="ident">Raftdb</span>,
-            <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">DBConfigManger</span>::<span class="ident">new</span>(
-                <span class="ident">engines</span>.<span class="ident">raft</span>.<span class="ident">clone</span>(),
-                <span class="ident">DBType</span>::<span class="ident">Raft</span>,
                 <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">storage</span>.<span class="ident">block_cache</span>.<span class="ident">shared</span>,
             )),
         );
@@ -1516,10 +1550,7 @@
 
     <span class="kw">fn</span> <span class="ident">init_gc_worker</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">GcWorker</span><span class="op">&lt;</span>
-        <span class="ident">RaftKv</span><span class="op">&lt;</span><span class="ident">ServerRaftStoreRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-        <span class="ident">RaftRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span>,
-    <span class="op">&gt;</span> {
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">GcWorker</span><span class="op">&lt;</span><span class="ident">RaftKv</span><span class="op">&lt;</span><span class="ident">ServerRaftStoreRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">ER</span><span class="op">&gt;</span><span class="op">&gt;</span>, <span class="ident">RaftRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">ER</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">engines</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">engines</span>.<span class="ident">as_ref</span>().<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">gc_worker</span> <span class="op">=</span> <span class="ident">GcWorker</span>::<span class="ident">new</span>(
             <span class="ident">engines</span>.<span class="ident">engine</span>.<span class="ident">clone</span>(),
@@ -1540,8 +1571,8 @@
     <span class="kw">fn</span> <span class="ident">init_servers</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
         <span class="ident">gc_worker</span>: <span class="kw-2">&amp;</span><span class="ident">GcWorker</span><span class="op">&lt;</span>
-            <span class="ident">RaftKv</span><span class="op">&lt;</span><span class="ident">ServerRaftStoreRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-            <span class="ident">RaftRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span>,
+            <span class="ident">RaftKv</span><span class="op">&lt;</span><span class="ident">ServerRaftStoreRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">ER</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+            <span class="ident">RaftRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">ER</span><span class="op">&gt;</span>,
         <span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">ServerConfig</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">cfg_controller</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">cfg_controller</span>.<span class="ident">as_mut</span>().<span class="ident">unwrap</span>();
@@ -1965,6 +1996,111 @@
     }
 }
 
+<span class="kw">impl</span> <span class="ident">TiKVServer</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">init_raw_engines</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Engines</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="ident">env</span> <span class="op">=</span> <span class="ident">get_env</span>(<span class="self">self</span>.<span class="ident">encryption_key_manager</span>.<span class="ident">clone</span>(), <span class="prelude-val">None</span> <span class="comment">/*base_env*/</span>).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">block_cache</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">storage</span>.<span class="ident">block_cache</span>.<span class="ident">build_shared_cache</span>();
+
+        <span class="comment">// Create raft engine.</span>
+        <span class="kw">let</span> <span class="ident">raft_db_path</span> <span class="op">=</span> <span class="ident">Path</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">config</span>.<span class="ident">raft_store</span>.<span class="ident">raftdb_path</span>);
+        <span class="kw">let</span> <span class="ident">config_raftdb</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">config</span>.<span class="ident">raftdb</span>;
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">raft_db_opts</span> <span class="op">=</span> <span class="ident">config_raftdb</span>.<span class="ident">build_opt</span>();
+        <span class="ident">raft_db_opts</span>.<span class="ident">set_env</span>(<span class="ident">env</span>.<span class="ident">clone</span>());
+        <span class="kw">let</span> <span class="ident">raft_db_cf_opts</span> <span class="op">=</span> <span class="ident">config_raftdb</span>.<span class="ident">build_cf_opts</span>(<span class="kw-2">&amp;</span><span class="ident">block_cache</span>);
+        <span class="kw">let</span> <span class="ident">raft_engine</span> <span class="op">=</span> <span class="ident">engine_rocks</span>::<span class="ident">raw_util</span>::<span class="ident">new_engine_opt</span>(
+            <span class="ident">raft_db_path</span>.<span class="ident">to_str</span>().<span class="ident">unwrap</span>(),
+            <span class="ident">raft_db_opts</span>,
+            <span class="ident">raft_db_cf_opts</span>,
+        )
+        .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="macro">fatal</span><span class="macro">!</span>(<span class="string">&quot;failed to create raft engine: {}&quot;</span>, <span class="ident">s</span>));
+
+        <span class="comment">// Create kv engine.</span>
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">kv_db_opts</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">rocksdb</span>.<span class="ident">build_opt</span>();
+        <span class="ident">kv_db_opts</span>.<span class="ident">set_env</span>(<span class="ident">env</span>);
+        <span class="ident">kv_db_opts</span>.<span class="ident">add_event_listener</span>(<span class="self">self</span>.<span class="ident">create_raftstore_compaction_listener</span>());
+        <span class="kw">let</span> <span class="ident">kv_cfs_opts</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">rocksdb</span>.<span class="ident">build_cf_opts</span>(<span class="kw-2">&amp;</span><span class="ident">block_cache</span>);
+        <span class="kw">let</span> <span class="ident">db_path</span> <span class="op">=</span> <span class="self">self</span>
+            .<span class="ident">store_path</span>
+            .<span class="ident">join</span>(<span class="ident">Path</span>::<span class="ident">new</span>(<span class="ident">storage</span>::<span class="ident">config</span>::<span class="ident">DEFAULT_ROCKSDB_SUB_DIR</span>));
+        <span class="kw">let</span> <span class="ident">kv_engine</span> <span class="op">=</span> <span class="ident">engine_rocks</span>::<span class="ident">raw_util</span>::<span class="ident">new_engine_opt</span>(
+            <span class="ident">db_path</span>.<span class="ident">to_str</span>().<span class="ident">unwrap</span>(),
+            <span class="ident">kv_db_opts</span>,
+            <span class="ident">kv_cfs_opts</span>,
+        )
+        .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="macro">fatal</span><span class="macro">!</span>(<span class="string">&quot;failed to create kv engine: {}&quot;</span>, <span class="ident">s</span>));
+
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">kv_engine</span> <span class="op">=</span> <span class="ident">RocksEngine</span>::<span class="ident">from_db</span>(<span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">kv_engine</span>));
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">raft_engine</span> <span class="op">=</span> <span class="ident">RocksEngine</span>::<span class="ident">from_db</span>(<span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">raft_engine</span>));
+        <span class="kw">let</span> <span class="ident">shared_block_cache</span> <span class="op">=</span> <span class="ident">block_cache</span>.<span class="ident">is_some</span>();
+        <span class="ident">kv_engine</span>.<span class="ident">set_shared_block_cache</span>(<span class="ident">shared_block_cache</span>);
+        <span class="ident">raft_engine</span>.<span class="ident">set_shared_block_cache</span>(<span class="ident">shared_block_cache</span>);
+        <span class="kw">let</span> <span class="ident">engines</span> <span class="op">=</span> <span class="ident">Engines</span>::<span class="ident">new</span>(<span class="ident">kv_engine</span>, <span class="ident">raft_engine</span>);
+
+        <span class="kw">let</span> <span class="ident">cfg_controller</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">cfg_controller</span>.<span class="ident">as_mut</span>().<span class="ident">unwrap</span>();
+        <span class="ident">cfg_controller</span>.<span class="ident">register</span>(
+            <span class="ident">tikv</span>::<span class="ident">config</span>::<span class="ident">Module</span>::<span class="ident">Rocksdb</span>,
+            <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">DBConfigManger</span>::<span class="ident">new</span>(
+                <span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">clone</span>(),
+                <span class="ident">DBType</span>::<span class="ident">Kv</span>,
+                <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">storage</span>.<span class="ident">block_cache</span>.<span class="ident">shared</span>,
+            )),
+        );
+        <span class="ident">cfg_controller</span>.<span class="ident">register</span>(
+            <span class="ident">tikv</span>::<span class="ident">config</span>::<span class="ident">Module</span>::<span class="ident">Raftdb</span>,
+            <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">DBConfigManger</span>::<span class="ident">new</span>(
+                <span class="ident">engines</span>.<span class="ident">raft</span>.<span class="ident">clone</span>(),
+                <span class="ident">DBType</span>::<span class="ident">Raft</span>,
+                <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">storage</span>.<span class="ident">block_cache</span>.<span class="ident">shared</span>,
+            )),
+        );
+
+        <span class="ident">engines</span>
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">TiKVServer</span><span class="op">&lt;</span><span class="ident">RaftLogEngine</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">init_raw_engines</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Engines</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RaftLogEngine</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="ident">env</span> <span class="op">=</span> <span class="ident">get_env</span>(<span class="self">self</span>.<span class="ident">encryption_key_manager</span>.<span class="ident">clone</span>(), <span class="prelude-val">None</span> <span class="comment">/*base_env*/</span>).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">block_cache</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">storage</span>.<span class="ident">block_cache</span>.<span class="ident">build_shared_cache</span>();
+
+        <span class="comment">// Create raft engine.</span>
+        <span class="kw">let</span> <span class="ident">raft_config</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">raft_engine</span>.<span class="ident">config</span>();
+        <span class="kw">let</span> <span class="ident">raft_engine</span> <span class="op">=</span> <span class="ident">RaftLogEngine</span>::<span class="ident">new</span>(<span class="ident">raft_config</span>);
+
+        <span class="comment">// Create kv engine.</span>
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">kv_db_opts</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">rocksdb</span>.<span class="ident">build_opt</span>();
+        <span class="ident">kv_db_opts</span>.<span class="ident">set_env</span>(<span class="ident">env</span>);
+        <span class="ident">kv_db_opts</span>.<span class="ident">add_event_listener</span>(<span class="self">self</span>.<span class="ident">create_raftstore_compaction_listener</span>());
+        <span class="kw">let</span> <span class="ident">kv_cfs_opts</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">rocksdb</span>.<span class="ident">build_cf_opts</span>(<span class="kw-2">&amp;</span><span class="ident">block_cache</span>);
+        <span class="kw">let</span> <span class="ident">db_path</span> <span class="op">=</span> <span class="self">self</span>
+            .<span class="ident">store_path</span>
+            .<span class="ident">join</span>(<span class="ident">Path</span>::<span class="ident">new</span>(<span class="ident">storage</span>::<span class="ident">config</span>::<span class="ident">DEFAULT_ROCKSDB_SUB_DIR</span>));
+        <span class="kw">let</span> <span class="ident">kv_engine</span> <span class="op">=</span> <span class="ident">engine_rocks</span>::<span class="ident">raw_util</span>::<span class="ident">new_engine_opt</span>(
+            <span class="ident">db_path</span>.<span class="ident">to_str</span>().<span class="ident">unwrap</span>(),
+            <span class="ident">kv_db_opts</span>,
+            <span class="ident">kv_cfs_opts</span>,
+        )
+        .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="macro">fatal</span><span class="macro">!</span>(<span class="string">&quot;failed to create kv engine: {}&quot;</span>, <span class="ident">s</span>));
+
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">kv_engine</span> <span class="op">=</span> <span class="ident">RocksEngine</span>::<span class="ident">from_db</span>(<span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">kv_engine</span>));
+        <span class="kw">let</span> <span class="ident">shared_block_cache</span> <span class="op">=</span> <span class="ident">block_cache</span>.<span class="ident">is_some</span>();
+        <span class="ident">kv_engine</span>.<span class="ident">set_shared_block_cache</span>(<span class="ident">shared_block_cache</span>);
+        <span class="kw">let</span> <span class="ident">engines</span> <span class="op">=</span> <span class="ident">Engines</span>::<span class="ident">new</span>(<span class="ident">kv_engine</span>, <span class="ident">raft_engine</span>);
+
+        <span class="kw">let</span> <span class="ident">cfg_controller</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">cfg_controller</span>.<span class="ident">as_mut</span>().<span class="ident">unwrap</span>();
+        <span class="ident">cfg_controller</span>.<span class="ident">register</span>(
+            <span class="ident">tikv</span>::<span class="ident">config</span>::<span class="ident">Module</span>::<span class="ident">Rocksdb</span>,
+            <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">DBConfigManger</span>::<span class="ident">new</span>(
+                <span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">clone</span>(),
+                <span class="ident">DBType</span>::<span class="ident">Kv</span>,
+                <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">storage</span>.<span class="ident">block_cache</span>.<span class="ident">shared</span>,
+            )),
+        );
+
+        <span class="ident">engines</span>
+    }
+}
+
 <span class="doccomment">/// Various sanity-checks and logging before running a server.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Warnings are logged.</span>
@@ -2071,7 +2207,7 @@
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Stop</span> <span class="kw">for</span> <span class="ident">MetricsFlusher</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">ER</span>: <span class="ident">RaftEngine</span><span class="op">&gt;</span> <span class="ident">Stop</span> <span class="kw">for</span> <span class="ident">MetricsFlusher</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">ER</span><span class="op">&gt;</span> {
     <span class="kw">fn</span> <span class="ident">stop</span>(<span class="kw-2">mut</span> <span class="self">self</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>) {
         (<span class="kw-2">*</span><span class="self">self</span>).<span class="ident">stop</span>()
     }
