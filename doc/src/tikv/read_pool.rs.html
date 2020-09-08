@@ -368,15 +368,14 @@
 <span id="368">368</span>
 <span id="369">369</span>
 <span id="370">370</span>
-<span id="371">371</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
-<span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">sync</span>::<span class="ident">oneshot</span>;
-<span class="kw">use</span> <span class="ident">futures</span>::{<span class="ident">future</span>, <span class="ident">Future</span>};
+<span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">channel</span>::<span class="ident">oneshot</span>;
+<span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">future</span>::<span class="ident">TryFutureExt</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">kvrpcpb</span>::<span class="ident">CommandPri</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">cell</span>::<span class="ident">Cell</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">future</span>::<span class="ident">Future</span> <span class="kw">as</span> <span class="ident">StdFuture</span>;
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">future</span>::<span class="ident">Future</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">time</span>::<span class="ident">Duration</span>;
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">future_pool</span>::{<span class="self">self</span>, <span class="ident">FuturePool</span>};
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">time</span>::<span class="ident">Instant</span>;
@@ -445,7 +444,7 @@
 <span class="kw">impl</span> <span class="ident">ReadPoolHandle</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">spawn</span><span class="op">&lt;</span><span class="ident">F</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="ident">F</span>, <span class="ident">priority</span>: <span class="ident">CommandPri</span>, <span class="ident">task_id</span>: <span class="ident">u64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">ReadPoolError</span><span class="op">&gt;</span>
     <span class="kw">where</span>
-        <span class="ident">F</span>: <span class="ident">StdFuture</span><span class="op">&lt;</span><span class="ident">Output</span> <span class="op">=</span> ()<span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+        <span class="ident">F</span>: <span class="ident">Future</span><span class="op">&lt;</span><span class="ident">Output</span> <span class="op">=</span> ()<span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
     {
         <span class="kw">match</span> <span class="self">self</span> {
             <span class="ident">ReadPoolHandle</span>::<span class="ident">FuturePools</span> {
@@ -500,23 +499,22 @@
         <span class="ident">f</span>: <span class="ident">F</span>,
         <span class="ident">priority</span>: <span class="ident">CommandPri</span>,
         <span class="ident">task_id</span>: <span class="ident">u64</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="kw">impl</span> <span class="ident">Future</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">T</span>, <span class="ident">Error</span> <span class="op">=</span> <span class="ident">ReadPoolError</span><span class="op">&gt;</span>
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="kw">impl</span> <span class="ident">Future</span><span class="op">&lt;</span><span class="ident">Output</span> <span class="op">=</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">ReadPoolError</span><span class="op">&gt;</span><span class="op">&gt;</span>
     <span class="kw">where</span>
-        <span class="ident">F</span>: <span class="ident">StdFuture</span><span class="op">&lt;</span><span class="ident">Output</span> <span class="op">=</span> <span class="ident">T</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+        <span class="ident">F</span>: <span class="ident">Future</span><span class="op">&lt;</span><span class="ident">Output</span> <span class="op">=</span> <span class="ident">T</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
         <span class="ident">T</span>: <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
     {
         <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">oneshot</span>::<span class="ident">channel</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>();
-        <span class="kw">let</span> <span class="ident">spawn_res</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">spawn</span>(
+        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">spawn</span>(
             <span class="kw">async</span> <span class="kw">move</span> {
                 <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="ident">tx</span>.<span class="ident">send</span>(<span class="ident">f</span>.<span class="kw">await</span>);
             },
             <span class="ident">priority</span>,
             <span class="ident">task_id</span>,
         );
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">spawn_res</span> {
-            <span class="ident">future</span>::<span class="ident">Either</span>::<span class="ident">A</span>(<span class="ident">future</span>::<span class="ident">err</span>(<span class="ident">e</span>))
-        } <span class="kw">else</span> {
-            <span class="ident">future</span>::<span class="ident">Either</span>::<span class="ident">B</span>(<span class="ident">rx</span>.<span class="ident">map_err</span>(<span class="ident">ReadPoolError</span>::<span class="ident">from</span>))
+        <span class="kw">async</span> <span class="kw">move</span> {
+            <span class="ident">res</span><span class="question-mark">?</span>;
+            <span class="ident">rx</span>.<span class="ident">map_err</span>(<span class="ident">ReadPoolError</span>::<span class="ident">from</span>).<span class="kw">await</span>
         }
     }
 }

@@ -330,16 +330,10 @@
 <span id="330">330</span>
 <span id="331">331</span>
 <span id="332">332</span>
-<span id="333">333</span>
-<span id="334">334</span>
-<span id="335">335</span>
-<span id="336">336</span>
-<span id="337">337</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
-<span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">Future</span>;
-
+<span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">executor</span>::<span class="ident">block_on</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">kvrpcpb</span>::{<span class="ident">Context</span>, <span class="ident">GetRequest</span>, <span class="ident">LockInfo</span>};
 <span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">coprocessor</span>::<span class="ident">RegionInfoProvider</span>;
 <span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">router</span>::<span class="ident">RaftStoreBlackHole</span>;
@@ -444,7 +438,7 @@
         <span class="ident">key</span>: <span class="kw-2">&amp;</span><span class="ident">Key</span>,
         <span class="ident">start_ts</span>: <span class="kw">impl</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">TimeStamp</span><span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">store</span>.<span class="ident">get</span>(<span class="ident">ctx</span>, <span class="ident">key</span>.<span class="ident">to_owned</span>(), <span class="ident">start_ts</span>.<span class="ident">into</span>()).<span class="ident">wait</span>()
+        <span class="ident">block_on</span>(<span class="self">self</span>.<span class="ident">store</span>.<span class="ident">get</span>(<span class="ident">ctx</span>, <span class="ident">key</span>.<span class="ident">to_owned</span>(), <span class="ident">start_ts</span>.<span class="ident">into</span>()))
     }
 
     <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
@@ -454,9 +448,7 @@
         <span class="ident">keys</span>: <span class="kw-2">&amp;</span>[<span class="ident">Key</span>],
         <span class="ident">start_ts</span>: <span class="kw">impl</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">TimeStamp</span><span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">KvPair</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">store</span>
-            .<span class="ident">batch_get</span>(<span class="ident">ctx</span>, <span class="ident">keys</span>.<span class="ident">to_owned</span>(), <span class="ident">start_ts</span>.<span class="ident">into</span>())
-            .<span class="ident">wait</span>()
+        <span class="ident">block_on</span>(<span class="self">self</span>.<span class="ident">store</span>.<span class="ident">batch_get</span>(<span class="ident">ctx</span>, <span class="ident">keys</span>.<span class="ident">to_owned</span>(), <span class="ident">start_ts</span>.<span class="ident">into</span>()))
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">batch_get_command</span>(
@@ -476,7 +468,7 @@
                 <span class="ident">req</span>
             })
             .<span class="ident">collect</span>();
-        <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">store</span>.<span class="ident">batch_get_command</span>(<span class="ident">requests</span>).<span class="ident">wait</span>()<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">block_on</span>(<span class="self">self</span>.<span class="ident">store</span>.<span class="ident">batch_get_command</span>(<span class="ident">requests</span>))<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">values</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[];
 
         <span class="kw">for</span> <span class="ident">value</span> <span class="kw">in</span> <span class="ident">resp</span>.<span class="ident">into_iter</span>() {
@@ -494,18 +486,16 @@
         <span class="ident">key_only</span>: <span class="ident">bool</span>,
         <span class="ident">start_ts</span>: <span class="kw">impl</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">TimeStamp</span><span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">KvPair</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">store</span>
-            .<span class="ident">scan</span>(
-                <span class="ident">ctx</span>,
-                <span class="ident">start_key</span>,
-                <span class="ident">end_key</span>,
-                <span class="ident">limit</span>,
-                <span class="number">0</span>,
-                <span class="ident">start_ts</span>.<span class="ident">into</span>(),
-                <span class="ident">key_only</span>,
-                <span class="bool-val">false</span>,
-            )
-            .<span class="ident">wait</span>()
+        <span class="ident">block_on</span>(<span class="self">self</span>.<span class="ident">store</span>.<span class="ident">scan</span>(
+            <span class="ident">ctx</span>,
+            <span class="ident">start_key</span>,
+            <span class="ident">end_key</span>,
+            <span class="ident">limit</span>,
+            <span class="number">0</span>,
+            <span class="ident">start_ts</span>.<span class="ident">into</span>(),
+            <span class="ident">key_only</span>,
+            <span class="bool-val">false</span>,
+        ))
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">reverse_scan</span>(
@@ -517,18 +507,16 @@
         <span class="ident">key_only</span>: <span class="ident">bool</span>,
         <span class="ident">start_ts</span>: <span class="kw">impl</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">TimeStamp</span><span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">KvPair</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">store</span>
-            .<span class="ident">scan</span>(
-                <span class="ident">ctx</span>,
-                <span class="ident">start_key</span>,
-                <span class="ident">end_key</span>,
-                <span class="ident">limit</span>,
-                <span class="number">0</span>,
-                <span class="ident">start_ts</span>.<span class="ident">into</span>(),
-                <span class="ident">key_only</span>,
-                <span class="bool-val">true</span>,
-            )
-            .<span class="ident">wait</span>()
+        <span class="ident">block_on</span>(<span class="self">self</span>.<span class="ident">store</span>.<span class="ident">scan</span>(
+            <span class="ident">ctx</span>,
+            <span class="ident">start_key</span>,
+            <span class="ident">end_key</span>,
+            <span class="ident">limit</span>,
+            <span class="number">0</span>,
+            <span class="ident">start_ts</span>.<span class="ident">into</span>(),
+            <span class="ident">key_only</span>,
+            <span class="bool-val">true</span>,
+        ))
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">prewrite</span>(
@@ -636,7 +624,7 @@
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">raw_get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ctx</span>: <span class="ident">Context</span>, <span class="ident">cf</span>: <span class="ident">String</span>, <span class="ident">key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">store</span>.<span class="ident">raw_get</span>(<span class="ident">ctx</span>, <span class="ident">cf</span>, <span class="ident">key</span>).<span class="ident">wait</span>()
+        <span class="ident">block_on</span>(<span class="self">self</span>.<span class="ident">store</span>.<span class="ident">raw_get</span>(<span class="ident">ctx</span>, <span class="ident">cf</span>, <span class="ident">key</span>))
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">raw_put</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ctx</span>: <span class="ident">Context</span>, <span class="ident">cf</span>: <span class="ident">String</span>, <span class="ident">key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>, <span class="ident">value</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
@@ -655,9 +643,10 @@
         <span class="ident">end_key</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">limit</span>: <span class="ident">usize</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">KvPair</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">store</span>
-            .<span class="ident">raw_scan</span>(<span class="ident">ctx</span>, <span class="ident">cf</span>, <span class="ident">start_key</span>, <span class="ident">end_key</span>, <span class="ident">limit</span>, <span class="bool-val">false</span>, <span class="bool-val">false</span>)
-            .<span class="ident">wait</span>()
+        <span class="ident">block_on</span>(
+            <span class="self">self</span>.<span class="ident">store</span>
+                .<span class="ident">raw_scan</span>(<span class="ident">ctx</span>, <span class="ident">cf</span>, <span class="ident">start_key</span>, <span class="ident">end_key</span>, <span class="ident">limit</span>, <span class="bool-val">false</span>, <span class="bool-val">false</span>),
+        )
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">reverse_raw_scan</span>(
@@ -668,9 +657,10 @@
         <span class="ident">end_key</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">limit</span>: <span class="ident">usize</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">KvPair</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">store</span>
-            .<span class="ident">raw_scan</span>(<span class="ident">ctx</span>, <span class="ident">cf</span>, <span class="ident">start_key</span>, <span class="ident">end_key</span>, <span class="ident">limit</span>, <span class="bool-val">false</span>, <span class="bool-val">true</span>)
-            .<span class="ident">wait</span>()
+        <span class="ident">block_on</span>(
+            <span class="self">self</span>.<span class="ident">store</span>
+                .<span class="ident">raw_scan</span>(<span class="ident">ctx</span>, <span class="ident">cf</span>, <span class="ident">start_key</span>, <span class="ident">end_key</span>, <span class="ident">limit</span>, <span class="bool-val">false</span>, <span class="bool-val">true</span>),
+        )
     }
 }
 </pre></div>

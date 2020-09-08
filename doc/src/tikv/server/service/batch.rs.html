@@ -189,6 +189,7 @@
 <span id="189">189</span>
 <span id="190">190</span>
 <span id="191">191</span>
+<span id="192">192</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2017 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -200,7 +201,8 @@
     <span class="ident">lock_manager</span>::<span class="ident">LockManager</span>,
     <span class="ident">Storage</span>,
 };
-<span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">Future</span>;
+<span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">compat</span>::<span class="ident">Compat</span>;
+<span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">future</span>::<span class="ident">FutureExt</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">kvrpcpb</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">mpsc</span>::<span class="ident">batch</span>::<span class="ident">Sender</span>;
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">time</span>::{<span class="ident">duration_to_sec</span>, <span class="ident">Instant</span>};
@@ -282,8 +284,9 @@
     <span class="ident">tx</span>: <span class="ident">Sender</span><span class="op">&lt;</span>(<span class="ident">u64</span>, <span class="ident">batch_commands_response</span>::<span class="ident">Response</span>)<span class="op">&gt;</span>,
 ) {
     <span class="kw">let</span> <span class="ident">begin_instant</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now_coarse</span>();
-    <span class="kw">let</span> <span class="ident">f</span> <span class="op">=</span> <span class="ident">storage</span>.<span class="ident">batch_get_command</span>(<span class="ident">gets</span>).<span class="ident">then</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">ret</span><span class="op">|</span> {
-        <span class="kw">match</span> <span class="ident">ret</span> {
+    <span class="kw">let</span> <span class="ident">ret</span> <span class="op">=</span> <span class="ident">storage</span>.<span class="ident">batch_get_command</span>(<span class="ident">gets</span>);
+    <span class="kw">let</span> <span class="ident">f</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
+        <span class="kw">match</span> <span class="ident">ret</span>.<span class="kw">await</span> {
             <span class="prelude-val">Ok</span>(<span class="ident">ret</span>) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">for</span> (<span class="ident">v</span>, <span class="ident">req</span>) <span class="kw">in</span> <span class="ident">ret</span>.<span class="ident">into_iter</span>().<span class="ident">zip</span>(<span class="ident">requests</span>) {
                     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">GetResponse</span>::<span class="ident">default</span>();
@@ -322,9 +325,8 @@
         <span class="ident">GRPC_MSG_HISTOGRAM_STATIC</span>
             .<span class="ident">kv_batch_get_command</span>
             .<span class="ident">observe</span>(<span class="ident">begin_instant</span>.<span class="ident">elapsed_secs</span>());
-        <span class="prelude-val">Ok</span>(())
-    });
-    <span class="ident">poll_future_notify</span>(<span class="ident">f</span>);
+    };
+    <span class="ident">poll_future_notify</span>(<span class="ident">Compat</span>::<span class="ident">new</span>(<span class="ident">f</span>.<span class="ident">unit_error</span>().<span class="ident">boxed</span>()));
 }
 
 <span class="kw">fn</span> <span class="ident">future_batch_raw_get_command</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">Engine</span>, <span class="ident">L</span>: <span class="ident">LockManager</span><span class="op">&gt;</span>(
@@ -334,8 +336,9 @@
     <span class="ident">tx</span>: <span class="ident">Sender</span><span class="op">&lt;</span>(<span class="ident">u64</span>, <span class="ident">batch_commands_response</span>::<span class="ident">Response</span>)<span class="op">&gt;</span>,
 ) {
     <span class="kw">let</span> <span class="ident">begin_instant</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now_coarse</span>();
-    <span class="kw">let</span> <span class="ident">f</span> <span class="op">=</span> <span class="ident">storage</span>.<span class="ident">raw_batch_get_command</span>(<span class="ident">gets</span>).<span class="ident">then</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">v</span><span class="op">|</span> {
-        <span class="kw">match</span> <span class="ident">v</span> {
+    <span class="kw">let</span> <span class="ident">ret</span> <span class="op">=</span> <span class="ident">storage</span>.<span class="ident">raw_batch_get_command</span>(<span class="ident">gets</span>);
+    <span class="kw">let</span> <span class="ident">f</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
+        <span class="kw">match</span> <span class="ident">ret</span>.<span class="kw">await</span> {
             <span class="prelude-val">Ok</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">if</span> <span class="ident">requests</span>.<span class="ident">len</span>() <span class="op">!</span><span class="op">=</span> <span class="ident">v</span>.<span class="ident">len</span>() {
                     <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;KvService batch response size mismatch&quot;</span>);
@@ -377,9 +380,8 @@
         <span class="ident">GRPC_MSG_HISTOGRAM_STATIC</span>
             .<span class="ident">raw_batch_get_command</span>
             .<span class="ident">observe</span>(<span class="ident">duration_to_sec</span>(<span class="ident">begin_instant</span>.<span class="ident">elapsed</span>()));
-        <span class="prelude-val">Ok</span>(())
-    });
-    <span class="ident">poll_future_notify</span>(<span class="ident">f</span>);
+    };
+    <span class="ident">poll_future_notify</span>(<span class="ident">Compat</span>::<span class="ident">new</span>(<span class="ident">f</span>.<span class="ident">unit_error</span>().<span class="ident">boxed</span>()));
 }
 </pre></div>
 </section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../../../";window.currentCrate = "tikv";</script><script src="../../../../main.js"></script><script src="../../../../source-script.js"></script><script src="../../../../source-files.js"></script><script defer src="../../../../search-index.js"></script></body></html>

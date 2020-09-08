@@ -450,6 +450,29 @@
 <span id="450">450</span>
 <span id="451">451</span>
 <span id="452">452</span>
+<span id="453">453</span>
+<span id="454">454</span>
+<span id="455">455</span>
+<span id="456">456</span>
+<span id="457">457</span>
+<span id="458">458</span>
+<span id="459">459</span>
+<span id="460">460</span>
+<span id="461">461</span>
+<span id="462">462</span>
+<span id="463">463</span>
+<span id="464">464</span>
+<span id="465">465</span>
+<span id="466">466</span>
+<span id="467">467</span>
+<span id="468">468</span>
+<span id="469">469</span>
+<span id="470">470</span>
+<span id="471">471</span>
+<span id="472">472</span>
+<span id="473">473</span>
+<span id="474">474</span>
+<span id="475">475</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -457,10 +480,11 @@
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">Arc</span>;
 
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">name_to_cf</span>, <span class="ident">CompactExt</span>, <span class="ident">MiscExt</span>, <span class="ident">CF_DEFAULT</span>, <span class="ident">CF_WRITE</span>};
-<span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">sync</span>::<span class="ident">mpsc</span>;
-<span class="kw">use</span> <span class="ident">futures</span>::{<span class="ident">future</span>, <span class="ident">Future</span>, <span class="ident">Stream</span>};
-<span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">compat</span>::<span class="ident">Compat</span>;
-<span class="kw">use</span> <span class="ident">futures_cpupool</span>::{<span class="ident">Builder</span>, <span class="ident">CpuPool</span>};
+<span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">Future</span>;
+<span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">compat</span>::{<span class="ident">Compat</span>, <span class="ident">Future01CompatExt</span>, <span class="ident">Stream01CompatExt</span>};
+<span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">executor</span>::{<span class="ident">ThreadPool</span>, <span class="ident">ThreadPoolBuilder</span>};
+<span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">future</span>::<span class="ident">FutureExt</span>;
+<span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">stream</span>::<span class="ident">TryStreamExt</span>;
 <span class="kw">use</span> <span class="ident">grpcio</span>::{<span class="ident">ClientStreamingSink</span>, <span class="ident">RequestStream</span>, <span class="ident">RpcContext</span>, <span class="ident">UnarySink</span>};
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">errorpb</span>;
 
@@ -479,6 +503,7 @@
 <span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">store</span>::<span class="ident">Callback</span>;
 <span class="kw">use</span> <span class="ident">security</span>::{<span class="ident">check_common_name</span>, <span class="ident">SecurityManager</span>};
 <span class="kw">use</span> <span class="ident">sst_importer</span>::<span class="ident">send_rpc_response</span>;
+<span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">future</span>::<span class="ident">create_stream_with_buffer</span>;
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">future</span>::<span class="ident">paired_future_callback</span>;
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">time</span>::{<span class="ident">Instant</span>, <span class="ident">Limiter</span>};
 
@@ -496,7 +521,7 @@
     <span class="ident">cfg</span>: <span class="ident">Config</span>,
     <span class="ident">router</span>: <span class="ident">Router</span>,
     <span class="ident">engine</span>: <span class="ident">RocksEngine</span>,
-    <span class="ident">threads</span>: <span class="ident">CpuPool</span>,
+    <span class="ident">threads</span>: <span class="ident">ThreadPool</span>,
     <span class="ident">importer</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">SSTImporter</span><span class="op">&gt;</span>,
     <span class="ident">switcher</span>: <span class="ident">ImportModeSwitcher</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>,
     <span class="ident">limiter</span>: <span class="ident">Limiter</span>,
@@ -511,12 +536,13 @@
         <span class="ident">importer</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">SSTImporter</span><span class="op">&gt;</span>,
         <span class="ident">security_mgr</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">SecurityManager</span><span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ImportSSTService</span><span class="op">&lt;</span><span class="ident">Router</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">threads</span> <span class="op">=</span> <span class="ident">Builder</span>::<span class="ident">new</span>()
-            .<span class="ident">name_prefix</span>(<span class="string">&quot;sst-importer&quot;</span>)
-            .<span class="ident">after_start</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> <span class="ident">tikv_alloc</span>::<span class="ident">add_thread_memory_accessor</span>())
-            .<span class="ident">before_stop</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> <span class="ident">tikv_alloc</span>::<span class="ident">remove_thread_memory_accessor</span>())
+        <span class="kw">let</span> <span class="ident">threads</span> <span class="op">=</span> <span class="ident">ThreadPoolBuilder</span>::<span class="ident">new</span>()
             .<span class="ident">pool_size</span>(<span class="ident">cfg</span>.<span class="ident">num_threads</span>)
-            .<span class="ident">create</span>();
+            .<span class="ident">name_prefix</span>(<span class="string">&quot;sst-importer&quot;</span>)
+            .<span class="ident">after_start</span>(<span class="kw">move</span> <span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">tikv_alloc</span>::<span class="ident">add_thread_memory_accessor</span>())
+            .<span class="ident">before_stop</span>(<span class="kw">move</span> <span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">tikv_alloc</span>::<span class="ident">remove_thread_memory_accessor</span>())
+            .<span class="ident">create</span>()
+            .<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">switcher</span> <span class="op">=</span> <span class="ident">ImportModeSwitcher</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">cfg</span>, <span class="kw-2">&amp;</span><span class="ident">threads</span>, <span class="ident">engine</span>.<span class="ident">clone</span>());
         <span class="ident">ImportSSTService</span> {
             <span class="ident">cfg</span>,
@@ -559,11 +585,11 @@
             <span class="prelude-val">Err</span>(<span class="kw-2">ref</span> <span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;switch mode failed&quot;</span>; <span class="string">&quot;mode&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">req</span>.<span class="ident">get_mode</span>(), <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>),
         }
 
-        <span class="ident">ctx</span>.<span class="ident">spawn</span>(
-            <span class="ident">future</span>::<span class="ident">result</span>(<span class="ident">res</span>)
-                .<span class="ident">map</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">SwitchModeResponse</span>::<span class="ident">default</span>())
-                .<span class="ident">then</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">res</span><span class="op">|</span> <span class="macro">send_rpc_response</span><span class="macro">!</span>(<span class="ident">res</span>, <span class="ident">sink</span>, <span class="ident">label</span>, <span class="ident">timer</span>)),
-        )
+        <span class="kw">let</span> <span class="ident">task</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
+            <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="prelude-val">Ok</span>(<span class="ident">SwitchModeResponse</span>::<span class="ident">default</span>());
+            <span class="macro">send_rpc_response</span><span class="macro">!</span>(<span class="ident">res</span>, <span class="ident">sink</span>, <span class="ident">label</span>, <span class="ident">timer</span>);
+        };
+        <span class="ident">ctx</span>.<span class="ident">spawn</span>(<span class="ident">Compat</span>::<span class="ident">new</span>(<span class="ident">task</span>.<span class="ident">unit_error</span>().<span class="ident">boxed</span>()));
     }
 
     <span class="doccomment">/// Receive SST from client and save the file for later ingesting.</span>
@@ -578,46 +604,44 @@
         }
         <span class="kw">let</span> <span class="ident">label</span> <span class="op">=</span> <span class="string">&quot;upload&quot;</span>;
         <span class="kw">let</span> <span class="ident">timer</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now_coarse</span>();
-        <span class="kw">let</span> <span class="ident">import</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">importer</span>);
-        <span class="kw">let</span> <span class="ident">bounded_stream</span> <span class="op">=</span> <span class="ident">mpsc</span>::<span class="ident">spawn</span>(<span class="ident">stream</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">threads</span>, <span class="self">self</span>.<span class="ident">cfg</span>.<span class="ident">stream_channel_window</span>);
+        <span class="kw">let</span> <span class="ident">import</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">importer</span>.<span class="ident">clone</span>();
+        <span class="kw">let</span> (<span class="ident">rx</span>, <span class="ident">buf_driver</span>) <span class="op">=</span>
+            <span class="ident">create_stream_with_buffer</span>(<span class="ident">stream</span>.<span class="ident">compat</span>(), <span class="self">self</span>.<span class="ident">cfg</span>.<span class="ident">stream_channel_window</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rx</span> <span class="op">=</span> <span class="ident">rx</span>.<span class="ident">map_err</span>(<span class="ident">Error</span>::<span class="ident">from</span>);
 
-        <span class="ident">ctx</span>.<span class="ident">spawn</span>(
-            <span class="self">self</span>.<span class="ident">threads</span>.<span class="ident">spawn</span>(
-                <span class="ident">bounded_stream</span>
-                    .<span class="ident">into_future</span>()
-                    .<span class="ident">map_err</span>(<span class="op">|</span>(<span class="ident">e</span>, <span class="kw">_</span>)<span class="op">|</span> <span class="ident">Error</span>::<span class="ident">from</span>(<span class="ident">e</span>))
-                    .<span class="ident">and_then</span>(<span class="kw">move</span> <span class="op">|</span>(<span class="ident">chunk</span>, <span class="ident">stream</span>)<span class="op">|</span> {
-                        <span class="comment">// The first message of the stream contains metadata</span>
-                        <span class="comment">// of the file.</span>
-                        <span class="kw">let</span> <span class="ident">meta</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">chunk</span> {
-                            <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">chunk</span>) <span class="kw">if</span> <span class="ident">chunk</span>.<span class="ident">has_meta</span>() <span class="op">=</span><span class="op">&gt;</span> <span class="ident">chunk</span>.<span class="ident">get_meta</span>(),
-                            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">InvalidChunk</span>),
-                        };
-                        <span class="kw">let</span> <span class="ident">file</span> <span class="op">=</span> <span class="ident">import</span>.<span class="ident">create</span>(<span class="ident">meta</span>)<span class="question-mark">?</span>;
-                        <span class="prelude-val">Ok</span>((<span class="ident">file</span>, <span class="ident">stream</span>))
+        <span class="kw">let</span> <span class="ident">handle_task</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
+            <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
+                <span class="kw">let</span> <span class="ident">first_chunk</span> <span class="op">=</span> <span class="ident">rx</span>.<span class="ident">try_next</span>().<span class="kw">await</span><span class="question-mark">?</span>;
+                <span class="kw">let</span> <span class="ident">meta</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">first_chunk</span> {
+                    <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">chunk</span>) <span class="kw">if</span> <span class="ident">chunk</span>.<span class="ident">has_meta</span>() <span class="op">=</span><span class="op">&gt;</span> <span class="ident">chunk</span>.<span class="ident">get_meta</span>(),
+                    <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">InvalidChunk</span>),
+                };
+                <span class="kw">let</span> <span class="ident">file</span> <span class="op">=</span> <span class="ident">import</span>.<span class="ident">create</span>(<span class="ident">meta</span>)<span class="question-mark">?</span>;
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">file</span> <span class="op">=</span> <span class="ident">rx</span>
+                    .<span class="ident">try_fold</span>(<span class="ident">file</span>, <span class="op">|</span><span class="kw-2">mut</span> <span class="ident">file</span>, <span class="ident">chunk</span><span class="op">|</span> <span class="kw">async</span> <span class="kw">move</span> {
+                        <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now_coarse</span>();
+                        <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="ident">chunk</span>.<span class="ident">get_data</span>();
+                        <span class="kw">if</span> <span class="ident">data</span>.<span class="ident">is_empty</span>() {
+                            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">InvalidChunk</span>);
+                        }
+                        <span class="ident">file</span>.<span class="ident">append</span>(<span class="ident">data</span>)<span class="question-mark">?</span>;
+                        <span class="ident">IMPORT_UPLOAD_CHUNK_BYTES</span>.<span class="ident">observe</span>(<span class="ident">data</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">f64</span>);
+                        <span class="ident">IMPORT_UPLOAD_CHUNK_DURATION</span>.<span class="ident">observe</span>(<span class="ident">start</span>.<span class="ident">elapsed_secs</span>());
+                        <span class="prelude-val">Ok</span>(<span class="ident">file</span>)
                     })
-                    .<span class="ident">and_then</span>(<span class="kw">move</span> <span class="op">|</span>(<span class="ident">file</span>, <span class="ident">stream</span>)<span class="op">|</span> {
-                        <span class="ident">stream</span>
-                            .<span class="ident">map_err</span>(<span class="ident">Error</span>::<span class="ident">from</span>)
-                            .<span class="ident">fold</span>(<span class="ident">file</span>, <span class="op">|</span><span class="kw-2">mut</span> <span class="ident">file</span>, <span class="ident">chunk</span><span class="op">|</span> {
-                                <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now_coarse</span>();
-                                <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="ident">chunk</span>.<span class="ident">get_data</span>();
-                                <span class="kw">if</span> <span class="ident">data</span>.<span class="ident">is_empty</span>() {
-                                    <span class="kw">return</span> <span class="ident">future</span>::<span class="ident">err</span>(<span class="ident">Error</span>::<span class="ident">InvalidChunk</span>);
-                                }
-                                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">file</span>.<span class="ident">append</span>(<span class="ident">data</span>) {
-                                    <span class="kw">return</span> <span class="ident">future</span>::<span class="ident">err</span>(<span class="ident">e</span>);
-                                }
-                                <span class="ident">IMPORT_UPLOAD_CHUNK_BYTES</span>.<span class="ident">observe</span>(<span class="ident">data</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">f64</span>);
-                                <span class="ident">IMPORT_UPLOAD_CHUNK_DURATION</span>.<span class="ident">observe</span>(<span class="ident">start</span>.<span class="ident">elapsed_secs</span>());
-                                <span class="ident">future</span>::<span class="ident">ok</span>(<span class="ident">file</span>)
-                            })
-                            .<span class="ident">and_then</span>(<span class="op">|</span><span class="kw-2">mut</span> <span class="ident">file</span><span class="op">|</span> <span class="ident">file</span>.<span class="ident">finish</span>())
-                    })
-                    .<span class="ident">map</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">UploadResponse</span>::<span class="ident">default</span>())
-                    .<span class="ident">then</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">res</span><span class="op">|</span> <span class="macro">send_rpc_response</span><span class="macro">!</span>(<span class="ident">res</span>, <span class="ident">sink</span>, <span class="ident">label</span>, <span class="ident">timer</span>)),
-            ),
-        )
+                    .<span class="kw">await</span><span class="question-mark">?</span>;
+                <span class="ident">file</span>.<span class="ident">finish</span>().<span class="ident">map</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">UploadResponse</span>::<span class="ident">default</span>())
+            }
+            .<span class="kw">await</span>;
+            <span class="macro">send_rpc_response</span><span class="macro">!</span>(<span class="ident">res</span>, <span class="ident">sink</span>, <span class="ident">label</span>, <span class="ident">timer</span>);
+        };
+
+        <span class="kw">let</span> <span class="ident">thread_handle</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">threads</span>.<span class="ident">clone</span>();
+        <span class="kw">let</span> <span class="ident">ctx_task</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
+            <span class="ident">thread_handle</span>.<span class="ident">spawn_ok</span>(<span class="ident">buf_driver</span>);
+            <span class="ident">thread_handle</span>.<span class="ident">spawn_ok</span>(<span class="ident">handle_task</span>);
+        };
+        <span class="ident">ctx</span>.<span class="ident">spawn</span>(<span class="ident">Compat</span>::<span class="ident">new</span>(<span class="ident">ctx_task</span>.<span class="ident">unit_error</span>().<span class="ident">boxed</span>()));
     }
 
     <span class="doccomment">/// Downloads the file and performs key-rewrite for later ingesting.</span>
@@ -640,7 +664,7 @@
             .<span class="ident">build</span>(<span class="self">self</span>.<span class="ident">importer</span>.<span class="ident">get_path</span>(<span class="ident">req</span>.<span class="ident">get_sst</span>()).<span class="ident">to_str</span>().<span class="ident">unwrap</span>())
             .<span class="ident">unwrap</span>();
 
-        <span class="ident">ctx</span>.<span class="ident">spawn</span>(<span class="self">self</span>.<span class="ident">threads</span>.<span class="ident">spawn_fn</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
+        <span class="kw">let</span> <span class="ident">handle_task</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
             <span class="comment">// FIXME: download() should be an async fn, to allow BR to cancel</span>
             <span class="comment">// a download task.</span>
             <span class="comment">// Unfortunately, this currently can&#39;t happen because the S3Storage</span>
@@ -653,25 +677,23 @@
                 <span class="ident">limiter</span>,
                 <span class="ident">sst_writer</span>,
             );
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">DownloadResponse</span>::<span class="ident">default</span>();
+            <span class="kw">match</span> <span class="ident">res</span> {
+                <span class="prelude-val">Ok</span>(<span class="ident">range</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">match</span> <span class="ident">range</span> {
+                    <span class="prelude-val">Some</span>(<span class="ident">r</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">resp</span>.<span class="ident">set_range</span>(<span class="ident">r</span>),
+                    <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">resp</span>.<span class="ident">set_is_empty</span>(<span class="bool-val">true</span>),
+                },
+                <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">resp</span>.<span class="ident">set_error</span>(<span class="ident">e</span>.<span class="ident">into</span>()),
+            }
+            <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="prelude-val">Ok</span>(<span class="ident">resp</span>);
+            <span class="macro">send_rpc_response</span><span class="macro">!</span>(<span class="ident">resp</span>, <span class="ident">sink</span>, <span class="ident">label</span>, <span class="ident">timer</span>);
+        };
 
-            <span class="ident">future</span>::<span class="ident">result</span>(<span class="ident">res</span>)
-                .<span class="ident">map_err</span>(<span class="ident">Error</span>::<span class="ident">from</span>)
-                .<span class="ident">then</span>(<span class="op">|</span><span class="ident">res</span><span class="op">|</span> {
-                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">DownloadResponse</span>::<span class="ident">default</span>();
-                    <span class="kw">match</span> <span class="ident">res</span> {
-                        <span class="prelude-val">Ok</span>(<span class="ident">range</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">r</span>) <span class="op">=</span> <span class="ident">range</span> {
-                                <span class="ident">resp</span>.<span class="ident">set_range</span>(<span class="ident">r</span>);
-                            } <span class="kw">else</span> {
-                                <span class="ident">resp</span>.<span class="ident">set_is_empty</span>(<span class="bool-val">true</span>);
-                            }
-                        }
-                        <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">resp</span>.<span class="ident">set_error</span>(<span class="ident">e</span>.<span class="ident">into</span>()),
-                    }
-                    <span class="prelude-val">Ok</span>(<span class="ident">resp</span>)
-                })
-                .<span class="ident">then</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">res</span><span class="op">|</span> <span class="macro">send_rpc_response</span><span class="macro">!</span>(<span class="ident">res</span>, <span class="ident">sink</span>, <span class="ident">label</span>, <span class="ident">timer</span>))
-        }));
+        <span class="kw">let</span> <span class="ident">thread_handle</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">threads</span>.<span class="ident">clone</span>();
+        <span class="kw">let</span> <span class="ident">ctx_task</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
+            <span class="ident">thread_handle</span>.<span class="ident">spawn_ok</span>(<span class="ident">handle_task</span>);
+        };
+        <span class="ident">ctx</span>.<span class="ident">spawn</span>(<span class="ident">Compat</span>::<span class="ident">new</span>(<span class="ident">ctx_task</span>.<span class="ident">unit_error</span>().<span class="ident">boxed</span>()));
     }
 
     <span class="doccomment">/// Ingest the file by sending a raft command to raftstore.</span>
@@ -733,22 +755,22 @@
             <span class="kw">return</span>;
         }
 
-        <span class="ident">ctx</span>.<span class="ident">spawn</span>(
-            <span class="ident">Compat</span>::<span class="ident">new</span>(<span class="ident">future</span>)
-                .<span class="ident">map_err</span>(<span class="ident">Error</span>::<span class="ident">from</span>)
-                .<span class="ident">then</span>(<span class="op">|</span><span class="ident">res</span><span class="op">|</span> <span class="kw">match</span> <span class="ident">res</span> {
-                    <span class="prelude-val">Ok</span>(<span class="kw-2">mut</span> <span class="ident">res</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">IngestResponse</span>::<span class="ident">default</span>();
-                        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">header</span> <span class="op">=</span> <span class="ident">res</span>.<span class="ident">response</span>.<span class="ident">take_header</span>();
-                        <span class="kw">if</span> <span class="ident">header</span>.<span class="ident">has_error</span>() {
-                            <span class="ident">resp</span>.<span class="ident">set_error</span>(<span class="ident">header</span>.<span class="ident">take_error</span>());
-                        }
-                        <span class="ident">future</span>::<span class="ident">ok</span>(<span class="ident">resp</span>)
+        <span class="kw">let</span> <span class="ident">ctx_task</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
+            <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">future</span>.<span class="kw">await</span>.<span class="ident">map_err</span>(<span class="ident">Error</span>::<span class="ident">from</span>);
+            <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">res</span> {
+                <span class="prelude-val">Ok</span>(<span class="kw-2">mut</span> <span class="ident">res</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">IngestResponse</span>::<span class="ident">default</span>();
+                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">header</span> <span class="op">=</span> <span class="ident">res</span>.<span class="ident">response</span>.<span class="ident">take_header</span>();
+                    <span class="kw">if</span> <span class="ident">header</span>.<span class="ident">has_error</span>() {
+                        <span class="ident">resp</span>.<span class="ident">set_error</span>(<span class="ident">header</span>.<span class="ident">take_error</span>());
                     }
-                    <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">future</span>::<span class="ident">err</span>(<span class="ident">e</span>),
-                })
-                .<span class="ident">then</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">res</span><span class="op">|</span> <span class="macro">send_rpc_response</span><span class="macro">!</span>(<span class="ident">res</span>, <span class="ident">sink</span>, <span class="ident">label</span>, <span class="ident">timer</span>)),
-        )
+                    <span class="prelude-val">Ok</span>(<span class="ident">resp</span>)
+                }
+                <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>),
+            };
+            <span class="macro">send_rpc_response</span><span class="macro">!</span>(<span class="ident">res</span>, <span class="ident">sink</span>, <span class="ident">label</span>, <span class="ident">timer</span>);
+        };
+        <span class="ident">ctx</span>.<span class="ident">spawn</span>(<span class="ident">Compat</span>::<span class="ident">new</span>(<span class="ident">ctx_task</span>.<span class="ident">unit_error</span>().<span class="ident">boxed</span>()));
     }
 
     <span class="kw">fn</span> <span class="ident">compact</span>(
@@ -764,7 +786,7 @@
         <span class="kw">let</span> <span class="ident">timer</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now_coarse</span>();
         <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">engine</span>.<span class="ident">clone</span>();
 
-        <span class="ident">ctx</span>.<span class="ident">spawn</span>(<span class="self">self</span>.<span class="ident">threads</span>.<span class="ident">spawn_fn</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
+        <span class="kw">let</span> <span class="ident">handle_task</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
             <span class="kw">let</span> (<span class="ident">start</span>, <span class="ident">end</span>) <span class="op">=</span> <span class="kw">if</span> <span class="op">!</span><span class="ident">req</span>.<span class="ident">has_range</span>() {
                 (<span class="prelude-val">None</span>, <span class="prelude-val">None</span>)
             } <span class="kw">else</span> {
@@ -794,12 +816,32 @@
                     <span class="string">&quot;output_level&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">output_level</span>, <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>
                 ),
             }
-
-            <span class="ident">future</span>::<span class="ident">result</span>(<span class="ident">res</span>)
+            <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">compact_files_in_range</span>(<span class="ident">start</span>, <span class="ident">end</span>, <span class="ident">output_level</span>);
+            <span class="kw">match</span> <span class="ident">res</span> {
+                <span class="prelude-val">Ok</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">info</span><span class="macro">!</span>(
+                    <span class="string">&quot;compact files in range&quot;</span>;
+                    <span class="string">&quot;start&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">start</span>.<span class="ident">map</span>(<span class="ident">log_wrappers</span>::<span class="ident">Key</span>),
+                    <span class="string">&quot;end&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">end</span>.<span class="ident">map</span>(<span class="ident">log_wrappers</span>::<span class="ident">Key</span>),
+                    <span class="string">&quot;output_level&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">output_level</span>, <span class="string">&quot;takes&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">timer</span>.<span class="ident">elapsed</span>()
+                ),
+                <span class="prelude-val">Err</span>(<span class="kw-2">ref</span> <span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">error</span><span class="macro">!</span>(
+                    <span class="string">&quot;compact files in range failed&quot;</span>;
+                    <span class="string">&quot;start&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">start</span>.<span class="ident">map</span>(<span class="ident">log_wrappers</span>::<span class="ident">Key</span>),
+                    <span class="string">&quot;end&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">end</span>.<span class="ident">map</span>(<span class="ident">log_wrappers</span>::<span class="ident">Key</span>),
+                    <span class="string">&quot;output_level&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">output_level</span>, <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>
+                ),
+            }
+            <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">res</span>
                 .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">Error</span>::<span class="ident">Engine</span>(<span class="macro">box_err</span><span class="macro">!</span>(<span class="ident">e</span>)))
-                .<span class="ident">map</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">CompactResponse</span>::<span class="ident">default</span>())
-                .<span class="ident">then</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">res</span><span class="op">|</span> <span class="macro">send_rpc_response</span><span class="macro">!</span>(<span class="ident">res</span>, <span class="ident">sink</span>, <span class="ident">label</span>, <span class="ident">timer</span>))
-        }))
+                .<span class="ident">map</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">CompactResponse</span>::<span class="ident">default</span>());
+            <span class="macro">send_rpc_response</span><span class="macro">!</span>(<span class="ident">res</span>, <span class="ident">sink</span>, <span class="ident">label</span>, <span class="ident">timer</span>);
+        };
+
+        <span class="kw">let</span> <span class="ident">thread_handle</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">threads</span>.<span class="ident">clone</span>();
+        <span class="kw">let</span> <span class="ident">ctx_task</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
+            <span class="ident">thread_handle</span>.<span class="ident">spawn_ok</span>(<span class="ident">handle_task</span>);
+        };
+        <span class="ident">ctx</span>.<span class="ident">spawn</span>(<span class="ident">Compat</span>::<span class="ident">new</span>(<span class="ident">ctx_task</span>.<span class="ident">unit_error</span>().<span class="ident">boxed</span>()));
     }
 
     <span class="kw">fn</span> <span class="ident">set_download_speed_limit</span>(
@@ -821,10 +863,12 @@
             <span class="ident">INFINITY</span>
         });
 
-        <span class="ident">ctx</span>.<span class="ident">spawn</span>(
-            <span class="ident">future</span>::<span class="ident">ok</span>::<span class="op">&lt;</span><span class="kw">_</span>, <span class="ident">Error</span><span class="op">&gt;</span>(<span class="ident">SetDownloadSpeedLimitResponse</span>::<span class="ident">default</span>())
-                .<span class="ident">then</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">res</span><span class="op">|</span> <span class="macro">send_rpc_response</span><span class="macro">!</span>(<span class="ident">res</span>, <span class="ident">sink</span>, <span class="ident">label</span>, <span class="ident">timer</span>)),
-        )
+        <span class="kw">let</span> <span class="ident">ctx_task</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
+            <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="prelude-val">Ok</span>(<span class="ident">SetDownloadSpeedLimitResponse</span>::<span class="ident">default</span>());
+            <span class="macro">send_rpc_response</span><span class="macro">!</span>(<span class="ident">res</span>, <span class="ident">sink</span>, <span class="ident">label</span>, <span class="ident">timer</span>);
+        };
+
+        <span class="ident">ctx</span>.<span class="ident">spawn</span>(<span class="ident">Compat</span>::<span class="ident">new</span>(<span class="ident">ctx_task</span>.<span class="ident">unit_error</span>().<span class="ident">boxed</span>()));
     }
 
     <span class="kw">fn</span> <span class="ident">write</span>(
@@ -838,69 +882,71 @@
         }
         <span class="kw">let</span> <span class="ident">label</span> <span class="op">=</span> <span class="string">&quot;write&quot;</span>;
         <span class="kw">let</span> <span class="ident">timer</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now_coarse</span>();
-        <span class="kw">let</span> <span class="ident">import</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">importer</span>);
+        <span class="kw">let</span> <span class="ident">import</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">importer</span>.<span class="ident">clone</span>();
         <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">engine</span>.<span class="ident">clone</span>();
-        <span class="kw">let</span> <span class="ident">bounded_stream</span> <span class="op">=</span> <span class="ident">mpsc</span>::<span class="ident">spawn</span>(<span class="ident">stream</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">threads</span>, <span class="self">self</span>.<span class="ident">cfg</span>.<span class="ident">stream_channel_window</span>);
-        <span class="ident">ctx</span>.<span class="ident">spawn</span>(
-            <span class="self">self</span>.<span class="ident">threads</span>.<span class="ident">spawn</span>(
-                <span class="ident">bounded_stream</span>
-                    .<span class="ident">into_future</span>()
-                    .<span class="ident">map_err</span>(<span class="op">|</span>(<span class="ident">e</span>, <span class="kw">_</span>)<span class="op">|</span> <span class="ident">Error</span>::<span class="ident">from</span>(<span class="ident">e</span>))
-                    .<span class="ident">and_then</span>(<span class="kw">move</span> <span class="op">|</span>(<span class="ident">req</span>, <span class="ident">stream</span>)<span class="op">|</span> {
-                        <span class="kw">let</span> <span class="ident">meta</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">req</span> {
-                            <span class="prelude-val">Some</span>(<span class="ident">r</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">match</span> <span class="ident">r</span>.<span class="ident">chunk</span> {
-                                <span class="prelude-val">Some</span>(<span class="ident">Chunk</span>::<span class="ident">Meta</span>(<span class="ident">m</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">m</span>,
-                                <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">InvalidChunk</span>),
-                            },
+        <span class="kw">let</span> (<span class="ident">rx</span>, <span class="ident">buf_driver</span>) <span class="op">=</span>
+            <span class="ident">create_stream_with_buffer</span>(<span class="ident">stream</span>.<span class="ident">compat</span>(), <span class="self">self</span>.<span class="ident">cfg</span>.<span class="ident">stream_channel_window</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rx</span> <span class="op">=</span> <span class="ident">rx</span>.<span class="ident">map_err</span>(<span class="ident">Error</span>::<span class="ident">from</span>);
+
+        <span class="kw">let</span> <span class="ident">handle_task</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
+            <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
+                <span class="kw">let</span> <span class="ident">first_req</span> <span class="op">=</span> <span class="ident">rx</span>.<span class="ident">try_next</span>().<span class="kw">await</span><span class="question-mark">?</span>;
+                <span class="kw">let</span> <span class="ident">meta</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">first_req</span> {
+                    <span class="prelude-val">Some</span>(<span class="ident">r</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">match</span> <span class="ident">r</span>.<span class="ident">chunk</span> {
+                        <span class="prelude-val">Some</span>(<span class="ident">Chunk</span>::<span class="ident">Meta</span>(<span class="ident">m</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">m</span>,
+                        <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">InvalidChunk</span>),
+                    },
+                    <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">InvalidChunk</span>),
+                };
+
+                <span class="kw">let</span> <span class="ident">name</span> <span class="op">=</span> <span class="ident">import</span>.<span class="ident">get_path</span>(<span class="kw-2">&amp;</span><span class="ident">meta</span>);
+
+                <span class="kw">let</span> <span class="ident">default</span> <span class="op">=</span> <span class="op">&lt;</span><span class="ident">RocksEngine</span> <span class="kw">as</span> <span class="ident">SstExt</span><span class="op">&gt;</span>::<span class="ident">SstWriterBuilder</span>::<span class="ident">new</span>()
+                    .<span class="ident">set_in_memory</span>(<span class="bool-val">true</span>)
+                    .<span class="ident">set_db</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>)
+                    .<span class="ident">set_cf</span>(<span class="ident">CF_DEFAULT</span>)
+                    .<span class="ident">build</span>(<span class="kw-2">&amp;</span><span class="ident">name</span>.<span class="ident">to_str</span>().<span class="ident">unwrap</span>())<span class="question-mark">?</span>;
+                <span class="kw">let</span> <span class="ident">write</span> <span class="op">=</span> <span class="op">&lt;</span><span class="ident">RocksEngine</span> <span class="kw">as</span> <span class="ident">SstExt</span><span class="op">&gt;</span>::<span class="ident">SstWriterBuilder</span>::<span class="ident">new</span>()
+                    .<span class="ident">set_in_memory</span>(<span class="bool-val">true</span>)
+                    .<span class="ident">set_db</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>)
+                    .<span class="ident">set_cf</span>(<span class="ident">CF_WRITE</span>)
+                    .<span class="ident">build</span>(<span class="kw-2">&amp;</span><span class="ident">name</span>.<span class="ident">to_str</span>().<span class="ident">unwrap</span>())<span class="question-mark">?</span>;
+                <span class="kw">let</span> <span class="ident">writer</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">import</span>.<span class="ident">new_writer</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>(<span class="ident">default</span>, <span class="ident">write</span>, <span class="ident">meta</span>) {
+                    <span class="prelude-val">Ok</span>(<span class="ident">w</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">w</span>,
+                    <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                        <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;build writer failed {:?}&quot;</span>, <span class="ident">e</span>);
+                        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">InvalidChunk</span>);
+                    }
+                };
+                <span class="kw">let</span> <span class="ident">writer</span> <span class="op">=</span> <span class="ident">rx</span>
+                    .<span class="ident">try_fold</span>(<span class="ident">writer</span>, <span class="op">|</span><span class="kw-2">mut</span> <span class="ident">writer</span>, <span class="ident">req</span><span class="op">|</span> <span class="kw">async</span> <span class="kw">move</span> {
+                        <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now_coarse</span>();
+                        <span class="kw">let</span> <span class="ident">batch</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">req</span>.<span class="ident">chunk</span> {
+                            <span class="prelude-val">Some</span>(<span class="ident">Chunk</span>::<span class="ident">Batch</span>(<span class="ident">b</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">b</span>,
                             <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">InvalidChunk</span>),
                         };
-                        <span class="kw">let</span> <span class="ident">name</span> <span class="op">=</span> <span class="ident">import</span>.<span class="ident">get_path</span>(<span class="kw-2">&amp;</span><span class="ident">meta</span>);
+                        <span class="ident">writer</span>.<span class="ident">write</span>(<span class="ident">batch</span>)<span class="question-mark">?</span>;
+                        <span class="ident">IMPORT_WRITE_CHUNK_DURATION</span>.<span class="ident">observe</span>(<span class="ident">start</span>.<span class="ident">elapsed_secs</span>());
+                        <span class="prelude-val">Ok</span>(<span class="ident">writer</span>)
+                    })
+                    .<span class="kw">await</span><span class="question-mark">?</span>;
 
-                        <span class="kw">let</span> <span class="ident">default</span> <span class="op">=</span> <span class="op">&lt;</span><span class="ident">RocksEngine</span> <span class="kw">as</span> <span class="ident">SstExt</span><span class="op">&gt;</span>::<span class="ident">SstWriterBuilder</span>::<span class="ident">new</span>()
-                            .<span class="ident">set_in_memory</span>(<span class="bool-val">true</span>)
-                            .<span class="ident">set_db</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>)
-                            .<span class="ident">set_cf</span>(<span class="ident">CF_DEFAULT</span>)
-                            .<span class="ident">build</span>(<span class="kw-2">&amp;</span><span class="ident">name</span>.<span class="ident">to_str</span>().<span class="ident">unwrap</span>())<span class="question-mark">?</span>;
-                        <span class="kw">let</span> <span class="ident">write</span> <span class="op">=</span> <span class="op">&lt;</span><span class="ident">RocksEngine</span> <span class="kw">as</span> <span class="ident">SstExt</span><span class="op">&gt;</span>::<span class="ident">SstWriterBuilder</span>::<span class="ident">new</span>()
-                            .<span class="ident">set_in_memory</span>(<span class="bool-val">true</span>)
-                            .<span class="ident">set_db</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>)
-                            .<span class="ident">set_cf</span>(<span class="ident">CF_WRITE</span>)
-                            .<span class="ident">build</span>(<span class="kw-2">&amp;</span><span class="ident">name</span>.<span class="ident">to_str</span>().<span class="ident">unwrap</span>())<span class="question-mark">?</span>;
-                        <span class="kw">let</span> <span class="ident">writer</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">import</span>.<span class="ident">new_writer</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>(<span class="ident">default</span>, <span class="ident">write</span>, <span class="ident">meta</span>) {
-                            <span class="prelude-val">Ok</span>(<span class="ident">w</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">w</span>,
-                            <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                                <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;build writer failed {:?}&quot;</span>, <span class="ident">e</span>);
-                                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">InvalidChunk</span>);
-                            }
-                        };
-                        <span class="prelude-val">Ok</span>((<span class="ident">writer</span>, <span class="ident">stream</span>))
-                    })
-                    .<span class="ident">and_then</span>(<span class="kw">move</span> <span class="op">|</span>(<span class="ident">writer</span>, <span class="ident">stream</span>)<span class="op">|</span> {
-                        <span class="ident">stream</span>
-                            .<span class="ident">map_err</span>(<span class="ident">Error</span>::<span class="ident">from</span>)
-                            .<span class="ident">fold</span>(<span class="ident">writer</span>, <span class="op">|</span><span class="kw-2">mut</span> <span class="ident">writer</span>, <span class="ident">req</span><span class="op">|</span> {
-                                <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now_coarse</span>();
-                                <span class="kw">let</span> <span class="ident">batch</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">req</span>.<span class="ident">chunk</span> {
-                                    <span class="prelude-val">Some</span>(<span class="ident">Chunk</span>::<span class="ident">Batch</span>(<span class="ident">b</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">b</span>,
-                                    <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">InvalidChunk</span>),
-                                };
-                                <span class="ident">writer</span>.<span class="ident">write</span>(<span class="ident">batch</span>)<span class="question-mark">?</span>;
-                                <span class="ident">IMPORT_WRITE_CHUNK_DURATION</span>.<span class="ident">observe</span>(<span class="ident">start</span>.<span class="ident">elapsed_secs</span>());
-                                <span class="prelude-val">Ok</span>(<span class="ident">writer</span>)
-                            })
-                            .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">writer</span><span class="op">|</span> <span class="ident">writer</span>.<span class="ident">finish</span>())
-                    })
-                    .<span class="ident">then</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">res</span><span class="op">|</span> <span class="kw">match</span> <span class="ident">res</span> {
-                        <span class="prelude-val">Ok</span>(<span class="ident">metas</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">WriteResponse</span>::<span class="ident">default</span>();
-                            <span class="ident">resp</span>.<span class="ident">set_metas</span>(<span class="ident">metas</span>.<span class="ident">into</span>());
-                            <span class="prelude-val">Ok</span>(<span class="ident">resp</span>)
-                        }
-                        <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>),
-                    })
-                    .<span class="ident">then</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">res</span><span class="op">|</span> <span class="macro">send_rpc_response</span><span class="macro">!</span>(<span class="ident">res</span>, <span class="ident">sink</span>, <span class="ident">label</span>, <span class="ident">timer</span>)),
-            ),
-        )
+                <span class="ident">writer</span>.<span class="ident">finish</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">metas</span><span class="op">|</span> {
+                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">WriteResponse</span>::<span class="ident">default</span>();
+                    <span class="ident">resp</span>.<span class="ident">set_metas</span>(<span class="ident">metas</span>.<span class="ident">into</span>());
+                    <span class="ident">resp</span>
+                })
+            }
+            .<span class="kw">await</span>;
+            <span class="macro">send_rpc_response</span><span class="macro">!</span>(<span class="ident">res</span>, <span class="ident">sink</span>, <span class="ident">label</span>, <span class="ident">timer</span>);
+        };
+
+        <span class="kw">let</span> <span class="ident">thread_handle</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">threads</span>.<span class="ident">clone</span>();
+        <span class="kw">let</span> <span class="ident">ctx_task</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
+            <span class="ident">thread_handle</span>.<span class="ident">spawn_ok</span>(<span class="ident">buf_driver</span>);
+            <span class="ident">thread_handle</span>.<span class="ident">spawn_ok</span>(<span class="ident">handle_task</span>);
+        };
+        <span class="ident">ctx</span>.<span class="ident">spawn</span>(<span class="ident">Compat</span>::<span class="ident">new</span>(<span class="ident">ctx_task</span>.<span class="ident">unit_error</span>().<span class="ident">boxed</span>()));
     }
 }
 </pre></div>

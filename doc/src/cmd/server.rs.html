@@ -1037,6 +1037,11 @@
 <span id="1037">1037</span>
 <span id="1038">1038</span>
 <span id="1039">1039</span>
+<span id="1040">1040</span>
+<span id="1041">1041</span>
+<span id="1042">1042</span>
+<span id="1043">1043</span>
+<span id="1044">1044</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! This module startups all the components of a TiKV server.</span>
 <span class="doccomment">//!</span>
@@ -1055,8 +1060,7 @@
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">compaction_job</span>::<span class="ident">CompactionJobInfo</span>, <span class="ident">Engines</span>, <span class="ident">MetricsFlusher</span>};
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">CF_DEFAULT</span>, <span class="ident">CF_WRITE</span>};
 <span class="kw">use</span> <span class="ident">fs2</span>::<span class="ident">FileExt</span>;
-<span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">executor</span>::<span class="ident">block_on</span>;
-<span class="kw">use</span> <span class="ident">futures_cpupool</span>::<span class="ident">Builder</span>;
+<span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">executor</span>::<span class="ident">block_on</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::{
     <span class="ident">backup</span>::<span class="ident">create_backup</span>, <span class="ident">cdcpb</span>::<span class="ident">create_change_data</span>, <span class="ident">deadlock</span>::<span class="ident">create_deadlock</span>,
     <span class="ident">debugpb</span>::<span class="ident">create_debug</span>, <span class="ident">diagnosticspb</span>::<span class="ident">create_diagnostics</span>, <span class="ident">import_sstpb</span>::<span class="ident">create_import_sst</span>,
@@ -1111,6 +1115,7 @@
     <span class="ident">time</span>::<span class="ident">Monitor</span>,
     <span class="ident">worker</span>::{<span class="ident">FutureWorker</span>, <span class="ident">Worker</span>},
 };
+<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">runtime</span>::<span class="ident">Builder</span>;
 
 <span class="doccomment">/// Run a TiKV server. Returns when the server is shutdown by the user, in which</span>
 <span class="doccomment">/// case the server will be properly stopped.</span>
@@ -1581,6 +1586,18 @@
             <span class="prelude-val">None</span>
         };
 
+        <span class="comment">// The `DebugService` and `DiagnosticsService` will share the same thread pool</span>
+        <span class="kw">let</span> <span class="ident">debug_thread_pool</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(
+            <span class="ident">Builder</span>::<span class="ident">new</span>()
+                .<span class="ident">threaded_scheduler</span>()
+                .<span class="ident">thread_name</span>(<span class="macro">thd_name</span><span class="macro">!</span>(<span class="string">&quot;debugger&quot;</span>))
+                .<span class="ident">core_threads</span>(<span class="number">1</span>)
+                .<span class="ident">on_thread_start</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">tikv_alloc</span>::<span class="ident">add_thread_memory_accessor</span>())
+                .<span class="ident">on_thread_stop</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">tikv_alloc</span>::<span class="ident">remove_thread_memory_accessor</span>())
+                .<span class="ident">build</span>()
+                .<span class="ident">unwrap</span>(),
+        );
+
         <span class="kw">let</span> <span class="ident">storage_read_pool_handle</span> <span class="op">=</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">readpool</span>.<span class="ident">storage</span>.<span class="ident">use_unified_pool</span>() {
             <span class="ident">unified_read_pool</span>.<span class="ident">as_ref</span>().<span class="ident">unwrap</span>().<span class="ident">handle</span>()
         } <span class="kw">else</span> {
@@ -1652,6 +1669,7 @@
             <span class="ident">snap_mgr</span>.<span class="ident">clone</span>(),
             <span class="ident">gc_worker</span>.<span class="ident">clone</span>(),
             <span class="ident">unified_read_pool</span>,
+            <span class="ident">debug_thread_pool</span>,
         )
         .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">fatal</span><span class="macro">!</span>(<span class="string">&quot;failed to create server: {}&quot;</span>, <span class="ident">e</span>));
 
@@ -1772,18 +1790,10 @@
             <span class="macro">fatal</span><span class="macro">!</span>(<span class="string">&quot;failed to register import service&quot;</span>);
         }
 
-        <span class="comment">// The `DebugService` and `DiagnosticsService` will share the same thread pool</span>
-        <span class="kw">let</span> <span class="ident">pool</span> <span class="op">=</span> <span class="ident">Builder</span>::<span class="ident">new</span>()
-            .<span class="ident">name_prefix</span>(<span class="macro">thd_name</span><span class="macro">!</span>(<span class="string">&quot;debugger&quot;</span>))
-            .<span class="ident">pool_size</span>(<span class="number">1</span>)
-            .<span class="ident">after_start</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">tikv_alloc</span>::<span class="ident">add_thread_memory_accessor</span>())
-            .<span class="ident">before_stop</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">tikv_alloc</span>::<span class="ident">remove_thread_memory_accessor</span>())
-            .<span class="ident">create</span>();
-
         <span class="comment">// Debug service.</span>
         <span class="kw">let</span> <span class="ident">debug_service</span> <span class="op">=</span> <span class="ident">DebugService</span>::<span class="ident">new</span>(
             <span class="ident">engines</span>.<span class="ident">engines</span>.<span class="ident">clone</span>(),
-            <span class="ident">pool</span>.<span class="ident">clone</span>(),
+            <span class="ident">servers</span>.<span class="ident">server</span>.<span class="ident">get_debug_thread_pool</span>().<span class="ident">clone</span>(),
             <span class="self">self</span>.<span class="ident">router</span>.<span class="ident">clone</span>(),
             <span class="self">self</span>.<span class="ident">cfg_controller</span>.<span class="ident">as_ref</span>().<span class="ident">unwrap</span>().<span class="ident">clone</span>(),
             <span class="self">self</span>.<span class="ident">security_mgr</span>.<span class="ident">clone</span>(),
@@ -1798,7 +1808,7 @@
 
         <span class="comment">// Create Diagnostics service</span>
         <span class="kw">let</span> <span class="ident">diag_service</span> <span class="op">=</span> <span class="ident">DiagnosticsService</span>::<span class="ident">new</span>(
-            <span class="ident">pool</span>,
+            <span class="ident">servers</span>.<span class="ident">server</span>.<span class="ident">get_debug_thread_pool</span>().<span class="ident">clone</span>(),
             <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">log_file</span>.<span class="ident">clone</span>(),
             <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">slow_log_file</span>.<span class="ident">clone</span>(),
             <span class="self">self</span>.<span class="ident">security_mgr</span>.<span class="ident">clone</span>(),

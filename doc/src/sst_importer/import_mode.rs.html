@@ -378,9 +378,8 @@
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">time</span>::<span class="ident">Instant</span>;
 
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">ColumnFamilyOptions</span>, <span class="ident">DBOptions</span>, <span class="ident">KvEngine</span>};
-<span class="kw">use</span> <span class="ident">futures_cpupool</span>::<span class="ident">CpuPool</span>;
-<span class="kw">use</span> <span class="ident">futures_util</span>::<span class="ident">compat</span>::{<span class="ident">Compat</span>, <span class="ident">Future01CompatExt</span>};
-<span class="kw">use</span> <span class="ident">futures_util</span>::<span class="ident">future</span>::<span class="ident">FutureExt</span>;
+<span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">executor</span>::<span class="ident">ThreadPool</span>;
+<span class="kw">use</span> <span class="ident">futures_util</span>::<span class="ident">compat</span>::<span class="ident">Future01CompatExt</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">import_sstpb</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">timer</span>::<span class="ident">GLOBAL_TIMER_HANDLE</span>;
 
@@ -446,7 +445,7 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">KvEngine</span><span class="op">&gt;</span> <span class="ident">ImportModeSwitcher</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">cfg</span>: <span class="kw-2">&amp;</span><span class="ident">Config</span>, <span class="ident">executor</span>: <span class="kw-2">&amp;</span><span class="ident">CpuPool</span>, <span class="ident">db</span>: <span class="ident">E</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ImportModeSwitcher</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">cfg</span>: <span class="kw-2">&amp;</span><span class="ident">Config</span>, <span class="ident">executor</span>: <span class="kw-2">&amp;</span><span class="ident">ThreadPool</span>, <span class="ident">db</span>: <span class="ident">E</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ImportModeSwitcher</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
         <span class="kw">fn</span> <span class="ident">mf</span>(<span class="ident">_cf</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">_name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">_v</span>: <span class="ident">f64</span>) {}
 
         <span class="kw">let</span> <span class="ident">timeout</span> <span class="op">=</span> <span class="ident">cfg</span>.<span class="ident">import_mode_timeout</span>.<span class="number">0</span>;
@@ -487,9 +486,7 @@
                 }
             }
         };
-        <span class="ident">executor</span>
-            .<span class="ident">spawn</span>(<span class="ident">Compat</span>::<span class="ident">new</span>(<span class="ident">timer_loop</span>.<span class="ident">unit_error</span>().<span class="ident">boxed</span>()))
-            .<span class="ident">forget</span>();
+        <span class="ident">executor</span>.<span class="ident">spawn_ok</span>(<span class="ident">timer_loop</span>);
 
         <span class="ident">ImportModeSwitcher</span> { <span class="ident">inner</span> }
     }
@@ -612,6 +609,7 @@
     <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 
     <span class="kw">use</span> <span class="ident">engine_traits</span>::<span class="ident">KvEngine</span>;
+    <span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">executor</span>::<span class="ident">ThreadPoolBuilder</span>;
     <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">thread</span>;
     <span class="kw">use</span> <span class="ident">tempfile</span>::<span class="ident">Builder</span>;
     <span class="kw">use</span> <span class="ident">test_sst_importer</span>::{<span class="ident">new_test_engine</span>, <span class="ident">new_test_engine_with_options</span>};
@@ -673,10 +671,11 @@
         <span class="kw">fn</span> <span class="ident">mf</span>(<span class="ident">_cf</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">_name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">_v</span>: <span class="ident">f64</span>) {}
 
         <span class="kw">let</span> <span class="ident">cfg</span> <span class="op">=</span> <span class="ident">Config</span>::<span class="ident">default</span>();
-        <span class="kw">let</span> <span class="ident">threads</span> <span class="op">=</span> <span class="ident">futures_cpupool</span>::<span class="ident">Builder</span>::<span class="ident">new</span>()
-            .<span class="ident">name_prefix</span>(<span class="string">&quot;sst-importer&quot;</span>)
+        <span class="kw">let</span> <span class="ident">threads</span> <span class="op">=</span> <span class="ident">ThreadPoolBuilder</span>::<span class="ident">new</span>()
             .<span class="ident">pool_size</span>(<span class="ident">cfg</span>.<span class="ident">num_threads</span>)
-            .<span class="ident">create</span>();
+            .<span class="ident">name_prefix</span>(<span class="string">&quot;sst-importer&quot;</span>)
+            .<span class="ident">create</span>()
+            .<span class="ident">unwrap</span>();
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">switcher</span> <span class="op">=</span> <span class="ident">ImportModeSwitcher</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">cfg</span>, <span class="kw-2">&amp;</span><span class="ident">threads</span>, <span class="ident">db</span>.<span class="ident">clone</span>());
         <span class="ident">check_import_options</span>(<span class="kw-2">&amp;</span><span class="ident">db</span>, <span class="kw-2">&amp;</span><span class="ident">normal_db_options</span>, <span class="kw-2">&amp;</span><span class="ident">normal_cf_options</span>);
@@ -709,10 +708,11 @@
             <span class="ident">import_mode_timeout</span>: <span class="ident">ReadableDuration</span>::<span class="ident">millis</span>(<span class="number">300</span>),
             ..<span class="ident">Config</span>::<span class="ident">default</span>()
         };
-        <span class="kw">let</span> <span class="ident">threads</span> <span class="op">=</span> <span class="ident">futures_cpupool</span>::<span class="ident">Builder</span>::<span class="ident">new</span>()
-            .<span class="ident">name_prefix</span>(<span class="string">&quot;sst-importer&quot;</span>)
+        <span class="kw">let</span> <span class="ident">threads</span> <span class="op">=</span> <span class="ident">ThreadPoolBuilder</span>::<span class="ident">new</span>()
             .<span class="ident">pool_size</span>(<span class="ident">cfg</span>.<span class="ident">num_threads</span>)
-            .<span class="ident">create</span>();
+            .<span class="ident">name_prefix</span>(<span class="string">&quot;sst-importer&quot;</span>)
+            .<span class="ident">create</span>()
+            .<span class="ident">unwrap</span>();
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">switcher</span> <span class="op">=</span> <span class="ident">ImportModeSwitcher</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">cfg</span>, <span class="kw-2">&amp;</span><span class="ident">threads</span>, <span class="ident">db</span>.<span class="ident">clone</span>());
         <span class="ident">check_import_options</span>(<span class="kw-2">&amp;</span><span class="ident">db</span>, <span class="kw-2">&amp;</span><span class="ident">normal_db_options</span>, <span class="kw-2">&amp;</span><span class="ident">normal_cf_options</span>);

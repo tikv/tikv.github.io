@@ -1522,28 +1522,16 @@
 <span id="1522">1522</span>
 <span id="1523">1523</span>
 <span id="1524">1524</span>
-<span id="1525">1525</span>
-<span id="1526">1526</span>
-<span id="1527">1527</span>
-<span id="1528">1528</span>
-<span id="1529">1529</span>
-<span id="1530">1530</span>
-<span id="1531">1531</span>
-<span id="1532">1532</span>
-<span id="1533">1533</span>
-<span id="1534">1534</span>
-<span id="1535">1535</span>
-<span id="1536">1536</span>
-<span id="1537">1537</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">future</span>::<span class="ident">Future</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">marker</span>::<span class="ident">PhantomData</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">Arc</span>;
 <span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">borrow</span>::<span class="ident">Cow</span>, <span class="ident">time</span>::<span class="ident">Duration</span>};
 
 <span class="kw">use</span> <span class="ident">async_stream</span>::<span class="ident">try_stream</span>;
-<span class="kw">use</span> <span class="ident">futures</span>::{<span class="ident">future</span>, <span class="ident">Future</span>, <span class="ident">Stream</span>};
+<span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">Stream</span>;
 <span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">channel</span>::<span class="ident">mpsc</span>;
 <span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">prelude</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">sync</span>::<span class="ident">Semaphore</span>;
@@ -1969,21 +1957,22 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">req_ctx</span>: <span class="ident">ReqContext</span>,
         <span class="ident">handler_builder</span>: <span class="ident">RequestHandlerBuilder</span><span class="op">&lt;</span><span class="ident">E</span>::<span class="ident">Snap</span><span class="op">&gt;</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="kw">impl</span> <span class="ident">Future</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">coppb</span>::<span class="ident">Response</span>, <span class="ident">Error</span> <span class="op">=</span> <span class="ident">Error</span><span class="op">&gt;</span> {
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="kw">impl</span> <span class="ident">Future</span><span class="op">&lt;</span><span class="ident">Output</span> <span class="op">=</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">coppb</span>::<span class="ident">Response</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">priority</span> <span class="op">=</span> <span class="ident">req_ctx</span>.<span class="ident">context</span>.<span class="ident">get_priority</span>();
         <span class="kw">let</span> <span class="ident">task_id</span> <span class="op">=</span> <span class="ident">req_ctx</span>.<span class="ident">build_task_id</span>();
         <span class="comment">// box the tracker so that moving it is cheap.</span>
         <span class="kw">let</span> <span class="ident">tracker</span> <span class="op">=</span> <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">Tracker</span>::<span class="ident">new</span>(<span class="ident">req_ctx</span>));
 
-        <span class="self">self</span>.<span class="ident">read_pool</span>
+        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="self">self</span>
+            .<span class="ident">read_pool</span>
             .<span class="ident">spawn_handle</span>(
                 <span class="self">Self</span>::<span class="ident">handle_unary_request_impl</span>(<span class="self">self</span>.<span class="ident">semaphore</span>.<span class="ident">clone</span>(), <span class="ident">tracker</span>, <span class="ident">handler_builder</span>)
                     .<span class="ident">trace_task</span>(<span class="ident">tipb</span>::<span class="ident">Event</span>::<span class="ident">TiKvCoprScheduleTask</span> <span class="kw">as</span> <span class="ident">u32</span>),
                 <span class="ident">priority</span>,
                 <span class="ident">task_id</span>,
             )
-            .<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">Error</span>::<span class="ident">MaxPendingTasksExceeded</span>)
-            .<span class="ident">flatten</span>()
+            .<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">Error</span>::<span class="ident">MaxPendingTasksExceeded</span>);
+        <span class="kw">async</span> <span class="kw">move</span> { <span class="ident">res</span>.<span class="kw">await</span><span class="question-mark">?</span> }
     }
 
     <span class="doccomment">/// Parses and handles a unary request. Returns a future that will never fail. If there are</span>
@@ -1994,7 +1983,7 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">req</span>: <span class="ident">coppb</span>::<span class="ident">Request</span>,
         <span class="ident">peer</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="kw">impl</span> <span class="ident">Future</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">coppb</span>::<span class="ident">Response</span>, <span class="ident">Error</span> <span class="op">=</span> ()<span class="op">&gt;</span> {
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="kw">impl</span> <span class="ident">Future</span><span class="op">&lt;</span><span class="ident">Output</span> <span class="op">=</span> <span class="ident">coppb</span>::<span class="ident">Response</span><span class="op">&gt;</span> {
         <span class="kw">let</span> (<span class="ident">_guard</span>, <span class="ident">collector</span>) <span class="op">=</span> <span class="ident">minitrace</span>::<span class="ident">trace_may_enable</span>(
             <span class="ident">req</span>.<span class="ident">is_trace_enabled</span>,
             <span class="ident">tipb</span>::<span class="ident">Event</span>::<span class="ident">TiKvCoprGetRequest</span> <span class="kw">as</span> <span class="ident">u32</span>,
@@ -2003,16 +1992,18 @@
         <span class="kw">let</span> <span class="ident">result_of_future</span> <span class="op">=</span> <span class="self">self</span>
             .<span class="ident">parse_request_and_check_memory_locks</span>(<span class="ident">req</span>, <span class="ident">peer</span>, <span class="bool-val">false</span>)
             .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">handler_builder</span>, <span class="ident">req_ctx</span>)<span class="op">|</span> <span class="self">self</span>.<span class="ident">handle_unary_request</span>(<span class="ident">req_ctx</span>, <span class="ident">handler_builder</span>));
-        <span class="ident">future</span>::<span class="ident">result</span>(<span class="ident">result_of_future</span>)
-            .<span class="ident">flatten</span>()
-            .<span class="ident">or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="prelude-val">Ok</span>(<span class="ident">make_error_response</span>(<span class="ident">e</span>)))
-            .<span class="ident">map</span>(<span class="kw">move</span> <span class="op">|</span><span class="kw-2">mut</span> <span class="ident">resp</span><span class="op">|</span> {
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">collector</span>) <span class="op">=</span> <span class="ident">collector</span> {
-                    <span class="kw">let</span> <span class="ident">span_sets</span> <span class="op">=</span> <span class="ident">collector</span>.<span class="ident">collect</span>();
-                    <span class="ident">resp</span>.<span class="ident">set_spans</span>(<span class="ident">tikv_util</span>::<span class="ident">trace</span>::<span class="ident">encode_spans</span>(<span class="ident">span_sets</span>).<span class="ident">collect</span>())
-                }
-                <span class="ident">resp</span>
-            })
+
+        <span class="kw">async</span> <span class="kw">move</span> {
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">resp</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">result_of_future</span> {
+                <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">make_error_response</span>(<span class="ident">e</span>),
+                <span class="prelude-val">Ok</span>(<span class="ident">handle_fut</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">handle_fut</span>.<span class="kw">await</span>.<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">make_error_response</span>(<span class="ident">e</span>)),
+            };
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">collector</span>) <span class="op">=</span> <span class="ident">collector</span> {
+                <span class="kw">let</span> <span class="ident">span_sets</span> <span class="op">=</span> <span class="ident">collector</span>.<span class="ident">collect</span>();
+                <span class="ident">resp</span>.<span class="ident">set_spans</span>(<span class="ident">tikv_util</span>::<span class="ident">trace</span>::<span class="ident">encode_spans</span>(<span class="ident">span_sets</span>).<span class="ident">collect</span>())
+            }
+            <span class="ident">resp</span>
+        }
     }
 
     <span class="doccomment">/// The real implementation of handling a stream request.</span>
@@ -2349,10 +2340,9 @@
         <span class="comment">// a normal request</span>
         <span class="kw">let</span> <span class="ident">handler_builder</span> <span class="op">=</span>
             <span class="ident">Box</span>::<span class="ident">new</span>(<span class="op">|</span><span class="kw">_</span>, <span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="kw">_</span><span class="op">|</span> <span class="prelude-val">Ok</span>(<span class="ident">UnaryFixture</span>::<span class="ident">new</span>(<span class="prelude-val">Ok</span>(<span class="ident">coppb</span>::<span class="ident">Response</span>::<span class="ident">default</span>())).<span class="ident">into_boxed</span>()));
-        <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">cop</span>
-            .<span class="ident">handle_unary_request</span>(<span class="ident">ReqContext</span>::<span class="ident">default_for_test</span>(), <span class="ident">handler_builder</span>)
-            .<span class="ident">wait</span>()
-            .<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span>
+            <span class="ident">block_on</span>(<span class="ident">cop</span>.<span class="ident">handle_unary_request</span>(<span class="ident">ReqContext</span>::<span class="ident">default_for_test</span>(), <span class="ident">handler_builder</span>))
+                .<span class="ident">unwrap</span>();
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">resp</span>.<span class="ident">get_other_error</span>().<span class="ident">is_empty</span>());
 
         <span class="comment">// an outdated request</span>
@@ -2368,10 +2358,7 @@
             <span class="ident">TimeStamp</span>::<span class="ident">max</span>(),
             <span class="prelude-val">None</span>,
         );
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">cop</span>
-            .<span class="ident">handle_unary_request</span>(<span class="ident">outdated_req_ctx</span>, <span class="ident">handler_builder</span>)
-            .<span class="ident">wait</span>()
-            .<span class="ident">is_err</span>());
+        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">block_on</span>(<span class="ident">cop</span>.<span class="ident">handle_unary_request</span>(<span class="ident">outdated_req_ctx</span>, <span class="ident">handler_builder</span>)).<span class="ident">is_err</span>());
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
@@ -2404,10 +2391,7 @@
             <span class="ident">req</span>
         };
 
-        <span class="kw">let</span> <span class="ident">resp</span>: <span class="ident">coppb</span>::<span class="ident">Response</span> <span class="op">=</span> <span class="ident">cop</span>
-            .<span class="ident">parse_and_handle_unary_request</span>(<span class="ident">req</span>, <span class="prelude-val">None</span>)
-            .<span class="ident">wait</span>()
-            .<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">resp</span>: <span class="ident">coppb</span>::<span class="ident">Response</span> <span class="op">=</span> <span class="ident">block_on</span>(<span class="ident">cop</span>.<span class="ident">parse_and_handle_unary_request</span>(<span class="ident">req</span>, <span class="prelude-val">None</span>));
         <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">resp</span>.<span class="ident">get_other_error</span>().<span class="ident">is_empty</span>());
     }
 
@@ -2424,10 +2408,7 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">coppb</span>::<span class="ident">Request</span>::<span class="ident">default</span>();
         <span class="ident">req</span>.<span class="ident">set_tp</span>(<span class="number">9999</span>);
 
-        <span class="kw">let</span> <span class="ident">resp</span>: <span class="ident">coppb</span>::<span class="ident">Response</span> <span class="op">=</span> <span class="ident">cop</span>
-            .<span class="ident">parse_and_handle_unary_request</span>(<span class="ident">req</span>, <span class="prelude-val">None</span>)
-            .<span class="ident">wait</span>()
-            .<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">resp</span>: <span class="ident">coppb</span>::<span class="ident">Response</span> <span class="op">=</span> <span class="ident">block_on</span>(<span class="ident">cop</span>.<span class="ident">parse_and_handle_unary_request</span>(<span class="ident">req</span>, <span class="prelude-val">None</span>));
         <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">resp</span>.<span class="ident">get_other_error</span>().<span class="ident">is_empty</span>());
     }
 
@@ -2445,10 +2426,7 @@
         <span class="ident">req</span>.<span class="ident">set_tp</span>(<span class="ident">REQ_TYPE_DAG</span>);
         <span class="ident">req</span>.<span class="ident">set_data</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>]);
 
-        <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">cop</span>
-            .<span class="ident">parse_and_handle_unary_request</span>(<span class="ident">req</span>, <span class="prelude-val">None</span>)
-            .<span class="ident">wait</span>()
-            .<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">block_on</span>(<span class="ident">cop</span>.<span class="ident">parse_and_handle_unary_request</span>(<span class="ident">req</span>, <span class="prelude-val">None</span>));
         <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">resp</span>.<span class="ident">get_other_error</span>().<span class="ident">is_empty</span>());
     }
 
@@ -2499,7 +2477,7 @@
             <span class="kw">let</span> <span class="ident">future</span> <span class="op">=</span> <span class="ident">cop</span>.<span class="ident">handle_unary_request</span>(<span class="ident">ReqContext</span>::<span class="ident">default_for_test</span>(), <span class="ident">handler_builder</span>);
             <span class="kw">let</span> <span class="ident">tx</span> <span class="op">=</span> <span class="ident">tx</span>.<span class="ident">clone</span>();
             <span class="ident">thread</span>::<span class="ident">spawn</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
-                <span class="ident">tx</span>.<span class="ident">send</span>(<span class="ident">future</span>.<span class="ident">wait</span>()).<span class="ident">unwrap</span>();
+                <span class="ident">tx</span>.<span class="ident">send</span>(<span class="ident">block_on</span>(<span class="ident">future</span>)).<span class="ident">unwrap</span>();
             });
             <span class="ident">thread</span>::<span class="ident">sleep</span>(<span class="ident">Duration</span>::<span class="ident">from_millis</span>(<span class="number">100</span>));
         }
@@ -2527,10 +2505,9 @@
 
         <span class="kw">let</span> <span class="ident">handler_builder</span> <span class="op">=</span>
             <span class="ident">Box</span>::<span class="ident">new</span>(<span class="op">|</span><span class="kw">_</span>, <span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="kw">_</span><span class="op">|</span> <span class="prelude-val">Ok</span>(<span class="ident">UnaryFixture</span>::<span class="ident">new</span>(<span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(<span class="string">&quot;foo&quot;</span>))).<span class="ident">into_boxed</span>()));
-        <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">cop</span>
-            .<span class="ident">handle_unary_request</span>(<span class="ident">ReqContext</span>::<span class="ident">default_for_test</span>(), <span class="ident">handler_builder</span>)
-            .<span class="ident">wait</span>()
-            .<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span>
+            <span class="ident">block_on</span>(<span class="ident">cop</span>.<span class="ident">handle_unary_request</span>(<span class="ident">ReqContext</span>::<span class="ident">default_for_test</span>(), <span class="ident">handler_builder</span>))
+                .<span class="ident">unwrap</span>();
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">resp</span>.<span class="ident">get_data</span>().<span class="ident">len</span>(), <span class="number">0</span>);
         <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">resp</span>.<span class="ident">get_other_error</span>().<span class="ident">is_empty</span>());
     }
@@ -2790,7 +2767,7 @@
             <span class="kw">let</span> <span class="ident">resp_future_1</span> <span class="op">=</span>
                 <span class="ident">cop</span>.<span class="ident">handle_unary_request</span>(<span class="ident">req_with_exec_detail</span>.<span class="ident">clone</span>(), <span class="ident">handler_builder</span>);
             <span class="kw">let</span> <span class="ident">sender</span> <span class="op">=</span> <span class="ident">tx</span>.<span class="ident">clone</span>();
-            <span class="ident">thread</span>::<span class="ident">spawn</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> <span class="ident">sender</span>.<span class="ident">send</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">resp_future_1</span>.<span class="ident">wait</span>().<span class="ident">unwrap</span>()]).<span class="ident">unwrap</span>());
+            <span class="ident">thread</span>::<span class="ident">spawn</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> <span class="ident">sender</span>.<span class="ident">send</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">block_on</span>(<span class="ident">resp_future_1</span>).<span class="ident">unwrap</span>()]).<span class="ident">unwrap</span>());
             <span class="comment">// Sleep a while to make sure that thread is spawn and snapshot is taken.</span>
             <span class="ident">thread</span>::<span class="ident">sleep</span>(<span class="ident">Duration</span>::<span class="ident">from_millis</span>(<span class="ident">SNAPSHOT_DURATION_MS</span> <span class="kw">as</span> <span class="ident">u64</span>));
 
@@ -2804,7 +2781,7 @@
             <span class="kw">let</span> <span class="ident">resp_future_2</span> <span class="op">=</span>
                 <span class="ident">cop</span>.<span class="ident">handle_unary_request</span>(<span class="ident">req_with_exec_detail</span>.<span class="ident">clone</span>(), <span class="ident">handler_builder</span>);
             <span class="kw">let</span> <span class="ident">sender</span> <span class="op">=</span> <span class="ident">tx</span>.<span class="ident">clone</span>();
-            <span class="ident">thread</span>::<span class="ident">spawn</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> <span class="ident">sender</span>.<span class="ident">send</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">resp_future_2</span>.<span class="ident">wait</span>().<span class="ident">unwrap</span>()]).<span class="ident">unwrap</span>());
+            <span class="ident">thread</span>::<span class="ident">spawn</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> <span class="ident">sender</span>.<span class="ident">send</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">block_on</span>(<span class="ident">resp_future_2</span>).<span class="ident">unwrap</span>()]).<span class="ident">unwrap</span>());
             <span class="ident">thread</span>::<span class="ident">sleep</span>(<span class="ident">Duration</span>::<span class="ident">from_millis</span>(<span class="ident">SNAPSHOT_DURATION_MS</span> <span class="kw">as</span> <span class="ident">u64</span>));
 
             <span class="comment">// Response 1</span>
@@ -2862,7 +2839,7 @@
             <span class="kw">let</span> <span class="ident">resp_future_1</span> <span class="op">=</span>
                 <span class="ident">cop</span>.<span class="ident">handle_unary_request</span>(<span class="ident">req_with_exec_detail</span>.<span class="ident">clone</span>(), <span class="ident">handler_builder</span>);
             <span class="kw">let</span> <span class="ident">sender</span> <span class="op">=</span> <span class="ident">tx</span>.<span class="ident">clone</span>();
-            <span class="ident">thread</span>::<span class="ident">spawn</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> <span class="ident">sender</span>.<span class="ident">send</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">resp_future_1</span>.<span class="ident">wait</span>().<span class="ident">unwrap</span>()]).<span class="ident">unwrap</span>());
+            <span class="ident">thread</span>::<span class="ident">spawn</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> <span class="ident">sender</span>.<span class="ident">send</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">block_on</span>(<span class="ident">resp_future_1</span>).<span class="ident">unwrap</span>()]).<span class="ident">unwrap</span>());
             <span class="comment">// Sleep a while to make sure that thread is spawn and snapshot is taken.</span>
             <span class="ident">thread</span>::<span class="ident">sleep</span>(<span class="ident">Duration</span>::<span class="ident">from_millis</span>(<span class="ident">SNAPSHOT_DURATION_MS</span> <span class="kw">as</span> <span class="ident">u64</span>));
 
@@ -2877,7 +2854,7 @@
             <span class="kw">let</span> <span class="ident">resp_future_2</span> <span class="op">=</span>
                 <span class="ident">cop</span>.<span class="ident">handle_unary_request</span>(<span class="ident">req_with_exec_detail</span>.<span class="ident">clone</span>(), <span class="ident">handler_builder</span>);
             <span class="kw">let</span> <span class="ident">sender</span> <span class="op">=</span> <span class="ident">tx</span>.<span class="ident">clone</span>();
-            <span class="ident">thread</span>::<span class="ident">spawn</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> <span class="ident">sender</span>.<span class="ident">send</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">resp_future_2</span>.<span class="ident">wait</span>().<span class="ident">unwrap</span>()]).<span class="ident">unwrap</span>());
+            <span class="ident">thread</span>::<span class="ident">spawn</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> <span class="ident">sender</span>.<span class="ident">send</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">block_on</span>(<span class="ident">resp_future_2</span>).<span class="ident">unwrap</span>()]).<span class="ident">unwrap</span>());
             <span class="ident">thread</span>::<span class="ident">sleep</span>(<span class="ident">Duration</span>::<span class="ident">from_millis</span>(<span class="ident">SNAPSHOT_DURATION_MS</span> <span class="kw">as</span> <span class="ident">u64</span>));
 
             <span class="comment">// Response 1</span>
@@ -2919,7 +2896,7 @@
             <span class="kw">let</span> <span class="ident">resp_future_1</span> <span class="op">=</span>
                 <span class="ident">cop</span>.<span class="ident">handle_unary_request</span>(<span class="ident">req_with_exec_detail</span>.<span class="ident">clone</span>(), <span class="ident">handler_builder</span>);
             <span class="kw">let</span> <span class="ident">sender</span> <span class="op">=</span> <span class="ident">tx</span>.<span class="ident">clone</span>();
-            <span class="ident">thread</span>::<span class="ident">spawn</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> <span class="ident">sender</span>.<span class="ident">send</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">resp_future_1</span>.<span class="ident">wait</span>().<span class="ident">unwrap</span>()]).<span class="ident">unwrap</span>());
+            <span class="ident">thread</span>::<span class="ident">spawn</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> <span class="ident">sender</span>.<span class="ident">send</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">block_on</span>(<span class="ident">resp_future_1</span>).<span class="ident">unwrap</span>()]).<span class="ident">unwrap</span>());
             <span class="comment">// Sleep a while to make sure that thread is spawn and snapshot is taken.</span>
             <span class="ident">thread</span>::<span class="ident">sleep</span>(<span class="ident">Duration</span>::<span class="ident">from_millis</span>(<span class="ident">SNAPSHOT_DURATION_MS</span> <span class="kw">as</span> <span class="ident">u64</span>));
 
@@ -3066,10 +3043,7 @@
         <span class="ident">dag</span>.<span class="ident">mut_executors</span>().<span class="ident">push</span>(<span class="ident">Executor</span>::<span class="ident">default</span>());
         <span class="ident">req</span>.<span class="ident">set_data</span>(<span class="ident">dag</span>.<span class="ident">write_to_bytes</span>().<span class="ident">unwrap</span>());
 
-        <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">cop</span>
-            .<span class="ident">parse_and_handle_unary_request</span>(<span class="ident">req</span>, <span class="prelude-val">None</span>)
-            .<span class="ident">wait</span>()
-            .<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">block_on</span>(<span class="ident">cop</span>.<span class="ident">parse_and_handle_unary_request</span>(<span class="ident">req</span>, <span class="prelude-val">None</span>));
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">resp</span>.<span class="ident">get_locked</span>().<span class="ident">get_key</span>(), <span class="string">b&quot;key&quot;</span>);
     }
 }
