@@ -796,7 +796,7 @@
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">path</span>::<span class="ident">Path</span>;
 
 <span class="kw">use</span> <span class="ident">chrono</span>::<span class="ident">DateTime</span>;
-<span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">stream</span>::{<span class="ident">iter_ok</span>, <span class="ident">Stream</span>};
+<span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">stream</span>::{<span class="self">self</span>, <span class="ident">Stream</span>};
 <span class="kw">use</span> <span class="ident">itertools</span>::<span class="ident">Itertools</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">diagnosticspb</span>::{<span class="ident">LogLevel</span>, <span class="ident">LogMessage</span>, <span class="ident">SearchLogRequest</span>, <span class="ident">SearchLogResponse</span>};
 <span class="kw">use</span> <span class="ident">lazy_static</span>::<span class="ident">lazy_static</span>;
@@ -1093,8 +1093,8 @@
 <span class="comment">// Batch size of the log streaming</span>
 <span class="kw">const</span> <span class="ident">LOG_ITEM_BATCH_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">256</span>;
 
-<span class="kw">fn</span> <span class="ident">batch_log_item</span>(<span class="ident">item</span>: <span class="ident">LogIterator</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw">impl</span> <span class="ident">Stream</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">SearchLogResponse</span>, <span class="ident">Error</span> <span class="op">=</span> ()<span class="op">&gt;</span> {
-    <span class="ident">iter_ok</span>(<span class="ident">item</span>.<span class="ident">batching</span>(<span class="op">|</span><span class="ident">iter</span><span class="op">|</span> {
+<span class="kw">fn</span> <span class="ident">batch_log_item</span>(<span class="ident">item</span>: <span class="ident">LogIterator</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw">impl</span> <span class="ident">Stream</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">SearchLogResponse</span><span class="op">&gt;</span> {
+    <span class="ident">stream</span>::<span class="ident">iter</span>(<span class="ident">item</span>.<span class="ident">batching</span>(<span class="op">|</span><span class="ident">iter</span><span class="op">|</span> {
         <span class="kw">let</span> <span class="ident">batch</span> <span class="op">=</span> <span class="ident">iter</span>.<span class="ident">take</span>(<span class="ident">LOG_ITEM_BATCH_SIZE</span>).<span class="ident">collect_vec</span>();
         <span class="kw">if</span> <span class="ident">batch</span>.<span class="ident">is_empty</span>() {
             <span class="prelude-val">None</span>
@@ -1109,7 +1109,7 @@
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">search</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">AsRef</span><span class="op">&lt;</span><span class="ident">Path</span><span class="op">&gt;</span><span class="op">&gt;</span>(
     <span class="ident">log_file</span>: <span class="ident">P</span>,
     <span class="kw-2">mut</span> <span class="ident">req</span>: <span class="ident">SearchLogRequest</span>,
-) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw">impl</span> <span class="ident">Stream</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">SearchLogResponse</span>, <span class="ident">Error</span> <span class="op">=</span> ()<span class="op">&gt;</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
+) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw">impl</span> <span class="ident">Stream</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">SearchLogResponse</span><span class="op">&gt;</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
     <span class="kw">if</span> <span class="op">!</span><span class="ident">log_file</span>.<span class="ident">as_ref</span>().<span class="ident">exists</span>() {
         <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">batch_log_item</span>(<span class="ident">LogIterator</span>::<span class="ident">default</span>()));
     }
@@ -1132,6 +1132,8 @@
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
 <span class="kw">mod</span> <span class="ident">tests</span> {
     <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+    <span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">executor</span>::<span class="ident">block_on</span>;
+    <span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">stream</span>::<span class="ident">StreamExt</span>;
     <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">Write</span>;
     <span class="kw">use</span> <span class="ident">tempfile</span>::<span class="ident">tempdir</span>;
 
@@ -1561,20 +1563,18 @@ Some invalid logs 2: Welcome to TiKV - test-filter&quot;#</span>
         .<span class="ident">iter</span>()
         .<span class="ident">map</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">timestamp</span>(<span class="ident">s</span>))
         .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">i64</span><span class="op">&gt;</span><span class="op">&gt;</span>();
-        <span class="macro">assert_eq</span><span class="macro">!</span>(
-            <span class="ident">expected</span>,
-            <span class="ident">search</span>(<span class="ident">log_file</span>, <span class="ident">req</span>)
-                .<span class="ident">unwrap</span>()
-                .<span class="ident">wait</span>()
-                .<span class="ident">map</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span>.<span class="ident">unwrap</span>())
-                .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SearchLogResponse</span><span class="op">&gt;</span><span class="op">&gt;</span>()
+        <span class="kw">let</span> <span class="ident">fact</span> <span class="op">=</span> <span class="ident">block_on</span>(<span class="kw">async</span> <span class="kw">move</span> {
+            <span class="kw">let</span> <span class="ident">s</span> <span class="op">=</span> <span class="ident">search</span>(<span class="ident">log_file</span>, <span class="ident">req</span>).<span class="ident">unwrap</span>();
+            <span class="ident">s</span>.<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SearchLogResponse</span><span class="op">&gt;</span><span class="op">&gt;</span>()
+                .<span class="kw">await</span>
                 .<span class="ident">into_iter</span>()
                 .<span class="ident">map</span>(<span class="op">|</span><span class="kw-2">mut</span> <span class="ident">resp</span><span class="op">|</span> <span class="ident">resp</span>.<span class="ident">take_messages</span>().<span class="ident">into_iter</span>())
                 .<span class="ident">into_iter</span>()
                 .<span class="ident">flatten</span>()
                 .<span class="ident">map</span>(<span class="op">|</span><span class="ident">msg</span><span class="op">|</span> <span class="ident">msg</span>.<span class="ident">get_time</span>())
                 .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">i64</span><span class="op">&gt;</span><span class="op">&gt;</span>()
-        );
+        });
+        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">expected</span>, <span class="ident">fact</span>);
     }
 }
 </pre></div>
