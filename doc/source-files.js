@@ -50,6 +50,7 @@ sourcesIndex["crossbeam_channel"] = {"name":"","dirs":[{"name":"flavors","files"
 sourcesIndex["crossbeam_deque"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["crossbeam_epoch"] = {"name":"","dirs":[{"name":"sync","files":["list.rs","mod.rs","queue.rs"]}],"files":["atomic.rs","collector.rs","default.rs","deferred.rs","epoch.rs","guard.rs","internal.rs","lib.rs"]};
 sourcesIndex["crossbeam_queue"] = {"name":"","files":["array_queue.rs","err.rs","lib.rs","seg_queue.rs"]};
+sourcesIndex["crossbeam_skiplist"] = {"name":"","files":["base.rs","lib.rs","map.rs","set.rs"]};
 sourcesIndex["crossbeam_utils"] = {"name":"","dirs":[{"name":"atomic","files":["atomic_cell.rs","consume.rs","mod.rs","seq_lock.rs"]},{"name":"sync","files":["mod.rs","parker.rs","sharded_lock.rs","wait_group.rs"]}],"files":["backoff.rs","cache_padded.rs","lib.rs","thread.rs"]};
 sourcesIndex["crypto_mac"] = {"name":"","files":["errors.rs","lib.rs"]};
 sourcesIndex["darling"] = {"name":"","files":["lib.rs","macros_public.rs"]};
