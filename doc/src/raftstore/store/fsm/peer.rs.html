@@ -3959,50 +3959,19 @@
 <span id="3959">3959</span>
 <span id="3960">3960</span>
 <span id="3961">3961</span>
-<span id="3962">3962</span>
-<span id="3963">3963</span>
-<span id="3964">3964</span>
-<span id="3965">3965</span>
-<span id="3966">3966</span>
-<span id="3967">3967</span>
-<span id="3968">3968</span>
-<span id="3969">3969</span>
-<span id="3970">3970</span>
-<span id="3971">3971</span>
-<span id="3972">3972</span>
-<span id="3973">3973</span>
-<span id="3974">3974</span>
-<span id="3975">3975</span>
-<span id="3976">3976</span>
-<span id="3977">3977</span>
-<span id="3978">3978</span>
-<span id="3979">3979</span>
-<span id="3980">3980</span>
-<span id="3981">3981</span>
-<span id="3982">3982</span>
-<span id="3983">3983</span>
-<span id="3984">3984</span>
-<span id="3985">3985</span>
-<span id="3986">3986</span>
-<span id="3987">3987</span>
-<span id="3988">3988</span>
-<span id="3989">3989</span>
-<span id="3990">3990</span>
-<span id="3991">3991</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">borrow</span>::<span class="ident">Cow</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">collections</span>::<span class="ident">Bound</span>::{<span class="ident">Excluded</span>, <span class="ident">Included</span>, <span class="ident">Unbounded</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">collections</span>::<span class="ident">VecDeque</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">time</span>::{<span class="ident">Duration</span>, <span class="ident">Instant</span>};
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">time</span>::<span class="ident">Instant</span>;
 <span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">cmp</span>, <span class="ident">u64</span>};
 
 <span class="kw">use</span> <span class="ident">batch_system</span>::{<span class="ident">BasicMailbox</span>, <span class="ident">Fsm</span>};
 <span class="kw">use</span> <span class="ident">engine_traits</span>::<span class="ident">CF_RAFT</span>;
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">Engines</span>, <span class="ident">KvEngine</span>, <span class="ident">RaftEngine</span>, <span class="ident">WriteBatchExt</span>};
 <span class="kw">use</span> <span class="ident">error_code</span>::<span class="ident">ErrorCodeExt</span>;
-<span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">compat</span>::<span class="ident">Future01CompatExt</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">errorpb</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">import_sstpb</span>::<span class="ident">SstMeta</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">metapb</span>::{<span class="self">self</span>, <span class="ident">Region</span>, <span class="ident">RegionEpoch</span>};
@@ -4903,17 +4872,18 @@
     }
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">schedule_tick</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">tick</span>: <span class="ident">PeerTicks</span>, <span class="ident">timeout</span>: <span class="ident">Duration</span>) {
+    <span class="kw">fn</span> <span class="ident">schedule_tick</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">tick</span>: <span class="ident">PeerTicks</span>) {
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">tick_registry</span>.<span class="ident">contains</span>(<span class="ident">tick</span>) {
             <span class="kw">return</span>;
         }
-        <span class="kw">if</span> <span class="ident">is_zero_duration</span>(<span class="kw-2">&amp;</span><span class="ident">timeout</span>) {
+        <span class="kw">let</span> <span class="ident">idx</span> <span class="op">=</span> <span class="ident">tick</span>.<span class="ident">bits</span>() <span class="kw">as</span> <span class="ident">usize</span>;
+        <span class="kw">if</span> <span class="ident">is_zero_duration</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">tick_batch</span>[<span class="ident">idx</span>].<span class="ident">wait_duration</span>) {
             <span class="kw">return</span>;
         }
         <span class="macro">trace</span><span class="macro">!</span>(
             <span class="string">&quot;schedule tick&quot;</span>;
             <span class="string">&quot;tick&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">tick</span>,
-            <span class="string">&quot;timeout&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">timeout</span>,
+            <span class="string">&quot;timeout&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">tick_batch</span>[<span class="ident">idx</span>].<span class="ident">wait_duration</span>,
             <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">region_id</span>(),
             <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer_id</span>(),
         );
@@ -4934,43 +4904,27 @@
             }
         };
         <span class="kw">let</span> <span class="ident">peer_id</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">peer_id</span>();
-        <span class="kw">let</span> <span class="ident">delay</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">timer</span>.<span class="ident">delay</span>(<span class="ident">timeout</span>).<span class="ident">compat</span>();
-        <span class="kw">let</span> <span class="ident">f</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
-            <span class="kw">match</span> <span class="ident">delay</span>.<span class="kw">await</span> {
-                <span class="prelude-val">Ok</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="macro">fail_point</span><span class="macro">!</span>(
-                        <span class="string">&quot;on_raft_log_gc_tick_1&quot;</span>,
-                        <span class="ident">peer_id</span> <span class="op">=</span><span class="op">=</span> <span class="number">1</span> <span class="kw-2">&amp;</span><span class="op">&amp;</span> <span class="ident">tick</span> <span class="op">=</span><span class="op">=</span> <span class="ident">PeerTicks</span>::<span class="ident">RAFT_LOG_GC</span>,
-                        <span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="macro">unreachable</span><span class="macro">!</span>()
-                    );
-                    <span class="comment">// This can happen only when the peer is about to be destroyed</span>
-                    <span class="comment">// or the node is shutting down. So it&#39;s OK to not to clean up</span>
-                    <span class="comment">// registry.</span>
-                    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">mb</span>.<span class="ident">force_send</span>(<span class="ident">PeerMsg</span>::<span class="ident">Tick</span>(<span class="ident">tick</span>)) {
-                        <span class="macro">debug</span><span class="macro">!</span>(
-                            <span class="string">&quot;failed to schedule peer tick&quot;</span>;
-                            <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>,
-                            <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">peer_id</span>,
-                            <span class="string">&quot;tick&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">tick</span>,
-                            <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>,
-                        );
-                    }
-                }
-                <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="macro">panic</span><span class="macro">!</span>(
-                        <span class="string">&quot;[region {}] {} tick {:?} is lost due to timeout error: {:?}&quot;</span>,
-                        <span class="ident">region_id</span>, <span class="ident">peer_id</span>, <span class="ident">tick</span>, <span class="ident">e</span>
-                    );
-                }
+        <span class="kw">let</span> <span class="ident">cb</span> <span class="op">=</span> <span class="ident">Box</span>::<span class="ident">new</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
+            <span class="comment">// This can happen only when the peer is about to be destroyed</span>
+            <span class="comment">// or the node is shutting down. So it&#39;s OK to not to clean up</span>
+            <span class="comment">// registry.</span>
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">mb</span>.<span class="ident">force_send</span>(<span class="ident">PeerMsg</span>::<span class="ident">Tick</span>(<span class="ident">tick</span>)) {
+                <span class="macro">debug</span><span class="macro">!</span>(
+                    <span class="string">&quot;failed to schedule peer tick&quot;</span>;
+                    <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>,
+                    <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">peer_id</span>,
+                    <span class="string">&quot;tick&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">tick</span>,
+                    <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>,
+                );
             }
-        };
-        <span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">poller_handle</span>.<span class="ident">spawn</span>(<span class="ident">f</span>);
+        });
+        <span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">tick_batch</span>[<span class="ident">idx</span>].<span class="ident">ticks</span>.<span class="ident">push</span>(<span class="ident">cb</span>);
     }
 
     <span class="kw">fn</span> <span class="ident">register_raft_base_tick</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
         <span class="comment">// If we register raft base tick failed, the whole raft can&#39;t run correctly,</span>
         <span class="comment">// TODO: shutdown the store?</span>
-        <span class="self">self</span>.<span class="ident">schedule_tick</span>(<span class="ident">PeerTicks</span>::<span class="ident">RAFT</span>, <span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">cfg</span>.<span class="ident">raft_base_tick_interval</span>.<span class="number">0</span>)
+        <span class="self">self</span>.<span class="ident">schedule_tick</span>(<span class="ident">PeerTicks</span>::<span class="ident">RAFT</span>)
     }
 
     <span class="kw">fn</span> <span class="ident">on_raft_base_tick</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
@@ -6161,10 +6115,7 @@
     }
 
     <span class="kw">fn</span> <span class="ident">register_merge_check_tick</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">schedule_tick</span>(
-            <span class="ident">PeerTicks</span>::<span class="ident">CHECK_MERGE</span>,
-            <span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">cfg</span>.<span class="ident">merge_check_tick_interval</span>.<span class="number">0</span>,
-        )
+        <span class="self">self</span>.<span class="ident">schedule_tick</span>(<span class="ident">PeerTicks</span>::<span class="ident">CHECK_MERGE</span>)
     }
 
     <span class="doccomment">/// Check if merge target region is staler than the local one in kv engine.</span>
@@ -7123,10 +7074,7 @@
     }
 
     <span class="kw">fn</span> <span class="ident">register_raft_gc_log_tick</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">schedule_tick</span>(
-            <span class="ident">PeerTicks</span>::<span class="ident">RAFT_LOG_GC</span>,
-            <span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">cfg</span>.<span class="ident">raft_log_gc_tick_interval</span>.<span class="number">0</span>,
-        )
+        <span class="self">self</span>.<span class="ident">schedule_tick</span>(<span class="ident">PeerTicks</span>::<span class="ident">RAFT_LOG_GC</span>)
     }
 
     <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy</span>::<span class="ident">if_same_then_else</span>)]</span>
@@ -7134,8 +7082,9 @@
         <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">get_store</span>().<span class="ident">is_cache_empty</span>() <span class="op">|</span><span class="op">|</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">cfg</span>.<span class="ident">hibernate_regions</span> {
             <span class="self">self</span>.<span class="ident">register_raft_gc_log_tick</span>();
         }
-        <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="op">!</span><span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">stopped</span>);
+        <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;on_raft_log_gc_tick_1&quot;</span>, <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer_id</span>() <span class="op">=</span><span class="op">=</span> <span class="number">1</span>, <span class="op">|</span><span class="kw">_</span><span class="op">|</span> {});
         <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;on_raft_gc_log_tick&quot;</span>, <span class="op">|</span><span class="kw">_</span><span class="op">|</span> {});
+        <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="op">!</span><span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">stopped</span>);
 
         <span class="comment">// As leader, we would not keep caches for the peers that didn&#39;t response heartbeat in the</span>
         <span class="comment">// last few seconds. That happens probably because another TiKV is down. In this case if we</span>
@@ -7245,10 +7194,7 @@
     }
 
     <span class="kw">fn</span> <span class="ident">register_split_region_check_tick</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">schedule_tick</span>(
-            <span class="ident">PeerTicks</span>::<span class="ident">SPLIT_REGION_CHECK</span>,
-            <span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">cfg</span>.<span class="ident">split_region_check_tick_interval</span>.<span class="number">0</span>,
-        )
+        <span class="self">self</span>.<span class="ident">schedule_tick</span>(<span class="ident">PeerTicks</span>::<span class="ident">SPLIT_REGION_CHECK</span>)
     }
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
@@ -7486,10 +7432,7 @@
     }
 
     <span class="kw">fn</span> <span class="ident">register_pd_heartbeat_tick</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">schedule_tick</span>(
-            <span class="ident">PeerTicks</span>::<span class="ident">PD_HEARTBEAT</span>,
-            <span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">cfg</span>.<span class="ident">pd_heartbeat_tick_interval</span>.<span class="number">0</span>,
-        )
+        <span class="self">self</span>.<span class="ident">schedule_tick</span>(<span class="ident">PeerTicks</span>::<span class="ident">PD_HEARTBEAT</span>)
     }
 
     <span class="kw">fn</span> <span class="ident">on_check_peer_stale_state_tick</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
@@ -7587,10 +7530,7 @@
     }
 
     <span class="kw">fn</span> <span class="ident">register_check_peer_stale_state_tick</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">schedule_tick</span>(
-            <span class="ident">PeerTicks</span>::<span class="ident">CHECK_PEER_STALE_STATE</span>,
-            <span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">cfg</span>.<span class="ident">peer_stale_state_check_interval</span>.<span class="number">0</span>,
-        )
+        <span class="self">self</span>.<span class="ident">schedule_tick</span>(<span class="ident">PeerTicks</span>::<span class="ident">CHECK_PEER_STALE_STATE</span>)
     }
 }
 
