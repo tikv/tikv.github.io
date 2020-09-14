@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `components/tikv_util/src/future_pool/mod.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mod.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css"><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script src="../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="shortcut icon" href="../../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../tikv_util/index.html'><div class='logo-container'><img src='../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `components/tikv_util/src/yatp_pool/future_pool.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>future_pool.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css"><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script src="../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="shortcut icon" href="../../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../tikv_util/index.html'><div class='logo-container'><img src='../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
 <span id="2">  2</span>
 <span id="3">  3</span>
 <span id="4">  4</span>
@@ -423,56 +423,14 @@
 <span id="423">423</span>
 <span id="424">424</span>
 <span id="425">425</span>
-<span id="426">426</span>
-<span id="427">427</span>
-<span id="428">428</span>
-<span id="429">429</span>
-<span id="430">430</span>
-<span id="431">431</span>
-<span id="432">432</span>
-<span id="433">433</span>
-<span id="434">434</span>
-<span id="435">435</span>
-<span id="436">436</span>
-<span id="437">437</span>
-<span id="438">438</span>
-<span id="439">439</span>
-<span id="440">440</span>
-<span id="441">441</span>
-<span id="442">442</span>
-<span id="443">443</span>
-<span id="444">444</span>
-<span id="445">445</span>
-<span id="446">446</span>
-<span id="447">447</span>
-<span id="448">448</span>
-<span id="449">449</span>
-<span id="450">450</span>
-<span id="451">451</span>
-<span id="452">452</span>
-<span id="453">453</span>
-<span id="454">454</span>
-<span id="455">455</span>
-<span id="456">456</span>
-<span id="457">457</span>
-<span id="458">458</span>
-<span id="459">459</span>
-<span id="460">460</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
 <span class="doccomment">//! This mod implemented a wrapped future pool that supports `on_tick()` which</span>
 <span class="doccomment">//! is invoked no less than the specific interval.</span>
 
-<span class="kw">mod</span> <span class="ident">builder</span>;
-<span class="kw">mod</span> <span class="ident">metrics</span>;
-
-<span class="kw">pub</span> <span class="kw">use</span> <span class="self">self</span>::<span class="ident">builder</span>::{<span class="ident">Builder</span>, <span class="ident">Config</span>};
-
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">cell</span>::<span class="ident">Cell</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">future</span>::<span class="ident">Future</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">Arc</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">time</span>::<span class="ident">Duration</span>;
 
 <span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">channel</span>::<span class="ident">oneshot</span>::{<span class="self">self</span>, <span class="ident">Canceled</span>};
 <span class="kw">use</span> <span class="ident">prometheus</span>::{<span class="ident">Histogram</span>, <span class="ident">IntCounter</span>, <span class="ident">IntGauge</span>};
@@ -480,67 +438,14 @@
 
 <span class="kw">pub</span> <span class="kw">type</span> <span class="ident">ThreadPool</span> <span class="op">=</span> <span class="ident">yatp</span>::<span class="ident">ThreadPool</span><span class="op">&lt;</span><span class="ident">future</span>::<span class="ident">TaskCell</span><span class="op">&gt;</span>;
 
+<span class="kw">use</span> <span class="kw">super</span>::<span class="ident">metrics</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">time</span>::<span class="ident">Instant</span>;
-<span class="kw">use</span> <span class="ident">yatp</span>::<span class="ident">pool</span>::<span class="ident">Local</span>;
-
-<span class="kw">const</span> <span class="ident">TICK_INTERVAL</span>: <span class="ident">Duration</span> <span class="op">=</span> <span class="ident">Duration</span>::<span class="ident">from_secs</span>(<span class="number">1</span>);
-
-<span class="macro">thread_local</span><span class="macro">!</span> {
-    <span class="kw">static</span> <span class="ident">THREAD_LAST_TICK_TIME</span>: <span class="ident">Cell</span><span class="op">&lt;</span><span class="ident">Instant</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Cell</span>::<span class="ident">new</span>(<span class="ident">Instant</span>::<span class="ident">now_coarse</span>());
-}
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>)]</span>
 <span class="kw">struct</span> <span class="ident">Env</span> {
     <span class="ident">metrics_running_task_count</span>: <span class="ident">IntGauge</span>,
     <span class="ident">metrics_handled_task_count</span>: <span class="ident">IntCounter</span>,
     <span class="ident">metrics_pool_schedule_duration</span>: <span class="ident">Histogram</span>,
-}
-
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>)]</span>
-<span class="kw">struct</span> <span class="ident">FuturePoolRunner</span> {
-    <span class="ident">inner</span>: <span class="ident">future</span>::<span class="ident">Runner</span>,
-    <span class="ident">before_stop</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Fn</span>() <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">after_start</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Fn</span>() <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">on_tick</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Fn</span>() <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">env</span>: <span class="ident">Env</span>,
-}
-
-<span class="kw">impl</span> <span class="ident">yatp</span>::<span class="ident">pool</span>::<span class="ident">Runner</span> <span class="kw">for</span> <span class="ident">FuturePoolRunner</span> {
-    <span class="kw">type</span> <span class="ident">TaskCell</span> <span class="op">=</span> <span class="ident">future</span>::<span class="ident">TaskCell</span>;
-
-    <span class="kw">fn</span> <span class="ident">start</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">local</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Local</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">TaskCell</span><span class="op">&gt;</span>) {
-        <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">start</span>(<span class="ident">local</span>);
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">after_start</span>) <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">after_start</span> {
-            <span class="ident">after_start</span>();
-        }
-        <span class="ident">tikv_alloc</span>::<span class="ident">add_thread_memory_accessor</span>();
-    }
-
-    <span class="kw">fn</span> <span class="ident">handle</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">local</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Local</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">TaskCell</span><span class="op">&gt;</span>, <span class="ident">task_cell</span>: <span class="self">Self</span>::<span class="ident">TaskCell</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="kw">let</span> <span class="ident">finished</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">handle</span>(<span class="ident">local</span>, <span class="ident">task_cell</span>);
-        <span class="kw">if</span> <span class="ident">finished</span> {
-            <span class="self">self</span>.<span class="ident">env</span>.<span class="ident">metrics_handled_task_count</span>.<span class="ident">inc</span>();
-            <span class="self">self</span>.<span class="ident">env</span>.<span class="ident">metrics_running_task_count</span>.<span class="ident">dec</span>();
-            <span class="ident">try_tick_thread</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">on_tick</span>);
-        }
-        <span class="ident">finished</span>
-    }
-
-    <span class="kw">fn</span> <span class="ident">pause</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">local</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Local</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">TaskCell</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">pause</span>(<span class="ident">local</span>)
-    }
-
-    <span class="kw">fn</span> <span class="ident">resume</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">local</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Local</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">TaskCell</span><span class="op">&gt;</span>) {
-        <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">resume</span>(<span class="ident">local</span>)
-    }
-
-    <span class="kw">fn</span> <span class="ident">end</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">local</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Local</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">TaskCell</span><span class="op">&gt;</span>) {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">before_stop</span>) <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">before_stop</span> {
-            <span class="ident">before_stop</span>();
-        }
-        <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">end</span>(<span class="ident">local</span>);
-        <span class="ident">tikv_alloc</span>::<span class="ident">remove_thread_memory_accessor</span>();
-    }
 }
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>)]</span>
@@ -562,6 +467,23 @@
 <span class="kw">impl</span> <span class="kw">crate</span>::<span class="ident">AssertSync</span> <span class="kw">for</span> <span class="ident">FuturePool</span> {}
 
 <span class="kw">impl</span> <span class="ident">FuturePool</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_pool</span>(<span class="ident">pool</span>: <span class="ident">ThreadPool</span>, <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">pool_size</span>: <span class="ident">usize</span>, <span class="ident">max_tasks</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+        <span class="kw">let</span> <span class="ident">env</span> <span class="op">=</span> <span class="ident">Env</span> {
+            <span class="ident">metrics_running_task_count</span>: <span class="ident">metrics</span>::<span class="ident">FUTUREPOOL_RUNNING_TASK_VEC</span>
+                .<span class="ident">with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="ident">name</span>]),
+            <span class="ident">metrics_handled_task_count</span>: <span class="ident">metrics</span>::<span class="ident">FUTUREPOOL_HANDLED_TASK_VEC</span>
+                .<span class="ident">with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="ident">name</span>]),
+            <span class="ident">metrics_pool_schedule_duration</span>: <span class="ident">metrics</span>::<span class="ident">FUTUREPOOL_SCHEDULE_DURATION_VEC</span>
+                .<span class="ident">with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="ident">name</span>]),
+        };
+        <span class="ident">FuturePool</span> {
+            <span class="ident">pool</span>: <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">pool</span>),
+            <span class="ident">env</span>,
+            <span class="ident">pool_size</span>,
+            <span class="ident">max_tasks</span>,
+        }
+    }
+
     <span class="doccomment">/// Gets inner thread pool size.</span>
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_pool_size</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
@@ -604,13 +526,18 @@
     {
         <span class="kw">let</span> <span class="ident">timer</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now_coarse</span>();
         <span class="kw">let</span> <span class="ident">h_schedule</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">env</span>.<span class="ident">metrics_pool_schedule_duration</span>.<span class="ident">clone</span>();
+        <span class="kw">let</span> <span class="ident">metrics_handled_task_count</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">env</span>.<span class="ident">metrics_handled_task_count</span>.<span class="ident">clone</span>();
+        <span class="kw">let</span> <span class="ident">metrics_running_task_count</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">env</span>.<span class="ident">metrics_running_task_count</span>.<span class="ident">clone</span>();
 
         <span class="self">self</span>.<span class="ident">gate_spawn</span>()<span class="question-mark">?</span>;
 
-        <span class="self">self</span>.<span class="ident">env</span>.<span class="ident">metrics_running_task_count</span>.<span class="ident">inc</span>();
+        <span class="ident">metrics_running_task_count</span>.<span class="ident">inc</span>();
+
         <span class="self">self</span>.<span class="ident">pool</span>.<span class="ident">spawn</span>(<span class="kw">async</span> <span class="kw">move</span> {
             <span class="ident">h_schedule</span>.<span class="ident">observe</span>(<span class="ident">timer</span>.<span class="ident">elapsed_secs</span>());
             <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="ident">future</span>.<span class="kw">await</span>;
+            <span class="ident">metrics_handled_task_count</span>.<span class="ident">inc</span>();
+            <span class="ident">metrics_running_task_count</span>.<span class="ident">dec</span>();
         });
         <span class="prelude-val">Ok</span>(())
     }
@@ -628,37 +555,22 @@
     {
         <span class="kw">let</span> <span class="ident">timer</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now_coarse</span>();
         <span class="kw">let</span> <span class="ident">h_schedule</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">env</span>.<span class="ident">metrics_pool_schedule_duration</span>.<span class="ident">clone</span>();
+        <span class="kw">let</span> <span class="ident">metrics_handled_task_count</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">env</span>.<span class="ident">metrics_handled_task_count</span>.<span class="ident">clone</span>();
+        <span class="kw">let</span> <span class="ident">metrics_running_task_count</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">env</span>.<span class="ident">metrics_running_task_count</span>.<span class="ident">clone</span>();
 
         <span class="self">self</span>.<span class="ident">gate_spawn</span>()<span class="question-mark">?</span>;
 
         <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">oneshot</span>::<span class="ident">channel</span>();
-        <span class="self">self</span>.<span class="ident">env</span>.<span class="ident">metrics_running_task_count</span>.<span class="ident">inc</span>();
+        <span class="ident">metrics_running_task_count</span>.<span class="ident">inc</span>();
         <span class="self">self</span>.<span class="ident">pool</span>.<span class="ident">spawn</span>(<span class="kw">async</span> <span class="kw">move</span> {
             <span class="ident">h_schedule</span>.<span class="ident">observe</span>(<span class="ident">timer</span>.<span class="ident">elapsed_secs</span>());
             <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">future</span>.<span class="kw">await</span>;
+            <span class="ident">metrics_handled_task_count</span>.<span class="ident">inc</span>();
+            <span class="ident">metrics_running_task_count</span>.<span class="ident">dec</span>();
             <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="ident">tx</span>.<span class="ident">send</span>(<span class="ident">res</span>);
         });
         <span class="prelude-val">Ok</span>(<span class="ident">rx</span>)
     }
-}
-
-<span class="doccomment">/// Tries to trigger a tick in current thread.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This function is effective only when it is called in thread pool worker</span>
-<span class="doccomment">/// thread.</span>
-<span class="attribute">#[<span class="ident">inline</span>]</span>
-<span class="kw">fn</span> <span class="ident">try_tick_thread</span>(<span class="ident">on_tick</span>: <span class="kw-2">&amp;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Fn</span>() <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span><span class="op">&gt;</span><span class="op">&gt;</span>) {
-    <span class="ident">THREAD_LAST_TICK_TIME</span>.<span class="ident">with</span>(<span class="op">|</span><span class="ident">tls_last_tick</span><span class="op">|</span> {
-        <span class="kw">let</span> <span class="ident">now</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now_coarse</span>();
-        <span class="kw">let</span> <span class="ident">last_tick</span> <span class="op">=</span> <span class="ident">tls_last_tick</span>.<span class="ident">get</span>();
-        <span class="kw">if</span> <span class="ident">now</span>.<span class="ident">duration_since</span>(<span class="ident">last_tick</span>) <span class="op">&lt;</span> <span class="ident">TICK_INTERVAL</span> {
-            <span class="kw">return</span>;
-        }
-        <span class="ident">tls_last_tick</span>.<span class="ident">set</span>(<span class="ident">now</span>);
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">f</span>) <span class="op">=</span> <span class="ident">on_tick</span> {
-            <span class="ident">f</span>();
-        }
-    })
 }
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">Debug</span>)]</span>
@@ -686,7 +598,9 @@
     <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::{<span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>};
     <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">mpsc</span>;
     <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">thread</span>;
+    <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">time</span>::<span class="ident">Duration</span>;
 
+    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw">super</span>::{<span class="ident">DefaultTicker</span>, <span class="ident">PoolTicker</span>, <span class="ident">YatpPoolBuilder</span> <span class="kw">as</span> <span class="ident">Builder</span>, <span class="ident">TICK_INTERVAL</span>};
     <span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">executor</span>::<span class="ident">block_on</span>;
 
     <span class="kw">fn</span> <span class="ident">spawn_future_and_wait</span>(<span class="ident">pool</span>: <span class="kw-2">&amp;</span><span class="ident">FuturePool</span>, <span class="ident">duration</span>: <span class="ident">Duration</span>) {
@@ -706,24 +620,40 @@
         .<span class="ident">unwrap</span>();
     }
 
+    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>)]</span>
+    <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">SequenceTicker</span> {
+        <span class="ident">tick</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Fn</span>() <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span><span class="op">&gt;</span>,
+    }
+
+    <span class="kw">impl</span> <span class="ident">SequenceTicker</span> {
+        <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span><span class="op">&lt;</span><span class="ident">F</span><span class="op">&gt;</span>(<span class="ident">tick</span>: <span class="ident">F</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">SequenceTicker</span>
+        <span class="kw">where</span>
+            <span class="ident">F</span>: <span class="ident">Fn</span>() <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+        {
+            <span class="ident">SequenceTicker</span> {
+                <span class="ident">tick</span>: <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">tick</span>),
+            }
+        }
+    }
+
+    <span class="kw">impl</span> <span class="ident">PoolTicker</span> <span class="kw">for</span> <span class="ident">SequenceTicker</span> {
+        <span class="kw">fn</span> <span class="ident">on_tick</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
+            (<span class="self">self</span>.<span class="ident">tick</span>)();
+        }
+    }
+
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_tick</span>() {
         <span class="kw">let</span> <span class="ident">tick_sequence</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">AtomicUsize</span>::<span class="ident">new</span>(<span class="number">0</span>));
 
         <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">mpsc</span>::<span class="ident">sync_channel</span>(<span class="number">1000</span>);
+        <span class="kw">let</span> <span class="ident">ticker</span> <span class="op">=</span> <span class="ident">SequenceTicker</span>::<span class="ident">new</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
+            <span class="kw">let</span> <span class="ident">seq</span> <span class="op">=</span> <span class="ident">tick_sequence</span>.<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
+            <span class="ident">tx</span>.<span class="ident">send</span>(<span class="ident">seq</span>).<span class="ident">unwrap</span>();
+        });
 
-        <span class="kw">let</span> <span class="ident">pool</span> <span class="op">=</span> <span class="ident">Builder</span>::<span class="ident">new</span>()
-            .<span class="ident">pool_size</span>(<span class="number">1</span>)
-            .<span class="ident">on_tick</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
-                <span class="kw">let</span> <span class="ident">seq</span> <span class="op">=</span> <span class="ident">tick_sequence</span>.<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
-                <span class="ident">tx</span>.<span class="ident">send</span>(<span class="ident">seq</span>).<span class="ident">unwrap</span>();
-            })
-            .<span class="ident">build</span>();
+        <span class="kw">let</span> <span class="ident">pool</span> <span class="op">=</span> <span class="ident">Builder</span>::<span class="ident">new</span>(<span class="ident">ticker</span>).<span class="ident">thread_count</span>(<span class="number">1</span>, <span class="number">1</span>).<span class="ident">build_future_pool</span>();
 
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">rx</span>.<span class="ident">try_recv</span>().<span class="ident">is_err</span>());
-
-        <span class="comment">// Tick is not emitted since there is no task</span>
-        <span class="ident">thread</span>::<span class="ident">sleep</span>(<span class="ident">TICK_INTERVAL</span> <span class="op">*</span> <span class="number">2</span>);
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">rx</span>.<span class="ident">try_recv</span>().<span class="ident">is_err</span>());
 
         <span class="comment">// Tick is emitted because long enough time has elapsed since pool is created</span>
@@ -766,14 +696,12 @@
         <span class="kw">let</span> <span class="ident">tick_sequence</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">AtomicUsize</span>::<span class="ident">new</span>(<span class="number">0</span>));
 
         <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">mpsc</span>::<span class="ident">sync_channel</span>(<span class="number">1000</span>);
+        <span class="kw">let</span> <span class="ident">ticker</span> <span class="op">=</span> <span class="ident">SequenceTicker</span>::<span class="ident">new</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
+            <span class="kw">let</span> <span class="ident">seq</span> <span class="op">=</span> <span class="ident">tick_sequence</span>.<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
+            <span class="ident">tx</span>.<span class="ident">send</span>(<span class="ident">seq</span>).<span class="ident">unwrap</span>();
+        });
 
-        <span class="kw">let</span> <span class="ident">pool</span> <span class="op">=</span> <span class="ident">Builder</span>::<span class="ident">new</span>()
-            .<span class="ident">pool_size</span>(<span class="number">2</span>)
-            .<span class="ident">on_tick</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
-                <span class="kw">let</span> <span class="ident">seq</span> <span class="op">=</span> <span class="ident">tick_sequence</span>.<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
-                <span class="ident">tx</span>.<span class="ident">send</span>(<span class="ident">seq</span>).<span class="ident">unwrap</span>();
-            })
-            .<span class="ident">build</span>();
+        <span class="kw">let</span> <span class="ident">pool</span> <span class="op">=</span> <span class="ident">Builder</span>::<span class="ident">new</span>(<span class="ident">ticker</span>).<span class="ident">thread_count</span>(<span class="number">2</span>, <span class="number">2</span>).<span class="ident">build_future_pool</span>();
 
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">rx</span>.<span class="ident">try_recv</span>().<span class="ident">is_err</span>());
 
@@ -802,7 +730,9 @@
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_handle_result</span>() {
-        <span class="kw">let</span> <span class="ident">pool</span> <span class="op">=</span> <span class="ident">Builder</span>::<span class="ident">new</span>().<span class="ident">pool_size</span>(<span class="number">1</span>).<span class="ident">build</span>();
+        <span class="kw">let</span> <span class="ident">pool</span> <span class="op">=</span> <span class="ident">Builder</span>::<span class="ident">new</span>(<span class="ident">DefaultTicker</span> {})
+            .<span class="ident">thread_count</span>(<span class="number">1</span>, <span class="number">1</span>)
+            .<span class="ident">build_future_pool</span>();
 
         <span class="kw">let</span> <span class="ident">handle</span> <span class="op">=</span> <span class="ident">pool</span>.<span class="ident">spawn_handle</span>(<span class="kw">async</span> { <span class="number">42</span> });
 
@@ -811,10 +741,10 @@
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_running_task_count</span>() {
-        <span class="kw">let</span> <span class="ident">pool</span> <span class="op">=</span> <span class="ident">Builder</span>::<span class="ident">new</span>()
+        <span class="kw">let</span> <span class="ident">pool</span> <span class="op">=</span> <span class="ident">Builder</span>::<span class="ident">new</span>(<span class="ident">DefaultTicker</span> {})
             .<span class="ident">name_prefix</span>(<span class="string">&quot;future_pool_for_running_task_test&quot;</span>) <span class="comment">// The name is important</span>
-            .<span class="ident">pool_size</span>(<span class="number">2</span>)
-            .<span class="ident">build</span>();
+            .<span class="ident">thread_count</span>(<span class="number">2</span>, <span class="number">2</span>)
+            .<span class="ident">build_future_pool</span>();
 
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">pool</span>.<span class="ident">get_running_task_count</span>(), <span class="number">0</span>);
 
@@ -863,11 +793,11 @@
     <span class="kw">fn</span> <span class="ident">test_full</span>() {
         <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">mpsc</span>::<span class="ident">channel</span>();
 
-        <span class="kw">let</span> <span class="ident">read_pool</span> <span class="op">=</span> <span class="ident">Builder</span>::<span class="ident">new</span>()
+        <span class="kw">let</span> <span class="ident">read_pool</span> <span class="op">=</span> <span class="ident">Builder</span>::<span class="ident">new</span>(<span class="ident">DefaultTicker</span> {})
             .<span class="ident">name_prefix</span>(<span class="string">&quot;future_pool_test_full&quot;</span>)
-            .<span class="ident">pool_size</span>(<span class="number">2</span>)
+            .<span class="ident">thread_count</span>(<span class="number">2</span>, <span class="number">2</span>)
             .<span class="ident">max_tasks</span>(<span class="number">4</span>)
-            .<span class="ident">build</span>();
+            .<span class="ident">build_future_pool</span>();
 
         <span class="ident">wait_on_new_thread</span>(
             <span class="ident">tx</span>.<span class="ident">clone</span>(),

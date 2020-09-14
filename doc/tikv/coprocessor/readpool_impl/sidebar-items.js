@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["build_read_pool",""],["build_read_pool_for_test",""]]});
+initSidebarItems({"fn":[["build_read_pool",""],["build_read_pool_for_test",""]],"struct":[["FuturePoolTicker",""]]});

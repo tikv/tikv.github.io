@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["ReadPool",""],["ReadPoolError",""],["ReadPoolHandle",""]],"fn":[["build_yatp_read_pool",""],["get_unified_read_pool_name",""]],"mod":[["metrics",""]],"struct":[["ReadPoolRunner",""]]});
+initSidebarItems({"enum":[["ReadPool",""],["ReadPoolError",""],["ReadPoolHandle",""]],"fn":[["build_yatp_read_pool",""],["get_unified_read_pool_name",""]],"mod":[["metrics",""]],"struct":[["ReporterTicker",""]]});

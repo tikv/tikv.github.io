@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["TLS_SCHED_METRICS",""]],"fn":[["tls_collect_keyread_histogram_vec",""],["tls_collect_read_duration",""],["tls_collect_scan_details",""],["tls_flush",""]],"struct":[["SchedLocalMetrics",""],["SchedPool",""]]});
+initSidebarItems({"constant":[["TLS_SCHED_METRICS",""]],"fn":[["tls_collect_keyread_histogram_vec",""],["tls_collect_read_duration",""],["tls_collect_scan_details",""],["tls_flush",""]],"struct":[["SchedLocalMetrics",""],["SchedPool",""],["SchedTicker",""]]});
