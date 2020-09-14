@@ -106,6 +106,24 @@
 <span id="106">106</span>
 <span id="107">107</span>
 <span id="108">108</span>
+<span id="109">109</span>
+<span id="110">110</span>
+<span id="111">111</span>
+<span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
+<span id="118">118</span>
+<span id="119">119</span>
+<span id="120">120</span>
+<span id="121">121</span>
+<span id="122">122</span>
+<span id="123">123</span>
+<span id="124">124</span>
+<span id="125">125</span>
+<span id="126">126</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -116,8 +134,10 @@
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">util</span>::<span class="ident">is_epoch_stale</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::{<span class="ident">StoreMsg</span>, <span class="ident">StoreRouter</span>};
+<span class="kw">use</span> <span class="ident">engine_traits</span>::<span class="ident">KvEngine</span>;
 <span class="kw">use</span> <span class="ident">pd_client</span>::<span class="ident">PdClient</span>;
 <span class="kw">use</span> <span class="ident">sst_importer</span>::<span class="ident">SSTImporter</span>;
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">marker</span>::<span class="ident">PhantomData</span>;
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">worker</span>::<span class="ident">Runnable</span>;
 
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Task</span> {
@@ -134,25 +154,36 @@
     }
 }
 
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Runner</span><span class="op">&lt;</span><span class="ident">C</span>, <span class="ident">S</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Runner</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">C</span>, <span class="ident">S</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">EK</span>: <span class="ident">KvEngine</span>,
+    <span class="ident">S</span>: <span class="ident">StoreRouter</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>,
+{
     <span class="ident">store_id</span>: <span class="ident">u64</span>,
     <span class="ident">store_router</span>: <span class="ident">S</span>,
     <span class="ident">importer</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">SSTImporter</span><span class="op">&gt;</span>,
     <span class="ident">pd_client</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>,
+    <span class="ident">_engine</span>: <span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">PdClient</span>, <span class="ident">S</span>: <span class="ident">StoreRouter</span><span class="op">&gt;</span> <span class="ident">Runner</span><span class="op">&lt;</span><span class="ident">C</span>, <span class="ident">S</span><span class="op">&gt;</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">C</span>, <span class="ident">S</span><span class="op">&gt;</span> <span class="ident">Runner</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">C</span>, <span class="ident">S</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">EK</span>: <span class="ident">KvEngine</span>,
+    <span class="ident">C</span>: <span class="ident">PdClient</span>,
+    <span class="ident">S</span>: <span class="ident">StoreRouter</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>,
+{
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
         <span class="ident">store_id</span>: <span class="ident">u64</span>,
         <span class="ident">store_router</span>: <span class="ident">S</span>,
         <span class="ident">importer</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">SSTImporter</span><span class="op">&gt;</span>,
         <span class="ident">pd_client</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Runner</span><span class="op">&lt;</span><span class="ident">C</span>, <span class="ident">S</span><span class="op">&gt;</span> {
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Runner</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">C</span>, <span class="ident">S</span><span class="op">&gt;</span> {
         <span class="ident">Runner</span> {
             <span class="ident">store_id</span>,
             <span class="ident">store_router</span>,
             <span class="ident">importer</span>,
             <span class="ident">pd_client</span>,
+            <span class="ident">_engine</span>: <span class="ident">PhantomData</span>,
         }
     }
 
@@ -201,7 +232,12 @@
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">PdClient</span>, <span class="ident">S</span>: <span class="ident">StoreRouter</span><span class="op">&gt;</span> <span class="ident">Runnable</span> <span class="kw">for</span> <span class="ident">Runner</span><span class="op">&lt;</span><span class="ident">C</span>, <span class="ident">S</span><span class="op">&gt;</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">C</span>, <span class="ident">S</span><span class="op">&gt;</span> <span class="ident">Runnable</span> <span class="kw">for</span> <span class="ident">Runner</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">C</span>, <span class="ident">S</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">EK</span>: <span class="ident">KvEngine</span>,
+    <span class="ident">C</span>: <span class="ident">PdClient</span>,
+    <span class="ident">S</span>: <span class="ident">StoreRouter</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>,
+{
     <span class="kw">type</span> <span class="ident">Task</span> <span class="op">=</span> <span class="ident">Task</span>;
 
     <span class="kw">fn</span> <span class="ident">run</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">task</span>: <span class="ident">Task</span>) {

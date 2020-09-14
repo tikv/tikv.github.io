@@ -1,1 +1,1 @@
-initSidebarItems({"trait":[["CompactExt",""]]});
+initSidebarItems({"trait":[["CompactExt",""],["CompactedEvent",""]]});

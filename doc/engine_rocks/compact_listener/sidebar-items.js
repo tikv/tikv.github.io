@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["CompactedEvent",""],["CompactionListener",""],["RocksCompactionJobInfo",""]],"type":[["Filter",""]]});
+initSidebarItems({"struct":[["CompactionListener",""],["RocksCompactedEvent",""],["RocksCompactionJobInfo",""]],"type":[["Filter",""]]});

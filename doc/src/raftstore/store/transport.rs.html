@@ -118,6 +118,12 @@
 <span id="118">118</span>
 <span id="119">119</span>
 <span id="120">120</span>
+<span id="121">121</span>
+<span id="122">122</span>
+<span id="123">123</span>
+<span id="124">124</span>
+<span id="125">125</span>
+<span id="126">126</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -156,8 +162,11 @@
 <span class="doccomment">/// Routes message to store FSM.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Messages are not guaranteed to be delivered by this trait.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">StoreRouter</span> {
-    <span class="kw">fn</span> <span class="ident">send</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">msg</span>: <span class="ident">StoreMsg</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span>;
+<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">StoreRouter</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">EK</span>: <span class="ident">KvEngine</span>,
+{
+    <span class="kw">fn</span> <span class="ident">send</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">msg</span>: <span class="ident">StoreMsg</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span>;
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span> <span class="ident">CasualRouter</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">RaftRouter</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>
@@ -189,13 +198,13 @@
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span> <span class="ident">StoreRouter</span> <span class="kw">for</span> <span class="ident">RaftRouter</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span> <span class="ident">StoreRouter</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">RaftRouter</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>
 <span class="kw">where</span>
     <span class="ident">EK</span>: <span class="ident">KvEngine</span>,
     <span class="ident">ER</span>: <span class="ident">RaftEngine</span>,
 {
     <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">send</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">msg</span>: <span class="ident">StoreMsg</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">send</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">msg</span>: <span class="ident">StoreMsg</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">match</span> <span class="self">self</span>.<span class="ident">send_control</span>(<span class="ident">msg</span>) {
             <span class="prelude-val">Ok</span>(()) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(()),
             <span class="prelude-val">Err</span>(<span class="ident">TrySendError</span>::<span class="ident">Full</span>(<span class="kw">_</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">Transport</span>(<span class="ident">DiscardReason</span>::<span class="ident">Full</span>)),
@@ -231,8 +240,11 @@
     }
 }
 
-<span class="kw">impl</span> <span class="ident">StoreRouter</span> <span class="kw">for</span> <span class="ident">mpsc</span>::<span class="ident">Sender</span><span class="op">&lt;</span><span class="ident">StoreMsg</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">send</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">msg</span>: <span class="ident">StoreMsg</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span> <span class="ident">StoreRouter</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">mpsc</span>::<span class="ident">Sender</span><span class="op">&lt;</span><span class="ident">StoreMsg</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">EK</span>: <span class="ident">KvEngine</span>,
+{
+    <span class="kw">fn</span> <span class="ident">send</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">msg</span>: <span class="ident">StoreMsg</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">match</span> <span class="self">self</span>.<span class="ident">send</span>(<span class="ident">msg</span>) {
             <span class="prelude-val">Ok</span>(()) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(()),
             <span class="prelude-val">Err</span>(<span class="ident">mpsc</span>::<span class="ident">SendError</span>(<span class="kw">_</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">Transport</span>(<span class="ident">DiscardReason</span>::<span class="ident">Disconnected</span>)),

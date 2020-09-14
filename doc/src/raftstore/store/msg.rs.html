@@ -468,13 +468,18 @@
 <span id="468">468</span>
 <span id="469">469</span>
 <span id="470">470</span>
+<span id="471">471</span>
+<span id="472">472</span>
+<span id="473">473</span>
+<span id="474">474</span>
+<span id="475">475</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">fmt</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">time</span>::<span class="ident">Instant</span>;
 
-<span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">KvEngine</span>, <span class="ident">Snapshot</span>};
+<span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">CompactedEvent</span>, <span class="ident">KvEngine</span>, <span class="ident">Snapshot</span>};
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">import_sstpb</span>::<span class="ident">SstMeta</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">kvrpcpb</span>::<span class="ident">ExtraOp</span> <span class="kw">as</span> <span class="ident">TxnExtraOp</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">metapb</span>;
@@ -490,7 +495,6 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">metrics</span>::<span class="ident">RaftEventDurationType</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">util</span>::<span class="ident">KeysInfoFormatter</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">SnapKey</span>;
-<span class="kw">use</span> <span class="ident">engine_rocks</span>::<span class="ident">CompactedEvent</span>;
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">escape</span>;
 
 <span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">AbstractPeer</span>, <span class="ident">RegionSnapshot</span>};
@@ -883,7 +887,10 @@
     }
 }
 
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">StoreMsg</span> {
+<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">StoreMsg</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">EK</span>: <span class="ident">KvEngine</span>,
+{
     <span class="ident">RaftMessage</span>(<span class="ident">RaftMessage</span>),
 
     <span class="ident">ValidateSSTResult</span> {
@@ -901,7 +908,7 @@
     },
 
     <span class="comment">// Compaction finished event</span>
-    <span class="ident">CompactedEvent</span>(<span class="ident">CompactedEvent</span>),
+    <span class="ident">CompactedEvent</span>(<span class="ident">EK</span>::<span class="ident">CompactedEvent</span>),
     <span class="ident">Tick</span>(<span class="ident">StoreTick</span>),
     <span class="ident">Start</span> {
         <span class="ident">store</span>: <span class="ident">metapb</span>::<span class="ident">Store</span>,
@@ -914,14 +921,17 @@
     <span class="ident">UpdateReplicationMode</span>(<span class="ident">ReplicationStatus</span>),
 }
 
-<span class="kw">impl</span> <span class="ident">fmt</span>::<span class="ident">Debug</span> <span class="kw">for</span> <span class="ident">StoreMsg</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="ident">Debug</span> <span class="kw">for</span> <span class="ident">StoreMsg</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">EK</span>: <span class="ident">KvEngine</span>,
+{
     <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">fmt</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt</span>::<span class="ident">Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="prelude-ty">Result</span> {
         <span class="kw">match</span> <span class="kw-2">*</span><span class="self">self</span> {
             <span class="ident">StoreMsg</span>::<span class="ident">RaftMessage</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write</span><span class="macro">!</span>(<span class="ident">fmt</span>, <span class="string">&quot;Raft Message&quot;</span>),
             <span class="ident">StoreMsg</span>::<span class="ident">StoreUnreachable</span> { <span class="ident">store_id</span> } <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="macro">write</span><span class="macro">!</span>(<span class="ident">fmt</span>, <span class="string">&quot;Store {}  is unreachable&quot;</span>, <span class="ident">store_id</span>)
             }
-            <span class="ident">StoreMsg</span>::<span class="ident">CompactedEvent</span>(<span class="kw-2">ref</span> <span class="ident">event</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write</span><span class="macro">!</span>(<span class="ident">fmt</span>, <span class="string">&quot;CompactedEvent cf {}&quot;</span>, <span class="ident">event</span>.<span class="ident">cf</span>),
+            <span class="ident">StoreMsg</span>::<span class="ident">CompactedEvent</span>(<span class="kw-2">ref</span> <span class="ident">event</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write</span><span class="macro">!</span>(<span class="ident">fmt</span>, <span class="string">&quot;CompactedEvent cf {}&quot;</span>, <span class="ident">event</span>.<span class="ident">cf</span>()),
             <span class="ident">StoreMsg</span>::<span class="ident">ValidateSSTResult</span> { .. } <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write</span><span class="macro">!</span>(<span class="ident">fmt</span>, <span class="string">&quot;Validate SST Result&quot;</span>),
             <span class="ident">StoreMsg</span>::<span class="ident">ClearRegionSizeInRange</span> {
                 <span class="kw-2">ref</span> <span class="ident">start_key</span>,
