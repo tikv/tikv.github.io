@@ -171,6 +171,7 @@
 <span id="171">171</span>
 <span id="172">172</span>
 <span id="173">173</span>
+<span id="174">174</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -178,11 +179,14 @@
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">time</span>::{<span class="ident">Duration</span>, <span class="ident">Instant</span>};
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">server</span>::<span class="ident">Error</span>;
-<span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">compat</span>::{<span class="ident">Compat</span>, <span class="ident">Future01CompatExt</span>, <span class="ident">Sink01CompatExt</span>};
-<span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">future</span>::{<span class="ident">FutureExt</span>, <span class="ident">TryFutureExt</span>};
-<span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">sink</span>::<span class="ident">SinkExt</span>;
-<span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">stream</span>::<span class="ident">StreamExt</span>;
-<span class="kw">use</span> <span class="ident">grpcio</span>::{<span class="ident">RpcContext</span>, <span class="ident">RpcStatus</span>, <span class="ident">RpcStatusCode</span>, <span class="ident">ServerStreamingSink</span>, <span class="ident">UnarySink</span>, <span class="ident">WriteFlags</span>};
+<span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">compat</span>::<span class="ident">Future01CompatExt</span>;
+<span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">future</span>::{<span class="ident">FutureExt</span>, <span class="ident">TryFutureExt</span>};
+<span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">sink</span>::<span class="ident">SinkExt</span>;
+<span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">stream</span>::<span class="ident">StreamExt</span>;
+<span class="kw">use</span> <span class="ident">grpcio</span>::{
+    <span class="prelude-ty">Result</span> <span class="kw">as</span> <span class="ident">GrpcResult</span>, <span class="ident">RpcContext</span>, <span class="ident">RpcStatus</span>, <span class="ident">RpcStatusCode</span>, <span class="ident">ServerStreamingSink</span>, <span class="ident">UnarySink</span>,
+    <span class="ident">WriteFlags</span>,
+};
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">diagnosticspb</span>::{
     <span class="ident">Diagnostics</span>, <span class="ident">SearchLogRequest</span>, <span class="ident">SearchLogResponse</span>, <span class="ident">ServerInfoRequest</span>, <span class="ident">ServerInfoResponse</span>,
     <span class="ident">ServerInfoType</span>,
@@ -232,7 +236,7 @@
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
         <span class="ident">ctx</span>: <span class="ident">RpcContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>,
         <span class="ident">req</span>: <span class="ident">SearchLogRequest</span>,
-        <span class="ident">sink</span>: <span class="ident">ServerStreamingSink</span><span class="op">&lt;</span><span class="ident">SearchLogResponse</span><span class="op">&gt;</span>,
+        <span class="kw-2">mut</span> <span class="ident">sink</span>: <span class="ident">ServerStreamingSink</span><span class="op">&lt;</span><span class="ident">SearchLogResponse</span><span class="op">&gt;</span>,
     ) {
         <span class="kw">if</span> <span class="op">!</span><span class="ident">check_common_name</span>(<span class="self">self</span>.<span class="ident">security_mgr</span>.<span class="ident">cert_allowed_cn</span>(), <span class="kw-2">&amp;</span><span class="ident">ctx</span>) {
             <span class="kw">return</span>;
@@ -259,10 +263,12 @@
             .<span class="ident">spawn</span>(<span class="kw">async</span> <span class="kw">move</span> {
                 <span class="kw">match</span> <span class="ident">stream</span>.<span class="kw">await</span>.<span class="ident">unwrap</span>() {
                     <span class="prelude-val">Ok</span>(<span class="ident">s</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">sink</span>
-                            .<span class="ident">sink_compat</span>()
-                            .<span class="ident">send_all</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">s</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">item</span><span class="op">|</span> <span class="prelude-val">Ok</span>(<span class="ident">item</span>)))
-                            .<span class="kw">await</span>;
+                        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
+                            <span class="ident">sink</span>.<span class="ident">send_all</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">s</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">item</span><span class="op">|</span> <span class="prelude-val">Ok</span>(<span class="ident">item</span>))).<span class="kw">await</span><span class="question-mark">?</span>;
+                            <span class="ident">sink</span>.<span class="ident">close</span>().<span class="kw">await</span><span class="question-mark">?</span>;
+                            <span class="ident">GrpcResult</span>::<span class="prelude-val">Ok</span>(())
+                        }
+                        .<span class="kw">await</span>;
                         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">res</span> {
                             <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;search log RPC error&quot;</span>; <span class="string">&quot;error&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
                         }
@@ -274,7 +280,7 @@
             })
             .<span class="ident">map</span>(<span class="op">|</span><span class="ident">res</span><span class="op">|</span> <span class="ident">res</span>.<span class="ident">unwrap</span>());
 
-        <span class="ident">ctx</span>.<span class="ident">spawn</span>(<span class="ident">Compat</span>::<span class="ident">new</span>(<span class="ident">f</span>.<span class="ident">unit_error</span>().<span class="ident">boxed</span>()));
+        <span class="ident">ctx</span>.<span class="ident">spawn</span>(<span class="ident">f</span>);
     }
 
     <span class="kw">fn</span> <span class="ident">server_info</span>(
@@ -332,17 +338,13 @@
         };
 
         <span class="kw">let</span> <span class="ident">f</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pool</span>.<span class="ident">spawn</span>(<span class="ident">collect</span>).<span class="ident">then</span>(<span class="op">|</span><span class="ident">res</span><span class="op">|</span> <span class="kw">async</span> <span class="kw">move</span> {
-            <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">sink</span>
-                .<span class="ident">success</span>(<span class="ident">res</span>.<span class="ident">unwrap</span>())
-                .<span class="ident">compat</span>()
-                .<span class="ident">map_err</span>(<span class="ident">Error</span>::<span class="ident">from</span>)
-                .<span class="kw">await</span>;
+            <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">sink</span>.<span class="ident">success</span>(<span class="ident">res</span>.<span class="ident">unwrap</span>()).<span class="ident">map_err</span>(<span class="ident">Error</span>::<span class="ident">from</span>).<span class="kw">await</span>;
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">res</span> {
                 <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;Diagnostics rpc failed&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
             }
         });
 
-        <span class="ident">ctx</span>.<span class="ident">spawn</span>(<span class="ident">Compat</span>::<span class="ident">new</span>(<span class="ident">f</span>.<span class="ident">unit_error</span>().<span class="ident">boxed</span>()));
+        <span class="ident">ctx</span>.<span class="ident">spawn</span>(<span class="ident">f</span>);
     }
 }
 </pre></div>

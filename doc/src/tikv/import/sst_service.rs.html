@@ -454,25 +454,6 @@
 <span id="454">454</span>
 <span id="455">455</span>
 <span id="456">456</span>
-<span id="457">457</span>
-<span id="458">458</span>
-<span id="459">459</span>
-<span id="460">460</span>
-<span id="461">461</span>
-<span id="462">462</span>
-<span id="463">463</span>
-<span id="464">464</span>
-<span id="465">465</span>
-<span id="466">466</span>
-<span id="467">467</span>
-<span id="468">468</span>
-<span id="469">469</span>
-<span id="470">470</span>
-<span id="471">471</span>
-<span id="472">472</span>
-<span id="473">473</span>
-<span id="474">474</span>
-<span id="475">475</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -480,11 +461,8 @@
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">Arc</span>;
 
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">name_to_cf</span>, <span class="ident">CompactExt</span>, <span class="ident">MiscExt</span>, <span class="ident">CF_DEFAULT</span>, <span class="ident">CF_WRITE</span>};
-<span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">Future</span>;
-<span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">compat</span>::{<span class="ident">Compat</span>, <span class="ident">Future01CompatExt</span>, <span class="ident">Stream01CompatExt</span>};
-<span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">executor</span>::{<span class="ident">ThreadPool</span>, <span class="ident">ThreadPoolBuilder</span>};
-<span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">future</span>::<span class="ident">FutureExt</span>;
-<span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">stream</span>::<span class="ident">TryStreamExt</span>;
+<span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">executor</span>::{<span class="ident">ThreadPool</span>, <span class="ident">ThreadPoolBuilder</span>};
+<span class="kw">use</span> <span class="ident">futures</span>::{<span class="ident">TryFutureExt</span>, <span class="ident">TryStreamExt</span>};
 <span class="kw">use</span> <span class="ident">grpcio</span>::{<span class="ident">ClientStreamingSink</span>, <span class="ident">RequestStream</span>, <span class="ident">RpcContext</span>, <span class="ident">UnarySink</span>};
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">errorpb</span>;
 
@@ -589,7 +567,7 @@
             <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="prelude-val">Ok</span>(<span class="ident">SwitchModeResponse</span>::<span class="ident">default</span>());
             <span class="macro">send_rpc_response</span><span class="macro">!</span>(<span class="ident">res</span>, <span class="ident">sink</span>, <span class="ident">label</span>, <span class="ident">timer</span>);
         };
-        <span class="ident">ctx</span>.<span class="ident">spawn</span>(<span class="ident">Compat</span>::<span class="ident">new</span>(<span class="ident">task</span>.<span class="ident">unit_error</span>().<span class="ident">boxed</span>()));
+        <span class="ident">ctx</span>.<span class="ident">spawn</span>(<span class="ident">task</span>);
     }
 
     <span class="doccomment">/// Receive SST from client and save the file for later ingesting.</span>
@@ -605,8 +583,7 @@
         <span class="kw">let</span> <span class="ident">label</span> <span class="op">=</span> <span class="string">&quot;upload&quot;</span>;
         <span class="kw">let</span> <span class="ident">timer</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now_coarse</span>();
         <span class="kw">let</span> <span class="ident">import</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">importer</span>.<span class="ident">clone</span>();
-        <span class="kw">let</span> (<span class="ident">rx</span>, <span class="ident">buf_driver</span>) <span class="op">=</span>
-            <span class="ident">create_stream_with_buffer</span>(<span class="ident">stream</span>.<span class="ident">compat</span>(), <span class="self">self</span>.<span class="ident">cfg</span>.<span class="ident">stream_channel_window</span>);
+        <span class="kw">let</span> (<span class="ident">rx</span>, <span class="ident">buf_driver</span>) <span class="op">=</span> <span class="ident">create_stream_with_buffer</span>(<span class="ident">stream</span>, <span class="self">self</span>.<span class="ident">cfg</span>.<span class="ident">stream_channel_window</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rx</span> <span class="op">=</span> <span class="ident">rx</span>.<span class="ident">map_err</span>(<span class="ident">Error</span>::<span class="ident">from</span>);
 
         <span class="kw">let</span> <span class="ident">handle_task</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
@@ -636,12 +613,8 @@
             <span class="macro">send_rpc_response</span><span class="macro">!</span>(<span class="ident">res</span>, <span class="ident">sink</span>, <span class="ident">label</span>, <span class="ident">timer</span>);
         };
 
-        <span class="kw">let</span> <span class="ident">thread_handle</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">threads</span>.<span class="ident">clone</span>();
-        <span class="kw">let</span> <span class="ident">ctx_task</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
-            <span class="ident">thread_handle</span>.<span class="ident">spawn_ok</span>(<span class="ident">buf_driver</span>);
-            <span class="ident">thread_handle</span>.<span class="ident">spawn_ok</span>(<span class="ident">handle_task</span>);
-        };
-        <span class="ident">ctx</span>.<span class="ident">spawn</span>(<span class="ident">Compat</span>::<span class="ident">new</span>(<span class="ident">ctx_task</span>.<span class="ident">unit_error</span>().<span class="ident">boxed</span>()));
+        <span class="self">self</span>.<span class="ident">threads</span>.<span class="ident">spawn_ok</span>(<span class="ident">buf_driver</span>);
+        <span class="self">self</span>.<span class="ident">threads</span>.<span class="ident">spawn_ok</span>(<span class="ident">handle_task</span>);
     }
 
     <span class="doccomment">/// Downloads the file and performs key-rewrite for later ingesting.</span>
@@ -689,11 +662,7 @@
             <span class="macro">send_rpc_response</span><span class="macro">!</span>(<span class="ident">resp</span>, <span class="ident">sink</span>, <span class="ident">label</span>, <span class="ident">timer</span>);
         };
 
-        <span class="kw">let</span> <span class="ident">thread_handle</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">threads</span>.<span class="ident">clone</span>();
-        <span class="kw">let</span> <span class="ident">ctx_task</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
-            <span class="ident">thread_handle</span>.<span class="ident">spawn_ok</span>(<span class="ident">handle_task</span>);
-        };
-        <span class="ident">ctx</span>.<span class="ident">spawn</span>(<span class="ident">Compat</span>::<span class="ident">new</span>(<span class="ident">ctx_task</span>.<span class="ident">unit_error</span>().<span class="ident">boxed</span>()));
+        <span class="self">self</span>.<span class="ident">threads</span>.<span class="ident">spawn_ok</span>(<span class="ident">handle_task</span>);
     }
 
     <span class="doccomment">/// Ingest the file by sending a raft command to raftstore.</span>
@@ -727,9 +696,10 @@
             <span class="ident">errorpb</span>.<span class="ident">set_server_is_busy</span>(<span class="ident">server_is_busy_err</span>);
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">IngestResponse</span>::<span class="ident">default</span>();
             <span class="ident">resp</span>.<span class="ident">set_error</span>(<span class="ident">errorpb</span>);
-            <span class="ident">ctx</span>.<span class="ident">spawn</span>(<span class="ident">sink</span>.<span class="ident">success</span>(<span class="ident">resp</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
-                <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;send rpc failed&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>);
-            }));
+            <span class="ident">ctx</span>.<span class="ident">spawn</span>(
+                <span class="ident">sink</span>.<span class="ident">success</span>(<span class="ident">resp</span>)
+                    .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;send rpc failed&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>)),
+            );
             <span class="kw">return</span>;
         }
         <span class="comment">// Make ingest command.</span>
@@ -749,9 +719,10 @@
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">router</span>.<span class="ident">send_command</span>(<span class="ident">cmd</span>, <span class="ident">Callback</span>::<span class="ident">Write</span>(<span class="ident">cb</span>)) {
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">IngestResponse</span>::<span class="ident">default</span>();
             <span class="ident">resp</span>.<span class="ident">set_error</span>(<span class="ident">e</span>.<span class="ident">into</span>());
-            <span class="ident">ctx</span>.<span class="ident">spawn</span>(<span class="ident">sink</span>.<span class="ident">success</span>(<span class="ident">resp</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
-                <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;send rpc failed&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>);
-            }));
+            <span class="ident">ctx</span>.<span class="ident">spawn</span>(
+                <span class="ident">sink</span>.<span class="ident">success</span>(<span class="ident">resp</span>)
+                    .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;send rpc failed&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>)),
+            );
             <span class="kw">return</span>;
         }
 
@@ -770,7 +741,7 @@
             };
             <span class="macro">send_rpc_response</span><span class="macro">!</span>(<span class="ident">res</span>, <span class="ident">sink</span>, <span class="ident">label</span>, <span class="ident">timer</span>);
         };
-        <span class="ident">ctx</span>.<span class="ident">spawn</span>(<span class="ident">Compat</span>::<span class="ident">new</span>(<span class="ident">ctx_task</span>.<span class="ident">unit_error</span>().<span class="ident">boxed</span>()));
+        <span class="ident">ctx</span>.<span class="ident">spawn</span>(<span class="ident">ctx_task</span>);
     }
 
     <span class="kw">fn</span> <span class="ident">compact</span>(
@@ -837,11 +808,7 @@
             <span class="macro">send_rpc_response</span><span class="macro">!</span>(<span class="ident">res</span>, <span class="ident">sink</span>, <span class="ident">label</span>, <span class="ident">timer</span>);
         };
 
-        <span class="kw">let</span> <span class="ident">thread_handle</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">threads</span>.<span class="ident">clone</span>();
-        <span class="kw">let</span> <span class="ident">ctx_task</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
-            <span class="ident">thread_handle</span>.<span class="ident">spawn_ok</span>(<span class="ident">handle_task</span>);
-        };
-        <span class="ident">ctx</span>.<span class="ident">spawn</span>(<span class="ident">Compat</span>::<span class="ident">new</span>(<span class="ident">ctx_task</span>.<span class="ident">unit_error</span>().<span class="ident">boxed</span>()));
+        <span class="self">self</span>.<span class="ident">threads</span>.<span class="ident">spawn_ok</span>(<span class="ident">handle_task</span>);
     }
 
     <span class="kw">fn</span> <span class="ident">set_download_speed_limit</span>(
@@ -868,7 +835,7 @@
             <span class="macro">send_rpc_response</span><span class="macro">!</span>(<span class="ident">res</span>, <span class="ident">sink</span>, <span class="ident">label</span>, <span class="ident">timer</span>);
         };
 
-        <span class="ident">ctx</span>.<span class="ident">spawn</span>(<span class="ident">Compat</span>::<span class="ident">new</span>(<span class="ident">ctx_task</span>.<span class="ident">unit_error</span>().<span class="ident">boxed</span>()));
+        <span class="ident">ctx</span>.<span class="ident">spawn</span>(<span class="ident">ctx_task</span>);
     }
 
     <span class="kw">fn</span> <span class="ident">write</span>(
@@ -884,8 +851,7 @@
         <span class="kw">let</span> <span class="ident">timer</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now_coarse</span>();
         <span class="kw">let</span> <span class="ident">import</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">importer</span>.<span class="ident">clone</span>();
         <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">engine</span>.<span class="ident">clone</span>();
-        <span class="kw">let</span> (<span class="ident">rx</span>, <span class="ident">buf_driver</span>) <span class="op">=</span>
-            <span class="ident">create_stream_with_buffer</span>(<span class="ident">stream</span>.<span class="ident">compat</span>(), <span class="self">self</span>.<span class="ident">cfg</span>.<span class="ident">stream_channel_window</span>);
+        <span class="kw">let</span> (<span class="ident">rx</span>, <span class="ident">buf_driver</span>) <span class="op">=</span> <span class="ident">create_stream_with_buffer</span>(<span class="ident">stream</span>, <span class="self">self</span>.<span class="ident">cfg</span>.<span class="ident">stream_channel_window</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rx</span> <span class="op">=</span> <span class="ident">rx</span>.<span class="ident">map_err</span>(<span class="ident">Error</span>::<span class="ident">from</span>);
 
         <span class="kw">let</span> <span class="ident">handle_task</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
@@ -941,12 +907,8 @@
             <span class="macro">send_rpc_response</span><span class="macro">!</span>(<span class="ident">res</span>, <span class="ident">sink</span>, <span class="ident">label</span>, <span class="ident">timer</span>);
         };
 
-        <span class="kw">let</span> <span class="ident">thread_handle</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">threads</span>.<span class="ident">clone</span>();
-        <span class="kw">let</span> <span class="ident">ctx_task</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
-            <span class="ident">thread_handle</span>.<span class="ident">spawn_ok</span>(<span class="ident">buf_driver</span>);
-            <span class="ident">thread_handle</span>.<span class="ident">spawn_ok</span>(<span class="ident">handle_task</span>);
-        };
-        <span class="ident">ctx</span>.<span class="ident">spawn</span>(<span class="ident">Compat</span>::<span class="ident">new</span>(<span class="ident">ctx_task</span>.<span class="ident">unit_error</span>().<span class="ident">boxed</span>()));
+        <span class="self">self</span>.<span class="ident">threads</span>.<span class="ident">spawn_ok</span>(<span class="ident">buf_driver</span>);
+        <span class="self">self</span>.<span class="ident">threads</span>.<span class="ident">spawn_ok</span>(<span class="ident">handle_task</span>);
     }
 }
 </pre></div>

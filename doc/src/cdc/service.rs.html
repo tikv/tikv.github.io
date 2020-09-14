@@ -421,6 +421,9 @@
 <span id="421">421</span>
 <span id="422">422</span>
 <span id="423">423</span>
+<span id="424">424</span>
+<span id="425">425</span>
+<span id="426">426</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -428,9 +431,9 @@
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::{<span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">Arc</span>;
 
-<span class="kw">use</span> <span class="ident">futures</span>::{<span class="ident">Future</span>, <span class="ident">Sink</span>, <span class="ident">Stream</span>};
-<span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">compat</span>::<span class="ident">Compat</span>;
-<span class="kw">use</span> <span class="ident">futures03</span>::<span class="ident">stream</span>::{<span class="self">self</span>, <span class="ident">StreamExt</span>};
+<span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">future</span>::{<span class="self">self</span>, <span class="ident">TryFutureExt</span>};
+<span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">sink</span>::<span class="ident">SinkExt</span>;
+<span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">stream</span>::{<span class="self">self</span>, <span class="ident">StreamExt</span>, <span class="ident">TryStreamExt</span>};
 <span class="kw">use</span> <span class="ident">grpcio</span>::{
     <span class="ident">DuplexSink</span>, <span class="ident">Error</span> <span class="kw">as</span> <span class="ident">GrpcError</span>, <span class="ident">RequestStream</span>, <span class="prelude-ty">Result</span> <span class="kw">as</span> <span class="ident">GrpcResult</span>, <span class="ident">RpcContext</span>, <span class="ident">RpcStatus</span>,
     <span class="ident">RpcStatusCode</span>, <span class="ident">WriteFlags</span>,
@@ -671,7 +674,7 @@
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
         <span class="ident">ctx</span>: <span class="ident">RpcContext</span>,
         <span class="ident">stream</span>: <span class="ident">RequestStream</span><span class="op">&lt;</span><span class="ident">ChangeDataRequest</span><span class="op">&gt;</span>,
-        <span class="ident">sink</span>: <span class="ident">DuplexSink</span><span class="op">&lt;</span><span class="ident">ChangeDataEvent</span><span class="op">&gt;</span>,
+        <span class="kw-2">mut</span> <span class="ident">sink</span>: <span class="ident">DuplexSink</span><span class="op">&lt;</span><span class="ident">ChangeDataEvent</span><span class="op">&gt;</span>,
     ) {
         <span class="kw">if</span> <span class="op">!</span><span class="ident">check_common_name</span>(<span class="self">self</span>.<span class="ident">security_mgr</span>.<span class="ident">cert_allowed_cn</span>(), <span class="kw-2">&amp;</span><span class="ident">ctx</span>) {
             <span class="kw">return</span>;
@@ -688,15 +691,16 @@
             .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">RpcStatus</span>::<span class="ident">new</span>(<span class="ident">RpcStatusCode</span>::<span class="ident">INVALID_ARGUMENT</span>, <span class="prelude-val">Some</span>(<span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;{:?}&quot;</span>, <span class="ident">e</span>))))
         {
             <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;cdc connection initiate failed&quot;</span>; <span class="string">&quot;error&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">status</span>);
-            <span class="ident">ctx</span>.<span class="ident">spawn</span>(<span class="ident">sink</span>.<span class="ident">fail</span>(<span class="ident">status</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
-                <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;cdc failed to send error&quot;</span>; <span class="string">&quot;error&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
-            }));
+            <span class="ident">ctx</span>.<span class="ident">spawn</span>(
+                <span class="ident">sink</span>.<span class="ident">fail</span>(<span class="ident">status</span>)
+                    .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;cdc failed to send error&quot;</span>; <span class="string">&quot;error&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>)),
+            );
             <span class="kw">return</span>;
         }
 
         <span class="kw">let</span> <span class="ident">peer</span> <span class="op">=</span> <span class="ident">ctx</span>.<span class="ident">peer</span>();
         <span class="kw">let</span> <span class="ident">scheduler</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">scheduler</span>.<span class="ident">clone</span>();
-        <span class="kw">let</span> <span class="ident">recv_req</span> <span class="op">=</span> <span class="ident">stream</span>.<span class="ident">for_each</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">request</span><span class="op">|</span> {
+        <span class="kw">let</span> <span class="ident">recv_req</span> <span class="op">=</span> <span class="ident">stream</span>.<span class="ident">try_for_each</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">request</span><span class="op">|</span> {
             <span class="kw">let</span> <span class="ident">region_epoch</span> <span class="op">=</span> <span class="ident">request</span>.<span class="ident">get_region_epoch</span>().<span class="ident">clone</span>();
             <span class="kw">let</span> <span class="ident">req_id</span> <span class="op">=</span> <span class="ident">request</span>.<span class="ident">get_request_id</span>();
             <span class="kw">let</span> <span class="ident">version</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">semver</span>::<span class="ident">Version</span>::<span class="ident">parse</span>(<span class="ident">request</span>.<span class="ident">get_header</span>().<span class="ident">get_ticdc_version</span>()) {
@@ -709,7 +713,7 @@
                 }
             };
             <span class="kw">let</span> <span class="ident">downstream</span> <span class="op">=</span> <span class="ident">Downstream</span>::<span class="ident">new</span>(<span class="ident">peer</span>.<span class="ident">clone</span>(), <span class="ident">region_epoch</span>, <span class="ident">req_id</span>, <span class="ident">conn_id</span>);
-            <span class="ident">scheduler</span>
+            <span class="kw">let</span> <span class="ident">ret</span> <span class="op">=</span> <span class="ident">scheduler</span>
                 .<span class="ident">schedule</span>(<span class="ident">Task</span>::<span class="ident">Register</span> {
                     <span class="ident">request</span>,
                     <span class="ident">downstream</span>,
@@ -721,11 +725,12 @@
                         <span class="ident">RpcStatusCode</span>::<span class="ident">INVALID_ARGUMENT</span>,
                         <span class="prelude-val">Some</span>(<span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;{:?}&quot;</span>, <span class="ident">e</span>)),
                     ))
-                })
+                });
+            <span class="ident">future</span>::<span class="ident">ready</span>(<span class="ident">ret</span>)
         });
 
         <span class="kw">let</span> <span class="ident">rx</span> <span class="op">=</span> <span class="ident">BatchReceiver</span>::<span class="ident">new</span>(<span class="ident">rx</span>, <span class="ident">CDC_MSG_MAX_BATCH_SIZE</span>, <span class="ident">Vec</span>::<span class="ident">new</span>, <span class="ident">VecCollector</span>);
-        <span class="kw">let</span> <span class="ident">rx</span> <span class="op">=</span> <span class="ident">rx</span>
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rx</span> <span class="op">=</span> <span class="ident">rx</span>
             .<span class="ident">map</span>(<span class="op">|</span><span class="ident">events</span><span class="op">|</span> {
                 <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">batcher</span> <span class="op">=</span> <span class="ident">EventBatcher</span>::<span class="ident">with_capacity</span>(<span class="ident">events</span>.<span class="ident">len</span>());
                 <span class="ident">events</span>.<span class="ident">into_iter</span>().<span class="ident">for_each</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">batcher</span>.<span class="ident">push</span>(<span class="ident">e</span>));
@@ -737,30 +742,31 @@
             })
             .<span class="ident">flatten</span>()
             .<span class="ident">map</span>(<span class="op">|</span><span class="ident">item</span><span class="op">|</span> <span class="ident">GrpcResult</span>::<span class="prelude-val">Ok</span>(<span class="ident">item</span>));
-        <span class="kw">let</span> <span class="ident">send_resp</span> <span class="op">=</span> <span class="ident">sink</span>.<span class="ident">send_all</span>(<span class="ident">Compat</span>::<span class="ident">new</span>(<span class="ident">rx</span>));
 
         <span class="kw">let</span> <span class="ident">peer</span> <span class="op">=</span> <span class="ident">ctx</span>.<span class="ident">peer</span>();
         <span class="kw">let</span> <span class="ident">scheduler</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">scheduler</span>.<span class="ident">clone</span>();
-        <span class="ident">ctx</span>.<span class="ident">spawn</span>(<span class="ident">recv_req</span>.<span class="ident">then</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">res</span><span class="op">|</span> {
+        <span class="ident">ctx</span>.<span class="ident">spawn</span>(<span class="kw">async</span> <span class="kw">move</span> {
+            <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">recv_req</span>.<span class="kw">await</span>;
             <span class="comment">// Unregister this downstream only.</span>
             <span class="kw">let</span> <span class="ident">deregister</span> <span class="op">=</span> <span class="ident">Deregister</span>::<span class="ident">Conn</span>(<span class="ident">conn_id</span>);
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">scheduler</span>.<span class="ident">schedule</span>(<span class="ident">Task</span>::<span class="ident">Deregister</span>(<span class="ident">deregister</span>)) {
                 <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;cdc deregister failed&quot;</span>; <span class="string">&quot;error&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>, <span class="string">&quot;conn_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">conn_id</span>);
             }
             <span class="kw">match</span> <span class="ident">res</span> {
-                <span class="prelude-val">Ok</span>(<span class="ident">_s</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="prelude-val">Ok</span>(()) <span class="op">=</span><span class="op">&gt;</span> {
                     <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;cdc send half closed&quot;</span>; <span class="string">&quot;downstream&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">peer</span>, <span class="string">&quot;conn_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">conn_id</span>);
                 }
                 <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
                     <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;cdc send failed&quot;</span>; <span class="string">&quot;error&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>, <span class="string">&quot;downstream&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">peer</span>, <span class="string">&quot;conn_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">conn_id</span>);
                 }
             }
-            <span class="prelude-val">Ok</span>(())
-        }));
+        });
 
         <span class="kw">let</span> <span class="ident">peer</span> <span class="op">=</span> <span class="ident">ctx</span>.<span class="ident">peer</span>();
         <span class="kw">let</span> <span class="ident">scheduler</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">scheduler</span>.<span class="ident">clone</span>();
-        <span class="ident">ctx</span>.<span class="ident">spawn</span>(<span class="ident">send_resp</span>.<span class="ident">then</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">res</span><span class="op">|</span> {
+
+        <span class="ident">ctx</span>.<span class="ident">spawn</span>(<span class="kw">async</span> <span class="kw">move</span> {
+            <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">sink</span>.<span class="ident">send_all</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">rx</span>).<span class="kw">await</span>;
             <span class="comment">// Unregister this downstream only.</span>
             <span class="kw">let</span> <span class="ident">deregister</span> <span class="op">=</span> <span class="ident">Deregister</span>::<span class="ident">Conn</span>(<span class="ident">conn_id</span>);
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">scheduler</span>.<span class="ident">schedule</span>(<span class="ident">Task</span>::<span class="ident">Deregister</span>(<span class="ident">deregister</span>)) {
@@ -769,13 +775,13 @@
             <span class="kw">match</span> <span class="ident">res</span> {
                 <span class="prelude-val">Ok</span>(<span class="ident">_s</span>) <span class="op">=</span><span class="op">&gt;</span> {
                     <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;cdc send half closed&quot;</span>; <span class="string">&quot;downstream&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">peer</span>, <span class="string">&quot;conn_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">conn_id</span>);
+                    <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="ident">sink</span>.<span class="ident">close</span>().<span class="kw">await</span>;
                 }
                 <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
                     <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;cdc send failed&quot;</span>; <span class="string">&quot;error&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>, <span class="string">&quot;downstream&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">peer</span>, <span class="string">&quot;conn_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">conn_id</span>);
                 }
             }
-            <span class="prelude-val">Ok</span>(())
-        }));
+        });
     }
 }
 
