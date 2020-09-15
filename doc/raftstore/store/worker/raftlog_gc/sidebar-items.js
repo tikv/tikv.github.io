@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["Error",""],["Task",""]],"struct":[["Runner",""]]});
+initSidebarItems({"constant":[["COMPACT_LOG_INTERVAL",""],["MAX_GC_REGION_BATCH",""]],"enum":[["Error",""],["Task",""]],"struct":[["Runner",""]]});
