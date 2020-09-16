@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["FILE_MAGIC_HEADER",""],["VERSION",""]],"struct":[["PipeLog",""]]});
+initSidebarItems({"constant":[["FILE_MAGIC_HEADER",""],["VERSION",""]],"enum":[["LogQueue",""]],"struct":[["LogFd",""],["PipeLog",""]],"trait":[["GenericPipeLog",""]]});

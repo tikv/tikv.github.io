@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["Error",""]],"macro":[["box_err",""]],"mod":[["codec",""],["config",""],["engine",""],["log_batch",""],["memtable",""],["metrics",""],["pipe_log",""],["util",""]],"struct":[["CacheStats",""]],"type":[["Result",""]]});
+initSidebarItems({"enum":[["Error",""]],"macro":[["box_err",""]],"mod":[["codec",""],["config",""],["engine",""],["log_batch",""],["memtable",""],["metrics",""],["pipe_log",""],["util",""]],"struct":[["CacheStats",""]],"type":[["RaftLogEngine",""],["Result",""]]});
