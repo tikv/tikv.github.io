@@ -3704,6 +3704,19 @@
 <span id="3704">3704</span>
 <span id="3705">3705</span>
 <span id="3706">3706</span>
+<span id="3707">3707</span>
+<span id="3708">3708</span>
+<span id="3709">3709</span>
+<span id="3710">3710</span>
+<span id="3711">3711</span>
+<span id="3712">3712</span>
+<span id="3713">3713</span>
+<span id="3714">3714</span>
+<span id="3715">3715</span>
+<span id="3716">3716</span>
+<span id="3717">3717</span>
+<span id="3718">3718</span>
+<span id="3719">3719</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -3733,9 +3746,10 @@
 <span class="kw">use</span> <span class="ident">protobuf</span>::<span class="ident">Message</span>;
 <span class="kw">use</span> <span class="ident">raft</span>::<span class="ident">eraftpb</span>::{<span class="self">self</span>, <span class="ident">ConfChangeType</span>, <span class="ident">EntryType</span>, <span class="ident">MessageType</span>};
 <span class="kw">use</span> <span class="ident">raft</span>::{
-    <span class="self">self</span>, <span class="ident">Progress</span>, <span class="ident">ProgressState</span>, <span class="ident">RawNode</span>, <span class="ident">Ready</span>, <span class="ident">SnapshotStatus</span>, <span class="ident">StateRole</span>, <span class="ident">INVALID_INDEX</span>,
-    <span class="ident">NO_LIMIT</span>,
+    <span class="self">self</span>, <span class="ident">Changer</span>, <span class="ident">ProgressState</span>, <span class="ident">ProgressTracker</span>, <span class="ident">RawNode</span>, <span class="ident">Ready</span>, <span class="ident">SnapshotStatus</span>, <span class="ident">StateRole</span>,
+    <span class="ident">INVALID_INDEX</span>, <span class="ident">NO_LIMIT</span>,
 };
+<span class="kw">use</span> <span class="ident">raft_proto</span>::<span class="ident">ConfChangeI</span>;
 <span class="kw">use</span> <span class="ident">smallvec</span>::<span class="ident">SmallVec</span>;
 <span class="kw">use</span> <span class="ident">time</span>::<span class="ident">Timespec</span>;
 <span class="kw">use</span> <span class="ident">uuid</span>::<span class="ident">Uuid</span>;
@@ -5822,6 +5836,7 @@
     <span class="kw">fn</span> <span class="ident">check_conf_change</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">C</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
         <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">PollContext</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">T</span>, <span class="ident">C</span><span class="op">&gt;</span>,
+        <span class="ident">cc</span>: <span class="kw-2">&amp;</span><span class="ident">eraftpb</span>::<span class="ident">ConfChange</span>,
         <span class="ident">cmd</span>: <span class="kw-2">&amp;</span><span class="ident">RaftCmdRequest</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">change_peer</span> <span class="op">=</span> <span class="ident">apply</span>::<span class="ident">get_change_peer_cmd</span>(<span class="ident">cmd</span>).<span class="ident">unwrap</span>();
@@ -5855,33 +5870,23 @@
             <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(<span class="string">&quot;{} ignore remove leader&quot;</span>, <span class="self">self</span>.<span class="ident">tag</span>));
         }
 
-        <span class="kw">let</span> (<span class="ident">total</span>, <span class="kw-2">mut</span> <span class="ident">progress</span>) <span class="op">=</span> {
-            <span class="kw">let</span> <span class="ident">status</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">status</span>();
-            <span class="kw">let</span> <span class="ident">total</span> <span class="op">=</span> <span class="ident">status</span>.<span class="ident">progress</span>.<span class="ident">unwrap</span>().<span class="ident">voter_ids</span>().<span class="ident">len</span>();
-            <span class="kw">if</span> <span class="ident">total</span> <span class="op">=</span><span class="op">=</span> <span class="number">1</span> {
+        <span class="kw">let</span> <span class="ident">before_progress</span> <span class="op">=</span> {
+            <span class="kw">let</span> <span class="ident">pr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">status</span>().<span class="ident">progress</span>.<span class="ident">unwrap</span>().<span class="ident">clone</span>();
+            <span class="kw">if</span> <span class="ident">pr</span>.<span class="ident">is_singleton</span>() {
                 <span class="comment">// It&#39;s always safe if there is only one node in the cluster.</span>
                 <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
             }
-            (<span class="ident">total</span>, <span class="ident">status</span>.<span class="ident">progress</span>.<span class="ident">unwrap</span>().<span class="ident">clone</span>())
+            <span class="ident">pr</span>
         };
 
-        <span class="kw">match</span> <span class="ident">change_type</span> {
-            <span class="ident">ConfChangeType</span>::<span class="ident">AddNode</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">raft</span>::<span class="ident">Error</span>::<span class="ident">NotExists</span>(<span class="kw">_</span>, <span class="kw">_</span>)) <span class="op">=</span> <span class="ident">progress</span>.<span class="ident">promote_learner</span>(<span class="ident">peer</span>.<span class="ident">get_id</span>()) {
-                    <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="ident">progress</span>.<span class="ident">insert_voter</span>(<span class="ident">peer</span>.<span class="ident">get_id</span>(), <span class="ident">Progress</span>::<span class="ident">new</span>(<span class="number">0</span>, <span class="number">0</span>));
-                }
-            }
-            <span class="ident">ConfChangeType</span>::<span class="ident">RemoveNode</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="ident">progress</span>.<span class="ident">remove</span>(<span class="ident">peer</span>.<span class="ident">get_id</span>())<span class="question-mark">?</span>;
-            }
-            <span class="ident">ConfChangeType</span>::<span class="ident">AddLearnerNode</span> <span class="op">=</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> (<span class="ident">after_progress</span>, <span class="ident">promoted_commit_index</span>) <span class="op">=</span> {
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">pr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">check_joint_state</span>(<span class="ident">cc</span>)<span class="question-mark">?</span>;
+            <span class="kw">let</span> <span class="ident">idx</span> <span class="op">=</span> <span class="ident">pr</span>.<span class="ident">maximal_committed_index</span>().<span class="number">0</span>;
+            <span class="kw">if</span> <span class="ident">idx</span> <span class="op">&gt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">get_store</span>().<span class="ident">truncated_index</span>() {
                 <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
             }
-        }
-        <span class="kw">let</span> <span class="ident">promoted_commit_index</span> <span class="op">=</span> <span class="ident">progress</span>.<span class="ident">maximal_committed_index</span>().<span class="number">0</span>;
-        <span class="kw">if</span> <span class="ident">promoted_commit_index</span> <span class="op">&gt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">get_store</span>().<span class="ident">truncated_index</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
-        }
+            (<span class="ident">pr</span>, <span class="ident">idx</span>)
+        };
 
         <span class="ident">PEER_ADMIN_CMD_COUNTER_VEC</span>
             .<span class="ident">with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="string">&quot;conf_change&quot;</span>, <span class="string">&quot;reject_unsafe&quot;</span>])
@@ -5892,20 +5897,35 @@
             <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">region_id</span>,
             <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">peer</span>.<span class="ident">get_id</span>(),
             <span class="string">&quot;request&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">change_peer</span>,
-            <span class="string">&quot;total&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">total</span>,
-            <span class="string">&quot;after&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">progress</span>.<span class="ident">voter_ids</span>().<span class="ident">len</span>(),
+            <span class="string">&quot;before&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">before_progress</span>.<span class="ident">conf</span>().<span class="ident">to_conf_state</span>(),
+            <span class="string">&quot;after&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">after_progress</span>.<span class="ident">conf</span>().<span class="ident">to_conf_state</span>(),
             <span class="string">&quot;truncated_index&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">get_store</span>().<span class="ident">truncated_index</span>(),
             <span class="string">&quot;promoted_commit_index&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">promoted_commit_index</span>,
         );
         <span class="comment">// Waking it up to replicate logs to candidate.</span>
         <span class="self">self</span>.<span class="ident">should_wake_up</span> <span class="op">=</span> <span class="bool-val">true</span>;
         <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(
-            <span class="string">&quot;unsafe to perform conf change {:?}, total {}, truncated index {}, promoted commit index {}&quot;</span>,
+            <span class="string">&quot;unsafe to perform conf change {:?}, truncated index {}, promoted commit index {}&quot;</span>,
             <span class="ident">change_peer</span>,
-            <span class="ident">total</span>,
             <span class="self">self</span>.<span class="ident">get_store</span>().<span class="ident">truncated_index</span>(),
             <span class="ident">promoted_commit_index</span>
         ))
+    }
+
+    <span class="doccomment">/// Check if current joint state can handle this confchange</span>
+    <span class="kw">fn</span> <span class="ident">check_joint_state</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">cc</span>: <span class="kw-2">&amp;</span><span class="kw">impl</span> <span class="ident">ConfChangeI</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">ProgressTracker</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="ident">cc</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">cc</span>.<span class="ident">as_v2</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">prs</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">status</span>().<span class="ident">progress</span>.<span class="ident">unwrap</span>().<span class="ident">clone</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">changer</span> <span class="op">=</span> <span class="ident">Changer</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">prs</span>);
+        <span class="kw">let</span> (<span class="ident">cfg</span>, <span class="ident">changes</span>) <span class="op">=</span> <span class="kw">if</span> <span class="ident">cc</span>.<span class="ident">leave_joint</span>() {
+            <span class="ident">changer</span>.<span class="ident">leave_joint</span>()<span class="question-mark">?</span>
+        } <span class="kw">else</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">auto_leave</span>) <span class="op">=</span> <span class="ident">cc</span>.<span class="ident">enter_joint</span>() {
+            <span class="ident">changer</span>.<span class="ident">enter_joint</span>(<span class="ident">auto_leave</span>, <span class="kw-2">&amp;</span><span class="ident">cc</span>.<span class="ident">changes</span>)<span class="question-mark">?</span>
+        } <span class="kw">else</span> {
+            <span class="ident">changer</span>.<span class="ident">simple</span>(<span class="kw-2">&amp;</span><span class="ident">cc</span>.<span class="ident">changes</span>)<span class="question-mark">?</span>
+        };
+        <span class="ident">prs</span>.<span class="ident">apply_conf</span>(<span class="ident">cfg</span>, <span class="ident">changes</span>, <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">raft</span>.<span class="ident">raft_log</span>.<span class="ident">last_index</span>());
+        <span class="prelude-val">Ok</span>(<span class="ident">prs</span>)
     }
 
     <span class="kw">fn</span> <span class="ident">transfer_leader</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">peer</span>: <span class="kw-2">&amp;</span><span class="ident">metapb</span>::<span class="ident">Peer</span>) {
@@ -5956,12 +5976,12 @@
         <span class="kw">let</span> <span class="ident">status</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">status</span>();
         <span class="kw">let</span> <span class="ident">progress</span> <span class="op">=</span> <span class="ident">status</span>.<span class="ident">progress</span>.<span class="ident">unwrap</span>();
 
-        <span class="kw">if</span> <span class="op">!</span><span class="ident">progress</span>.<span class="ident">voter_ids</span>().<span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="ident">peer_id</span>) {
+        <span class="kw">if</span> <span class="op">!</span><span class="ident">progress</span>.<span class="ident">conf</span>().<span class="ident">voters</span>().<span class="ident">contains</span>(<span class="ident">peer_id</span>) {
             <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="string">&quot;non voter&quot;</span>);
         }
 
-        <span class="kw">for</span> (<span class="ident">id</span>, <span class="ident">progress</span>) <span class="kw">in</span> <span class="ident">progress</span>.<span class="ident">voters</span>() {
-            <span class="kw">if</span> <span class="ident">progress</span>.<span class="ident">state</span> <span class="op">=</span><span class="op">=</span> <span class="ident">ProgressState</span>::<span class="ident">Snapshot</span> {
+        <span class="kw">for</span> (<span class="ident">id</span>, <span class="ident">pr</span>) <span class="kw">in</span> <span class="ident">progress</span>.<span class="ident">iter</span>() {
+            <span class="kw">if</span> <span class="ident">pr</span>.<span class="ident">state</span> <span class="op">=</span><span class="op">=</span> <span class="ident">ProgressState</span>::<span class="ident">Snapshot</span> {
                 <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="string">&quot;pending snapshot&quot;</span>);
             }
             <span class="kw">if</span> <span class="kw-2">*</span><span class="ident">id</span> <span class="op">=</span><span class="op">=</span> <span class="ident">peer_id</span> <span class="kw-2">&amp;</span><span class="op">&amp;</span> <span class="ident">index</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
@@ -5969,7 +5989,7 @@
                 <span class="comment">// pre-transfer-leader feature. Set it to matched to make it</span>
                 <span class="comment">// possible to transfer leader to an older version. It may be</span>
                 <span class="comment">// useful during rolling restart.</span>
-                <span class="ident">index</span> <span class="op">=</span> <span class="ident">progress</span>.<span class="ident">matched</span>;
+                <span class="ident">index</span> <span class="op">=</span> <span class="ident">pr</span>.<span class="ident">matched</span>;
             }
         }
 
@@ -6527,20 +6547,22 @@
             <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">Either</span>::<span class="ident">Right</span>(<span class="ident">index</span>));
         }
 
-        <span class="self">self</span>.<span class="ident">check_conf_change</span>(<span class="ident">ctx</span>, <span class="ident">req</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">cc</span> <span class="op">=</span> {
+            <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="ident">req</span>.<span class="ident">write_to_bytes</span>()<span class="question-mark">?</span>;
+            <span class="kw">let</span> <span class="ident">change_peer</span> <span class="op">=</span> <span class="ident">apply</span>::<span class="ident">get_change_peer_cmd</span>(<span class="ident">req</span>).<span class="ident">unwrap</span>();
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cc</span> <span class="op">=</span> <span class="ident">eraftpb</span>::<span class="ident">ConfChange</span>::<span class="ident">default</span>();
+            <span class="ident">cc</span>.<span class="ident">set_change_type</span>(<span class="ident">change_peer</span>.<span class="ident">get_change_type</span>());
+            <span class="ident">cc</span>.<span class="ident">set_node_id</span>(<span class="ident">change_peer</span>.<span class="ident">get_peer</span>().<span class="ident">get_id</span>());
+            <span class="ident">cc</span>.<span class="ident">set_context</span>(<span class="ident">data</span>);
+            <span class="ident">cc</span>
+        };
+
+        <span class="self">self</span>.<span class="ident">check_conf_change</span>(<span class="ident">ctx</span>, <span class="kw-2">&amp;</span><span class="ident">cc</span>, <span class="ident">req</span>)<span class="question-mark">?</span>;
 
         <span class="ident">ctx</span>.<span class="ident">raft_metrics</span>.<span class="ident">propose</span>.<span class="ident">conf_change</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
 
-        <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="ident">req</span>.<span class="ident">write_to_bytes</span>()<span class="question-mark">?</span>;
-
         <span class="comment">// TODO: use local histogram metrics</span>
-        <span class="ident">PEER_PROPOSE_LOG_SIZE_HISTOGRAM</span>.<span class="ident">observe</span>(<span class="ident">data</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">f64</span>);
-
-        <span class="kw">let</span> <span class="ident">change_peer</span> <span class="op">=</span> <span class="ident">apply</span>::<span class="ident">get_change_peer_cmd</span>(<span class="ident">req</span>).<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cc</span> <span class="op">=</span> <span class="ident">eraftpb</span>::<span class="ident">ConfChange</span>::<span class="ident">default</span>();
-        <span class="ident">cc</span>.<span class="ident">set_change_type</span>(<span class="ident">change_peer</span>.<span class="ident">get_change_type</span>());
-        <span class="ident">cc</span>.<span class="ident">set_node_id</span>(<span class="ident">change_peer</span>.<span class="ident">get_peer</span>().<span class="ident">get_id</span>());
-        <span class="ident">cc</span>.<span class="ident">set_context</span>(<span class="ident">data</span>);
+        <span class="ident">PEER_PROPOSE_LOG_SIZE_HISTOGRAM</span>.<span class="ident">observe</span>(<span class="ident">cc</span>.<span class="ident">get_context</span>().<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">f64</span>);
 
         <span class="macro">info</span><span class="macro">!</span>(
             <span class="string">&quot;propose conf change peer&quot;</span>;
@@ -6662,7 +6684,11 @@
                 <span class="kw">if</span> <span class="prelude-val">Some</span>(<span class="bool-val">true</span>) <span class="op">!</span><span class="op">=</span> <span class="ident">res</span> {
                     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buffer</span>: <span class="ident">SmallVec</span><span class="op">&lt;</span>[(<span class="ident">u64</span>, <span class="ident">u64</span>, <span class="ident">u64</span>); <span class="number">5</span>]<span class="op">&gt;</span> <span class="op">=</span> <span class="ident">SmallVec</span>::<span class="ident">new</span>();
                     <span class="kw">if</span> <span class="self">self</span>.<span class="ident">get_store</span>().<span class="ident">applied_index_term</span>() <span class="op">&gt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">term</span>() {
-                        <span class="kw">for</span> (<span class="ident">id</span>, <span class="ident">p</span>) <span class="kw">in</span> <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">raft</span>.<span class="ident">prs</span>().<span class="ident">voters</span>() {
+                        <span class="kw">let</span> <span class="ident">progress</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">raft</span>.<span class="ident">prs</span>();
+                        <span class="kw">for</span> (<span class="ident">id</span>, <span class="ident">p</span>) <span class="kw">in</span> <span class="ident">progress</span>.<span class="ident">iter</span>() {
+                            <span class="kw">if</span> <span class="op">!</span><span class="ident">progress</span>.<span class="ident">conf</span>().<span class="ident">voters</span>().<span class="ident">contains</span>(<span class="kw-2">*</span><span class="ident">id</span>) {
+                                <span class="kw">continue</span>;
+                            }
                             <span class="ident">buffer</span>.<span class="ident">push</span>((<span class="kw-2">*</span><span class="ident">id</span>, <span class="ident">p</span>.<span class="ident">commit_group_id</span>, <span class="ident">p</span>.<span class="ident">matched</span>));
                         }
                     };
