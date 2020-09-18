@@ -250,6 +250,26 @@
 <span id="250">250</span>
 <span id="251">251</span>
 <span id="252">252</span>
+<span id="253">253</span>
+<span id="254">254</span>
+<span id="255">255</span>
+<span id="256">256</span>
+<span id="257">257</span>
+<span id="258">258</span>
+<span id="259">259</span>
+<span id="260">260</span>
+<span id="261">261</span>
+<span id="262">262</span>
+<span id="263">263</span>
+<span id="264">264</span>
+<span id="265">265</span>
+<span id="266">266</span>
+<span id="267">267</span>
+<span id="268">268</span>
+<span id="269">269</span>
+<span id="270">270</span>
+<span id="271">271</span>
+<span id="272">272</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2017 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -261,7 +281,6 @@
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">thread</span>::{<span class="self">self</span>, <span class="ident">Builder</span>, <span class="ident">JoinHandle</span>};
 
 <span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">channel</span>::<span class="ident">mpsc</span>::{<span class="ident">unbounded</span>, <span class="ident">UnboundedReceiver</span>, <span class="ident">UnboundedSender</span>};
-<span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">executor</span>::<span class="ident">block_on</span>;
 <span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">stream</span>::<span class="ident">StreamExt</span>;
 <span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">task</span>::<span class="ident">LocalSet</span>;
 
@@ -370,7 +389,11 @@
             }
         };
         <span class="comment">// `UnboundedReceiver` never returns an error.</span>
-        <span class="ident">block_on</span>(<span class="ident">handle</span>.<span class="ident">run_until</span>(<span class="ident">task</span>));
+        <span class="ident">tokio</span>::<span class="ident">runtime</span>::<span class="ident">Builder</span>::<span class="ident">new</span>()
+            .<span class="ident">basic_scheduler</span>()
+            .<span class="ident">build</span>()
+            .<span class="ident">unwrap</span>()
+            .<span class="ident">block_on</span>(<span class="ident">handle</span>.<span class="ident">run_until</span>(<span class="ident">task</span>));
     }
     <span class="ident">runner</span>.<span class="ident">shutdown</span>();
     <span class="ident">tikv_alloc</span>::<span class="ident">remove_thread_memory_accessor</span>();
@@ -501,6 +524,23 @@
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">worker</span>.<span class="ident">is_busy</span>());
         <span class="comment">// when shutdown, StepRunner should send back a 0.</span>
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="number">0</span>, <span class="ident">rx</span>.<span class="ident">recv</span>().<span class="ident">unwrap</span>());
+    }
+
+    <span class="attribute">#[<span class="ident">test</span>]</span>
+    <span class="kw">fn</span> <span class="ident">test_block_on_inside_worker</span>() {
+        <span class="kw">struct</span> <span class="ident">BlockingRunner</span>;
+
+        <span class="kw">impl</span> <span class="ident">Runnable</span><span class="op">&lt;</span><span class="ident">bool</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">BlockingRunner</span> {
+            <span class="kw">fn</span> <span class="ident">run</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="kw">_</span>: <span class="ident">bool</span>) {
+                <span class="ident">futures</span>::<span class="ident">executor</span>::<span class="ident">block_on</span>(<span class="kw">async</span> {});
+            }
+        }
+
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">worker</span> <span class="op">=</span> <span class="ident">Worker</span>::<span class="ident">new</span>(<span class="string">&quot;test-block-on-worker&quot;</span>);
+        <span class="ident">worker</span>.<span class="ident">start</span>(<span class="ident">BlockingRunner</span>).<span class="ident">unwrap</span>();
+        <span class="ident">worker</span>.<span class="ident">schedule</span>(<span class="bool-val">true</span>).<span class="ident">unwrap</span>();
+        <span class="ident">worker</span>.<span class="ident">schedule</span>(<span class="bool-val">false</span>).<span class="ident">unwrap</span>();
+        <span class="ident">worker</span>.<span class="ident">stop</span>().<span class="ident">unwrap</span>().<span class="ident">join</span>().<span class="ident">unwrap</span>();
     }
 }
 </pre></div>
