@@ -1447,6 +1447,17 @@
 <span id="1447">1447</span>
 <span id="1448">1448</span>
 <span id="1449">1449</span>
+<span id="1450">1450</span>
+<span id="1451">1451</span>
+<span id="1452">1452</span>
+<span id="1453">1453</span>
+<span id="1454">1454</span>
+<span id="1455">1455</span>
+<span id="1456">1456</span>
+<span id="1457">1457</span>
+<span id="1458">1458</span>
+<span id="1459">1459</span>
+<span id="1460">1460</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1476,11 +1487,12 @@
     <span class="ident">EntryBatch</span>, <span class="ident">Error</span> <span class="kw">as</span> <span class="ident">TxnError</span>, <span class="ident">SnapshotStore</span>, <span class="ident">TxnEntryScanner</span>, <span class="ident">TxnEntryStore</span>,
 };
 <span class="kw">use</span> <span class="ident">tikv</span>::<span class="ident">storage</span>::<span class="ident">Statistics</span>;
-<span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">threadpool</span>::{<span class="ident">DefaultContext</span>, <span class="ident">ThreadPool</span>, <span class="ident">ThreadPoolBuilder</span>};
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">time</span>::<span class="ident">Limiter</span>;
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">timer</span>::<span class="ident">Timer</span>;
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">worker</span>::{<span class="ident">Runnable</span>, <span class="ident">RunnableWithTimer</span>};
 <span class="kw">use</span> <span class="ident">txn_types</span>::{<span class="ident">Key</span>, <span class="ident">Lock</span>, <span class="ident">TimeStamp</span>};
+<span class="kw">use</span> <span class="ident">yatp</span>::<span class="ident">task</span>::<span class="ident">callback</span>::{<span class="ident">Handle</span>, <span class="ident">TaskCell</span>};
+<span class="kw">use</span> <span class="ident">yatp</span>::<span class="ident">ThreadPool</span>;
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">metrics</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="kw-2">*</span>;
@@ -1959,7 +1971,7 @@
 
 <span class="kw">struct</span> <span class="ident">ControlThreadPool</span> {
     <span class="ident">size</span>: <span class="ident">usize</span>,
-    <span class="ident">workers</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ThreadPool</span><span class="op">&lt;</span><span class="ident">DefaultContext</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">workers</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">ThreadPool</span><span class="op">&lt;</span><span class="ident">TaskCell</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">last_active</span>: <span class="ident">Instant</span>,
 }
 
@@ -1976,7 +1988,15 @@
     <span class="kw">where</span>
         <span class="ident">F</span>: <span class="ident">FnOnce</span>() <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
     {
-        <span class="self">self</span>.<span class="ident">workers</span>.<span class="ident">as_ref</span>().<span class="ident">unwrap</span>().<span class="ident">execute</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">func</span>());
+        <span class="kw">let</span> <span class="ident">workers</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">workers</span>.<span class="ident">as_ref</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">w</span> <span class="op">=</span> <span class="ident">workers</span>.<span class="ident">clone</span>();
+        <span class="ident">workers</span>.<span class="ident">spawn</span>(<span class="kw">move</span> <span class="op">|</span><span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Handle</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span><span class="op">|</span> {
+            <span class="ident">func</span>();
+            <span class="comment">// Debug service requires jobs in the old thread pool continue to run even after</span>
+            <span class="comment">// the pool is recreated. So the pool needs to be ref counted and dropped after</span>
+            <span class="comment">// task has finished.</span>
+            <span class="ident">drop</span>(<span class="ident">w</span>);
+        });
     }
 
     <span class="doccomment">/// Lazily adjust the thread pool&#39;s size</span>
@@ -1987,9 +2007,11 @@
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">size</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">new_size</span> <span class="kw-2">&amp;</span><span class="op">&amp;</span> <span class="self">self</span>.<span class="ident">size</span> <span class="op">-</span> <span class="ident">new_size</span> <span class="op">&lt;</span><span class="op">=</span> <span class="number">10</span> {
             <span class="kw">return</span>;
         }
-        <span class="kw">let</span> <span class="ident">workers</span> <span class="op">=</span> <span class="ident">ThreadPoolBuilder</span>::<span class="ident">with_default_factory</span>(<span class="string">&quot;backup-worker&quot;</span>.<span class="ident">to_owned</span>())
-            .<span class="ident">thread_count</span>(<span class="ident">new_size</span>)
-            .<span class="ident">build</span>();
+        <span class="kw">let</span> <span class="ident">workers</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(
+            <span class="ident">yatp</span>::<span class="ident">Builder</span>::<span class="ident">new</span>(<span class="macro">thd_name</span><span class="macro">!</span>(<span class="string">&quot;backup-worker&quot;</span>))
+                .<span class="ident">max_thread_count</span>(<span class="ident">new_size</span>)
+                .<span class="ident">build_callback_pool</span>(),
+        );
         <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">workers</span>.<span class="ident">replace</span>(<span class="ident">workers</span>);
         <span class="self">self</span>.<span class="ident">size</span> <span class="op">=</span> <span class="ident">new_size</span>;
         <span class="ident">BACKUP_THREAD_POOL_SIZE_GAUGE</span>.<span class="ident">set</span>(<span class="ident">new_size</span> <span class="kw">as</span> <span class="ident">i64</span>);
