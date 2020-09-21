@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["EncryptionMethod",""]],"struct":[["DataKey",""],["EncryptedContent",""],["FileDictionary",""],["FileInfo",""],["KeyDictionary",""]]});
+initSidebarItems({"enum":[["EncryptionMethod",""],["MasterKey_oneof_backend",""]],"struct":[["DataKey",""],["EncryptedContent",""],["EncryptionMeta",""],["FileDictionary",""],["FileInfo",""],["KeyDictionary",""],["MasterKey",""],["MasterKeyFile",""],["MasterKeyKms",""],["MasterKeyPlaintext",""]]});
