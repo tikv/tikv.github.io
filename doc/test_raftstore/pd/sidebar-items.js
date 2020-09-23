@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["Operator",""],["SchedulePolicy",""]],"fn":[["bootstrap_with_first_region",""],["check_stale_region",""]],"struct":[["Cluster",""],["Store",""],["TestPdClient",""]]});
+initSidebarItems({"enum":[["Operator",""],["SchedulePolicy",""]],"fn":[["bootstrap_with_first_region",""],["change_peer",""],["check_stale_region",""]],"struct":[["Cluster",""],["Store",""],["TestPdClient",""]]});

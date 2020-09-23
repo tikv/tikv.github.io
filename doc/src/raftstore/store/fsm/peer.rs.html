@@ -3954,6 +3954,43 @@
 <span id="3954">3954</span>
 <span id="3955">3955</span>
 <span id="3956">3956</span>
+<span id="3957">3957</span>
+<span id="3958">3958</span>
+<span id="3959">3959</span>
+<span id="3960">3960</span>
+<span id="3961">3961</span>
+<span id="3962">3962</span>
+<span id="3963">3963</span>
+<span id="3964">3964</span>
+<span id="3965">3965</span>
+<span id="3966">3966</span>
+<span id="3967">3967</span>
+<span id="3968">3968</span>
+<span id="3969">3969</span>
+<span id="3970">3970</span>
+<span id="3971">3971</span>
+<span id="3972">3972</span>
+<span id="3973">3973</span>
+<span id="3974">3974</span>
+<span id="3975">3975</span>
+<span id="3976">3976</span>
+<span id="3977">3977</span>
+<span id="3978">3978</span>
+<span id="3979">3979</span>
+<span id="3980">3980</span>
+<span id="3981">3981</span>
+<span id="3982">3982</span>
+<span id="3983">3983</span>
+<span id="3984">3984</span>
+<span id="3985">3985</span>
+<span id="3986">3986</span>
+<span id="3987">3987</span>
+<span id="3988">3988</span>
+<span id="3989">3989</span>
+<span id="3990">3990</span>
+<span id="3991">3991</span>
+<span id="3992">3992</span>
+<span id="3993">3993</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -5808,13 +5845,30 @@
         }
     }
 
+    <span class="comment">// Update some region infos</span>
+    <span class="kw">fn</span> <span class="ident">update_region</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="kw-2">mut</span> <span class="ident">region</span>: <span class="ident">metapb</span>::<span class="ident">Region</span>) {
+        {
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">meta</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">store_meta</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+            <span class="ident">meta</span>.<span class="ident">set_region</span>(
+                <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">coprocessor_host</span>,
+                <span class="ident">region</span>.<span class="ident">clone</span>(),
+                <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>,
+            );
+        }
+        <span class="kw">for</span> <span class="ident">peer</span> <span class="kw">in</span> <span class="ident">region</span>.<span class="ident">take_peers</span>().<span class="ident">into_iter</span>() {
+            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">peer_id</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">peer</span>.<span class="ident">get_id</span>() {
+                <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">peer</span> <span class="op">=</span> <span class="ident">peer</span>.<span class="ident">clone</span>();
+            }
+            <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">insert_peer_cache</span>(<span class="ident">peer</span>);
+        }
+    }
+
     <span class="kw">fn</span> <span class="ident">on_ready_change_peer</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">cp</span>: <span class="ident">ChangePeer</span>) {
-        <span class="kw">if</span> <span class="ident">cp</span>.<span class="ident">conf_change</span>.<span class="ident">get_node_id</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">raft</span>::<span class="ident">INVALID_ID</span> {
+        <span class="kw">if</span> <span class="ident">cp</span>.<span class="ident">index</span> <span class="op">=</span><span class="op">=</span> <span class="ident">raft</span>::<span class="ident">INVALID_INDEX</span> {
             <span class="comment">// Apply failed, skip.</span>
             <span class="kw">return</span>;
         }
 
-        <span class="kw">let</span> <span class="ident">change_type</span> <span class="op">=</span> <span class="ident">cp</span>.<span class="ident">conf_change</span>.<span class="ident">get_change_type</span>();
         <span class="kw">if</span> <span class="ident">cp</span>.<span class="ident">index</span> <span class="op">&gt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">raft_group</span>.<span class="ident">raft</span>.<span class="ident">raft_log</span>.<span class="ident">first_index</span>() {
             <span class="kw">match</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">raft_group</span>.<span class="ident">apply_conf_change</span>(<span class="kw-2">&amp;</span><span class="ident">cp</span>.<span class="ident">conf_change</span>) {
                 <span class="prelude-val">Ok</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> {}
@@ -5826,56 +5880,59 @@
             <span class="comment">// Please take a look at test case test_redundant_conf_change_by_snapshot.</span>
         }
 
-        {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">meta</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">store_meta</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
-            <span class="ident">meta</span>.<span class="ident">set_region</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">coprocessor_host</span>, <span class="ident">cp</span>.<span class="ident">region</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>);
-        }
+        <span class="self">self</span>.<span class="ident">update_region</span>(<span class="ident">cp</span>.<span class="ident">region</span>);
 
-        <span class="kw">let</span> <span class="ident">peer_id</span> <span class="op">=</span> <span class="ident">cp</span>.<span class="ident">peer</span>.<span class="ident">get_id</span>();
         <span class="kw">let</span> <span class="ident">now</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now</span>();
-        <span class="kw">match</span> <span class="ident">change_type</span> {
-            <span class="ident">ConfChangeType</span>::<span class="ident">AddNode</span> <span class="op">|</span> <span class="ident">ConfChangeType</span>::<span class="ident">AddLearnerNode</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">let</span> <span class="ident">peer</span> <span class="op">=</span> <span class="ident">cp</span>.<span class="ident">peer</span>.<span class="ident">clone</span>();
-                <span class="kw">let</span> <span class="ident">group_id</span> <span class="op">=</span> <span class="self">self</span>
-                    .<span class="ident">ctx</span>
-                    .<span class="ident">global_replication_state</span>
-                    .<span class="ident">lock</span>()
-                    .<span class="ident">unwrap</span>()
-                    .<span class="ident">group</span>
-                    .<span class="ident">group_id</span>(<span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">replication_mode_version</span>, <span class="ident">peer</span>.<span class="ident">store_id</span>);
-                <span class="kw">if</span> <span class="ident">group_id</span>.<span class="ident">unwrap_or</span>(<span class="number">0</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
-                    <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;updating group&quot;</span>; <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">peer</span>.<span class="ident">id</span>, <span class="string">&quot;group_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">group_id</span>.<span class="ident">unwrap</span>());
-                    <span class="self">self</span>.<span class="ident">fsm</span>
-                        .<span class="ident">peer</span>
-                        .<span class="ident">raft_group</span>
-                        .<span class="ident">raft</span>
-                        .<span class="ident">assign_commit_groups</span>(<span class="kw-2">&amp;</span>[(<span class="ident">peer</span>.<span class="ident">id</span>, <span class="ident">group_id</span>.<span class="ident">unwrap</span>())]);
+        <span class="kw">let</span> (<span class="kw-2">mut</span> <span class="ident">remove_self</span>, <span class="kw-2">mut</span> <span class="ident">need_ping</span>) <span class="op">=</span> (<span class="bool-val">false</span>, <span class="bool-val">false</span>);
+        <span class="kw">for</span> <span class="kw-2">mut</span> <span class="ident">change</span> <span class="kw">in</span> <span class="ident">cp</span>.<span class="ident">changes</span> {
+            <span class="kw">let</span> (<span class="ident">change_type</span>, <span class="ident">peer</span>) <span class="op">=</span> (<span class="ident">change</span>.<span class="ident">get_change_type</span>(), <span class="ident">change</span>.<span class="ident">take_peer</span>());
+            <span class="kw">let</span> (<span class="ident">store_id</span>, <span class="ident">peer_id</span>) <span class="op">=</span> (<span class="ident">peer</span>.<span class="ident">get_store_id</span>(), <span class="ident">peer</span>.<span class="ident">get_id</span>());
+            <span class="kw">match</span> <span class="ident">change_type</span> {
+                <span class="ident">ConfChangeType</span>::<span class="ident">AddNode</span> <span class="op">|</span> <span class="ident">ConfChangeType</span>::<span class="ident">AddLearnerNode</span> <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="kw">let</span> <span class="ident">group_id</span> <span class="op">=</span> <span class="self">self</span>
+                        .<span class="ident">ctx</span>
+                        .<span class="ident">global_replication_state</span>
+                        .<span class="ident">lock</span>()
+                        .<span class="ident">unwrap</span>()
+                        .<span class="ident">group</span>
+                        .<span class="ident">group_id</span>(<span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">replication_mode_version</span>, <span class="ident">store_id</span>);
+                    <span class="kw">if</span> <span class="ident">group_id</span>.<span class="ident">unwrap_or</span>(<span class="number">0</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
+                        <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;updating group&quot;</span>; <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">peer_id</span>, <span class="string">&quot;group_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">group_id</span>.<span class="ident">unwrap</span>());
+                        <span class="self">self</span>.<span class="ident">fsm</span>
+                            .<span class="ident">peer</span>
+                            .<span class="ident">raft_group</span>
+                            .<span class="ident">raft</span>
+                            .<span class="ident">assign_commit_groups</span>(<span class="kw-2">&amp;</span>[(<span class="ident">peer_id</span>, <span class="ident">group_id</span>.<span class="ident">unwrap</span>())]);
+                    }
+                    <span class="comment">// Add this peer to peer_heartbeats.</span>
+                    <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">peer_heartbeats</span>.<span class="ident">insert</span>(<span class="ident">peer_id</span>, <span class="ident">now</span>);
+                    <span class="kw">if</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">is_leader</span>() {
+                        <span class="ident">need_ping</span> <span class="op">=</span> <span class="bool-val">true</span>;
+                        <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">peers_start_pending_time</span>.<span class="ident">push</span>((<span class="ident">peer_id</span>, <span class="ident">now</span>));
+                    }
                 }
-                <span class="kw">if</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">peer_id</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">peer_id</span> {
-                    <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">peer</span> <span class="op">=</span> <span class="ident">peer</span>.<span class="ident">clone</span>();
+                <span class="ident">ConfChangeType</span>::<span class="ident">RemoveNode</span> <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="comment">// Remove this peer from cache.</span>
+                    <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">peer_heartbeats</span>.<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="ident">peer_id</span>);
+                    <span class="kw">if</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">is_leader</span>() {
+                        <span class="self">self</span>.<span class="ident">fsm</span>
+                            .<span class="ident">peer</span>
+                            .<span class="ident">peers_start_pending_time</span>
+                            .<span class="ident">retain</span>(<span class="op">|</span><span class="kw-2">&amp;</span>(<span class="ident">p</span>, <span class="kw">_</span>)<span class="op">|</span> <span class="ident">p</span> <span class="op">!</span><span class="op">=</span> <span class="ident">peer_id</span>);
+                    }
+                    <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">remove_peer_from_cache</span>(<span class="ident">peer_id</span>);
+                    <span class="comment">// We only care remove itself now.</span>
+                    <span class="kw">if</span> <span class="self">self</span>.<span class="ident">store_id</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">store_id</span> {
+                        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">peer_id</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">peer_id</span> {
+                            <span class="ident">remove_self</span> <span class="op">=</span> <span class="bool-val">true</span>;
+                        } <span class="kw">else</span> {
+                            <span class="macro">panic</span><span class="macro">!</span>(
+                                <span class="string">&quot;{} trying to remove unknown peer {:?}&quot;</span>,
+                                <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">tag</span>, <span class="ident">peer</span>
+                            );
+                        }
+                    }
                 }
-
-                <span class="comment">// Add this peer to cache and heartbeats.</span>
-                <span class="kw">let</span> <span class="ident">id</span> <span class="op">=</span> <span class="ident">peer</span>.<span class="ident">get_id</span>();
-                <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">peer_heartbeats</span>.<span class="ident">insert</span>(<span class="ident">id</span>, <span class="ident">now</span>);
-                <span class="kw">if</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">is_leader</span>() {
-                    <span class="comment">// Speed up snapshot instead of waiting another heartbeat.</span>
-                    <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">ping</span>();
-                    <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">has_ready</span> <span class="op">=</span> <span class="bool-val">true</span>;
-                    <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">peers_start_pending_time</span>.<span class="ident">push</span>((<span class="ident">id</span>, <span class="ident">now</span>));
-                }
-                <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">insert_peer_cache</span>(<span class="ident">peer</span>);
-            }
-            <span class="ident">ConfChangeType</span>::<span class="ident">RemoveNode</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="comment">// Remove this peer from cache.</span>
-                <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">peer_heartbeats</span>.<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="ident">peer_id</span>);
-                <span class="kw">if</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">is_leader</span>() {
-                    <span class="self">self</span>.<span class="ident">fsm</span>
-                        .<span class="ident">peer</span>
-                        .<span class="ident">peers_start_pending_time</span>
-                        .<span class="ident">retain</span>(<span class="op">|</span><span class="kw-2">&amp;</span>(<span class="ident">p</span>, <span class="kw">_</span>)<span class="op">|</span> <span class="ident">p</span> <span class="op">!</span><span class="op">=</span> <span class="ident">peer_id</span>);
-                }
-                <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">remove_peer_from_cache</span>(<span class="ident">peer_id</span>);
             }
         }
 
@@ -5893,21 +5950,38 @@
                 <span class="string">&quot;region&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">region</span>(),
             );
             <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">heartbeat_pd</span>(<span class="self">self</span>.<span class="ident">ctx</span>);
-        }
-        <span class="kw">let</span> <span class="ident">my_peer_id</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">peer_id</span>();
 
-        <span class="kw">let</span> <span class="ident">peer</span> <span class="op">=</span> <span class="ident">cp</span>.<span class="ident">peer</span>;
-
-        <span class="comment">// We only care remove itself now.</span>
-        <span class="kw">if</span> <span class="ident">change_type</span> <span class="op">=</span><span class="op">=</span> <span class="ident">ConfChangeType</span>::<span class="ident">RemoveNode</span> <span class="kw-2">&amp;</span><span class="op">&amp;</span> <span class="ident">peer</span>.<span class="ident">get_store_id</span>() <span class="op">=</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">store_id</span>() {
-            <span class="kw">if</span> <span class="ident">my_peer_id</span> <span class="op">=</span><span class="op">=</span> <span class="ident">peer</span>.<span class="ident">get_id</span>() {
-                <span class="self">self</span>.<span class="ident">destroy_peer</span>(<span class="bool-val">false</span>);
-            } <span class="kw">else</span> {
-                <span class="macro">panic</span><span class="macro">!</span>(
-                    <span class="string">&quot;{} trying to remove unknown peer {:?}&quot;</span>,
-                    <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">tag</span>, <span class="ident">peer</span>
+            <span class="comment">// Remove or demote leader will cause this raft group unavailable</span>
+            <span class="comment">// until new leader elected, but we can&#39;t revert this operation</span>
+            <span class="comment">// because its result is already persisted in apply worker</span>
+            <span class="comment">// TODO: should we transfer leader here?</span>
+            <span class="kw">let</span> <span class="ident">demote_self</span> <span class="op">=</span> <span class="ident">is_learner</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">peer</span>);
+            <span class="kw">if</span> <span class="ident">remove_self</span> <span class="op">|</span><span class="op">|</span> <span class="ident">demote_self</span> {
+                <span class="macro">warn</span><span class="macro">!</span>(
+                    <span class="string">&quot;Removing or demoting leader&quot;</span>;
+                    <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">region_id</span>(),
+                    <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer_id</span>(),
+                    <span class="string">&quot;remove&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">remove_self</span>,
+                    <span class="string">&quot;demote&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">demote_self</span>,
                 );
+                <span class="kw">if</span> <span class="ident">demote_self</span> {
+                    <span class="self">self</span>.<span class="ident">fsm</span>
+                        .<span class="ident">peer</span>
+                        .<span class="ident">raft_group</span>
+                        .<span class="ident">raft</span>
+                        .<span class="ident">become_follower</span>(<span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">term</span>(), <span class="ident">raft</span>::<span class="ident">INVALID_ID</span>);
+                }
+                <span class="comment">// Don&#39;t ping to speed up leader election</span>
+                <span class="ident">need_ping</span> <span class="op">=</span> <span class="bool-val">false</span>;
             }
+        }
+        <span class="kw">if</span> <span class="ident">need_ping</span> {
+            <span class="comment">// Speed up snapshot instead of waiting another heartbeat.</span>
+            <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">ping</span>();
+            <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">has_ready</span> <span class="op">=</span> <span class="bool-val">true</span>;
+        }
+        <span class="kw">if</span> <span class="ident">remove_self</span> {
+            <span class="self">self</span>.<span class="ident">destroy_peer</span>(<span class="bool-val">false</span>);
         }
     }
 

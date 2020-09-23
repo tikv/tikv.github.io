@@ -1345,6 +1345,40 @@
 <span id="1345">1345</span>
 <span id="1346">1346</span>
 <span id="1347">1347</span>
+<span id="1348">1348</span>
+<span id="1349">1349</span>
+<span id="1350">1350</span>
+<span id="1351">1351</span>
+<span id="1352">1352</span>
+<span id="1353">1353</span>
+<span id="1354">1354</span>
+<span id="1355">1355</span>
+<span id="1356">1356</span>
+<span id="1357">1357</span>
+<span id="1358">1358</span>
+<span id="1359">1359</span>
+<span id="1360">1360</span>
+<span id="1361">1361</span>
+<span id="1362">1362</span>
+<span id="1363">1363</span>
+<span id="1364">1364</span>
+<span id="1365">1365</span>
+<span id="1366">1366</span>
+<span id="1367">1367</span>
+<span id="1368">1368</span>
+<span id="1369">1369</span>
+<span id="1370">1370</span>
+<span id="1371">1371</span>
+<span id="1372">1372</span>
+<span id="1373">1373</span>
+<span id="1374">1374</span>
+<span id="1375">1375</span>
+<span id="1376">1376</span>
+<span id="1377">1377</span>
+<span id="1378">1378</span>
+<span id="1379">1379</span>
+<span id="1380">1380</span>
+<span id="1381">1381</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1364,7 +1398,10 @@
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">KvEngine</span>, <span class="ident">RaftEngine</span>};
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">metapb</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">pdpb</span>;
-<span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">raft_cmdpb</span>::{<span class="ident">AdminCmdType</span>, <span class="ident">AdminRequest</span>, <span class="ident">RaftCmdRequest</span>, <span class="ident">SplitRequest</span>};
+<span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">raft_cmdpb</span>::{
+    <span class="ident">AdminCmdType</span>, <span class="ident">AdminRequest</span>, <span class="ident">ChangePeerRequest</span>, <span class="ident">ChangePeerV2Request</span>, <span class="ident">RaftCmdRequest</span>,
+    <span class="ident">SplitRequest</span>,
+};
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">raft_serverpb</span>::<span class="ident">RaftMessage</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">replication_modepb</span>::<span class="ident">RegionReplicationStatus</span>;
 <span class="kw">use</span> <span class="ident">prometheus</span>::<span class="ident">local</span>::<span class="ident">LocalHistogram</span>;
@@ -1373,8 +1410,7 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">coprocessor</span>::{<span class="ident">get_region_approximate_keys</span>, <span class="ident">get_region_approximate_size</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">cmd_resp</span>::<span class="ident">new_error</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">metrics</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">util</span>::<span class="ident">is_epoch_stale</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">util</span>::<span class="ident">KeysInfoFormatter</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">util</span>::{<span class="ident">is_epoch_stale</span>, <span class="ident">ConfChangeKind</span>, <span class="ident">KeysInfoFormatter</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">worker</span>::<span class="ident">split_controller</span>::{<span class="ident">SplitInfo</span>, <span class="ident">TOP_N</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">worker</span>::{<span class="ident">AutoSplitController</span>, <span class="ident">ReadStats</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">Callback</span>;
@@ -2180,6 +2216,20 @@
                         <span class="ident">change_peer</span>.<span class="ident">take_peer</span>(),
                     );
                     <span class="ident">send_admin_request</span>(<span class="kw-2">&amp;</span><span class="ident">router</span>, <span class="ident">region_id</span>, <span class="ident">epoch</span>, <span class="ident">peer</span>, <span class="ident">req</span>, <span class="ident">Callback</span>::<span class="prelude-val">None</span>);
+                } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">resp</span>.<span class="ident">has_change_peer_v2</span>() {
+                    <span class="ident">PD_HEARTBEAT_COUNTER_VEC</span>
+                        .<span class="ident">with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="string">&quot;change peer&quot;</span>])
+                        .<span class="ident">inc</span>();
+
+                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">change_peer_v2</span> <span class="op">=</span> <span class="ident">resp</span>.<span class="ident">take_change_peer_v2</span>();
+                    <span class="macro">info</span><span class="macro">!</span>(
+                        <span class="string">&quot;try to change peer&quot;</span>;
+                        <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>,
+                        <span class="string">&quot;changes&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">change_peer_v2</span>.<span class="ident">get_changes</span>(),
+                        <span class="string">&quot;kind&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">ConfChangeKind</span>::<span class="ident">confchange_kind</span>(<span class="ident">change_peer_v2</span>.<span class="ident">get_changes</span>().<span class="ident">len</span>()),
+                    );
+                    <span class="kw">let</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">new_change_peer_v2_request</span>(<span class="ident">change_peer_v2</span>.<span class="ident">take_changes</span>().<span class="ident">into</span>());
+                    <span class="ident">send_admin_request</span>(<span class="kw-2">&amp;</span><span class="ident">router</span>, <span class="ident">region_id</span>, <span class="ident">epoch</span>, <span class="ident">peer</span>, <span class="ident">req</span>, <span class="ident">Callback</span>::<span class="prelude-val">None</span>);
                 } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">resp</span>.<span class="ident">has_transfer_leader</span>() {
                     <span class="ident">PD_HEARTBEAT_COUNTER_VEC</span>
                         .<span class="ident">with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="string">&quot;transfer leader&quot;</span>])
@@ -2496,6 +2546,24 @@
     <span class="ident">req</span>.<span class="ident">set_cmd_type</span>(<span class="ident">AdminCmdType</span>::<span class="ident">ChangePeer</span>);
     <span class="ident">req</span>.<span class="ident">mut_change_peer</span>().<span class="ident">set_change_type</span>(<span class="ident">change_type</span>);
     <span class="ident">req</span>.<span class="ident">mut_change_peer</span>().<span class="ident">set_peer</span>(<span class="ident">peer</span>);
+    <span class="ident">req</span>
+}
+
+<span class="kw">fn</span> <span class="ident">new_change_peer_v2_request</span>(<span class="ident">changes</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">pdpb</span>::<span class="ident">ChangePeer</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">AdminRequest</span> {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">AdminRequest</span>::<span class="ident">default</span>();
+    <span class="ident">req</span>.<span class="ident">set_cmd_type</span>(<span class="ident">AdminCmdType</span>::<span class="ident">ChangePeerV2</span>);
+    <span class="kw">let</span> <span class="ident">change_peer_reqs</span> <span class="op">=</span> <span class="ident">changes</span>
+        .<span class="ident">into_iter</span>()
+        .<span class="ident">map</span>(<span class="op">|</span><span class="kw-2">mut</span> <span class="ident">c</span><span class="op">|</span> {
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cp</span> <span class="op">=</span> <span class="ident">ChangePeerRequest</span>::<span class="ident">default</span>();
+            <span class="ident">cp</span>.<span class="ident">set_change_type</span>(<span class="ident">c</span>.<span class="ident">get_change_type</span>());
+            <span class="ident">cp</span>.<span class="ident">set_peer</span>(<span class="ident">c</span>.<span class="ident">take_peer</span>());
+            <span class="ident">cp</span>
+        })
+        .<span class="ident">collect</span>();
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cp</span> <span class="op">=</span> <span class="ident">ChangePeerV2Request</span>::<span class="ident">default</span>();
+    <span class="ident">cp</span>.<span class="ident">set_changes</span>(<span class="ident">change_peer_reqs</span>);
+    <span class="ident">req</span>.<span class="ident">set_change_peer_v2</span>(<span class="ident">cp</span>);
     <span class="ident">req</span>
 }
 
