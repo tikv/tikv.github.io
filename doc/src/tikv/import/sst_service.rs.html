@@ -454,13 +454,23 @@
 <span id="454">454</span>
 <span id="455">455</span>
 <span id="456">456</span>
+<span id="457">457</span>
+<span id="458">458</span>
+<span id="459">459</span>
+<span id="460">460</span>
+<span id="461">461</span>
+<span id="462">462</span>
+<span id="463">463</span>
+<span id="464">464</span>
+<span id="465">465</span>
+<span id="466">466</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">f64</span>::<span class="ident">INFINITY</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">Arc</span>;
 
-<span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">name_to_cf</span>, <span class="ident">CompactExt</span>, <span class="ident">MiscExt</span>, <span class="ident">CF_DEFAULT</span>, <span class="ident">CF_WRITE</span>};
+<span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">name_to_cf</span>, <span class="ident">KvEngine</span>, <span class="ident">CF_DEFAULT</span>, <span class="ident">CF_WRITE</span>};
 <span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">executor</span>::{<span class="ident">ThreadPool</span>, <span class="ident">ThreadPoolBuilder</span>};
 <span class="kw">use</span> <span class="ident">futures</span>::{<span class="ident">TryFutureExt</span>, <span class="ident">TryStreamExt</span>};
 <span class="kw">use</span> <span class="ident">grpcio</span>::{<span class="ident">ClientStreamingSink</span>, <span class="ident">RequestStream</span>, <span class="ident">RpcContext</span>, <span class="ident">UnarySink</span>};
@@ -475,7 +485,6 @@
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">raft_cmdpb</span>::<span class="kw-2">*</span>;
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">server</span>::<span class="ident">CONFIG_ROCKSDB_GAUGE</span>;
-<span class="kw">use</span> <span class="ident">engine_rocks</span>::<span class="ident">RocksEngine</span>;
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">SstExt</span>, <span class="ident">SstWriterBuilder</span>};
 <span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">router</span>::<span class="ident">RaftStoreRouter</span>;
 <span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">store</span>::<span class="ident">Callback</span>;
@@ -495,25 +504,32 @@
 <span class="doccomment">/// It saves the SST sent from client to a file and then sends a command to</span>
 <span class="doccomment">/// raftstore to trigger the ingest process.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ImportSSTService</span><span class="op">&lt;</span><span class="ident">Router</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ImportSSTService</span><span class="op">&lt;</span><span class="ident">E</span>, <span class="ident">Router</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">E</span>: <span class="ident">KvEngine</span>,
+{
     <span class="ident">cfg</span>: <span class="ident">Config</span>,
     <span class="ident">router</span>: <span class="ident">Router</span>,
-    <span class="ident">engine</span>: <span class="ident">RocksEngine</span>,
+    <span class="ident">engine</span>: <span class="ident">E</span>,
     <span class="ident">threads</span>: <span class="ident">ThreadPool</span>,
     <span class="ident">importer</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">SSTImporter</span><span class="op">&gt;</span>,
-    <span class="ident">switcher</span>: <span class="ident">ImportModeSwitcher</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>,
+    <span class="ident">switcher</span>: <span class="ident">ImportModeSwitcher</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>,
     <span class="ident">limiter</span>: <span class="ident">Limiter</span>,
     <span class="ident">security_mgr</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">SecurityManager</span><span class="op">&gt;</span>,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">Router</span>: <span class="ident">RaftStoreRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">ImportSSTService</span><span class="op">&lt;</span><span class="ident">Router</span><span class="op">&gt;</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>, <span class="ident">Router</span><span class="op">&gt;</span> <span class="ident">ImportSSTService</span><span class="op">&lt;</span><span class="ident">E</span>, <span class="ident">Router</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">E</span>: <span class="ident">KvEngine</span>,
+    <span class="ident">Router</span>: <span class="ident">RaftStoreRouter</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>,
+{
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
         <span class="ident">cfg</span>: <span class="ident">Config</span>,
         <span class="ident">router</span>: <span class="ident">Router</span>,
-        <span class="ident">engine</span>: <span class="ident">RocksEngine</span>,
+        <span class="ident">engine</span>: <span class="ident">E</span>,
         <span class="ident">importer</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">SSTImporter</span><span class="op">&gt;</span>,
         <span class="ident">security_mgr</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">SecurityManager</span><span class="op">&gt;</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ImportSSTService</span><span class="op">&lt;</span><span class="ident">Router</span><span class="op">&gt;</span> {
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ImportSSTService</span><span class="op">&lt;</span><span class="ident">E</span>, <span class="ident">Router</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">threads</span> <span class="op">=</span> <span class="ident">ThreadPoolBuilder</span>::<span class="ident">new</span>()
             .<span class="ident">pool_size</span>(<span class="ident">cfg</span>.<span class="ident">num_threads</span>)
             .<span class="ident">name_prefix</span>(<span class="string">&quot;sst-importer&quot;</span>)
@@ -535,7 +551,11 @@
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">Router</span>: <span class="ident">RaftStoreRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">ImportSst</span> <span class="kw">for</span> <span class="ident">ImportSSTService</span><span class="op">&lt;</span><span class="ident">Router</span><span class="op">&gt;</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>, <span class="ident">Router</span><span class="op">&gt;</span> <span class="ident">ImportSst</span> <span class="kw">for</span> <span class="ident">ImportSSTService</span><span class="op">&lt;</span><span class="ident">E</span>, <span class="ident">Router</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">E</span>: <span class="ident">KvEngine</span>,
+    <span class="ident">Router</span>: <span class="ident">RaftStoreRouter</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>,
+{
     <span class="kw">fn</span> <span class="ident">switch_mode</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
         <span class="ident">ctx</span>: <span class="ident">RpcContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>,
@@ -631,7 +651,7 @@
         <span class="kw">let</span> <span class="ident">timer</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now_coarse</span>();
         <span class="kw">let</span> <span class="ident">importer</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">importer</span>);
         <span class="kw">let</span> <span class="ident">limiter</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">limiter</span>.<span class="ident">clone</span>();
-        <span class="kw">let</span> <span class="ident">sst_writer</span> <span class="op">=</span> <span class="op">&lt;</span><span class="ident">RocksEngine</span> <span class="kw">as</span> <span class="ident">SstExt</span><span class="op">&gt;</span>::<span class="ident">SstWriterBuilder</span>::<span class="ident">new</span>()
+        <span class="kw">let</span> <span class="ident">sst_writer</span> <span class="op">=</span> <span class="op">&lt;</span><span class="ident">E</span> <span class="kw">as</span> <span class="ident">SstExt</span><span class="op">&gt;</span>::<span class="ident">SstWriterBuilder</span>::<span class="ident">new</span>()
             .<span class="ident">set_db</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">engine</span>)
             .<span class="ident">set_cf</span>(<span class="ident">name_to_cf</span>(<span class="ident">req</span>.<span class="ident">get_sst</span>().<span class="ident">get_cf_name</span>()).<span class="ident">unwrap</span>())
             .<span class="ident">build</span>(<span class="self">self</span>.<span class="ident">importer</span>.<span class="ident">get_path</span>(<span class="ident">req</span>.<span class="ident">get_sst</span>()).<span class="ident">to_str</span>().<span class="ident">unwrap</span>())
@@ -642,7 +662,7 @@
             <span class="comment">// a download task.</span>
             <span class="comment">// Unfortunately, this currently can&#39;t happen because the S3Storage</span>
             <span class="comment">// is not Send + Sync. See the documentation of S3Storage for reason.</span>
-            <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">importer</span>.<span class="ident">download</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>(
+            <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">importer</span>.<span class="ident">download</span>::<span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>(
                 <span class="ident">req</span>.<span class="ident">get_sst</span>(),
                 <span class="ident">req</span>.<span class="ident">get_storage_backend</span>(),
                 <span class="ident">req</span>.<span class="ident">get_name</span>(),
@@ -867,17 +887,17 @@
 
                 <span class="kw">let</span> <span class="ident">name</span> <span class="op">=</span> <span class="ident">import</span>.<span class="ident">get_path</span>(<span class="kw-2">&amp;</span><span class="ident">meta</span>);
 
-                <span class="kw">let</span> <span class="ident">default</span> <span class="op">=</span> <span class="op">&lt;</span><span class="ident">RocksEngine</span> <span class="kw">as</span> <span class="ident">SstExt</span><span class="op">&gt;</span>::<span class="ident">SstWriterBuilder</span>::<span class="ident">new</span>()
+                <span class="kw">let</span> <span class="ident">default</span> <span class="op">=</span> <span class="op">&lt;</span><span class="ident">E</span> <span class="kw">as</span> <span class="ident">SstExt</span><span class="op">&gt;</span>::<span class="ident">SstWriterBuilder</span>::<span class="ident">new</span>()
                     .<span class="ident">set_in_memory</span>(<span class="bool-val">true</span>)
                     .<span class="ident">set_db</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>)
                     .<span class="ident">set_cf</span>(<span class="ident">CF_DEFAULT</span>)
                     .<span class="ident">build</span>(<span class="kw-2">&amp;</span><span class="ident">name</span>.<span class="ident">to_str</span>().<span class="ident">unwrap</span>())<span class="question-mark">?</span>;
-                <span class="kw">let</span> <span class="ident">write</span> <span class="op">=</span> <span class="op">&lt;</span><span class="ident">RocksEngine</span> <span class="kw">as</span> <span class="ident">SstExt</span><span class="op">&gt;</span>::<span class="ident">SstWriterBuilder</span>::<span class="ident">new</span>()
+                <span class="kw">let</span> <span class="ident">write</span> <span class="op">=</span> <span class="op">&lt;</span><span class="ident">E</span> <span class="kw">as</span> <span class="ident">SstExt</span><span class="op">&gt;</span>::<span class="ident">SstWriterBuilder</span>::<span class="ident">new</span>()
                     .<span class="ident">set_in_memory</span>(<span class="bool-val">true</span>)
                     .<span class="ident">set_db</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>)
                     .<span class="ident">set_cf</span>(<span class="ident">CF_WRITE</span>)
                     .<span class="ident">build</span>(<span class="kw-2">&amp;</span><span class="ident">name</span>.<span class="ident">to_str</span>().<span class="ident">unwrap</span>())<span class="question-mark">?</span>;
-                <span class="kw">let</span> <span class="ident">writer</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">import</span>.<span class="ident">new_writer</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>(<span class="ident">default</span>, <span class="ident">write</span>, <span class="ident">meta</span>) {
+                <span class="kw">let</span> <span class="ident">writer</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">import</span>.<span class="ident">new_writer</span>::<span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>(<span class="ident">default</span>, <span class="ident">write</span>, <span class="ident">meta</span>) {
                     <span class="prelude-val">Ok</span>(<span class="ident">w</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">w</span>,
                     <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
                         <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;build writer failed {:?}&quot;</span>, <span class="ident">e</span>);
