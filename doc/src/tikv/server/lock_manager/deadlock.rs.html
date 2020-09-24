@@ -1190,10 +1190,6 @@
 <span id="1190">1190</span>
 <span id="1191">1191</span>
 <span id="1192">1192</span>
-<span id="1193">1193</span>
-<span id="1194">1194</span>
-<span id="1195">1195</span>
-<span id="1196">1196</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1207,7 +1203,7 @@
 <span class="kw">use</span> <span class="ident">engine_rocks</span>::<span class="ident">RocksEngine</span>;
 <span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">future</span>::{<span class="self">self</span>, <span class="ident">FutureExt</span>, <span class="ident">TryFutureExt</span>};
 <span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">sink</span>::<span class="ident">SinkExt</span>;
-<span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">stream</span>::{<span class="ident">StreamExt</span>, <span class="ident">TryStreamExt</span>};
+<span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">stream</span>::<span class="ident">TryStreamExt</span>;
 <span class="kw">use</span> <span class="ident">grpcio</span>::{
     <span class="self">self</span>, <span class="ident">DuplexSink</span>, <span class="ident">Environment</span>, <span class="ident">RequestStream</span>, <span class="ident">RpcContext</span>, <span class="ident">RpcStatus</span>, <span class="ident">RpcStatusCode</span>, <span class="ident">UnarySink</span>,
     <span class="ident">WriteFlags</span>,
@@ -1954,47 +1950,43 @@
         }
 
         <span class="kw">let</span> <span class="ident">inner</span> <span class="op">=</span> <span class="ident">Rc</span>::<span class="ident">clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">inner</span>);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">s</span> <span class="op">=</span> <span class="ident">stream</span>.<span class="ident">map_err</span>(<span class="ident">Error</span>::<span class="ident">Grpc</span>).<span class="ident">filter_map</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">item</span><span class="op">|</span> {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="kw-2">mut</span> <span class="ident">req</span>) <span class="op">=</span> <span class="ident">item</span> {
-                <span class="comment">// It&#39;s possible the leader changes after registering this handler.</span>
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">inner</span> <span class="op">=</span> <span class="ident">inner</span>.<span class="ident">borrow_mut</span>();
-                <span class="kw">if</span> <span class="ident">inner</span>.<span class="ident">role</span> <span class="op">!</span><span class="op">=</span> <span class="ident">Role</span>::<span class="ident">Leader</span> {
-                    <span class="ident">ERROR_COUNTER_METRICS</span>.<span class="ident">not_leader</span>.<span class="ident">inc</span>();
-                    <span class="kw">return</span> <span class="ident">future</span>::<span class="ident">ready</span>(<span class="prelude-val">Some</span>(<span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">Other</span>(<span class="macro">box_err</span><span class="macro">!</span>(<span class="string">&quot;leader changed&quot;</span>)))));
-                }
-                <span class="kw">let</span> <span class="ident">WaitForEntry</span> {
-                    <span class="ident">txn</span>,
-                    <span class="ident">wait_for_txn</span>,
-                    <span class="ident">key_hash</span>,
-                    ..
-                } <span class="op">=</span> <span class="ident">req</span>.<span class="ident">get_entry</span>();
-                <span class="kw">let</span> <span class="ident">detect_table</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">inner</span>.<span class="ident">detect_table</span>;
-                <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">req</span>.<span class="ident">get_tp</span>() {
-                    <span class="ident">DeadlockRequestType</span>::<span class="ident">Detect</span> <span class="op">=</span><span class="op">&gt;</span> {
-                        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">deadlock_key_hash</span>) <span class="op">=</span>
-                            <span class="ident">detect_table</span>.<span class="ident">detect</span>(<span class="ident">txn</span>.<span class="ident">into</span>(), <span class="ident">wait_for_txn</span>.<span class="ident">into</span>(), <span class="kw-2">*</span><span class="ident">key_hash</span>)
-                        {
-                            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">DeadlockResponse</span>::<span class="ident">default</span>();
-                            <span class="ident">resp</span>.<span class="ident">set_entry</span>(<span class="ident">req</span>.<span class="ident">take_entry</span>());
-                            <span class="ident">resp</span>.<span class="ident">set_deadlock_key_hash</span>(<span class="ident">deadlock_key_hash</span>);
-                            <span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>((<span class="ident">resp</span>, <span class="ident">WriteFlags</span>::<span class="ident">default</span>())))
-                        } <span class="kw">else</span> {
-                            <span class="prelude-val">None</span>
-                        }
-                    }
-                    <span class="ident">DeadlockRequestType</span>::<span class="ident">CleanUpWaitFor</span> <span class="op">=</span><span class="op">&gt;</span> {
-                        <span class="ident">detect_table</span>.<span class="ident">clean_up_wait_for</span>(<span class="ident">txn</span>.<span class="ident">into</span>(), <span class="ident">wait_for_txn</span>.<span class="ident">into</span>(), <span class="kw-2">*</span><span class="ident">key_hash</span>);
-                        <span class="prelude-val">None</span>
-                    }
-                    <span class="ident">DeadlockRequestType</span>::<span class="ident">CleanUp</span> <span class="op">=</span><span class="op">&gt;</span> {
-                        <span class="ident">detect_table</span>.<span class="ident">clean_up</span>(<span class="ident">txn</span>.<span class="ident">into</span>());
-                        <span class="prelude-val">None</span>
-                    }
-                };
-                <span class="ident">future</span>::<span class="ident">ready</span>(<span class="ident">res</span>)
-            } <span class="kw">else</span> {
-                <span class="ident">future</span>::<span class="ident">ready</span>(<span class="prelude-val">None</span>)
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">s</span> <span class="op">=</span> <span class="ident">stream</span>.<span class="ident">map_err</span>(<span class="ident">Error</span>::<span class="ident">Grpc</span>).<span class="ident">try_filter_map</span>(<span class="kw">move</span> <span class="op">|</span><span class="kw-2">mut</span> <span class="ident">req</span><span class="op">|</span> {
+            <span class="comment">// It&#39;s possible the leader changes after registering this handler.</span>
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">inner</span> <span class="op">=</span> <span class="ident">inner</span>.<span class="ident">borrow_mut</span>();
+            <span class="kw">if</span> <span class="ident">inner</span>.<span class="ident">role</span> <span class="op">!</span><span class="op">=</span> <span class="ident">Role</span>::<span class="ident">Leader</span> {
+                <span class="ident">ERROR_COUNTER_METRICS</span>.<span class="ident">not_leader</span>.<span class="ident">inc</span>();
+                <span class="kw">return</span> <span class="ident">future</span>::<span class="ident">ready</span>(<span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">Other</span>(<span class="macro">box_err</span><span class="macro">!</span>(<span class="string">&quot;leader changed&quot;</span>))));
             }
+            <span class="kw">let</span> <span class="ident">WaitForEntry</span> {
+                <span class="ident">txn</span>,
+                <span class="ident">wait_for_txn</span>,
+                <span class="ident">key_hash</span>,
+                ..
+            } <span class="op">=</span> <span class="ident">req</span>.<span class="ident">get_entry</span>();
+            <span class="kw">let</span> <span class="ident">detect_table</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">inner</span>.<span class="ident">detect_table</span>;
+            <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">req</span>.<span class="ident">get_tp</span>() {
+                <span class="ident">DeadlockRequestType</span>::<span class="ident">Detect</span> <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">deadlock_key_hash</span>) <span class="op">=</span>
+                        <span class="ident">detect_table</span>.<span class="ident">detect</span>(<span class="ident">txn</span>.<span class="ident">into</span>(), <span class="ident">wait_for_txn</span>.<span class="ident">into</span>(), <span class="kw-2">*</span><span class="ident">key_hash</span>)
+                    {
+                        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">DeadlockResponse</span>::<span class="ident">default</span>();
+                        <span class="ident">resp</span>.<span class="ident">set_entry</span>(<span class="ident">req</span>.<span class="ident">take_entry</span>());
+                        <span class="ident">resp</span>.<span class="ident">set_deadlock_key_hash</span>(<span class="ident">deadlock_key_hash</span>);
+                        <span class="prelude-val">Some</span>((<span class="ident">resp</span>, <span class="ident">WriteFlags</span>::<span class="ident">default</span>()))
+                    } <span class="kw">else</span> {
+                        <span class="prelude-val">None</span>
+                    }
+                }
+                <span class="ident">DeadlockRequestType</span>::<span class="ident">CleanUpWaitFor</span> <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="ident">detect_table</span>.<span class="ident">clean_up_wait_for</span>(<span class="ident">txn</span>.<span class="ident">into</span>(), <span class="ident">wait_for_txn</span>.<span class="ident">into</span>(), <span class="kw-2">*</span><span class="ident">key_hash</span>);
+                    <span class="prelude-val">None</span>
+                }
+                <span class="ident">DeadlockRequestType</span>::<span class="ident">CleanUp</span> <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="ident">detect_table</span>.<span class="ident">clean_up</span>(<span class="ident">txn</span>.<span class="ident">into</span>());
+                    <span class="prelude-val">None</span>
+                }
+            };
+            <span class="ident">future</span>::<span class="ident">ok</span>(<span class="ident">res</span>)
         });
         <span class="kw">let</span> <span class="ident">send_task</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">sink</span> <span class="op">=</span> <span class="ident">sink</span>.<span class="ident">sink_map_err</span>(<span class="ident">Error</span>::<span class="ident">from</span>);
@@ -2002,7 +1994,7 @@
             <span class="ident">sink</span>.<span class="ident">close</span>().<span class="kw">await</span><span class="question-mark">?</span>;
             <span class="prelude-ty">Result</span>::<span class="prelude-val">Ok</span>(())
         }
-        .<span class="ident">map</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> ());
+        .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;deadlock detect rpc stream disconnected&quot;</span>; <span class="string">&quot;error&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>));
         <span class="ident">spawn_local</span>(<span class="ident">send_task</span>);
     }
 
