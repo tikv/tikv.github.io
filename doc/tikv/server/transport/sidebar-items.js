@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["ServerTransport",""],["SnapshotReporter",""]]});
+initSidebarItems({"struct":[["ServerTransport",""]]});

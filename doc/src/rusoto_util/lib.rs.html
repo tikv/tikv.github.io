@@ -138,6 +138,9 @@
 <span id="138">138</span>
 <span id="139">139</span>
 <span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -268,15 +271,18 @@
     <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">credentials</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">AwsCredentials</span>, <span class="ident">CredentialsError</span><span class="op">&gt;</span> {
         <span class="comment">// Need to use web identity provider first to prevent default provider takes precedence in</span>
         <span class="comment">// kubernetes environment.</span>
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">creds</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">web_identity_provider</span>.<span class="ident">credentials</span>().<span class="kw">await</span> {
-            <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">creds</span>);
-        }
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">creds</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">default_provider</span>.<span class="ident">credentials</span>().<span class="kw">await</span> {
-            <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">creds</span>);
-        }
-        <span class="prelude-val">Err</span>(<span class="ident">CredentialsError</span>::<span class="ident">new</span>(
-            <span class="string">&quot;Couldn&#39;t find AWS credentials in default sources or k8s environment.&quot;</span>,
-        ))
+        <span class="kw">let</span> <span class="ident">k8s_error</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">web_identity_provider</span>.<span class="ident">credentials</span>().<span class="kw">await</span> {
+            <span class="ident">res</span> @ <span class="prelude-val">Ok</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="ident">res</span>,
+            <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">e</span>,
+        };
+        <span class="kw">let</span> <span class="ident">def_error</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">default_provider</span>.<span class="ident">credentials</span>().<span class="kw">await</span> {
+            <span class="ident">res</span> @ <span class="prelude-val">Ok</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="ident">res</span>,
+            <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">e</span>,
+        };
+        <span class="prelude-val">Err</span>(<span class="ident">CredentialsError</span>::<span class="ident">new</span>(<span class="macro">format_args</span><span class="macro">!</span>(
+            <span class="string">&quot;Couldn&#39;t find AWS credentials in default sources ({}) or k8s environment ({}).&quot;</span>,
+            <span class="ident">def_error</span>.<span class="ident">message</span>, <span class="ident">k8s_error</span>.<span class="ident">message</span>,
+        )))
     }
 }
 </pre></div>

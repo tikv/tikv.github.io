@@ -1552,47 +1552,12 @@
 <span id="1552">1552</span>
 <span id="1553">1553</span>
 <span id="1554">1554</span>
-<span id="1555">1555</span>
-<span id="1556">1556</span>
-<span id="1557">1557</span>
-<span id="1558">1558</span>
-<span id="1559">1559</span>
-<span id="1560">1560</span>
-<span id="1561">1561</span>
-<span id="1562">1562</span>
-<span id="1563">1563</span>
-<span id="1564">1564</span>
-<span id="1565">1565</span>
-<span id="1566">1566</span>
-<span id="1567">1567</span>
-<span id="1568">1568</span>
-<span id="1569">1569</span>
-<span id="1570">1570</span>
-<span id="1571">1571</span>
-<span id="1572">1572</span>
-<span id="1573">1573</span>
-<span id="1574">1574</span>
-<span id="1575">1575</span>
-<span id="1576">1576</span>
-<span id="1577">1577</span>
-<span id="1578">1578</span>
-<span id="1579">1579</span>
-<span id="1580">1580</span>
-<span id="1581">1581</span>
-<span id="1582">1582</span>
-<span id="1583">1583</span>
-<span id="1584">1584</span>
-<span id="1585">1585</span>
-<span id="1586">1586</span>
-<span id="1587">1587</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">kv</span>::{<span class="ident">Cursor</span>, <span class="ident">ScanMode</span>, <span class="ident">Snapshot</span>, <span class="ident">Statistics</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">mvcc</span>::{<span class="ident">default_not_found_error</span>, <span class="prelude-ty">Result</span>};
-<span class="kw">use</span> <span class="ident">engine_rocks</span>::<span class="ident">properties</span>::<span class="ident">MvccProperties</span>;
-<span class="kw">use</span> <span class="ident">engine_rocks</span>::<span class="ident">RocksTablePropertiesCollection</span>;
-<span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">IterOptions</span>, <span class="ident">TableProperties</span>, <span class="ident">TablePropertiesCollection</span>};
+<span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">IterOptions</span>, <span class="ident">MvccProperties</span>};
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">CF_LOCK</span>, <span class="ident">CF_WRITE</span>};
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">kvrpcpb</span>::<span class="ident">IsolationLevel</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">borrow</span>::<span class="ident">Cow</span>;
@@ -2028,20 +1993,11 @@
 
 <span class="comment">// Returns true if it needs gc.</span>
 <span class="comment">// This is for optimization purpose, does not mean to be accurate.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">check_need_gc</span>(
-    <span class="ident">safe_point</span>: <span class="ident">TimeStamp</span>,
-    <span class="ident">ratio_threshold</span>: <span class="ident">f64</span>,
-    <span class="ident">write_properties</span>: <span class="kw-2">&amp;</span><span class="ident">RocksTablePropertiesCollection</span>,
-) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">check_need_gc</span>(<span class="ident">safe_point</span>: <span class="ident">TimeStamp</span>, <span class="ident">ratio_threshold</span>: <span class="ident">f64</span>, <span class="ident">props</span>: <span class="ident">MvccProperties</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
     <span class="comment">// Always GC.</span>
     <span class="kw">if</span> <span class="ident">ratio_threshold</span> <span class="op">&lt;</span> <span class="number">1.0</span> {
         <span class="kw">return</span> <span class="bool-val">true</span>;
     }
-
-    <span class="kw">let</span> <span class="ident">props</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">get_mvcc_properties</span>(<span class="ident">safe_point</span>, <span class="ident">write_properties</span>) {
-        <span class="prelude-val">Some</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">v</span>,
-        <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="bool-val">true</span>,
-    };
 
     <span class="comment">// No data older than safe_point to GC.</span>
     <span class="kw">if</span> <span class="ident">props</span>.<span class="ident">min_ts</span> <span class="op">&gt;</span> <span class="ident">safe_point</span> {
@@ -2064,29 +2020,6 @@
     <span class="ident">props</span>.<span class="ident">max_row_versions</span> <span class="op">&gt;</span> <span class="ident">GC_MAX_ROW_VERSIONS_THRESHOLD</span>
 }
 
-<span class="kw">fn</span> <span class="ident">get_mvcc_properties</span>(
-    <span class="ident">safe_point</span>: <span class="ident">TimeStamp</span>,
-    <span class="ident">collection</span>: <span class="kw-2">&amp;</span><span class="ident">RocksTablePropertiesCollection</span>,
-) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">MvccProperties</span><span class="op">&gt;</span> {
-    <span class="kw">if</span> <span class="ident">collection</span>.<span class="ident">is_empty</span>() {
-        <span class="kw">return</span> <span class="prelude-val">None</span>;
-    }
-    <span class="comment">// Aggregate MVCC properties.</span>
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">props</span> <span class="op">=</span> <span class="ident">MvccProperties</span>::<span class="ident">new</span>();
-    <span class="kw">for</span> (<span class="kw">_</span>, <span class="ident">v</span>) <span class="kw">in</span> <span class="ident">collection</span>.<span class="ident">iter</span>() {
-        <span class="kw">let</span> <span class="ident">mvcc</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">MvccProperties</span>::<span class="ident">decode</span>(<span class="kw-2">&amp;</span><span class="ident">v</span>.<span class="ident">user_collected_properties</span>()) {
-            <span class="prelude-val">Ok</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">v</span>,
-            <span class="prelude-val">Err</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="prelude-val">None</span>,
-        };
-        <span class="comment">// Filter out properties after safe_point.</span>
-        <span class="kw">if</span> <span class="ident">mvcc</span>.<span class="ident">min_ts</span> <span class="op">&gt;</span> <span class="ident">safe_point</span> {
-            <span class="kw">continue</span>;
-        }
-        <span class="ident">props</span>.<span class="ident">add</span>(<span class="kw-2">&amp;</span><span class="ident">mvcc</span>);
-    }
-    <span class="prelude-val">Some</span>(<span class="ident">props</span>)
-}
-
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
 <span class="kw">mod</span> <span class="ident">tests</span> {
     <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
@@ -2094,14 +2027,14 @@
     <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">kv</span>::<span class="ident">Modify</span>;
     <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">mvcc</span>::{<span class="ident">MvccReader</span>, <span class="ident">MvccTxn</span>};
 
-    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">txn</span>::{<span class="ident">commit</span>, <span class="ident">prewrite</span>};
+    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">txn</span>::{<span class="ident">commit</span>, <span class="ident">pessimistic_prewrite</span>, <span class="ident">prewrite</span>};
     <span class="kw">use</span> <span class="ident">concurrency_manager</span>::<span class="ident">ConcurrencyManager</span>;
     <span class="kw">use</span> <span class="ident">engine_rocks</span>::<span class="ident">properties</span>::<span class="ident">MvccPropertiesCollectorFactory</span>;
     <span class="kw">use</span> <span class="ident">engine_rocks</span>::<span class="ident">raw</span>::<span class="ident">DB</span>;
     <span class="kw">use</span> <span class="ident">engine_rocks</span>::<span class="ident">raw</span>::{<span class="ident">ColumnFamilyOptions</span>, <span class="ident">DBOptions</span>};
     <span class="kw">use</span> <span class="ident">engine_rocks</span>::<span class="ident">raw_util</span>::<span class="ident">CFOptions</span>;
     <span class="kw">use</span> <span class="ident">engine_rocks</span>::{<span class="ident">Compat</span>, <span class="ident">RocksSnapshot</span>};
-    <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">Mutable</span>, <span class="ident">TablePropertiesExt</span>, <span class="ident">WriteBatchExt</span>};
+    <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">Mutable</span>, <span class="ident">MvccPropertiesExt</span>, <span class="ident">WriteBatchExt</span>};
     <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">ALL_CFS</span>, <span class="ident">CF_DEFAULT</span>, <span class="ident">CF_LOCK</span>, <span class="ident">CF_RAFT</span>, <span class="ident">CF_WRITE</span>};
     <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">kvrpcpb</span>::<span class="ident">IsolationLevel</span>;
     <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">metapb</span>::{<span class="ident">Peer</span>, <span class="ident">Region</span>};
@@ -2183,7 +2116,8 @@
             <span class="kw">let</span> <span class="ident">cm</span> <span class="op">=</span> <span class="ident">ConcurrencyManager</span>::<span class="ident">new</span>(<span class="ident">start_ts</span>);
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">txn</span> <span class="op">=</span> <span class="ident">MvccTxn</span>::<span class="ident">new</span>(<span class="ident">snap</span>, <span class="ident">start_ts</span>, <span class="bool-val">true</span>, <span class="ident">cm</span>);
 
-            <span class="ident">txn</span>.<span class="ident">pessimistic_prewrite</span>(
+            <span class="ident">pessimistic_prewrite</span>(
+                <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">txn</span>,
                 <span class="ident">m</span>,
                 <span class="ident">pk</span>,
                 <span class="kw-2">&amp;</span><span class="prelude-val">None</span>,
@@ -2349,13 +2283,13 @@
 
         <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">keys</span>::<span class="ident">data_key</span>(<span class="ident">region</span>.<span class="ident">get_start_key</span>());
         <span class="kw">let</span> <span class="ident">end</span> <span class="op">=</span> <span class="ident">keys</span>::<span class="ident">data_end_key</span>(<span class="ident">region</span>.<span class="ident">get_end_key</span>());
-        <span class="kw">let</span> <span class="ident">collection</span> <span class="op">=</span> <span class="ident">db</span>
+        <span class="kw">let</span> <span class="ident">props</span> <span class="op">=</span> <span class="ident">db</span>
             .<span class="ident">c</span>()
-            .<span class="ident">get_range_properties_cf</span>(<span class="ident">CF_WRITE</span>, <span class="kw-2">&amp;</span><span class="ident">start</span>, <span class="kw-2">&amp;</span><span class="ident">end</span>)
-            .<span class="ident">unwrap</span>();
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">check_need_gc</span>(<span class="ident">safe_point</span>, <span class="number">1.0</span>, <span class="kw-2">&amp;</span><span class="ident">collection</span>), <span class="ident">need_gc</span>);
-
-        <span class="ident">get_mvcc_properties</span>(<span class="ident">safe_point</span>, <span class="kw-2">&amp;</span><span class="ident">collection</span>)
+            .<span class="ident">get_mvcc_properties_cf</span>(<span class="ident">CF_WRITE</span>, <span class="ident">safe_point</span>, <span class="kw-2">&amp;</span><span class="ident">start</span>, <span class="kw-2">&amp;</span><span class="ident">end</span>);
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">props</span>) <span class="op">=</span> <span class="ident">props</span>.<span class="ident">as_ref</span>() {
+            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">check_need_gc</span>(<span class="ident">safe_point</span>, <span class="number">1.0</span>, <span class="ident">props</span>.<span class="ident">clone</span>()), <span class="ident">need_gc</span>);
+        }
+        <span class="ident">props</span>
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>

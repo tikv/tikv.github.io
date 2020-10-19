@@ -1,1 +1,1 @@
-initSidebarItems({});
+initSidebarItems({"constant":[["MAX_DELETE_COUNT_BY_KEY",""]]});

@@ -816,11 +816,6 @@
 <span id="816">816</span>
 <span id="817">817</span>
 <span id="818">818</span>
-<span id="819">819</span>
-<span id="820">820</span>
-<span id="821">821</span>
-<span id="822">822</span>
-<span id="823">823</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -844,7 +839,8 @@
 <span class="doccomment">//! is ensured by the transaction protocol implemented in the client library, which is transparent</span>
 <span class="doccomment">//! to the scheduler.</span>
 
-<span class="kw">use</span> <span class="ident">parking_lot</span>::<span class="ident">Mutex</span>;
+<span class="kw">use</span> <span class="ident">crossbeam</span>::<span class="ident">utils</span>::<span class="ident">CachePadded</span>;
+<span class="kw">use</span> <span class="ident">parking_lot</span>::{<span class="ident">Mutex</span>, <span class="ident">MutexGuard</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::{<span class="ident">AtomicU64</span>, <span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">Arc</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">u64</span>;
@@ -855,7 +851,8 @@
 <span class="kw">use</span> <span class="ident">txn_types</span>::<span class="ident">TimeStamp</span>;
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">kv</span>::{
-    <span class="ident">drop_snapshot_callback</span>, <span class="ident">with_tls_engine</span>, <span class="ident">Engine</span>, <span class="prelude-ty">Result</span> <span class="kw">as</span> <span class="ident">EngineResult</span>, <span class="ident">Statistics</span>,
+    <span class="ident">drop_snapshot_callback</span>, <span class="ident">with_tls_engine</span>, <span class="ident">Engine</span>, <span class="ident">ExtCallback</span>, <span class="prelude-ty">Result</span> <span class="kw">as</span> <span class="ident">EngineResult</span>,
+    <span class="ident">Statistics</span>,
 };
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">lock_manager</span>::{<span class="self">self</span>, <span class="ident">LockManager</span>, <span class="ident">WaitTimeout</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">metrics</span>::{
@@ -960,10 +957,10 @@
 
 <span class="kw">struct</span> <span class="ident">SchedulerInner</span><span class="op">&lt;</span><span class="ident">L</span>: <span class="ident">LockManager</span><span class="op">&gt;</span> {
     <span class="comment">// slot_id -&gt; { cid -&gt; `TaskContext` } in the slot.</span>
-    <span class="ident">task_contexts</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">u64</span>, <span class="ident">TaskContext</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">task_slots</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">CachePadded</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">u64</span>, <span class="ident">TaskContext</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 
     <span class="comment">// cmd id generator</span>
-    <span class="ident">id_alloc</span>: <span class="ident">AtomicU64</span>,
+    <span class="ident">id_alloc</span>: <span class="ident">CachePadded</span><span class="op">&lt;</span><span class="ident">AtomicU64</span><span class="op">&gt;</span>,
 
     <span class="comment">// write concurrency control</span>
     <span class="ident">latches</span>: <span class="ident">Latches</span>,
@@ -977,15 +974,13 @@
     <span class="ident">high_priority_pool</span>: <span class="ident">SchedPool</span>,
 
     <span class="comment">// used to control write flow</span>
-    <span class="ident">running_write_bytes</span>: <span class="ident">AtomicUsize</span>,
+    <span class="ident">running_write_bytes</span>: <span class="ident">CachePadded</span><span class="op">&lt;</span><span class="ident">AtomicUsize</span><span class="op">&gt;</span>,
 
     <span class="ident">lock_mgr</span>: <span class="ident">L</span>,
 
     <span class="ident">concurrency_manager</span>: <span class="ident">ConcurrencyManager</span>,
 
     <span class="ident">pipelined_pessimistic_lock</span>: <span class="ident">bool</span>,
-
-    <span class="ident">enable_async_commit</span>: <span class="ident">bool</span>,
 }
 
 <span class="attribute">#[<span class="ident">inline</span>]</span>
@@ -1001,34 +996,23 @@
         <span class="ident">id</span> <span class="op">+</span> <span class="number">1</span>
     }
 
-    <span class="kw">fn</span> <span class="ident">dequeue_task</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">cid</span>: <span class="ident">u64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Task</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tasks</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">task_contexts</span>[<span class="ident">id_index</span>(<span class="ident">cid</span>)].<span class="ident">lock</span>();
-        <span class="kw">let</span> <span class="ident">task</span> <span class="op">=</span> <span class="ident">tasks</span>.<span class="ident">get_mut</span>(<span class="kw-2">&amp;</span><span class="ident">cid</span>).<span class="ident">unwrap</span>().<span class="ident">task</span>.<span class="ident">take</span>().<span class="ident">unwrap</span>();
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">task</span>.<span class="ident">cid</span>, <span class="ident">cid</span>);
-        <span class="ident">task</span>
+    <span class="attribute">#[<span class="ident">inline</span>]</span>
+    <span class="kw">fn</span> <span class="ident">get_task_slot</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">cid</span>: <span class="ident">u64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">MutexGuard</span><span class="op">&lt;</span><span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">u64</span>, <span class="ident">TaskContext</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">task_slots</span>[<span class="ident">id_index</span>(<span class="ident">cid</span>)].<span class="ident">lock</span>()
     }
 
-    <span class="kw">fn</span> <span class="ident">enqueue_task</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">task</span>: <span class="ident">Task</span>, <span class="ident">callback</span>: <span class="ident">StorageCallback</span>) {
-        <span class="kw">let</span> <span class="ident">cid</span> <span class="op">=</span> <span class="ident">task</span>.<span class="ident">cid</span>;
+    <span class="kw">fn</span> <span class="ident">new_task_context</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">task</span>: <span class="ident">Task</span>, <span class="ident">callback</span>: <span class="ident">StorageCallback</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">TaskContext</span> {
         <span class="kw">let</span> <span class="ident">tctx</span> <span class="op">=</span> <span class="ident">TaskContext</span>::<span class="ident">new</span>(<span class="ident">task</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">latches</span>, <span class="ident">callback</span>);
-
         <span class="kw">let</span> <span class="ident">running_write_bytes</span> <span class="op">=</span> <span class="self">self</span>
             .<span class="ident">running_write_bytes</span>
             .<span class="ident">fetch_add</span>(<span class="ident">tctx</span>.<span class="ident">write_bytes</span>, <span class="ident">Ordering</span>::<span class="ident">AcqRel</span>) <span class="kw">as</span> <span class="ident">i64</span>;
         <span class="ident">SCHED_WRITING_BYTES_GAUGE</span>.<span class="ident">set</span>(<span class="ident">running_write_bytes</span> <span class="op">+</span> <span class="ident">tctx</span>.<span class="ident">write_bytes</span> <span class="kw">as</span> <span class="ident">i64</span>);
         <span class="ident">SCHED_CONTEX_GAUGE</span>.<span class="ident">inc</span>();
-
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tasks</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">task_contexts</span>[<span class="ident">id_index</span>(<span class="ident">cid</span>)].<span class="ident">lock</span>();
-        <span class="kw">if</span> <span class="ident">tasks</span>.<span class="ident">insert</span>(<span class="ident">cid</span>, <span class="ident">tctx</span>).<span class="ident">is_some</span>() {
-            <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;TaskContext cid={} shouldn&#39;t exist&quot;</span>, <span class="ident">cid</span>);
-        }
+        <span class="ident">tctx</span>
     }
 
     <span class="kw">fn</span> <span class="ident">dequeue_task_context</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">cid</span>: <span class="ident">u64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">TaskContext</span> {
-        <span class="kw">let</span> <span class="ident">tctx</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">task_contexts</span>[<span class="ident">id_index</span>(<span class="ident">cid</span>)]
-            .<span class="ident">lock</span>()
-            .<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="ident">cid</span>)
-            .<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">tctx</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_task_slot</span>(<span class="ident">cid</span>).<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="ident">cid</span>).<span class="ident">unwrap</span>();
 
         <span class="kw">let</span> <span class="ident">running_write_bytes</span> <span class="op">=</span> <span class="self">self</span>
             .<span class="ident">running_write_bytes</span>
@@ -1040,8 +1024,7 @@
     }
 
     <span class="kw">fn</span> <span class="ident">take_task_cb</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">cid</span>: <span class="ident">u64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">StorageCallback</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">task_contexts</span>[<span class="ident">id_index</span>(<span class="ident">cid</span>)]
-            .<span class="ident">lock</span>()
+        <span class="self">self</span>.<span class="ident">get_task_slot</span>(<span class="ident">cid</span>)
             .<span class="ident">get_mut</span>(<span class="kw-2">&amp;</span><span class="ident">cid</span>)
             .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">tctx</span><span class="op">|</span> <span class="ident">tctx</span>.<span class="ident">cb</span>.<span class="ident">take</span>())
     }
@@ -1053,15 +1036,15 @@
 
     <span class="doccomment">/// Tries to acquire all the required latches for a command.</span>
     <span class="doccomment">///</span>
-    <span class="doccomment">/// Returns `true` if successful; returns `false` otherwise.</span>
-    <span class="kw">fn</span> <span class="ident">acquire_lock</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">cid</span>: <span class="ident">u64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">task_contexts</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">task_contexts</span>[<span class="ident">id_index</span>(<span class="ident">cid</span>)].<span class="ident">lock</span>();
-        <span class="kw">let</span> <span class="ident">tctx</span> <span class="op">=</span> <span class="ident">task_contexts</span>.<span class="ident">get_mut</span>(<span class="kw-2">&amp;</span><span class="ident">cid</span>).<span class="ident">unwrap</span>();
+    <span class="doccomment">/// Returns the `Task` if successful; returns `None` otherwise.</span>
+    <span class="kw">fn</span> <span class="ident">acquire_lock</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">cid</span>: <span class="ident">u64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Task</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">task_slot</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_task_slot</span>(<span class="ident">cid</span>);
+        <span class="kw">let</span> <span class="ident">tctx</span> <span class="op">=</span> <span class="ident">task_slot</span>.<span class="ident">get_mut</span>(<span class="kw-2">&amp;</span><span class="ident">cid</span>).<span class="ident">unwrap</span>();
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">latches</span>.<span class="ident">acquire</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">tctx</span>.<span class="ident">lock</span>, <span class="ident">cid</span>) {
             <span class="ident">tctx</span>.<span class="ident">on_schedule</span>();
-            <span class="kw">return</span> <span class="bool-val">true</span>;
+            <span class="kw">return</span> <span class="ident">tctx</span>.<span class="ident">task</span>.<span class="ident">take</span>();
         }
-        <span class="bool-val">false</span>
+        <span class="prelude-val">None</span>
     }
 }
 
@@ -1085,21 +1068,18 @@
         <span class="ident">worker_pool_size</span>: <span class="ident">usize</span>,
         <span class="ident">sched_pending_write_threshold</span>: <span class="ident">usize</span>,
         <span class="ident">pipelined_pessimistic_lock</span>: <span class="ident">bool</span>,
-        <span class="ident">enable_async_commit</span>: <span class="ident">bool</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="comment">// Add 2 logs records how long is need to initialize TASKS_SLOTS_NUM * 2048000 `Mutex`es.</span>
-        <span class="comment">// In a 3.5G Hz machine it needs 1.3s, which is a notable duration during start-up.</span>
         <span class="kw">let</span> <span class="ident">t</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now_coarse</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">task_contexts</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">with_capacity</span>(<span class="ident">TASKS_SLOTS_NUM</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">task_slots</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">with_capacity</span>(<span class="ident">TASKS_SLOTS_NUM</span>);
         <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">TASKS_SLOTS_NUM</span> {
-            <span class="ident">task_contexts</span>.<span class="ident">push</span>(<span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">Default</span>::<span class="ident">default</span>()));
+            <span class="ident">task_slots</span>.<span class="ident">push</span>(<span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">Default</span>::<span class="ident">default</span>()).<span class="ident">into</span>());
         }
 
         <span class="kw">let</span> <span class="ident">inner</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">SchedulerInner</span> {
-            <span class="ident">task_contexts</span>,
-            <span class="ident">id_alloc</span>: <span class="ident">AtomicU64</span>::<span class="ident">new</span>(<span class="number">0</span>),
+            <span class="ident">task_slots</span>,
+            <span class="ident">id_alloc</span>: <span class="ident">AtomicU64</span>::<span class="ident">new</span>(<span class="number">0</span>).<span class="ident">into</span>(),
             <span class="ident">latches</span>: <span class="ident">Latches</span>::<span class="ident">new</span>(<span class="ident">concurrency</span>),
-            <span class="ident">running_write_bytes</span>: <span class="ident">AtomicUsize</span>::<span class="ident">new</span>(<span class="number">0</span>),
+            <span class="ident">running_write_bytes</span>: <span class="ident">AtomicUsize</span>::<span class="ident">new</span>(<span class="number">0</span>).<span class="ident">into</span>(),
             <span class="ident">sched_pending_write_threshold</span>,
             <span class="ident">worker_pool</span>: <span class="ident">SchedPool</span>::<span class="ident">new</span>(<span class="ident">engine</span>.<span class="ident">clone</span>(), <span class="ident">worker_pool_size</span>, <span class="string">&quot;sched-worker-pool&quot;</span>),
             <span class="ident">high_priority_pool</span>: <span class="ident">SchedPool</span>::<span class="ident">new</span>(
@@ -1110,7 +1090,6 @@
             <span class="ident">lock_mgr</span>,
             <span class="ident">concurrency_manager</span>,
             <span class="ident">pipelined_pessimistic_lock</span>,
-            <span class="ident">enable_async_commit</span>,
         });
 
         <span class="macro">slow_log</span><span class="macro">!</span>(<span class="ident">t</span>.<span class="ident">elapsed</span>(), <span class="string">&quot;initialized the transaction scheduler&quot;</span>);
@@ -1146,23 +1125,28 @@
 
         <span class="kw">let</span> <span class="ident">tag</span> <span class="op">=</span> <span class="ident">cmd</span>.<span class="ident">tag</span>();
         <span class="kw">let</span> <span class="ident">priority_tag</span> <span class="op">=</span> <span class="ident">get_priority_tag</span>(<span class="ident">cmd</span>.<span class="ident">priority</span>());
-        <span class="kw">let</span> <span class="ident">task</span> <span class="op">=</span> <span class="ident">Task</span>::<span class="ident">new</span>(<span class="ident">cid</span>, <span class="ident">cmd</span>);
-        <span class="comment">// TODO: enqueue_task should return an reference of the tctx.</span>
-        <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">enqueue_task</span>(<span class="ident">task</span>, <span class="ident">callback</span>);
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">acquire_lock</span>(<span class="ident">cid</span>) {
-            <span class="self">self</span>.<span class="ident">get_snapshot</span>(<span class="ident">cid</span>);
-        }
         <span class="ident">SCHED_STAGE_COUNTER_VEC</span>.<span class="ident">get</span>(<span class="ident">tag</span>).<span class="ident">new</span>.<span class="ident">inc</span>();
         <span class="ident">SCHED_COMMANDS_PRI_COUNTER_VEC_STATIC</span>
             .<span class="ident">get</span>(<span class="ident">priority_tag</span>)
             .<span class="ident">inc</span>();
+
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">task_slot</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">get_task_slot</span>(<span class="ident">cid</span>);
+        <span class="kw">let</span> <span class="ident">tctx</span> <span class="op">=</span> <span class="ident">task_slot</span>
+            .<span class="ident">entry</span>(<span class="ident">cid</span>)
+            .<span class="ident">or_insert_with</span>(<span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">new_task_context</span>(<span class="ident">Task</span>::<span class="ident">new</span>(<span class="ident">cid</span>, <span class="ident">cmd</span>), <span class="ident">callback</span>));
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">latches</span>.<span class="ident">acquire</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">tctx</span>.<span class="ident">lock</span>, <span class="ident">cid</span>) {
+            <span class="ident">tctx</span>.<span class="ident">on_schedule</span>();
+            <span class="kw">let</span> <span class="ident">task</span> <span class="op">=</span> <span class="ident">tctx</span>.<span class="ident">task</span>.<span class="ident">take</span>().<span class="ident">unwrap</span>();
+            <span class="ident">drop</span>(<span class="ident">task_slot</span>);
+            <span class="self">self</span>.<span class="ident">execute</span>(<span class="ident">task</span>);
+        }
     }
 
     <span class="doccomment">/// Tries to acquire all the necessary latches. If all the necessary latches are acquired,</span>
     <span class="doccomment">/// the method initiates a get snapshot operation for further processing.</span>
     <span class="kw">fn</span> <span class="ident">try_to_wake_up</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">cid</span>: <span class="ident">u64</span>) {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">acquire_lock</span>(<span class="ident">cid</span>) {
-            <span class="self">self</span>.<span class="ident">get_snapshot</span>(<span class="ident">cid</span>);
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">task</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">acquire_lock</span>(<span class="ident">cid</span>) {
+            <span class="self">self</span>.<span class="ident">execute</span>(<span class="ident">task</span>);
         }
     }
 
@@ -1174,10 +1158,10 @@
         }
     }
 
-    <span class="doccomment">/// Initiates an async operation to get a snapshot from the storage engine, then posts a</span>
-    <span class="doccomment">/// `SnapshotFinished` message back to the event loop when it finishes.</span>
-    <span class="kw">fn</span> <span class="ident">get_snapshot</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">cid</span>: <span class="ident">u64</span>) {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">task</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">dequeue_task</span>(<span class="ident">cid</span>);
+    <span class="doccomment">/// Initiates an async operation to get a snapshot from the storage engine, then execute the</span>
+    <span class="doccomment">/// task in the sched pool.</span>
+    <span class="kw">fn</span> <span class="ident">execute</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw-2">mut</span> <span class="ident">task</span>: <span class="ident">Task</span>) {
+        <span class="kw">let</span> <span class="ident">cid</span> <span class="op">=</span> <span class="ident">task</span>.<span class="ident">cid</span>;
         <span class="kw">let</span> <span class="ident">tag</span> <span class="op">=</span> <span class="ident">task</span>.<span class="ident">cmd</span>.<span class="ident">tag</span>();
         <span class="kw">let</span> <span class="ident">ctx</span> <span class="op">=</span> <span class="ident">task</span>.<span class="ident">cmd</span>.<span class="ident">ctx</span>().<span class="ident">clone</span>();
         <span class="kw">let</span> <span class="ident">sched</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">clone</span>();
@@ -1358,13 +1342,13 @@
     <span class="doccomment">/// Delivers a command to a worker thread for processing.</span>
     <span class="kw">fn</span> <span class="ident">process_by_worker</span>(<span class="self">self</span>, <span class="ident">snapshot</span>: <span class="ident">E</span>::<span class="ident">Snap</span>, <span class="ident">task</span>: <span class="ident">Task</span>) {
         <span class="kw">let</span> <span class="ident">tag</span> <span class="op">=</span> <span class="ident">task</span>.<span class="ident">cmd</span>.<span class="ident">tag</span>();
-        <span class="ident">SCHED_STAGE_COUNTER_VEC</span>.<span class="ident">get</span>(<span class="ident">tag</span>).<span class="ident">process</span>.<span class="ident">inc</span>();
 
         <span class="self">self</span>.<span class="ident">get_sched_pool</span>(<span class="ident">task</span>.<span class="ident">cmd</span>.<span class="ident">priority</span>())
             .<span class="ident">clone</span>()
             .<span class="ident">pool</span>
             .<span class="ident">spawn</span>(<span class="kw">async</span> <span class="kw">move</span> {
                 <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;scheduler_async_snapshot_finish&quot;</span>);
+                <span class="ident">SCHED_STAGE_COUNTER_VEC</span>.<span class="ident">get</span>(<span class="ident">tag</span>).<span class="ident">process</span>.<span class="ident">inc</span>();
 
                 <span class="kw">let</span> <span class="ident">read_duration</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now_coarse</span>();
 
@@ -1429,7 +1413,6 @@
             <span class="ident">extra_op</span>: <span class="ident">task</span>.<span class="ident">extra_op</span>,
             <span class="ident">statistics</span>,
             <span class="ident">pipelined_pessimistic_lock</span>: <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">pipelined_pessimistic_lock</span>,
-            <span class="ident">enable_async_commit</span>: <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">enable_async_commit</span>,
         };
 
         <span class="kw">match</span> <span class="ident">task</span>.<span class="ident">cmd</span>.<span class="ident">process_write</span>(<span class="ident">snapshot</span>, <span class="ident">context</span>) {
@@ -1450,31 +1433,42 @@
                 } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">to_be_write</span>.<span class="ident">modifies</span>.<span class="ident">is_empty</span>() {
                     <span class="ident">scheduler</span>.<span class="ident">on_write_finished</span>(<span class="ident">cid</span>, <span class="ident">pr</span>, <span class="prelude-val">Ok</span>(()), <span class="ident">lock_guards</span>, <span class="bool-val">false</span>, <span class="ident">tag</span>);
                 } <span class="kw">else</span> {
-                    <span class="kw">let</span> <span class="ident">sched</span> <span class="op">=</span> <span class="ident">scheduler</span>.<span class="ident">clone</span>();
-                    <span class="comment">// The normal write process is respond to clients and release latches</span>
-                    <span class="comment">// after async write finished. If pipelined pessimistic lock is enabled,</span>
-                    <span class="comment">// the process becomes parallel and there are two msgs for one command:</span>
-                    <span class="comment">//   1. Msg::PipelinedWrite: respond to clients</span>
-                    <span class="comment">//   2. Msg::WriteFinished: deque context and release latches</span>
-                    <span class="comment">// The order between these two msgs is uncertain due to thread scheduling</span>
-                    <span class="comment">// so we clone the result for each msg.</span>
-                    <span class="kw">let</span> (<span class="ident">write_finished_pr</span>, <span class="ident">pipelined_write_pr</span>) <span class="op">=</span> <span class="kw">if</span> <span class="ident">pipelined</span> {
-                        (<span class="ident">pr</span>.<span class="ident">maybe_clone</span>().<span class="ident">unwrap</span>(), <span class="ident">pr</span>)
+                    <span class="kw">let</span> <span class="ident">proposed_cb</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ExtCallback</span><span class="op">&gt;</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">pipelined</span> {
+                        <span class="comment">// The normal write process is respond to clients and release latches</span>
+                        <span class="comment">// after async write finished. If pipelined pessimistic locking is enabled,</span>
+                        <span class="comment">// the process becomes parallel and there are two msgs for one command:</span>
+                        <span class="comment">//   1. Msg::PipelinedWrite: respond to clients</span>
+                        <span class="comment">//   2. Msg::WriteFinished: deque context and release latches</span>
+                        <span class="comment">// The order between these two msgs is uncertain due to thread scheduling</span>
+                        <span class="comment">// so we clone the result for each msg.</span>
+                        <span class="kw">let</span> <span class="ident">pipelined_write_pr</span> <span class="op">=</span> <span class="ident">pr</span>.<span class="ident">maybe_clone</span>().<span class="ident">unwrap</span>();
+                        <span class="kw">let</span> <span class="ident">sched</span> <span class="op">=</span> <span class="ident">scheduler</span>.<span class="ident">clone</span>();
+                        <span class="kw">let</span> <span class="ident">sched_pool</span> <span class="op">=</span> <span class="ident">scheduler</span>.<span class="ident">get_sched_pool</span>(<span class="ident">priority</span>).<span class="ident">pool</span>.<span class="ident">clone</span>();
+                        <span class="prelude-val">Some</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
+                            <span class="ident">sched_pool</span>
+                                .<span class="ident">spawn</span>(<span class="kw">async</span> <span class="kw">move</span> {
+                                    <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;scheduler_pipelined_write_finish&quot;</span>);
+                                    <span class="comment">// The write task is proposed to the raftstore successfully.</span>
+                                    <span class="comment">// Respond to client early.</span>
+                                    <span class="ident">sched</span>.<span class="ident">on_pipelined_write</span>(<span class="ident">cid</span>, <span class="ident">pipelined_write_pr</span>, <span class="ident">tag</span>);
+                                })
+                                .<span class="ident">unwrap</span>()
+                        }))
                     } <span class="kw">else</span> {
-                        (<span class="ident">pr</span>, <span class="ident">ProcessResult</span>::<span class="ident">Res</span>)
+                        <span class="prelude-val">None</span>
                     };
+
+                    <span class="kw">let</span> <span class="ident">sched</span> <span class="op">=</span> <span class="ident">scheduler</span>.<span class="ident">clone</span>();
+                    <span class="kw">let</span> <span class="ident">sched_pool</span> <span class="op">=</span> <span class="ident">scheduler</span>.<span class="ident">get_sched_pool</span>(<span class="ident">priority</span>).<span class="ident">pool</span>.<span class="ident">clone</span>();
                     <span class="comment">// The callback to receive async results of write prepare from the storage engine.</span>
                     <span class="kw">let</span> <span class="ident">engine_cb</span> <span class="op">=</span> <span class="ident">Box</span>::<span class="ident">new</span>(<span class="kw">move</span> <span class="op">|</span>(<span class="kw">_</span>, <span class="ident">result</span>)<span class="op">|</span> {
-                        <span class="ident">sched</span>
-                            .<span class="ident">get_sched_pool</span>(<span class="ident">priority</span>)
-                            .<span class="ident">clone</span>()
-                            .<span class="ident">pool</span>
+                        <span class="ident">sched_pool</span>
                             .<span class="ident">spawn</span>(<span class="kw">async</span> <span class="kw">move</span> {
                                 <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;scheduler_async_write_finish&quot;</span>);
 
                                 <span class="ident">sched</span>.<span class="ident">on_write_finished</span>(
                                     <span class="ident">cid</span>,
-                                    <span class="ident">write_finished_pr</span>,
+                                    <span class="ident">pr</span>,
                                     <span class="ident">result</span>,
                                     <span class="ident">lock_guards</span>,
                                     <span class="ident">pipelined</span>,
@@ -1487,17 +1481,13 @@
                             .<span class="ident">unwrap</span>()
                     });
 
-                    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">async_write</span>(<span class="kw-2">&amp;</span><span class="ident">ctx</span>, <span class="ident">to_be_write</span>, <span class="ident">engine_cb</span>) {
+                    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span>
+                        <span class="ident">engine</span>.<span class="ident">async_write_ext</span>(<span class="kw-2">&amp;</span><span class="ident">ctx</span>, <span class="ident">to_be_write</span>, <span class="ident">engine_cb</span>, <span class="ident">proposed_cb</span>)
+                    {
                         <span class="ident">SCHED_STAGE_COUNTER_VEC</span>.<span class="ident">get</span>(<span class="ident">tag</span>).<span class="ident">async_write_err</span>.<span class="ident">inc</span>();
 
                         <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;engine async_write failed&quot;</span>; <span class="string">&quot;cid&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">cid</span>, <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
                         <span class="ident">scheduler</span>.<span class="ident">finish_with_err</span>(<span class="ident">cid</span>, <span class="ident">e</span>.<span class="ident">into</span>());
-                    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">pipelined</span> {
-                        <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;scheduler_pipelined_write_finish&quot;</span>);
-
-                        <span class="comment">// The write task is scheduled to engine successfully.</span>
-                        <span class="comment">// Respond to client early.</span>
-                        <span class="ident">scheduler</span>.<span class="ident">on_pipelined_write</span>(<span class="ident">cid</span>, <span class="ident">pipelined_write_pr</span>, <span class="ident">tag</span>);
                     }
                 }
             }

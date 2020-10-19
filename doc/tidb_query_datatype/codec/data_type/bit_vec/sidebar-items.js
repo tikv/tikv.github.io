@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["BitAndIterator",""],["BitVec","A boolean vector, which consolidates 8 booleans into 1 u8 to save space."]]});
+initSidebarItems({"constant":[["BITS",""]],"struct":[["BitAndIterator",""],["BitVec","A boolean vector, which consolidates 64 booleans into 1 u64 to save space."]]});

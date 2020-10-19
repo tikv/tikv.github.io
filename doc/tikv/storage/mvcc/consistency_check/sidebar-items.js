@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["PHYSICAL_SHIFT_BITS",""],["SAFE_POINT_WINDOW",""]],"fn":[["get_safe_point_for_check",""],["zero_safe_point_for_check",""]],"struct":[["Mvcc",""],["MvccChecksum",""],["MvccInfoCollector",""],["MvccInfoIterator",""],["MvccInfoScanner",""]],"trait":[["MvccInfoObserver",""]]});

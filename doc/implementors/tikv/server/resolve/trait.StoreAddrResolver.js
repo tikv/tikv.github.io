@@ -1,3 +1,4 @@
 (function() {var implementors = {};
+implementors["test_raftstore"] = [{"text":"impl <a class=\"trait\" href=\"tikv/server/resolve/trait.StoreAddrResolver.html\" title=\"trait tikv::server::resolve::StoreAddrResolver\">StoreAddrResolver</a> for <a class=\"struct\" href=\"test_raftstore/struct.AddressMap.html\" title=\"struct test_raftstore::AddressMap\">AddressMap</a>","synthetic":false,"types":["test_raftstore::server::AddressMap"]}];
 implementors["tikv"] = [];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

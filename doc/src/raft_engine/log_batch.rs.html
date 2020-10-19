@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `/rust/git/checkouts/raft-engine-35ec7b0b2c07ddd2/400c925/src/log_batch.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>log_batch.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css"><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="shortcut icon" href="../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../raft_engine/index.html'><div class='logo-container'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `/rust/git/checkouts/raft-engine-35ec7b0b2c07ddd2/8452ee1/src/log_batch.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>log_batch.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css"><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="shortcut icon" href="../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../raft_engine/index.html'><div class='logo-container'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
 <span id="2">  2</span>
 <span id="3">  3</span>
 <span id="4">  4</span>
@@ -728,9 +728,21 @@
 <span id="728">728</span>
 <span id="729">729</span>
 <span id="730">730</span>
+<span id="731">731</span>
+<span id="732">732</span>
+<span id="733">733</span>
+<span id="734">734</span>
+<span id="735">735</span>
+<span id="736">736</span>
+<span id="737">737</span>
+<span id="738">738</span>
+<span id="739">739</span>
+<span id="740">740</span>
+<span id="741">741</span>
+<span id="742">742</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">borrow</span>::{<span class="ident">Borrow</span>, <span class="ident">Cow</span>};
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">cell</span>::<span class="ident">RefCell</span>;
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">cell</span>::{<span class="ident">Cell</span>, <span class="ident">RefCell</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">BufRead</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">marker</span>::<span class="ident">PhantomData</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::<span class="ident">AtomicUsize</span>;
@@ -770,54 +782,50 @@
 <span class="kw">mod</span> <span class="ident">lz4</span> {
     <span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">i32</span>, <span class="ident">ptr</span>};
 
-    <span class="comment">// TODO: use in place compression instead.</span>
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">encode_block</span>(<span class="ident">src</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">encode_block</span>(<span class="ident">src</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">head_reserve</span>: <span class="ident">usize</span>, <span class="ident">tail_alloc</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> {
         <span class="kw">unsafe</span> {
             <span class="kw">let</span> <span class="ident">bound</span> <span class="op">=</span> <span class="ident">lz4_sys</span>::<span class="ident">LZ4_compressBound</span>(<span class="ident">src</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">i32</span>);
-            <span class="kw">if</span> <span class="ident">bound</span> <span class="op">&gt;</span> <span class="number">0</span> <span class="kw-2">&amp;</span><span class="op">&amp;</span> <span class="ident">src</span>.<span class="ident">len</span>() <span class="op">&lt;</span><span class="op">=</span> <span class="ident">i32</span>::<span class="ident">MAX</span> <span class="kw">as</span> <span class="ident">usize</span> {
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>::<span class="ident">with_capacity</span>(<span class="ident">bound</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">+</span> <span class="number">4</span>);
-                <span class="kw">let</span> <span class="ident">le_len</span> <span class="op">=</span> <span class="ident">src</span>.<span class="ident">len</span>().<span class="ident">to_le_bytes</span>();
-                <span class="ident">ptr</span>::<span class="ident">copy_nonoverlapping</span>(<span class="ident">le_len</span>.<span class="ident">as_ptr</span>(), <span class="ident">output</span>.<span class="ident">as_mut_ptr</span>(), <span class="number">4</span>);
-                <span class="kw">let</span> <span class="ident">size</span> <span class="op">=</span> <span class="ident">lz4_sys</span>::<span class="ident">LZ4_compress_default</span>(
-                    <span class="ident">src</span>.<span class="ident">as_ptr</span>() <span class="kw">as</span> <span class="kw">_</span>,
-                    <span class="ident">output</span>.<span class="ident">as_mut_ptr</span>().<span class="ident">add</span>(<span class="number">4</span>) <span class="kw">as</span> <span class="kw">_</span>,
-                    <span class="ident">src</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">i32</span>,
-                    <span class="ident">bound</span>,
-                );
-                <span class="kw">if</span> <span class="ident">size</span> <span class="op">&gt;</span> <span class="number">0</span> {
-                    <span class="ident">output</span>.<span class="ident">set_len</span>(<span class="ident">size</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">+</span> <span class="number">4</span>);
-                    <span class="kw">return</span> <span class="ident">output</span>;
-                }
-                <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;compression fail: {}&quot;</span>, <span class="ident">size</span>);
-            }
-            <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;input size is too large: {}&quot;</span>, <span class="ident">src</span>.<span class="ident">len</span>());
+            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">bound</span> <span class="op">&gt;</span> <span class="number">0</span> <span class="kw-2">&amp;</span><span class="op">&amp;</span> <span class="ident">src</span>.<span class="ident">len</span>() <span class="op">&lt;</span><span class="op">=</span> <span class="ident">i32</span>::<span class="ident">MAX</span> <span class="kw">as</span> <span class="ident">usize</span>);
+
+            <span class="comment">// Layout: { header | decoded_len | content | checksum }.</span>
+            <span class="kw">let</span> <span class="ident">capacity</span> <span class="op">=</span> <span class="ident">head_reserve</span> <span class="op">+</span> <span class="number">4</span> <span class="op">+</span> <span class="ident">bound</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">+</span> <span class="ident">tail_alloc</span>;
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">output</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">with_capacity</span>(<span class="ident">capacity</span>);
+
+            <span class="kw">let</span> <span class="ident">le_len</span> <span class="op">=</span> <span class="ident">src</span>.<span class="ident">len</span>().<span class="ident">to_le_bytes</span>();
+            <span class="ident">ptr</span>::<span class="ident">copy_nonoverlapping</span>(<span class="ident">le_len</span>.<span class="ident">as_ptr</span>(), <span class="ident">output</span>.<span class="ident">as_mut_ptr</span>().<span class="ident">add</span>(<span class="ident">head_reserve</span>), <span class="number">4</span>);
+
+            <span class="kw">let</span> <span class="ident">size</span> <span class="op">=</span> <span class="ident">lz4_sys</span>::<span class="ident">LZ4_compress_default</span>(
+                <span class="ident">src</span>.<span class="ident">as_ptr</span>() <span class="kw">as</span> <span class="kw">_</span>,
+                <span class="ident">output</span>.<span class="ident">as_mut_ptr</span>().<span class="ident">add</span>(<span class="ident">head_reserve</span> <span class="op">+</span> <span class="number">4</span>) <span class="kw">as</span> <span class="kw">_</span>,
+                <span class="ident">src</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">i32</span>,
+                <span class="ident">bound</span>,
+            );
+            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">size</span> <span class="op">&gt;</span> <span class="number">0</span>);
+            <span class="ident">output</span>.<span class="ident">set_len</span>(<span class="ident">head_reserve</span> <span class="op">+</span> <span class="number">4</span> <span class="op">+</span> <span class="ident">size</span> <span class="kw">as</span> <span class="ident">usize</span>);
+            <span class="ident">output</span>
         }
     }
 
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">decode_block</span>(<span class="ident">src</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> {
+        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">src</span>.<span class="ident">len</span>() <span class="op">&gt;</span> <span class="number">4</span>, <span class="string">&quot;data is too short: {} &lt;= 4&quot;</span>, <span class="ident">src</span>.<span class="ident">len</span>());
         <span class="kw">unsafe</span> {
-            <span class="kw">if</span> <span class="ident">src</span>.<span class="ident">len</span>() <span class="op">&gt;</span> <span class="number">4</span> {
-                <span class="kw">let</span> <span class="ident">len</span> <span class="op">=</span> <span class="ident">u32</span>::<span class="ident">from_le</span>(<span class="ident">ptr</span>::<span class="ident">read_unaligned</span>(<span class="ident">src</span>.<span class="ident">as_ptr</span>() <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="ident">u32</span>));
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">dst</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">with_capacity</span>(<span class="ident">len</span> <span class="kw">as</span> <span class="ident">usize</span>);
-                <span class="kw">let</span> <span class="ident">l</span> <span class="op">=</span> <span class="ident">lz4_sys</span>::<span class="ident">LZ4_decompress_safe</span>(
-                    <span class="ident">src</span>.<span class="ident">as_ptr</span>().<span class="ident">add</span>(<span class="number">4</span>) <span class="kw">as</span> <span class="kw">_</span>,
-                    <span class="ident">dst</span>.<span class="ident">as_mut_ptr</span>() <span class="kw">as</span> <span class="kw">_</span>,
-                    <span class="ident">src</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">i32</span> <span class="op">-</span> <span class="number">4</span>,
-                    <span class="ident">dst</span>.<span class="ident">capacity</span>() <span class="kw">as</span> <span class="ident">i32</span>,
-                );
-                <span class="kw">if</span> <span class="ident">l</span> <span class="op">=</span><span class="op">=</span> <span class="ident">len</span> <span class="kw">as</span> <span class="ident">i32</span> {
-                    <span class="ident">dst</span>.<span class="ident">set_len</span>(<span class="ident">l</span> <span class="kw">as</span> <span class="ident">usize</span>);
-                    <span class="kw">return</span> <span class="ident">dst</span>;
-                }
-                <span class="kw">if</span> <span class="ident">l</span> <span class="op">&lt;</span> <span class="number">0</span> {
-                    <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;decompress failed: {}&quot;</span>, <span class="ident">l</span>);
-                } <span class="kw">else</span> {
-                    <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;length of decompress result not match {} != {}&quot;</span>, <span class="ident">len</span>, <span class="ident">l</span>);
-                }
+            <span class="kw">let</span> <span class="ident">len</span> <span class="op">=</span> <span class="ident">u32</span>::<span class="ident">from_le</span>(<span class="ident">ptr</span>::<span class="ident">read_unaligned</span>(<span class="ident">src</span>.<span class="ident">as_ptr</span>() <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="ident">u32</span>));
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">dst</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">with_capacity</span>(<span class="ident">len</span> <span class="kw">as</span> <span class="ident">usize</span>);
+            <span class="kw">let</span> <span class="ident">l</span> <span class="op">=</span> <span class="ident">lz4_sys</span>::<span class="ident">LZ4_decompress_safe</span>(
+                <span class="ident">src</span>.<span class="ident">as_ptr</span>().<span class="ident">add</span>(<span class="number">4</span>) <span class="kw">as</span> <span class="kw">_</span>,
+                <span class="ident">dst</span>.<span class="ident">as_mut_ptr</span>() <span class="kw">as</span> <span class="kw">_</span>,
+                <span class="ident">src</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">i32</span> <span class="op">-</span> <span class="number">4</span>,
+                <span class="ident">dst</span>.<span class="ident">capacity</span>() <span class="kw">as</span> <span class="ident">i32</span>,
+            );
+            <span class="kw">if</span> <span class="ident">l</span> <span class="op">=</span><span class="op">=</span> <span class="ident">len</span> <span class="kw">as</span> <span class="ident">i32</span> {
+                <span class="ident">dst</span>.<span class="ident">set_len</span>(<span class="ident">l</span> <span class="kw">as</span> <span class="ident">usize</span>);
+                <span class="kw">return</span> <span class="ident">dst</span>;
             }
-            <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;data is too short: {} &lt;= 4&quot;</span>, <span class="ident">src</span>.<span class="ident">len</span>());
+            <span class="kw">if</span> <span class="ident">l</span> <span class="op">&lt;</span> <span class="number">0</span> {
+                <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;decompress failed: {}&quot;</span>, <span class="ident">l</span>);
+            } <span class="kw">else</span> {
+                <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;length of decompress result not match {} != {}&quot;</span>, <span class="ident">len</span>, <span class="ident">l</span>);
+            }
         }
     }
 
@@ -827,7 +835,7 @@
         <span class="kw">fn</span> <span class="ident">test_basic</span>() {
             <span class="kw">let</span> <span class="ident">data</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> [<span class="ident">u8</span>]<span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[<span class="string">b&quot;&quot;</span>, <span class="string">b&quot;123&quot;</span>, <span class="string">b&quot;12345678910&quot;</span>];
             <span class="kw">for</span> <span class="ident">d</span> <span class="kw">in</span> <span class="ident">data</span> {
-                <span class="kw">let</span> <span class="ident">compressed</span> <span class="op">=</span> <span class="kw">super</span>::<span class="ident">encode_block</span>(<span class="ident">d</span>);
+                <span class="kw">let</span> <span class="ident">compressed</span> <span class="op">=</span> <span class="kw">super</span>::<span class="ident">encode_block</span>(<span class="ident">d</span>, <span class="number">0</span>, <span class="number">0</span>);
                 <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">compressed</span>.<span class="ident">len</span>() <span class="op">&gt;</span> <span class="number">4</span>);
                 <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="kw">super</span>::<span class="ident">decode_block</span>(<span class="kw-2">&amp;</span><span class="ident">compressed</span>);
                 <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">res</span>, <span class="ident">d</span>);
@@ -867,6 +875,8 @@
     <span class="kw">pub</span> <span class="ident">entries</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>,
     <span class="comment">// EntryIndex may be update after write to file.</span>
     <span class="kw">pub</span> <span class="ident">entries_index</span>: <span class="ident">RefCell</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">EntryIndex</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+
+    <span class="kw">pub</span> <span class="ident">encoded_size</span>: <span class="ident">Cell</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">Message</span> <span class="op">+</span> <span class="ident">PartialEq</span><span class="op">&gt;</span> <span class="ident">PartialEq</span> <span class="kw">for</span> <span class="ident">Entries</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
@@ -878,12 +888,17 @@
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">Message</span><span class="op">&gt;</span> <span class="ident">Entries</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">entries</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>, <span class="ident">entries_index</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">EntryIndex</span><span class="op">&gt;</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Entries</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">len</span> <span class="op">=</span> <span class="ident">entries</span>.<span class="ident">len</span>();
+        <span class="kw">let</span> (<span class="ident">encoded_size</span>, <span class="ident">entries_index</span>) <span class="op">=</span> <span class="kw">match</span> <span class="ident">entries_index</span> {
+            <span class="prelude-val">Some</span>(<span class="ident">index</span>) <span class="op">=</span><span class="op">&gt;</span> (
+                <span class="ident">index</span>.<span class="ident">iter</span>().<span class="ident">fold</span>(<span class="number">0</span>, <span class="op">|</span><span class="ident">acc</span>, <span class="ident">x</span><span class="op">|</span> <span class="ident">acc</span> <span class="op">+</span> <span class="ident">x</span>.<span class="ident">len</span> <span class="kw">as</span> <span class="ident">usize</span>),
+                <span class="ident">RefCell</span>::<span class="ident">new</span>(<span class="ident">index</span>),
+            ),
+            <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> (<span class="number">0</span>, <span class="ident">RefCell</span>::<span class="ident">new</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">EntryIndex</span>::<span class="ident">default</span>(); <span class="ident">len</span>])),
+        };
         <span class="ident">Entries</span> {
             <span class="ident">entries</span>,
-            <span class="ident">entries_index</span>: <span class="kw">match</span> <span class="ident">entries_index</span> {
-                <span class="prelude-val">Some</span>(<span class="ident">index</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">RefCell</span>::<span class="ident">new</span>(<span class="ident">index</span>),
-                <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">RefCell</span>::<span class="ident">new</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">EntryIndex</span>::<span class="ident">default</span>(); <span class="ident">len</span>]),
-            },
+            <span class="ident">entries_index</span>,
+            <span class="ident">encoded_size</span>: <span class="ident">Cell</span>::<span class="ident">new</span>(<span class="ident">encoded_size</span>),
         }
     }
 
@@ -938,6 +953,7 @@
                 <span class="comment">// This offset doesn&#39;t count the header.</span>
                 <span class="ident">entries_index</span>[<span class="ident">i</span>].<span class="ident">offset</span> <span class="op">=</span> <span class="ident">vec</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">u64</span>;
                 <span class="ident">entries_index</span>[<span class="ident">i</span>].<span class="ident">len</span> <span class="op">=</span> <span class="ident">content</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">u64</span>;
+                <span class="self">self</span>.<span class="ident">encoded_size</span>.<span class="ident">update</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span> <span class="op">+</span> <span class="ident">content</span>.<span class="ident">len</span>());
             }
 
             <span class="ident">vec</span>.<span class="ident">extend_from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">content</span>);
@@ -945,28 +961,37 @@
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">update_position</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">queue</span>: <span class="ident">LogQueue</span>, <span class="ident">file_num</span>: <span class="ident">u64</span>, <span class="ident">base</span>: <span class="ident">u64</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">update_position</span>(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="ident">queue</span>: <span class="ident">LogQueue</span>,
+        <span class="ident">file_num</span>: <span class="ident">u64</span>,
+        <span class="ident">base</span>: <span class="ident">u64</span>,
+        <span class="ident">chunk_size</span>: <span class="kw-2">&amp;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicUsize</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    ) {
         <span class="kw">for</span> <span class="ident">idx</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">entries_index</span>.<span class="ident">borrow_mut</span>().<span class="ident">iter_mut</span>() {
             <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="ident">idx</span>.<span class="ident">file_num</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> <span class="kw-2">&amp;</span><span class="op">&amp;</span> <span class="ident">idx</span>.<span class="ident">base_offset</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span>);
             <span class="ident">idx</span>.<span class="ident">queue</span> <span class="op">=</span> <span class="ident">queue</span>;
             <span class="ident">idx</span>.<span class="ident">file_num</span> <span class="op">=</span> <span class="ident">file_num</span>;
             <span class="ident">idx</span>.<span class="ident">base_offset</span> <span class="op">=</span> <span class="ident">base</span>;
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">chunk_size</span>) <span class="op">=</span> <span class="ident">chunk_size</span> {
+                <span class="ident">idx</span>.<span class="ident">cache_tracker</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">CacheTracker</span> {
+                    <span class="ident">chunk_size</span>: <span class="ident">chunk_size</span>.<span class="ident">clone</span>(),
+                    <span class="ident">sub_on_drop</span>: <span class="ident">idx</span>.<span class="ident">len</span> <span class="kw">as</span> <span class="ident">usize</span>,
+                });
+            }
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">attach_cache_tracker</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">size</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicUsize</span><span class="op">&gt;</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">attach_cache_tracker</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">chunk_size</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicUsize</span><span class="op">&gt;</span>) {
         <span class="kw">for</span> <span class="ident">idx</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">entries_index</span>.<span class="ident">borrow_mut</span>().<span class="ident">iter_mut</span>() {
-            <span class="kw">let</span> <span class="ident">sub_on_drop</span> <span class="op">=</span> <span class="ident">idx</span>.<span class="ident">len</span> <span class="kw">as</span> <span class="ident">usize</span>;
-            <span class="kw">let</span> <span class="ident">chunk_size</span> <span class="op">=</span> <span class="ident">size</span>.<span class="ident">clone</span>();
-            <span class="kw">let</span> <span class="ident">tracker</span> <span class="op">=</span> <span class="ident">CacheTracker</span> {
-                <span class="ident">chunk_size</span>,
-                <span class="ident">sub_on_drop</span>,
-            };
-            <span class="ident">idx</span>.<span class="ident">cache_tracker</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">tracker</span>);
+            <span class="ident">idx</span>.<span class="ident">cache_tracker</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">CacheTracker</span> {
+                <span class="ident">chunk_size</span>: <span class="ident">chunk_size</span>.<span class="ident">clone</span>(),
+                <span class="ident">sub_on_drop</span>: <span class="ident">idx</span>.<span class="ident">len</span> <span class="kw">as</span> <span class="ident">usize</span>,
+            });
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">update_compression_type</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">compression_type</span>: <span class="ident">CompressionType</span>, <span class="ident">batch_len</span>: <span class="ident">u64</span>) {
+    <span class="kw">fn</span> <span class="ident">update_compression_type</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">compression_type</span>: <span class="ident">CompressionType</span>, <span class="ident">batch_len</span>: <span class="ident">u64</span>) {
         <span class="kw">for</span> <span class="ident">idx</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">entries_index</span>.<span class="ident">borrow_mut</span>().<span class="ident">iter_mut</span>() {
             <span class="ident">idx</span>.<span class="ident">compression_type</span> <span class="op">=</span> <span class="ident">compression_type</span>;
             <span class="ident">idx</span>.<span class="ident">batch_len</span> <span class="op">=</span> <span class="ident">batch_len</span>;
@@ -1301,7 +1326,7 @@
     }
 
     <span class="comment">// TODO: avoid to write a large batch into one compressed chunk.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">encode_to_bytes</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">encode_to_bytes</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">encoded_size</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">items</span>.<span class="ident">is_empty</span>() {
             <span class="kw">return</span> <span class="prelude-val">None</span>;
         }
@@ -1315,9 +1340,7 @@
         }
 
         <span class="kw">let</span> <span class="ident">compression_type</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">vec</span>.<span class="ident">len</span>() <span class="op">&gt;</span> <span class="ident">COMPRESSION_SIZE</span> {
-            <span class="kw">let</span> <span class="ident">dst</span> <span class="op">=</span> <span class="ident">lz4</span>::<span class="ident">encode_block</span>(<span class="kw-2">&amp;</span><span class="ident">vec</span>[<span class="number">8</span>..]);
-            <span class="ident">vec</span>.<span class="ident">truncate</span>(<span class="number">8</span>);
-            <span class="ident">vec</span>.<span class="ident">extend_from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">dst</span>);
+            <span class="ident">vec</span> <span class="op">=</span> <span class="ident">lz4</span>::<span class="ident">encode_block</span>(<span class="kw-2">&amp;</span><span class="ident">vec</span>[<span class="ident">HEADER_LEN</span>..], <span class="ident">HEADER_LEN</span>, <span class="number">4</span>);
             <span class="ident">CompressionType</span>::<span class="ident">Lz4</span>
         } <span class="kw">else</span> {
             <span class="ident">CompressionType</span>::<span class="prelude-val">None</span>
@@ -1333,23 +1356,12 @@
         <span class="kw">let</span> <span class="ident">batch_len</span> <span class="op">=</span> (<span class="ident">vec</span>.<span class="ident">len</span>() <span class="op">-</span> <span class="number">8</span>) <span class="kw">as</span> <span class="ident">u64</span>;
         <span class="kw">for</span> <span class="ident">item</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">items</span> {
             <span class="kw">if</span> <span class="kw">let</span> <span class="ident">LogItemContent</span>::<span class="ident">Entries</span>(<span class="kw-2">ref</span> <span class="ident">entries</span>) <span class="op">=</span> <span class="ident">item</span>.<span class="ident">content</span> {
+                <span class="kw-2">*</span><span class="ident">encoded_size</span> <span class="op">+</span><span class="op">=</span> <span class="ident">entries</span>.<span class="ident">encoded_size</span>.<span class="ident">get</span>();
                 <span class="ident">entries</span>.<span class="ident">update_compression_type</span>(<span class="ident">compression_type</span>, <span class="ident">batch_len</span> <span class="kw">as</span> <span class="ident">u64</span>);
             }
         }
 
         <span class="prelude-val">Some</span>(<span class="ident">vec</span>)
-    }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">entries_size</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">size</span> <span class="op">=</span> <span class="number">0</span>;
-        <span class="kw">for</span> <span class="ident">item</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">items</span> {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="ident">LogItemContent</span>::<span class="ident">Entries</span>(<span class="kw-2">ref</span> <span class="ident">entries</span>) <span class="op">=</span> <span class="ident">item</span>.<span class="ident">content</span> {
-                <span class="kw">for</span> <span class="ident">entry</span> <span class="kw">in</span> <span class="ident">entries</span>.<span class="ident">entries_index</span>.<span class="ident">borrow</span>().<span class="ident">iter</span>() {
-                    <span class="ident">size</span> <span class="op">+</span><span class="op">=</span> <span class="ident">entry</span>.<span class="ident">len</span> <span class="kw">as</span> <span class="ident">usize</span>;
-                }
-            }
-        }
-        <span class="ident">size</span>
     }
 }
 
@@ -1447,16 +1459,28 @@
     <span class="kw">fn</span> <span class="ident">test_log_batch_enc_dec</span>() {
         <span class="kw">let</span> <span class="ident">region_id</span> <span class="op">=</span> <span class="number">8</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">batch</span> <span class="op">=</span> <span class="ident">LogBatch</span>::<span class="op">&lt;</span><span class="ident">Entry</span>, <span class="ident">Entry</span><span class="op">&gt;</span>::<span class="ident">new</span>();
-        <span class="ident">batch</span>.<span class="ident">add_entries</span>(<span class="ident">region_id</span>, <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">Entry</span>::<span class="ident">new</span>(); <span class="number">10</span>]);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">entry</span> <span class="op">=</span> <span class="ident">Entry</span>::<span class="ident">new</span>();
+        <span class="ident">entry</span>.<span class="ident">set_data</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="string">b&#39;x&#39;</span>; <span class="number">1024</span>]);
+        <span class="ident">batch</span>.<span class="ident">add_entries</span>(<span class="ident">region_id</span>, <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">entry</span>; <span class="number">10</span>]);
         <span class="ident">batch</span>.<span class="ident">add_command</span>(<span class="ident">region_id</span>, <span class="ident">Command</span>::<span class="ident">Clean</span>);
         <span class="ident">batch</span>.<span class="ident">put</span>(<span class="ident">region_id</span>, <span class="string">b&quot;key&quot;</span>.<span class="ident">to_vec</span>(), <span class="string">b&quot;value&quot;</span>.<span class="ident">to_vec</span>());
         <span class="ident">batch</span>.<span class="ident">delete</span>(<span class="ident">region_id</span>, <span class="string">b&quot;key2&quot;</span>.<span class="ident">to_vec</span>());
 
-        <span class="kw">let</span> <span class="ident">encoded</span> <span class="op">=</span> <span class="ident">batch</span>.<span class="ident">encode_to_bytes</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">encoded_size</span> <span class="op">=</span> <span class="number">0</span>;
+        <span class="kw">let</span> <span class="ident">encoded</span> <span class="op">=</span> <span class="ident">batch</span>.<span class="ident">encode_to_bytes</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">encoded_size</span>).<span class="ident">unwrap</span>();
+        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">encoded_size</span>, <span class="number">10270</span>);
+
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">s</span> <span class="op">=</span> <span class="ident">encoded</span>.<span class="ident">as_slice</span>();
         <span class="kw">let</span> <span class="ident">decoded_batch</span> <span class="op">=</span> <span class="ident">LogBatch</span>::<span class="ident">from_bytes</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">s</span>, <span class="number">0</span>, <span class="number">0</span>).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>();
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">s</span>.<span class="ident">len</span>(), <span class="number">0</span>);
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">batch</span>, <span class="ident">decoded_batch</span>);
+
+        <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="ident">decoded_batch</span>.<span class="ident">items</span>[<span class="number">0</span>].<span class="ident">content</span> {
+            <span class="ident">LogItemContent</span>::<span class="ident">Entries</span>(<span class="ident">entries</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">entries</span>.<span class="ident">encoded_size</span>.<span class="ident">get</span>(), <span class="ident">encoded_size</span>)
+            }
+            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">unreachable</span><span class="macro">!</span>(),
+        }
     }
 }
 </pre></div>

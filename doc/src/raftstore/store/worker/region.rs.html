@@ -1109,6 +1109,19 @@
 <span id="1109">1109</span>
 <span id="1110">1110</span>
 <span id="1111">1111</span>
+<span id="1112">1112</span>
+<span id="1113">1113</span>
+<span id="1114">1114</span>
+<span id="1115">1115</span>
+<span id="1116">1116</span>
+<span id="1117">1117</span>
+<span id="1118">1118</span>
+<span id="1119">1119</span>
+<span id="1120">1120</span>
+<span id="1121">1121</span>
+<span id="1122">1122</span>
+<span id="1123">1123</span>
+<span id="1124">1124</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1121,7 +1134,7 @@
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">time</span>::{<span class="ident">Duration</span>, <span class="ident">Instant</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">u64</span>;
 
-<span class="kw">use</span> <span class="ident">engine_traits</span>::<span class="ident">CF_RAFT</span>;
+<span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">DeleteStrategy</span>, <span class="ident">Range</span>, <span class="ident">CF_LOCK</span>, <span class="ident">CF_RAFT</span>};
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">Engines</span>, <span class="ident">KvEngine</span>, <span class="ident">Mutable</span>, <span class="ident">RaftEngine</span>};
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">raft_serverpb</span>::{<span class="ident">PeerState</span>, <span class="ident">RaftApplyState</span>, <span class="ident">RegionLocalState</span>};
 <span class="kw">use</span> <span class="ident">raft</span>::<span class="ident">eraftpb</span>::<span class="ident">Snapshot</span> <span class="kw">as</span> <span class="ident">RaftSnapshot</span>;
@@ -1152,7 +1165,7 @@
 <span class="comment">// used to periodically check whether schedule pending applies in region runner</span>
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">PENDING_APPLY_CHECK_INTERVAL</span>: <span class="ident">u64</span> <span class="op">=</span> <span class="number">1_000</span>; <span class="comment">// 1000 milliseconds</span>
 
-<span class="kw">const</span> <span class="ident">CLEANUP_MAX_DURATION</span>: <span class="ident">Duration</span> <span class="op">=</span> <span class="ident">Duration</span>::<span class="ident">from_secs</span>(<span class="number">5</span>);
+<span class="kw">const</span> <span class="ident">CLEANUP_MAX_REGION_COUNT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">128</span>;
 
 <span class="doccomment">/// Region related task</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
@@ -1201,8 +1214,8 @@
                 <span class="ident">f</span>,
                 <span class="string">&quot;Destroy {} [{}, {})&quot;</span>,
                 <span class="ident">region_id</span>,
-                <span class="ident">hex</span>::<span class="ident">encode_upper</span>(<span class="ident">start_key</span>),
-                <span class="ident">hex</span>::<span class="ident">encode_upper</span>(<span class="ident">end_key</span>)
+                <span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>(<span class="kw-2">&amp;</span><span class="ident">start_key</span>),
+                <span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>(<span class="kw-2">&amp;</span><span class="ident">end_key</span>)
             ),
         }
     }
@@ -1292,8 +1305,8 @@
             <span class="macro">panic</span><span class="macro">!</span>(
                 <span class="string">&quot;[region {}] register deleting data in [{}, {}) failed due to overlap&quot;</span>,
                 <span class="ident">region_id</span>,
-                <span class="ident">hex</span>::<span class="ident">encode_upper</span>(<span class="kw-2">&amp;</span><span class="ident">start_key</span>),
-                <span class="ident">hex</span>::<span class="ident">encode_upper</span>(<span class="kw-2">&amp;</span><span class="ident">end_key</span>),
+                <span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>(<span class="kw-2">&amp;</span><span class="ident">start_key</span>),
+                <span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>(<span class="kw-2">&amp;</span><span class="ident">end_key</span>),
             );
         }
         <span class="kw">let</span> <span class="ident">info</span> <span class="op">=</span> <span class="ident">StalePeerInfo</span> {
@@ -1418,7 +1431,7 @@
                 <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> {
                     <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(
                         <span class="string">&quot;failed to get region_state from {}&quot;</span>,
-                        <span class="ident">hex</span>::<span class="ident">encode_upper</span>(<span class="kw-2">&amp;</span><span class="ident">region_key</span>)
+                        <span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>(<span class="kw-2">&amp;</span><span class="ident">region_key</span>)
                     ));
                 }
             };
@@ -1428,11 +1441,8 @@
         <span class="kw">let</span> <span class="ident">start_key</span> <span class="op">=</span> <span class="ident">keys</span>::<span class="ident">enc_start_key</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>);
         <span class="kw">let</span> <span class="ident">end_key</span> <span class="op">=</span> <span class="ident">keys</span>::<span class="ident">enc_end_key</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>);
         <span class="ident">check_abort</span>(<span class="kw-2">&amp;</span><span class="ident">abort</span>)<span class="question-mark">?</span>;
-        <span class="self">self</span>.<span class="ident">cleanup_overlap_ranges</span>(<span class="kw-2">&amp;</span><span class="ident">start_key</span>, <span class="kw-2">&amp;</span><span class="ident">end_key</span>);
-        <span class="macro">box_try</span><span class="macro">!</span>(<span class="self">self</span>
-            .<span class="ident">engines</span>
-            .<span class="ident">kv</span>
-            .<span class="ident">delete_all_in_range</span>(<span class="kw-2">&amp;</span><span class="ident">start_key</span>, <span class="kw-2">&amp;</span><span class="ident">end_key</span>, <span class="self">self</span>.<span class="ident">use_delete_range</span>));
+        <span class="self">self</span>.<span class="ident">cleanup_overlap_ranges</span>(<span class="kw-2">&amp;</span><span class="ident">start_key</span>, <span class="kw-2">&amp;</span><span class="ident">end_key</span>)<span class="question-mark">?</span>;
+        <span class="self">self</span>.<span class="ident">delete_all_in_range</span>(<span class="kw-2">&amp;</span>[<span class="ident">Range</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">start_key</span>, <span class="kw-2">&amp;</span><span class="ident">end_key</span>)])<span class="question-mark">?</span>;
         <span class="ident">check_abort</span>(<span class="kw-2">&amp;</span><span class="ident">abort</span>)<span class="question-mark">?</span>;
         <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;apply_snap_cleanup_range&quot;</span>);
 
@@ -1443,7 +1453,7 @@
                 <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> {
                     <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(
                         <span class="string">&quot;failed to get raftstate from {}&quot;</span>,
-                        <span class="ident">hex</span>::<span class="ident">encode_upper</span>(<span class="kw-2">&amp;</span><span class="ident">state_key</span>)
+                        <span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>(<span class="kw-2">&amp;</span><span class="ident">state_key</span>)
                     ));
                 }
             };
@@ -1507,7 +1517,6 @@
             }
             <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="macro">error</span><span class="macro">!</span>(<span class="op">%</span><span class="ident">e</span>; <span class="string">&quot;failed to apply snap!!!&quot;</span>);
-
                 <span class="ident">status</span>.<span class="ident">swap</span>(<span class="ident">JOB_STATUS_FAILED</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
                 <span class="ident">SNAP_COUNTER</span>.<span class="ident">apply</span>.<span class="ident">fail</span>.<span class="ident">inc</span>();
             }
@@ -1517,106 +1526,83 @@
     }
 
     <span class="doccomment">/// Cleans up the data within the range.</span>
-    <span class="kw">fn</span> <span class="ident">cleanup_range</span>(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">region_id</span>: <span class="ident">u64</span>,
-        <span class="ident">start_key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>],
-        <span class="ident">end_key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>],
-        <span class="ident">use_delete_files</span>: <span class="ident">bool</span>,
-    ) {
-        <span class="kw">if</span> <span class="ident">use_delete_files</span> {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="self">self</span>
-                .<span class="ident">engines</span>
-                .<span class="ident">kv</span>
-                .<span class="ident">delete_all_files_in_range</span>(<span class="ident">start_key</span>, <span class="ident">end_key</span>)
-            {
-                <span class="macro">error</span><span class="macro">!</span>(<span class="op">%</span><span class="ident">e</span>;
-                    <span class="string">&quot;failed to delete files in range&quot;</span>;
-                    <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>,
-                    <span class="string">&quot;start_key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">log_wrappers</span>::<span class="ident">Key</span>(<span class="ident">start_key</span>),
-                    <span class="string">&quot;end_key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">log_wrappers</span>::<span class="ident">Key</span>(<span class="ident">end_key</span>),
-                );
-                <span class="kw">return</span>;
-            }
-        }
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span>
-            <span class="self">self</span>.<span class="ident">engines</span>
-                .<span class="ident">kv</span>
-                .<span class="ident">delete_all_in_range</span>(<span class="ident">start_key</span>, <span class="ident">end_key</span>, <span class="self">self</span>.<span class="ident">use_delete_range</span>)
-        {
-            <span class="macro">error</span><span class="macro">!</span>(<span class="op">%</span><span class="ident">e</span>;
-                <span class="string">&quot;failed to delete data in range&quot;</span>;
-                <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>,
-                <span class="string">&quot;start_key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">log_wrappers</span>::<span class="ident">Key</span>(<span class="ident">start_key</span>),
-                <span class="string">&quot;end_key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">log_wrappers</span>::<span class="ident">Key</span>(<span class="ident">end_key</span>),
-            );
-        }
-        <span class="kw">if</span> <span class="ident">use_delete_files</span> {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="self">self</span>
-                .<span class="ident">engines</span>
-                .<span class="ident">kv</span>
-                .<span class="ident">delete_blob_files_in_range</span>(<span class="ident">start_key</span>, <span class="ident">end_key</span>)
-            {
-                <span class="macro">error</span><span class="macro">!</span>(<span class="op">%</span><span class="ident">e</span>;
-                    <span class="string">&quot;failed to delete blob files in range&quot;</span>;
-                    <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>,
-                    <span class="string">&quot;start_key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">log_wrappers</span>::<span class="ident">Key</span>(<span class="ident">start_key</span>),
-                    <span class="string">&quot;end_key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">log_wrappers</span>::<span class="ident">Key</span>(<span class="ident">end_key</span>),
-                );
-                <span class="kw">return</span>;
-            }
-        }
-        <span class="macro">info</span><span class="macro">!</span>(
-            <span class="string">&quot;succeed in deleting data in range&quot;</span>;
-            <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>,
-            <span class="string">&quot;start_key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">log_wrappers</span>::<span class="ident">Key</span>(<span class="ident">start_key</span>),
-            <span class="string">&quot;end_key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">log_wrappers</span>::<span class="ident">Key</span>(<span class="ident">end_key</span>),
-        );
+    <span class="kw">fn</span> <span class="ident">cleanup_range</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ranges</span>: <span class="kw-2">&amp;</span>[<span class="ident">Range</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">engines</span>
+            .<span class="ident">kv</span>
+            .<span class="ident">delete_all_in_range</span>(<span class="ident">DeleteStrategy</span>::<span class="ident">DeleteFiles</span>, <span class="kw-2">&amp;</span><span class="ident">ranges</span>)
+            .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
+                <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;failed to delete files in range&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>);
+            });
+        <span class="self">self</span>.<span class="ident">delete_all_in_range</span>(<span class="ident">ranges</span>)<span class="question-mark">?</span>;
+        <span class="self">self</span>.<span class="ident">engines</span>
+            .<span class="ident">kv</span>
+            .<span class="ident">delete_all_in_range</span>(<span class="ident">DeleteStrategy</span>::<span class="ident">DeleteBlobs</span>, <span class="kw-2">&amp;</span><span class="ident">ranges</span>)
+            .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
+                <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;failed to delete files in range&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>);
+            });
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="doccomment">/// Gets the overlapping ranges and cleans them up.</span>
-    <span class="kw">fn</span> <span class="ident">cleanup_overlap_ranges</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">start_key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">end_key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) {
+    <span class="kw">fn</span> <span class="ident">cleanup_overlap_ranges</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">start_key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">end_key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">overlap_ranges</span> <span class="op">=</span> <span class="self">self</span>
             .<span class="ident">pending_delete_ranges</span>
             .<span class="ident">drain_overlap_ranges</span>(<span class="ident">start_key</span>, <span class="ident">end_key</span>);
         <span class="kw">if</span> <span class="ident">overlap_ranges</span>.<span class="ident">is_empty</span>() {
-            <span class="kw">return</span>;
+            <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
         }
         <span class="kw">let</span> <span class="ident">oldest_sequence</span> <span class="op">=</span> <span class="self">self</span>
             .<span class="ident">engines</span>
             .<span class="ident">kv</span>
             .<span class="ident">get_oldest_snapshot_sequence_number</span>()
             .<span class="ident">unwrap_or</span>(<span class="ident">u64</span>::<span class="ident">MAX</span>);
-        <span class="kw">for</span> (<span class="ident">region_id</span>, <span class="ident">s_key</span>, <span class="ident">e_key</span>, <span class="ident">stale_sequence</span>) <span class="kw">in</span> <span class="ident">overlap_ranges</span> {
-            <span class="comment">// `delete_files_in_range` may break current rocksdb snapshots consistency,</span>
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ranges</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">with_capacity</span>(<span class="ident">overlap_ranges</span>.<span class="ident">len</span>());
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">df_ranges</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">with_capacity</span>(<span class="ident">overlap_ranges</span>.<span class="ident">len</span>());
+        <span class="kw">for</span> (<span class="ident">region_id</span>, <span class="ident">start_key</span>, <span class="ident">end_key</span>, <span class="ident">stale_sequence</span>) <span class="kw">in</span> <span class="ident">overlap_ranges</span>.<span class="ident">iter</span>() {
+            <span class="comment">// `DeleteFiles` may break current rocksdb snapshots consistency,</span>
             <span class="comment">// so do not use it unless we can make sure there is no reader of the destroyed peer anymore.</span>
-            <span class="kw">let</span> <span class="ident">use_delete_files</span> <span class="op">=</span> <span class="ident">stale_sequence</span> <span class="op">&lt;</span> <span class="ident">oldest_sequence</span>;
-            <span class="kw">if</span> <span class="op">!</span><span class="ident">use_delete_files</span> {
+            <span class="kw">if</span> <span class="kw-2">*</span><span class="ident">stale_sequence</span> <span class="op">&lt;</span> <span class="ident">oldest_sequence</span> {
+                <span class="ident">df_ranges</span>.<span class="ident">push</span>(<span class="ident">Range</span>::<span class="ident">new</span>(<span class="ident">start_key</span>, <span class="ident">end_key</span>));
+            } <span class="kw">else</span> {
                 <span class="ident">SNAP_COUNTER_VEC</span>
                     .<span class="ident">with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="string">&quot;overlap&quot;</span>, <span class="string">&quot;not_delete_files&quot;</span>])
                     .<span class="ident">inc</span>();
             }
-            <span class="self">self</span>.<span class="ident">cleanup_range</span>(<span class="ident">region_id</span>, <span class="kw-2">&amp;</span><span class="ident">s_key</span>, <span class="kw-2">&amp;</span><span class="ident">e_key</span>, <span class="ident">use_delete_files</span>);
+            <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;delete data in range because of overlap&quot;</span>; <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>,
+                  <span class="string">&quot;start_key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>(<span class="ident">start_key</span>),
+                  <span class="string">&quot;end_key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>(<span class="ident">end_key</span>));
+            <span class="ident">ranges</span>.<span class="ident">push</span>(<span class="ident">Range</span>::<span class="ident">new</span>(<span class="ident">start_key</span>, <span class="ident">end_key</span>));
         }
+        <span class="self">self</span>.<span class="ident">engines</span>
+            .<span class="ident">kv</span>
+            .<span class="ident">delete_all_in_range</span>(<span class="ident">DeleteStrategy</span>::<span class="ident">DeleteFiles</span>, <span class="kw-2">&amp;</span><span class="ident">df_ranges</span>)
+            .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
+                <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;failed to delete files in range&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>);
+            });
+
+        <span class="self">self</span>.<span class="ident">delete_all_in_range</span>(<span class="kw-2">&amp;</span><span class="ident">ranges</span>)
     }
 
     <span class="doccomment">/// Inserts a new pending range, and it will be cleaned up with some delay.</span>
     <span class="kw">fn</span> <span class="ident">insert_pending_delete_range</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">region_id</span>: <span class="ident">u64</span>, <span class="ident">start_key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">end_key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) {
-        <span class="self">self</span>.<span class="ident">cleanup_overlap_ranges</span>(<span class="ident">start_key</span>, <span class="ident">end_key</span>);
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">cleanup_overlap_ranges</span>(<span class="ident">start_key</span>, <span class="ident">end_key</span>) {
+            <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;cleanup_overlap_ranges failed&quot;</span>;
+                <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>,
+                <span class="string">&quot;start_key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>(<span class="ident">start_key</span>),
+                <span class="string">&quot;end_key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>(<span class="ident">end_key</span>),
+                <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>,
+            );
+        } <span class="kw">else</span> {
+            <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;register deleting data in range&quot;</span>;
+                <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>,
+                <span class="string">&quot;start_key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>(<span class="ident">start_key</span>),
+                <span class="string">&quot;end_key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>(<span class="ident">end_key</span>),
+            );
+        }
 
-        <span class="macro">info</span><span class="macro">!</span>(
-            <span class="string">&quot;register deleting data in range&quot;</span>;
-            <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>,
-            <span class="string">&quot;start_key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">log_wrappers</span>::<span class="ident">Key</span>(<span class="ident">start_key</span>),
-            <span class="string">&quot;end_key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">log_wrappers</span>::<span class="ident">Key</span>(<span class="ident">end_key</span>),
-        );
-
-        <span class="self">self</span>.<span class="ident">pending_delete_ranges</span>.<span class="ident">insert</span>(
-            <span class="ident">region_id</span>,
-            <span class="ident">start_key</span>,
-            <span class="ident">end_key</span>,
-            <span class="self">self</span>.<span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">get_latest_sequence_number</span>(),
-        );
+        <span class="kw">let</span> <span class="ident">seq</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">get_latest_sequence_number</span>();
+        <span class="self">self</span>.<span class="ident">pending_delete_ranges</span>
+            .<span class="ident">insert</span>(<span class="ident">region_id</span>, <span class="ident">start_key</span>, <span class="ident">end_key</span>, <span class="ident">seq</span>);
     }
 
     <span class="doccomment">/// Cleans up stale ranges.</span>
@@ -1628,30 +1614,33 @@
             .<span class="ident">kv</span>
             .<span class="ident">get_oldest_snapshot_sequence_number</span>()
             .<span class="ident">unwrap_or</span>(<span class="ident">u64</span>::<span class="ident">MAX</span>);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cleaned_range_keys</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[];
-        {
-            <span class="kw">let</span> <span class="ident">now</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now</span>();
-            <span class="kw">for</span> (<span class="ident">region_id</span>, <span class="ident">start_key</span>, <span class="ident">end_key</span>) <span class="kw">in</span>
-                <span class="self">self</span>.<span class="ident">pending_delete_ranges</span>.<span class="ident">stale_ranges</span>(<span class="ident">oldest_sequence</span>)
-            {
-                <span class="self">self</span>.<span class="ident">cleanup_range</span>(
-                    <span class="ident">region_id</span>, <span class="ident">start_key</span>, <span class="ident">end_key</span>, <span class="bool-val">true</span>, <span class="comment">/* use_delete_files */</span>
-                );
-                <span class="ident">cleaned_range_keys</span>.<span class="ident">push</span>(<span class="ident">start_key</span>.<span class="ident">to_vec</span>());
-                <span class="kw">let</span> <span class="ident">elapsed</span> <span class="op">=</span> <span class="ident">now</span>.<span class="ident">elapsed</span>();
-                <span class="kw">if</span> <span class="ident">elapsed</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">CLEANUP_MAX_DURATION</span> {
-                    <span class="kw">let</span> <span class="ident">len</span> <span class="op">=</span> <span class="ident">cleaned_range_keys</span>.<span class="ident">len</span>();
-                    <span class="kw">let</span> <span class="ident">elapsed</span> <span class="op">=</span> <span class="ident">elapsed</span>.<span class="ident">as_millis</span>() <span class="kw">as</span> <span class="ident">f64</span> <span class="op">/</span> <span class="number">1000f64</span>;
-                    <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;clean stale ranges, now backoff&quot;</span>; <span class="string">&quot;key_count&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">len</span>, <span class="string">&quot;time_takes&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">elapsed</span>);
-                    <span class="kw">break</span>;
-                }
-            }
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cleanup_ranges</span>: <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">u64</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="self">self</span>
+            .<span class="ident">pending_delete_ranges</span>
+            .<span class="ident">stale_ranges</span>(<span class="ident">oldest_sequence</span>)
+            .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">region_id</span>, <span class="ident">s</span>, <span class="ident">e</span>)<span class="op">|</span> (<span class="ident">region_id</span>, <span class="ident">s</span>.<span class="ident">to_vec</span>(), <span class="ident">e</span>.<span class="ident">to_vec</span>()))
+            .<span class="ident">collect</span>();
+        <span class="ident">cleanup_ranges</span>.<span class="ident">sort_by</span>(<span class="op">|</span><span class="ident">a</span>, <span class="ident">b</span><span class="op">|</span> <span class="ident">a</span>.<span class="number">1</span>.<span class="ident">cmp</span>(<span class="kw-2">&amp;</span><span class="ident">b</span>.<span class="number">1</span>));
+        <span class="kw">while</span> <span class="ident">cleanup_ranges</span>.<span class="ident">len</span>() <span class="op">&gt;</span> <span class="ident">CLEANUP_MAX_REGION_COUNT</span> {
+            <span class="ident">cleanup_ranges</span>.<span class="ident">pop</span>();
         }
-        <span class="kw">for</span> <span class="ident">key</span> <span class="kw">in</span> <span class="ident">cleaned_range_keys</span> {
+        <span class="kw">let</span> <span class="ident">ranges</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Range</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">cleanup_ranges</span>
+            .<span class="ident">iter</span>()
+            .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">region_id</span>, <span class="ident">start</span>, <span class="ident">end</span>)<span class="op">|</span> {
+                <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;delete data in range because of stale&quot;</span>; <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>,
+                  <span class="string">&quot;start_key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>(<span class="ident">start</span>),
+                  <span class="string">&quot;end_key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>(<span class="ident">end</span>));
+                <span class="ident">Range</span>::<span class="ident">new</span>(<span class="ident">start</span>, <span class="ident">end</span>)
+            })
+            .<span class="ident">collect</span>();
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">cleanup_range</span>(<span class="kw-2">&amp;</span><span class="ident">ranges</span>) {
+            <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;failed to cleanup stale range&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>);
+            <span class="kw">return</span>;
+        }
+        <span class="kw">for</span> (<span class="kw">_</span>, <span class="ident">key</span>, <span class="kw">_</span>) <span class="kw">in</span> <span class="ident">cleanup_ranges</span> {
             <span class="macro">assert</span><span class="macro">!</span>(
                 <span class="self">self</span>.<span class="ident">pending_delete_ranges</span>.<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>).<span class="ident">is_some</span>(),
                 <span class="string">&quot;cleanup pending_delete_ranges {} should exist&quot;</span>,
-                <span class="ident">hex</span>::<span class="ident">encode_upper</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>)
+                <span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>)
             );
         }
     }
@@ -1674,6 +1663,23 @@
             }
         }
         <span class="bool-val">false</span>
+    }
+
+    <span class="kw">fn</span> <span class="ident">delete_all_in_range</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ranges</span>: <span class="kw-2">&amp;</span>[<span class="ident">Range</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+        <span class="kw">for</span> <span class="ident">cf</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">cf_names</span>() {
+            <span class="kw">let</span> <span class="ident">strategy</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">cf</span> <span class="op">=</span><span class="op">=</span> <span class="ident">CF_LOCK</span> {
+                <span class="ident">DeleteStrategy</span>::<span class="ident">DeleteByKey</span>
+            } <span class="kw">else</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">use_delete_range</span> {
+                <span class="ident">DeleteStrategy</span>::<span class="ident">DeleteByRange</span>
+            } <span class="kw">else</span> {
+                <span class="ident">DeleteStrategy</span>::<span class="ident">DeleteByWriter</span> {
+                    <span class="ident">sst_path</span>: <span class="self">self</span>.<span class="ident">mgr</span>.<span class="ident">get_temp_path_for_ingest</span>(),
+                }
+            };
+            <span class="macro">box_try</span><span class="macro">!</span>(<span class="self">self</span>.<span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">delete_ranges_cf</span>(<span class="ident">cf</span>, <span class="ident">strategy</span>, <span class="ident">ranges</span>));
+        }
+
+        <span class="prelude-val">Ok</span>(())
     }
 }
 
@@ -1707,7 +1713,6 @@
             <span class="ident">pool</span>: <span class="ident">Builder</span>::<span class="ident">new</span>(<span class="macro">thd_name</span><span class="macro">!</span>(<span class="string">&quot;snap-generator&quot;</span>))
                 .<span class="ident">max_thread_count</span>(<span class="ident">GENERATE_POOL_SIZE</span>)
                 .<span class="ident">build_future_pool</span>(),
-
             <span class="ident">ctx</span>: <span class="ident">SnapContext</span> {
                 <span class="ident">engines</span>,
                 <span class="ident">mgr</span>,
@@ -1805,7 +1810,9 @@
                     .<span class="ident">insert_pending_delete_range</span>(<span class="ident">region_id</span>, <span class="kw-2">&amp;</span><span class="ident">start_key</span>, <span class="kw-2">&amp;</span><span class="ident">end_key</span>);
 
                 <span class="comment">// try to delete stale ranges if there are any</span>
-                <span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">clean_stale_ranges</span>();
+                <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">ingest_maybe_stall</span>() {
+                    <span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">clean_stale_ranges</span>();
+                }
             }
         }
     }
@@ -1969,19 +1976,22 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">worker</span> <span class="op">=</span> <span class="ident">Worker</span>::<span class="ident">new</span>(<span class="string">&quot;region-worker&quot;</span>);
         <span class="kw">let</span> <span class="ident">sched</span> <span class="op">=</span> <span class="ident">worker</span>.<span class="ident">scheduler</span>();
         <span class="kw">let</span> <span class="ident">engines</span> <span class="op">=</span> <span class="ident">Engines</span>::<span class="ident">new</span>(<span class="ident">engine</span>.<span class="ident">kv</span>.<span class="ident">clone</span>(), <span class="ident">engine</span>.<span class="ident">raft</span>.<span class="ident">clone</span>());
-        <span class="kw">let</span> (<span class="ident">router</span>, <span class="kw">_</span>) <span class="op">=</span> <span class="ident">mpsc</span>::<span class="ident">sync_channel</span>(<span class="number">1</span>);
+        <span class="kw">let</span> (<span class="ident">router</span>, <span class="kw">_</span>) <span class="op">=</span> <span class="ident">mpsc</span>::<span class="ident">sync_channel</span>(<span class="number">11</span>);
         <span class="kw">let</span> <span class="ident">runner</span> <span class="op">=</span> <span class="ident">RegionRunner</span>::<span class="ident">new</span>(
             <span class="ident">engines</span>,
             <span class="ident">mgr</span>,
             <span class="number">0</span>,
-            <span class="bool-val">true</span>,
+            <span class="bool-val">false</span>,
             <span class="ident">CoprocessorHost</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>::<span class="ident">default</span>(),
             <span class="ident">router</span>,
         );
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">timer</span> <span class="op">=</span> <span class="ident">Timer</span>::<span class="ident">new</span>(<span class="number">1</span>);
-        <span class="ident">timer</span>.<span class="ident">add_task</span>(<span class="ident">Duration</span>::<span class="ident">from_millis</span>(<span class="number">100</span>), <span class="ident">Event</span>::<span class="ident">CheckStalePeer</span>);
-        <span class="ident">worker</span>.<span class="ident">start_with_timer</span>(<span class="ident">runner</span>, <span class="ident">timer</span>).<span class="ident">unwrap</span>();
-
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ranges</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[];
+        <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="number">10</span> {
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">key</span> <span class="op">=</span> <span class="string">b&quot;k0&quot;</span>.<span class="ident">to_vec</span>();
+            <span class="ident">key</span>.<span class="ident">extend_from_slice</span>(<span class="ident">i</span>.<span class="ident">to_string</span>().<span class="ident">as_bytes</span>());
+            <span class="ident">engine</span>.<span class="ident">kv</span>.<span class="ident">put</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="string">b&quot;v1&quot;</span>).<span class="ident">unwrap</span>();
+            <span class="ident">ranges</span>.<span class="ident">push</span>(<span class="ident">key</span>);
+        }
         <span class="ident">engine</span>.<span class="ident">kv</span>.<span class="ident">put</span>(<span class="string">b&quot;k1&quot;</span>, <span class="string">b&quot;v1&quot;</span>).<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">snap</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">kv</span>.<span class="ident">snapshot</span>();
         <span class="ident">engine</span>.<span class="ident">kv</span>.<span class="ident">put</span>(<span class="string">b&quot;k2&quot;</span>, <span class="string">b&quot;v2&quot;</span>).<span class="ident">unwrap</span>();
@@ -1993,11 +2003,26 @@
                 <span class="ident">end_key</span>: <span class="string">b&quot;k2&quot;</span>.<span class="ident">to_vec</span>(),
             })
             .<span class="ident">unwrap</span>();
+        <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="number">9</span> {
+            <span class="ident">sched</span>
+                .<span class="ident">schedule</span>(<span class="ident">Task</span>::<span class="ident">Destroy</span> {
+                    <span class="ident">region_id</span>: <span class="ident">i</span> <span class="kw">as</span> <span class="ident">u64</span> <span class="op">+</span> <span class="number">2</span>,
+                    <span class="ident">start_key</span>: <span class="ident">ranges</span>[<span class="ident">i</span>].<span class="ident">clone</span>(),
+                    <span class="ident">end_key</span>: <span class="ident">ranges</span>[<span class="ident">i</span> <span class="op">+</span> <span class="number">1</span>].<span class="ident">clone</span>(),
+                })
+                .<span class="ident">unwrap</span>();
+        }
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">timer</span> <span class="op">=</span> <span class="ident">Timer</span>::<span class="ident">new</span>(<span class="number">1</span>);
+        <span class="ident">timer</span>.<span class="ident">add_task</span>(<span class="ident">Duration</span>::<span class="ident">from_millis</span>(<span class="number">100</span>), <span class="ident">Event</span>::<span class="ident">CheckStalePeer</span>);
+        <span class="ident">worker</span>.<span class="ident">start_with_timer</span>(<span class="ident">runner</span>, <span class="ident">timer</span>).<span class="ident">unwrap</span>();
+        <span class="ident">thread</span>::<span class="ident">sleep</span>(<span class="ident">Duration</span>::<span class="ident">from_millis</span>(<span class="number">20</span>));
         <span class="ident">drop</span>(<span class="ident">snap</span>);
-
-        <span class="ident">thread</span>::<span class="ident">sleep</span>(<span class="ident">Duration</span>::<span class="ident">from_millis</span>(<span class="number">100</span>));
+        <span class="ident">thread</span>::<span class="ident">sleep</span>(<span class="ident">Duration</span>::<span class="ident">from_millis</span>(<span class="number">200</span>));
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">engine</span>.<span class="ident">kv</span>.<span class="ident">get_value</span>(<span class="string">b&quot;k1&quot;</span>).<span class="ident">unwrap</span>().<span class="ident">is_none</span>());
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">engine</span>.<span class="ident">kv</span>.<span class="ident">get_value</span>(<span class="string">b&quot;k2&quot;</span>).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>(), <span class="string">b&quot;v2&quot;</span>);
+        <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="number">9</span> {
+            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">engine</span>.<span class="ident">kv</span>.<span class="ident">get_value</span>(<span class="kw-2">&amp;</span><span class="ident">ranges</span>[<span class="ident">i</span>]).<span class="ident">unwrap</span>().<span class="ident">is_none</span>());
+        }
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
@@ -2006,6 +2031,7 @@
             .<span class="ident">prefix</span>(<span class="string">&quot;test_pending_applies&quot;</span>)
             .<span class="ident">tempdir</span>()
             .<span class="ident">unwrap</span>();
+
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cf_opts</span> <span class="op">=</span> <span class="ident">ColumnFamilyOptions</span>::<span class="ident">new</span>();
         <span class="ident">cf_opts</span>.<span class="ident">set_level_zero_slowdown_writes_trigger</span>(<span class="number">5</span>);
         <span class="ident">cf_opts</span>.<span class="ident">set_disable_auto_compactions</span>(<span class="bool-val">true</span>);

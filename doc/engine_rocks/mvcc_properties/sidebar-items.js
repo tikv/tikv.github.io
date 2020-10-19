@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["PROP_MAX_ROW_VERSIONS",""],["PROP_MAX_TS",""],["PROP_MIN_TS",""],["PROP_NUM_DELETES",""],["PROP_NUM_ERRORS",""],["PROP_NUM_PUTS",""],["PROP_NUM_ROWS",""],["PROP_NUM_VERSIONS",""],["PROP_ROWS_INDEX",""],["PROP_ROWS_INDEX_DISTANCE",""]],"struct":[["RocksMvccProperties",""]]});

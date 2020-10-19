@@ -594,6 +594,42 @@
 <span id="594">594</span>
 <span id="595">595</span>
 <span id="596">596</span>
+<span id="597">597</span>
+<span id="598">598</span>
+<span id="599">599</span>
+<span id="600">600</span>
+<span id="601">601</span>
+<span id="602">602</span>
+<span id="603">603</span>
+<span id="604">604</span>
+<span id="605">605</span>
+<span id="606">606</span>
+<span id="607">607</span>
+<span id="608">608</span>
+<span id="609">609</span>
+<span id="610">610</span>
+<span id="611">611</span>
+<span id="612">612</span>
+<span id="613">613</span>
+<span id="614">614</span>
+<span id="615">615</span>
+<span id="616">616</span>
+<span id="617">617</span>
+<span id="618">618</span>
+<span id="619">619</span>
+<span id="620">620</span>
+<span id="621">621</span>
+<span id="622">622</span>
+<span id="623">623</span>
+<span id="624">624</span>
+<span id="625">625</span>
+<span id="626">626</span>
+<span id="627">627</span>
+<span id="628">628</span>
+<span id="629">629</span>
+<span id="630">630</span>
+<span id="631">631</span>
+<span id="632">632</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -605,19 +641,22 @@
 <span class="kw">use</span> <span class="ident">engine_rocks</span>::{<span class="ident">RocksEngine</span>, <span class="ident">RocksSnapshot</span>, <span class="ident">RocksTablePropertiesCollection</span>};
 <span class="kw">use</span> <span class="ident">engine_traits</span>::<span class="ident">CfName</span>;
 <span class="kw">use</span> <span class="ident">engine_traits</span>::<span class="ident">CF_DEFAULT</span>;
-<span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">IterOptions</span>, <span class="ident">Peekable</span>, <span class="ident">ReadOptions</span>, <span class="ident">Snapshot</span>, <span class="ident">TablePropertiesExt</span>};
+<span class="kw">use</span> <span class="ident">engine_traits</span>::{
+    <span class="ident">IterOptions</span>, <span class="ident">MvccProperties</span>, <span class="ident">MvccPropertiesExt</span>, <span class="ident">Peekable</span>, <span class="ident">ReadOptions</span>, <span class="ident">Snapshot</span>,
+    <span class="ident">TablePropertiesExt</span>,
+};
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">kvrpcpb</span>::<span class="ident">Context</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">raft_cmdpb</span>::{
     <span class="ident">CmdType</span>, <span class="ident">DeleteRangeRequest</span>, <span class="ident">DeleteRequest</span>, <span class="ident">PutRequest</span>, <span class="ident">RaftCmdRequest</span>, <span class="ident">RaftCmdResponse</span>,
     <span class="ident">RaftRequestHeader</span>, <span class="ident">Request</span>, <span class="ident">Response</span>,
 };
 <span class="kw">use</span> <span class="ident">kvproto</span>::{<span class="ident">errorpb</span>, <span class="ident">metapb</span>};
-<span class="kw">use</span> <span class="ident">txn_types</span>::{<span class="ident">Key</span>, <span class="ident">TxnExtraScheduler</span>, <span class="ident">Value</span>};
+<span class="kw">use</span> <span class="ident">txn_types</span>::{<span class="ident">Key</span>, <span class="ident">TimeStamp</span>, <span class="ident">TxnExtraScheduler</span>, <span class="ident">Value</span>};
 
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">metrics</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">kv</span>::{
     <span class="ident">write_modifies</span>, <span class="ident">Callback</span>, <span class="ident">CbContext</span>, <span class="ident">Cursor</span>, <span class="ident">Engine</span>, <span class="ident">Error</span> <span class="kw">as</span> <span class="ident">KvError</span>,
-    <span class="ident">ErrorInner</span> <span class="kw">as</span> <span class="ident">KvErrorInner</span>, <span class="ident">Iterator</span> <span class="kw">as</span> <span class="ident">EngineIterator</span>, <span class="ident">Modify</span>, <span class="ident">ScanMode</span>,
+    <span class="ident">ErrorInner</span> <span class="kw">as</span> <span class="ident">KvErrorInner</span>, <span class="ident">ExtCallback</span>, <span class="ident">Iterator</span> <span class="kw">as</span> <span class="ident">EngineIterator</span>, <span class="ident">Modify</span>, <span class="ident">ScanMode</span>,
     <span class="ident">Snapshot</span> <span class="kw">as</span> <span class="ident">EngineSnapshot</span>, <span class="ident">WriteData</span>,
 };
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::{<span class="self">self</span>, <span class="ident">kv</span>};
@@ -821,7 +860,8 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="ident">Context</span>,
         <span class="ident">reqs</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Request</span><span class="op">&gt;</span>,
-        <span class="ident">cb</span>: <span class="ident">Callback</span><span class="op">&lt;</span><span class="ident">CmdRes</span><span class="op">&gt;</span>,
+        <span class="ident">write_cb</span>: <span class="ident">Callback</span><span class="op">&lt;</span><span class="ident">CmdRes</span><span class="op">&gt;</span>,
+        <span class="ident">proposed_cb</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ExtCallback</span><span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;failpoints&quot;</span>)]</span>
         {
@@ -854,10 +894,13 @@
         <span class="self">self</span>.<span class="ident">router</span>
             .<span class="ident">send_command</span>(
                 <span class="ident">cmd</span>,
-                <span class="ident">StoreCallback</span>::<span class="ident">Write</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">resp</span><span class="op">|</span> {
-                    <span class="kw">let</span> (<span class="ident">cb_ctx</span>, <span class="ident">res</span>) <span class="op">=</span> <span class="ident">on_write_result</span>(<span class="ident">resp</span>, <span class="ident">len</span>);
-                    <span class="ident">cb</span>((<span class="ident">cb_ctx</span>, <span class="ident">res</span>.<span class="ident">map_err</span>(<span class="ident">Error</span>::<span class="ident">into</span>)));
-                })),
+                <span class="ident">StoreCallback</span>::<span class="ident">write_ext</span>(
+                    <span class="ident">Box</span>::<span class="ident">new</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">resp</span><span class="op">|</span> {
+                        <span class="kw">let</span> (<span class="ident">cb_ctx</span>, <span class="ident">res</span>) <span class="op">=</span> <span class="ident">on_write_result</span>(<span class="ident">resp</span>, <span class="ident">len</span>);
+                        <span class="ident">write_cb</span>((<span class="ident">cb_ctx</span>, <span class="ident">res</span>.<span class="ident">map_err</span>(<span class="ident">Error</span>::<span class="ident">into</span>)));
+                    }),
+                    <span class="ident">proposed_cb</span>,
+                ),
             )
             .<span class="ident">map_err</span>(<span class="ident">From</span>::<span class="ident">from</span>)
     }
@@ -933,7 +976,22 @@
         <span class="ident">write_modifies</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">engine</span>, <span class="ident">modifies</span>)
     }
 
-    <span class="kw">fn</span> <span class="ident">async_write</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="ident">Context</span>, <span class="ident">batch</span>: <span class="ident">WriteData</span>, <span class="ident">cb</span>: <span class="ident">Callback</span><span class="op">&lt;</span>()<span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">kv</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">async_write</span>(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="ident">Context</span>,
+        <span class="ident">batch</span>: <span class="ident">WriteData</span>,
+        <span class="ident">write_cb</span>: <span class="ident">Callback</span><span class="op">&lt;</span>()<span class="op">&gt;</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">kv</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">async_write_ext</span>(<span class="ident">ctx</span>, <span class="ident">batch</span>, <span class="ident">write_cb</span>, <span class="prelude-val">None</span>)
+    }
+
+    <span class="kw">fn</span> <span class="ident">async_write_ext</span>(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="ident">Context</span>,
+        <span class="ident">batch</span>: <span class="ident">WriteData</span>,
+        <span class="ident">write_cb</span>: <span class="ident">Callback</span><span class="op">&lt;</span>()<span class="op">&gt;</span>,
+        <span class="ident">proposed_cb</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ExtCallback</span><span class="op">&gt;</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">kv</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;raftkv_async_write&quot;</span>);
         <span class="kw">if</span> <span class="ident">batch</span>.<span class="ident">modifies</span>.<span class="ident">is_empty</span>() {
             <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">KvError</span>::<span class="ident">from</span>(<span class="ident">KvErrorInner</span>::<span class="ident">EmptyRequest</span>));
@@ -994,18 +1052,19 @@
                         .<span class="ident">write</span>
                         .<span class="ident">observe</span>(<span class="ident">begin_instant</span>.<span class="ident">elapsed_secs</span>());
                     <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;raftkv_async_write_finish&quot;</span>);
-                    <span class="ident">cb</span>((<span class="ident">cb_ctx</span>, <span class="prelude-val">Ok</span>(())))
+                    <span class="ident">write_cb</span>((<span class="ident">cb_ctx</span>, <span class="prelude-val">Ok</span>(())))
                 }
-                <span class="prelude-val">Ok</span>(<span class="ident">CmdRes</span>::<span class="ident">Snap</span>(<span class="kw">_</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">cb</span>((
+                <span class="prelude-val">Ok</span>(<span class="ident">CmdRes</span>::<span class="ident">Snap</span>(<span class="kw">_</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">write_cb</span>((
                     <span class="ident">cb_ctx</span>,
                     <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(<span class="string">&quot;unexpect snapshot, should mutate instead.&quot;</span>)),
                 )),
                 <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
                     <span class="kw">let</span> <span class="ident">status_kind</span> <span class="op">=</span> <span class="ident">get_status_kind_from_engine_error</span>(<span class="kw-2">&amp;</span><span class="ident">e</span>);
                     <span class="ident">ASYNC_REQUESTS_COUNTER_VEC</span>.<span class="ident">write</span>.<span class="ident">get</span>(<span class="ident">status_kind</span>).<span class="ident">inc</span>();
-                    <span class="ident">cb</span>((<span class="ident">cb_ctx</span>, <span class="prelude-val">Err</span>(<span class="ident">e</span>)))
+                    <span class="ident">write_cb</span>((<span class="ident">cb_ctx</span>, <span class="prelude-val">Err</span>(<span class="ident">e</span>)))
                 }
             }),
+            <span class="ident">proposed_cb</span>,
         )
         .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
             <span class="kw">let</span> <span class="ident">status_kind</span> <span class="op">=</span> <span class="ident">get_status_kind_from_error</span>(<span class="kw-2">&amp;</span><span class="ident">e</span>);
@@ -1069,6 +1128,19 @@
         <span class="self">self</span>.<span class="ident">engine</span>
             .<span class="ident">get_range_properties_cf</span>(<span class="ident">cf</span>, <span class="kw-2">&amp;</span><span class="ident">start</span>, <span class="kw-2">&amp;</span><span class="ident">end</span>)
             .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">e</span>.<span class="ident">into</span>())
+    }
+
+    <span class="kw">fn</span> <span class="ident">get_mvcc_properties_cf</span>(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="ident">cf</span>: <span class="ident">CfName</span>,
+        <span class="ident">safe_point</span>: <span class="ident">TimeStamp</span>,
+        <span class="ident">start</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>],
+        <span class="ident">end</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>],
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">MvccProperties</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">keys</span>::<span class="ident">data_key</span>(<span class="ident">start</span>);
+        <span class="kw">let</span> <span class="ident">end</span> <span class="op">=</span> <span class="ident">keys</span>::<span class="ident">data_end_key</span>(<span class="ident">end</span>);
+        <span class="self">self</span>.<span class="ident">engine</span>
+            .<span class="ident">get_mvcc_properties_cf</span>(<span class="ident">cf</span>, <span class="ident">safe_point</span>, <span class="kw-2">&amp;</span><span class="ident">start</span>, <span class="kw-2">&amp;</span><span class="ident">end</span>)
     }
 }
 

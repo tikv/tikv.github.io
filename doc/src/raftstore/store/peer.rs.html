@@ -3758,6 +3758,17 @@
 <span id="3758">3758</span>
 <span id="3759">3759</span>
 <span id="3760">3760</span>
+<span id="3761">3761</span>
+<span id="3762">3762</span>
+<span id="3763">3763</span>
+<span id="3764">3764</span>
+<span id="3765">3765</span>
+<span id="3766">3766</span>
+<span id="3767">3767</span>
+<span id="3768">3768</span>
+<span id="3769">3769</span>
+<span id="3770">3770</span>
+<span id="3771">3771</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -4004,7 +4015,7 @@
             <span class="kw">let</span> <span class="ident">cmd_type</span> <span class="op">=</span> <span class="ident">req</span>.<span class="ident">get_admin_request</span>().<span class="ident">get_cmd_type</span>();
             <span class="comment">// Due to `test_admin_cmd_epoch_map_include_all_cmd_type`, using unwrap is ok.</span>
             <span class="kw">let</span> <span class="ident">epoch_state</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">ADMIN_CMD_EPOCH_MAP</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">cmd_type</span>).<span class="ident">unwrap</span>();
-            (<span class="ident">epoch_state</span>.<span class="ident">check_ver</span>, <span class="ident">epoch_state</span>.<span class="ident">check_ver</span>)
+            (<span class="ident">epoch_state</span>.<span class="ident">check_ver</span>, <span class="ident">epoch_state</span>.<span class="ident">check_conf_ver</span>)
         };
         <span class="self">self</span>.<span class="ident">last_conflict_index</span>(<span class="ident">check_ver</span>, <span class="ident">check_conf_ver</span>)
     }
@@ -5778,7 +5789,7 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">propose</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Transport</span>, <span class="ident">C</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
         <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">PollContext</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">T</span>, <span class="ident">C</span><span class="op">&gt;</span>,
-        <span class="ident">cb</span>: <span class="ident">Callback</span><span class="op">&lt;</span><span class="ident">EK</span>::<span class="ident">Snapshot</span><span class="op">&gt;</span>,
+        <span class="kw-2">mut</span> <span class="ident">cb</span>: <span class="ident">Callback</span><span class="op">&lt;</span><span class="ident">EK</span>::<span class="ident">Snapshot</span><span class="op">&gt;</span>,
         <span class="ident">req</span>: <span class="ident">RaftCmdRequest</span>,
         <span class="kw-2">mut</span> <span class="ident">err_resp</span>: <span class="ident">RaftCmdResponse</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
@@ -5823,6 +5834,12 @@
                 <span class="bool-val">false</span>
             }
             <span class="prelude-val">Ok</span>(<span class="ident">Either</span>::<span class="ident">Left</span>(<span class="ident">idx</span>)) <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="kw">if</span> <span class="self">self</span>.<span class="ident">has_applied_to_current_term</span>() {
+                    <span class="comment">// After this peer has applied to current term and passed above checking including `cmd_epoch_checker`,</span>
+                    <span class="comment">// we can safely guarantee that this proposal will be committed if there is no abnormal leader transfer</span>
+                    <span class="comment">// in the near future. Thus proposed callback can be called.</span>
+                    <span class="ident">cb</span>.<span class="ident">invoke_proposed</span>();
+                }
                 <span class="kw">if</span> <span class="ident">is_urgent</span> {
                     <span class="self">self</span>.<span class="ident">last_urgent_proposal_idx</span> <span class="op">=</span> <span class="ident">idx</span>;
                     <span class="comment">// Eager flush to make urgent proposal be applied on all nodes as soon as</span>
@@ -6399,7 +6416,7 @@
 
         <span class="ident">poll_ctx</span>.<span class="ident">raft_metrics</span>.<span class="ident">propose</span>.<span class="ident">normal</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
 
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">get_store</span>().<span class="ident">applied_index_term</span>() <span class="op">=</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">term</span>() {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">has_applied_to_current_term</span>() {
             <span class="comment">// Only when applied index&#39;s term is equal to current leader&#39;s term, the information</span>
             <span class="comment">// in epoch checker is up to date and can be used to check epoch.</span>
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">index</span>) <span class="op">=</span> <span class="self">self</span>
@@ -7493,6 +7510,11 @@
         <span class="ident">epoch_checker</span>.<span class="ident">post_propose</span>(<span class="ident">AdminCmdType</span>::<span class="ident">ChangePeer</span>, <span class="number">6</span>, <span class="number">10</span>);
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">epoch_checker</span>.<span class="ident">proposed_admin_cmd</span>.<span class="ident">len</span>(), <span class="number">2</span>);
 
+        <span class="comment">// Conflict with the change peer admin cmd</span>
+        <span class="macro">assert_eq</span><span class="macro">!</span>(
+            <span class="ident">epoch_checker</span>.<span class="ident">propose_check_epoch</span>(<span class="kw-2">&amp;</span><span class="ident">change_peer_admin</span>, <span class="number">10</span>),
+            <span class="prelude-val">Some</span>(<span class="number">6</span>)
+        );
         <span class="comment">// Conflict with the split admin cmd</span>
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">epoch_checker</span>.<span class="ident">propose_check_epoch</span>(<span class="kw-2">&amp;</span><span class="ident">normal_cmd</span>, <span class="number">10</span>), <span class="prelude-val">Some</span>(<span class="number">5</span>));
         <span class="comment">// Conflict with the change peer admin cmd</span>
@@ -7512,7 +7534,7 @@
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">epoch_checker</span>.<span class="ident">propose_check_epoch</span>(<span class="kw-2">&amp;</span><span class="ident">normal_cmd</span>, <span class="number">10</span>), <span class="prelude-val">None</span>);
 
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">epoch_checker</span>.<span class="ident">propose_check_epoch</span>(<span class="kw-2">&amp;</span><span class="ident">split_admin</span>, <span class="number">10</span>), <span class="prelude-val">Some</span>(<span class="number">6</span>));
-        <span class="comment">// Change term to 6</span>
+        <span class="comment">// Change term to 11</span>
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">epoch_checker</span>.<span class="ident">propose_check_epoch</span>(<span class="kw-2">&amp;</span><span class="ident">split_admin</span>, <span class="number">11</span>), <span class="prelude-val">None</span>);
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">epoch_checker</span>.<span class="ident">term</span>, <span class="number">11</span>);
         <span class="comment">// Should be empty</span>

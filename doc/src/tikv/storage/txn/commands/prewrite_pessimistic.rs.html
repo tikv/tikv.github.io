@@ -164,11 +164,6 @@
 <span id="164">164</span>
 <span id="165">165</span>
 <span id="166">166</span>
-<span id="167">167</span>
-<span id="168">168</span>
-<span id="169">169</span>
-<span id="170">170</span>
-<span id="171">171</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -181,7 +176,7 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">txn</span>::<span class="ident">commands</span>::{
     <span class="ident">Command</span>, <span class="ident">CommandExt</span>, <span class="ident">TypedCommand</span>, <span class="ident">WriteCommand</span>, <span class="ident">WriteContext</span>, <span class="ident">WriteResult</span>,
 };
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">txn</span>::{<span class="ident">Error</span>, <span class="ident">ErrorInner</span>, <span class="prelude-ty">Result</span>};
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">txn</span>::{<span class="ident">pessimistic_prewrite</span>, <span class="ident">Error</span>, <span class="ident">ErrorInner</span>, <span class="prelude-ty">Result</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">types</span>::<span class="ident">PrewriteResult</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::{<span class="ident">Error</span> <span class="kw">as</span> <span class="ident">StorageError</span>, <span class="ident">ProcessResult</span>, <span class="ident">Snapshot</span>};
 
@@ -237,14 +232,8 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">Snapshot</span>, <span class="ident">L</span>: <span class="ident">LockManager</span><span class="op">&gt;</span> <span class="ident">WriteCommand</span><span class="op">&lt;</span><span class="ident">S</span>, <span class="ident">L</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">PrewritePessimistic</span> {
-    <span class="kw">fn</span> <span class="ident">process_write</span>(<span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">snapshot</span>: <span class="ident">S</span>, <span class="ident">context</span>: <span class="ident">WriteContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="ident">L</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">WriteResult</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">process_write</span>(<span class="self">self</span>, <span class="ident">snapshot</span>: <span class="ident">S</span>, <span class="ident">context</span>: <span class="ident">WriteContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="ident">L</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">WriteResult</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">rows</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">mutations</span>.<span class="ident">len</span>();
-
-        <span class="comment">// If async commit is disabled in TiKV, set the secondary_keys in the request to None</span>
-        <span class="comment">// so we won&#39;t do anything for async commit.</span>
-        <span class="kw">if</span> <span class="op">!</span><span class="ident">context</span>.<span class="ident">enable_async_commit</span> {
-            <span class="self">self</span>.<span class="ident">secondary_keys</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-        }
 
         <span class="comment">// Async commit requires the max timestamp in the concurrency manager to be up-to-date.</span>
         <span class="comment">// If it is possibly stale due to leader transfer or region merge, return an error.</span>
@@ -281,7 +270,8 @@
             <span class="kw">if</span> <span class="prelude-val">Some</span>(<span class="ident">m</span>.<span class="ident">key</span>()) <span class="op">=</span><span class="op">=</span> <span class="ident">async_commit_pk</span>.<span class="ident">as_ref</span>() {
                 <span class="ident">secondaries</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">secondary_keys</span>;
             }
-            <span class="kw">match</span> <span class="ident">txn</span>.<span class="ident">pessimistic_prewrite</span>(
+            <span class="kw">match</span> <span class="ident">pessimistic_prewrite</span>(
+                <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">txn</span>,
                 <span class="ident">m</span>,
                 <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">primary</span>,
                 <span class="ident">secondaries</span>,

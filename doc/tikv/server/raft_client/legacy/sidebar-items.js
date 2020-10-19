@@ -1,1 +1,0 @@
-initSidebarItems({"constant":[["GRPC_SEND_MSG_BUF",""],["RAFT_MSG_MAX_BATCH_SIZE",""],["RAFT_MSG_NOTIFY_SIZE",""]],"fn":[["check_rpc_result",""]],"static":[["CONN_ID",""]],"struct":[["Conn",""],["RaftClient","`RaftClient` is used for sending raft messages to other stores."],["RaftMsgCollector",""],["Reusable",""]]});

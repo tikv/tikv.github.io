@@ -1054,11 +1054,76 @@
 <span id="1054">1054</span>
 <span id="1055">1055</span>
 <span id="1056">1056</span>
+<span id="1057">1057</span>
+<span id="1058">1058</span>
+<span id="1059">1059</span>
+<span id="1060">1060</span>
+<span id="1061">1061</span>
+<span id="1062">1062</span>
+<span id="1063">1063</span>
+<span id="1064">1064</span>
+<span id="1065">1065</span>
+<span id="1066">1066</span>
+<span id="1067">1067</span>
+<span id="1068">1068</span>
+<span id="1069">1069</span>
+<span id="1070">1070</span>
+<span id="1071">1071</span>
+<span id="1072">1072</span>
+<span id="1073">1073</span>
+<span id="1074">1074</span>
+<span id="1075">1075</span>
+<span id="1076">1076</span>
+<span id="1077">1077</span>
+<span id="1078">1078</span>
+<span id="1079">1079</span>
+<span id="1080">1080</span>
+<span id="1081">1081</span>
+<span id="1082">1082</span>
+<span id="1083">1083</span>
+<span id="1084">1084</span>
+<span id="1085">1085</span>
+<span id="1086">1086</span>
+<span id="1087">1087</span>
+<span id="1088">1088</span>
+<span id="1089">1089</span>
+<span id="1090">1090</span>
+<span id="1091">1091</span>
+<span id="1092">1092</span>
+<span id="1093">1093</span>
+<span id="1094">1094</span>
+<span id="1095">1095</span>
+<span id="1096">1096</span>
+<span id="1097">1097</span>
+<span id="1098">1098</span>
+<span id="1099">1099</span>
+<span id="1100">1100</span>
+<span id="1101">1101</span>
+<span id="1102">1102</span>
+<span id="1103">1103</span>
+<span id="1104">1104</span>
+<span id="1105">1105</span>
+<span id="1106">1106</span>
+<span id="1107">1107</span>
+<span id="1108">1108</span>
+<span id="1109">1109</span>
+<span id="1110">1110</span>
+<span id="1111">1111</span>
+<span id="1112">1112</span>
+<span id="1113">1113</span>
+<span id="1114">1114</span>
+<span id="1115">1115</span>
+<span id="1116">1116</span>
+<span id="1117">1117</span>
+<span id="1118">1118</span>
+<span id="1119">1119</span>
+<span id="1120">1120</span>
+<span id="1121">1121</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">collections</span>::<span class="ident">BTreeMap</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">collections</span>::<span class="ident">Bound</span>::{<span class="ident">Excluded</span>, <span class="ident">Unbounded</span>};
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">collections</span>::<span class="ident">Bound</span>::{<span class="ident">Excluded</span>, <span class="ident">Included</span>, <span class="ident">Unbounded</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">fmt</span>::{<span class="ident">Display</span>, <span class="ident">Formatter</span>, <span class="prelude-ty">Result</span> <span class="kw">as</span> <span class="ident">FmtResult</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::{<span class="ident">mpsc</span>, <span class="ident">Arc</span>, <span class="ident">Mutex</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">time</span>::<span class="ident">Duration</span>;
@@ -1141,6 +1206,11 @@
         <span class="ident">region_id</span>: <span class="ident">u64</span>,
         <span class="ident">callback</span>: <span class="ident">Callback</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RegionInfo</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     },
+    <span class="ident">GetRegionsInRange</span> {
+        <span class="ident">start_key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
+        <span class="ident">end_key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
+        <span class="ident">callback</span>: <span class="ident">Callback</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Region</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    },
     <span class="doccomment">/// Gets all contents from the collection. Only used for testing.</span>
     <span class="ident">DebugDump</span>(<span class="ident">mpsc</span>::<span class="ident">Sender</span><span class="op">&lt;</span>(<span class="ident">RegionsMap</span>, <span class="ident">RegionRangesMap</span>)<span class="op">&gt;</span>),
 }
@@ -1150,11 +1220,19 @@
         <span class="kw">match</span> <span class="self">self</span> {
             <span class="ident">RegionInfoQuery</span>::<span class="ident">RaftStoreEvent</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;RaftStoreEvent({:?})&quot;</span>, <span class="ident">e</span>),
             <span class="ident">RegionInfoQuery</span>::<span class="ident">SeekRegion</span> { <span class="ident">from</span>, .. } <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;SeekRegion(from: {})&quot;</span>, <span class="ident">hex</span>::<span class="ident">encode_upper</span>(<span class="ident">from</span>))
+                <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;SeekRegion(from: {})&quot;</span>, <span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>(<span class="kw-2">&amp;</span><span class="ident">from</span>))
             }
             <span class="ident">RegionInfoQuery</span>::<span class="ident">FindRegionById</span> { <span class="ident">region_id</span>, .. } <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;FindRegionById(region_id: {})&quot;</span>, <span class="ident">region_id</span>)
             }
+            <span class="ident">RegionInfoQuery</span>::<span class="ident">GetRegionsInRange</span> {
+                <span class="ident">start_key</span>, <span class="ident">end_key</span>, ..
+            } <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write</span><span class="macro">!</span>(
+                <span class="ident">f</span>,
+                <span class="string">&quot;GetRegionsInRange(start_key: {}, end_key: {})&quot;</span>,
+                <span class="ident">hex</span>::<span class="ident">encode_upper</span>(<span class="ident">start_key</span>),
+                <span class="ident">hex</span>::<span class="ident">encode_upper</span>(<span class="ident">end_key</span>)
+            ),
             <span class="ident">RegionInfoQuery</span>::<span class="ident">DebugDump</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;DebugDump&quot;</span>),
         }
     }
@@ -1418,6 +1496,23 @@
         <span class="ident">callback</span>(<span class="self">self</span>.<span class="ident">regions</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">region_id</span>).<span class="ident">cloned</span>());
     }
 
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_get_regions_in_range</span>(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="ident">start_key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
+        <span class="ident">end_key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
+        <span class="ident">callback</span>: <span class="ident">Callback</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Region</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    ) {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">regions</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[];
+        <span class="kw">for</span> (<span class="kw">_</span>, <span class="ident">region_id</span>) <span class="kw">in</span> <span class="self">self</span>
+            .<span class="ident">region_ranges</span>
+            .<span class="ident">range</span>((<span class="ident">Included</span>(<span class="ident">start_key</span>), <span class="ident">Included</span>(<span class="ident">end_key</span>)))
+        {
+            <span class="kw">let</span> <span class="ident">region_info</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">regions</span>[<span class="ident">region_id</span>];
+            <span class="ident">regions</span>.<span class="ident">push</span>(<span class="ident">region_info</span>.<span class="ident">region</span>.<span class="ident">clone</span>());
+        }
+        <span class="ident">callback</span>(<span class="ident">regions</span>);
+    }
+
     <span class="kw">fn</span> <span class="ident">handle_raftstore_event</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">event</span>: <span class="ident">RaftStoreEvent</span>) {
         {
             <span class="kw">let</span> <span class="ident">region</span> <span class="op">=</span> <span class="ident">event</span>.<span class="ident">get_region</span>();
@@ -1475,6 +1570,13 @@
                 <span class="ident">callback</span>,
             } <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="self">self</span>.<span class="ident">handle_find_region_by_id</span>(<span class="ident">region_id</span>, <span class="ident">callback</span>);
+            }
+            <span class="ident">RegionInfoQuery</span>::<span class="ident">GetRegionsInRange</span> {
+                <span class="ident">start_key</span>,
+                <span class="ident">end_key</span>,
+                <span class="ident">callback</span>,
+            } <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="self">self</span>.<span class="ident">handle_get_regions_in_range</span>(<span class="ident">start_key</span>, <span class="ident">end_key</span>, <span class="ident">callback</span>);
             }
             <span class="ident">RegionInfoQuery</span>::<span class="ident">DebugDump</span>(<span class="ident">tx</span>) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="ident">tx</span>.<span class="ident">send</span>((<span class="self">self</span>.<span class="ident">regions</span>.<span class="ident">clone</span>(), <span class="self">self</span>.<span class="ident">region_ranges</span>.<span class="ident">clone</span>()))
@@ -1571,6 +1673,10 @@
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="macro">unimplemented</span><span class="macro">!</span>()
     }
+
+    <span class="kw">fn</span> <span class="ident">get_regions_in_range</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_start_key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">_end_key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Region</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+        <span class="macro">unimplemented</span><span class="macro">!</span>()
+    }
 }
 
 <span class="kw">impl</span> <span class="ident">RegionInfoProvider</span> <span class="kw">for</span> <span class="ident">RegionInfoAccessor</span> {
@@ -1596,6 +1702,30 @@
         <span class="self">self</span>.<span class="ident">scheduler</span>
             .<span class="ident">schedule</span>(<span class="ident">msg</span>)
             .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">box_err</span><span class="macro">!</span>(<span class="string">&quot;failed to send request to region collector: {:?}&quot;</span>, <span class="ident">e</span>))
+    }
+
+    <span class="kw">fn</span> <span class="ident">get_regions_in_range</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">start_key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">end_key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Region</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">mpsc</span>::<span class="ident">channel</span>();
+        <span class="kw">let</span> <span class="ident">msg</span> <span class="op">=</span> <span class="ident">RegionInfoQuery</span>::<span class="ident">GetRegionsInRange</span> {
+            <span class="ident">start_key</span>: <span class="ident">start_key</span>.<span class="ident">to_vec</span>(),
+            <span class="ident">end_key</span>: <span class="ident">end_key</span>.<span class="ident">to_vec</span>(),
+            <span class="ident">callback</span>: <span class="ident">Box</span>::<span class="ident">new</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">regions</span><span class="op">|</span> {
+                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">tx</span>.<span class="ident">send</span>(<span class="ident">regions</span>) {
+                    <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;failed to send get_regions_in_range result: {:?}&quot;</span>, <span class="ident">e</span>);
+                }
+            }),
+        };
+        <span class="self">self</span>.<span class="ident">scheduler</span>
+            .<span class="ident">schedule</span>(<span class="ident">msg</span>)
+            .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">box_err</span><span class="macro">!</span>(<span class="string">&quot;failed to send request to region collector: {:?}&quot;</span>, <span class="ident">e</span>))
+            .<span class="ident">and_then</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> {
+                <span class="ident">rx</span>.<span class="ident">recv</span>().<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
+                    <span class="macro">box_err</span><span class="macro">!</span>(
+                        <span class="string">&quot;failed to receive get_regions_in_range result from region collector: {:?}&quot;</span>,
+                        <span class="ident">e</span>
+                    )
+                })
+            })
     }
 }
 

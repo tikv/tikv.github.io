@@ -2449,6 +2449,57 @@
 <span id="2449">2449</span>
 <span id="2450">2450</span>
 <span id="2451">2451</span>
+<span id="2452">2452</span>
+<span id="2453">2453</span>
+<span id="2454">2454</span>
+<span id="2455">2455</span>
+<span id="2456">2456</span>
+<span id="2457">2457</span>
+<span id="2458">2458</span>
+<span id="2459">2459</span>
+<span id="2460">2460</span>
+<span id="2461">2461</span>
+<span id="2462">2462</span>
+<span id="2463">2463</span>
+<span id="2464">2464</span>
+<span id="2465">2465</span>
+<span id="2466">2466</span>
+<span id="2467">2467</span>
+<span id="2468">2468</span>
+<span id="2469">2469</span>
+<span id="2470">2470</span>
+<span id="2471">2471</span>
+<span id="2472">2472</span>
+<span id="2473">2473</span>
+<span id="2474">2474</span>
+<span id="2475">2475</span>
+<span id="2476">2476</span>
+<span id="2477">2477</span>
+<span id="2478">2478</span>
+<span id="2479">2479</span>
+<span id="2480">2480</span>
+<span id="2481">2481</span>
+<span id="2482">2482</span>
+<span id="2483">2483</span>
+<span id="2484">2484</span>
+<span id="2485">2485</span>
+<span id="2486">2486</span>
+<span id="2487">2487</span>
+<span id="2488">2488</span>
+<span id="2489">2489</span>
+<span id="2490">2490</span>
+<span id="2491">2491</span>
+<span id="2492">2492</span>
+<span id="2493">2493</span>
+<span id="2494">2494</span>
+<span id="2495">2495</span>
+<span id="2496">2496</span>
+<span id="2497">2497</span>
+<span id="2498">2498</span>
+<span id="2499">2499</span>
+<span id="2500">2500</span>
+<span id="2501">2501</span>
+<span id="2502">2502</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2017 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -2512,6 +2563,7 @@
 <span class="kw">const</span> <span class="ident">SNAP_GEN_PREFIX</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;gen&quot;</span>;
 <span class="doccomment">/// Name prefix for the received snapshot file.</span>
 <span class="kw">const</span> <span class="ident">SNAP_REV_PREFIX</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;rev&quot;</span>;
+<span class="kw">const</span> <span class="ident">DEL_RANGE_PREFIX</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;del_range&quot;</span>;
 
 <span class="kw">const</span> <span class="ident">TMP_FILE_SUFFIX</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;.tmp&quot;</span>;
 <span class="kw">const</span> <span class="ident">SST_FILE_SUFFIX</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;.sst&quot;</span>;
@@ -3554,6 +3606,7 @@
     <span class="ident">registry</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">SnapKey</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SnapEntry</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">limiter</span>: <span class="ident">Limiter</span>,
     <span class="ident">snap_size</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicU64</span><span class="op">&gt;</span>,
+    <span class="ident">temp_sst_id</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicU64</span><span class="op">&gt;</span>,
     <span class="ident">encryption_key_manager</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">DataKeyManager</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 }
 
@@ -3641,6 +3694,11 @@
                     <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="prelude-val">None</span>,
                     <span class="prelude-val">Some</span>(<span class="ident">n</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">n</span>,
                 };
+                <span class="kw">if</span> <span class="ident">name</span>.<span class="ident">starts_with</span>(<span class="ident">DEL_RANGE_PREFIX</span>) {
+                    <span class="comment">// This is a temp file to store delete keys and ingest them into Engine.</span>
+                    <span class="kw">return</span> <span class="prelude-val">None</span>;
+                }
+
                 <span class="kw">let</span> <span class="ident">is_sending</span> <span class="op">=</span> <span class="ident">name</span>.<span class="ident">starts_with</span>(<span class="ident">SNAP_GEN_PREFIX</span>);
                 <span class="kw">let</span> <span class="ident">numbers</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">name</span>.<span class="ident">split</span>(<span class="string">&#39;.&#39;</span>).<span class="ident">next</span>().<span class="ident">map_or_else</span>(
                     <span class="op">|</span><span class="op">|</span> <span class="macro">vec</span><span class="macro">!</span>[],
@@ -3669,6 +3727,16 @@
         <span class="ident">v</span>.<span class="ident">sort</span>();
         <span class="ident">v</span>.<span class="ident">dedup</span>();
         <span class="prelude-val">Ok</span>(<span class="ident">v</span>)
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_temp_path_for_ingest</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">String</span> {
+        <span class="kw">let</span> <span class="ident">sst_id</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">core</span>.<span class="ident">temp_sst_id</span>.<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
+        <span class="kw">let</span> <span class="ident">filename</span> <span class="op">=</span> <span class="macro">format</span><span class="macro">!</span>(
+            <span class="string">&quot;{}_{}{}{}&quot;</span>,
+            <span class="ident">DEL_RANGE_PREFIX</span>, <span class="ident">sst_id</span>, <span class="ident">SST_FILE_SUFFIX</span>, <span class="ident">TMP_FILE_SUFFIX</span>
+        );
+        <span class="kw">let</span> <span class="ident">path</span> <span class="op">=</span> <span class="ident">PathBuf</span>::<span class="ident">from</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">core</span>.<span class="ident">base</span>).<span class="ident">join</span>(<span class="kw-2">&amp;</span><span class="ident">filename</span>);
+        <span class="ident">path</span>.<span class="ident">to_str</span>().<span class="ident">unwrap</span>().<span class="ident">to_string</span>()
     }
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
@@ -3955,6 +4023,7 @@
                 <span class="ident">registry</span>: <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">RwLock</span>::<span class="ident">new</span>(<span class="macro">map</span><span class="macro">!</span>[])),
                 <span class="ident">limiter</span>,
                 <span class="ident">snap_size</span>: <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">AtomicU64</span>::<span class="ident">new</span>(<span class="number">0</span>)),
+                <span class="ident">temp_sst_id</span>: <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">AtomicU64</span>::<span class="ident">new</span>(<span class="number">0</span>)),
                 <span class="ident">encryption_key_manager</span>: <span class="self">self</span>.<span class="ident">key_manager</span>,
             },
             <span class="ident">max_total_size</span>,
@@ -3974,9 +4043,9 @@
 
     <span class="kw">use</span> <span class="ident">engine_rocks</span>::<span class="ident">raw</span>::{<span class="ident">DBOptions</span>, <span class="ident">Env</span>, <span class="ident">DB</span>};
     <span class="kw">use</span> <span class="ident">engine_rocks</span>::<span class="ident">raw_util</span>::<span class="ident">CFOptions</span>;
-    <span class="kw">use</span> <span class="ident">engine_rocks</span>::{<span class="ident">Compat</span>, <span class="ident">RocksEngine</span>, <span class="ident">RocksSnapshot</span>};
-    <span class="kw">use</span> <span class="ident">engine_traits</span>::<span class="ident">Engines</span>;
-    <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">Iterable</span>, <span class="ident">Peekable</span>, <span class="ident">SyncMutable</span>};
+    <span class="kw">use</span> <span class="ident">engine_rocks</span>::{<span class="ident">Compat</span>, <span class="ident">RocksEngine</span>, <span class="ident">RocksSnapshot</span>, <span class="ident">RocksSstWriterBuilder</span>};
+    <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">Engines</span>, <span class="ident">ExternalSstFileInfo</span>, <span class="ident">SstWriter</span>};
+    <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">Iterable</span>, <span class="ident">Peekable</span>, <span class="ident">SstWriterBuilder</span>, <span class="ident">SyncMutable</span>};
     <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">ALL_CFS</span>, <span class="ident">CF_DEFAULT</span>, <span class="ident">CF_LOCK</span>, <span class="ident">CF_RAFT</span>, <span class="ident">CF_WRITE</span>};
     <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">metapb</span>::{<span class="ident">Peer</span>, <span class="ident">Region</span>};
     <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">raft_serverpb</span>::{
@@ -3986,6 +4055,7 @@
 
     <span class="kw">use</span> <span class="ident">protobuf</span>::<span class="ident">Message</span>;
     <span class="kw">use</span> <span class="ident">tempfile</span>::{<span class="ident">Builder</span>, <span class="ident">TempDir</span>};
+    <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">file</span> <span class="kw">as</span> <span class="ident">file_util</span>;
     <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">time</span>::<span class="ident">Limiter</span>;
 
     <span class="kw">use</span> <span class="kw">super</span>::{
@@ -4139,6 +4209,7 @@
             <span class="ident">registry</span>: <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">RwLock</span>::<span class="ident">new</span>(<span class="macro">map</span><span class="macro">!</span>[])),
             <span class="ident">limiter</span>: <span class="ident">Limiter</span>::<span class="ident">new</span>(<span class="ident">INFINITY</span>),
             <span class="ident">snap_size</span>: <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">AtomicU64</span>::<span class="ident">new</span>(<span class="number">0</span>)),
+            <span class="ident">temp_sst_id</span>: <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">AtomicU64</span>::<span class="ident">new</span>(<span class="number">0</span>)),
             <span class="ident">encryption_key_manager</span>: <span class="prelude-val">None</span>,
         }
     }
@@ -4899,6 +4970,37 @@
                 <span class="ident">snap_size</span> <span class="op">*</span> <span class="ident">cmp</span>::<span class="ident">min</span>(<span class="ident">max_snap_count</span>, (<span class="ident">i</span> <span class="op">+</span> <span class="number">2</span>) <span class="kw">as</span> <span class="ident">u64</span>)
             );
         }
+    }
+
+    <span class="attribute">#[<span class="ident">test</span>]</span>
+    <span class="kw">fn</span> <span class="ident">test_snap_temp_file_delete</span>() {
+        <span class="kw">let</span> <span class="ident">src_temp_dir</span> <span class="op">=</span> <span class="ident">Builder</span>::<span class="ident">new</span>()
+            .<span class="ident">prefix</span>(<span class="string">&quot;test_snap_temp_file_delete_snap&quot;</span>)
+            .<span class="ident">tempdir</span>()
+            .<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">mgr_path</span> <span class="op">=</span> <span class="ident">src_temp_dir</span>.<span class="ident">path</span>().<span class="ident">to_str</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">src_mgr</span> <span class="op">=</span> <span class="ident">SnapManager</span>::<span class="ident">new</span>(<span class="ident">mgr_path</span>.<span class="ident">to_owned</span>());
+        <span class="ident">src_mgr</span>.<span class="ident">init</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">kv_temp_dir</span> <span class="op">=</span> <span class="ident">Builder</span>::<span class="ident">new</span>()
+            .<span class="ident">prefix</span>(<span class="string">&quot;test_snap_temp_file_delete_kv&quot;</span>)
+            .<span class="ident">tempdir</span>()
+            .<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">db</span> <span class="op">=</span> <span class="ident">open_test_db</span>(<span class="kw-2">&amp;</span><span class="ident">kv_temp_dir</span>.<span class="ident">path</span>(), <span class="prelude-val">None</span>, <span class="prelude-val">None</span>).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span> <span class="ident">RocksEngine</span>::<span class="ident">from_db</span>(<span class="ident">db</span>);
+        <span class="kw">let</span> <span class="ident">sst_path</span> <span class="op">=</span> <span class="ident">src_mgr</span>.<span class="ident">get_temp_path_for_ingest</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">writer</span> <span class="op">=</span> <span class="ident">RocksSstWriterBuilder</span>::<span class="ident">new</span>()
+            .<span class="ident">set_db</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>)
+            .<span class="ident">build</span>(<span class="kw-2">&amp;</span><span class="ident">sst_path</span>)
+            .<span class="ident">unwrap</span>();
+        <span class="ident">writer</span>.<span class="ident">put</span>(<span class="string">b&quot;a&quot;</span>, <span class="string">b&quot;a&quot;</span>).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="ident">writer</span>.<span class="ident">finish</span>().<span class="ident">unwrap</span>();
+        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">file_util</span>::<span class="ident">file_exists</span>(<span class="kw-2">&amp;</span><span class="ident">sst_path</span>));
+        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">file_path</span>().<span class="ident">to_str</span>().<span class="ident">unwrap</span>(), <span class="ident">sst_path</span>.<span class="ident">as_str</span>());
+        <span class="ident">drop</span>(<span class="ident">src_mgr</span>);
+        <span class="kw">let</span> <span class="ident">src_mgr</span> <span class="op">=</span> <span class="ident">SnapManager</span>::<span class="ident">new</span>(<span class="ident">mgr_path</span>.<span class="ident">to_owned</span>());
+        <span class="ident">src_mgr</span>.<span class="ident">init</span>().<span class="ident">unwrap</span>();
+        <span class="comment">// The sst_path will be deleted by SnapManager because it is a temp filet.</span>
+        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">file_util</span>::<span class="ident">file_exists</span>(<span class="kw-2">&amp;</span><span class="ident">sst_path</span>));
     }
 }
 </pre></div>

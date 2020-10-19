@@ -5226,6 +5226,8 @@
 <span id="5226">5226</span>
 <span id="5227">5227</span>
 <span id="5228">5228</span>
+<span id="5229">5229</span>
+<span id="5230">5230</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2017 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -5247,7 +5249,9 @@
 <span class="kw">use</span> <span class="ident">batch_system</span>::{<span class="ident">BasicMailbox</span>, <span class="ident">BatchRouter</span>, <span class="ident">BatchSystem</span>, <span class="ident">Fsm</span>, <span class="ident">HandlerBuilder</span>, <span class="ident">PollHandler</span>};
 <span class="kw">use</span> <span class="ident">crossbeam</span>::<span class="ident">channel</span>::{<span class="ident">TryRecvError</span>, <span class="ident">TrySendError</span>};
 <span class="kw">use</span> <span class="ident">engine_rocks</span>::{<span class="ident">PerfContext</span>, <span class="ident">PerfLevel</span>};
-<span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">KvEngine</span>, <span class="ident">RaftEngine</span>, <span class="ident">Snapshot</span>, <span class="ident">WriteBatch</span>};
+<span class="kw">use</span> <span class="ident">engine_traits</span>::{
+    <span class="ident">DeleteStrategy</span>, <span class="ident">KvEngine</span>, <span class="ident">RaftEngine</span>, <span class="ident">Range</span> <span class="kw">as</span> <span class="ident">EngineRange</span>, <span class="ident">Snapshot</span>, <span class="ident">WriteBatch</span>,
+};
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">ALL_CFS</span>, <span class="ident">CF_DEFAULT</span>, <span class="ident">CF_LOCK</span>, <span class="ident">CF_RAFT</span>, <span class="ident">CF_WRITE</span>};
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">import_sstpb</span>::<span class="ident">SstMeta</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">kvrpcpb</span>::<span class="ident">ExtraOp</span> <span class="kw">as</span> <span class="ident">TxnExtraOp</span>;
@@ -5269,7 +5273,7 @@
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">mpsc</span>::{<span class="ident">loose_bounded</span>, <span class="ident">LooseBoundedSender</span>, <span class="ident">Receiver</span>};
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">time</span>::{<span class="ident">duration_to_sec</span>, <span class="ident">Instant</span>};
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">worker</span>::<span class="ident">Scheduler</span>;
-<span class="kw">use</span> <span class="ident">tikv_util</span>::{<span class="ident">escape</span>, <span class="ident">Either</span>, <span class="ident">MustConsumeVec</span>};
+<span class="kw">use</span> <span class="ident">tikv_util</span>::{<span class="ident">Either</span>, <span class="ident">MustConsumeVec</span>};
 <span class="kw">use</span> <span class="ident">time</span>::<span class="ident">Timespec</span>;
 <span class="kw">use</span> <span class="ident">uuid</span>::<span class="ident">Builder</span> <span class="kw">as</span> <span class="ident">UuidBuilder</span>;
 
@@ -5411,11 +5415,22 @@
     <span class="kw">pub</span> <span class="ident">region</span>: <span class="ident">Region</span>,
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Range</span> {
     <span class="kw">pub</span> <span class="ident">cf</span>: <span class="ident">String</span>,
     <span class="kw">pub</span> <span class="ident">start_key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
     <span class="kw">pub</span> <span class="ident">end_key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
+}
+
+<span class="kw">impl</span> <span class="ident">Debug</span> <span class="kw">for</span> <span class="ident">Range</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Formatter</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="prelude-ty">Result</span> {
+        <span class="macro">write</span><span class="macro">!</span>(
+            <span class="ident">f</span>,
+            <span class="string">&quot;{{ cf: {:?}, start_key: {:?}, end_key: {:?} }}&quot;</span>,
+            <span class="self">self</span>.<span class="ident">cf</span>,
+            <span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">start_key</span>),
+            <span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">end_key</span>)
+        )
+    }
 }
 
 <span class="kw">impl</span> <span class="ident">Range</span> {
@@ -6470,7 +6485,7 @@
                 <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">id</span>(),
                 <span class="string">&quot;term&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">ctx</span>.<span class="ident">exec_ctx</span>.<span class="ident">as_ref</span>().<span class="ident">unwrap</span>().<span class="ident">term</span>,
                 <span class="string">&quot;index&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">ctx</span>.<span class="ident">exec_ctx</span>.<span class="ident">as_ref</span>().<span class="ident">unwrap</span>().<span class="ident">index</span>,
-                <span class="string">&quot;command&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">request</span>
+                <span class="string">&quot;command&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">request</span>,
             );
         }
 
@@ -6538,7 +6553,7 @@
                         <span class="string">&quot;skip readonly command&quot;</span>;
                         <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">region_id</span>(),
                         <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">id</span>(),
-                        <span class="string">&quot;command&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">req</span>
+                        <span class="string">&quot;command&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">req</span>,
                     );
                     <span class="kw">continue</span>;
                 }
@@ -6598,8 +6613,8 @@
                 <span class="macro">panic</span><span class="macro">!</span>(
                     <span class="string">&quot;{} failed to write ({}, {}) to cf {}: {:?}&quot;</span>,
                     <span class="self">self</span>.<span class="ident">tag</span>,
-                    <span class="ident">hex</span>::<span class="ident">encode_upper</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>),
-                    <span class="ident">escape</span>(<span class="ident">value</span>),
+                    <span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>),
+                    <span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">value</span>(<span class="kw-2">&amp;</span><span class="ident">value</span>),
                     <span class="ident">cf</span>,
                     <span class="ident">e</span>
                 )
@@ -6609,8 +6624,8 @@
                 <span class="macro">panic</span><span class="macro">!</span>(
                     <span class="string">&quot;{} failed to write ({}, {}): {:?}&quot;</span>,
                     <span class="self">self</span>.<span class="ident">tag</span>,
-                    <span class="ident">hex</span>::<span class="ident">encode_upper</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>),
-                    <span class="ident">escape</span>(<span class="ident">value</span>),
+                    <span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>),
+                    <span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">value</span>(<span class="kw-2">&amp;</span><span class="ident">value</span>),
                     <span class="ident">e</span>
                 );
             });
@@ -6634,7 +6649,7 @@
                 <span class="macro">panic</span><span class="macro">!</span>(
                     <span class="string">&quot;{} failed to delete {}: {}&quot;</span>,
                     <span class="self">self</span>.<span class="ident">tag</span>,
-                    <span class="ident">hex</span>::<span class="ident">encode_upper</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>),
+                    <span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>),
                     <span class="ident">e</span>
                 )
             });
@@ -6650,7 +6665,7 @@
                 <span class="macro">panic</span><span class="macro">!</span>(
                     <span class="string">&quot;{} failed to delete {}: {}&quot;</span>,
                     <span class="self">self</span>.<span class="ident">tag</span>,
-                    <span class="ident">hex</span>::<span class="ident">encode_upper</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>),
+                    <span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>),
                     <span class="ident">e</span>
                 )
             });
@@ -6698,44 +6713,33 @@
         <span class="comment">// Use delete_files_in_range to drop as many sst files as possible, this</span>
         <span class="comment">// is a way to reclaim disk space quickly after drop a table/index.</span>
         <span class="kw">if</span> <span class="op">!</span><span class="ident">notify_only</span> {
+            <span class="kw">let</span> <span class="ident">range</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">EngineRange</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">start_key</span>, <span class="kw-2">&amp;</span><span class="ident">end_key</span>)];
+            <span class="kw">let</span> <span class="ident">fail_f</span> <span class="op">=</span> <span class="op">|</span><span class="ident">e</span>: <span class="ident">engine_traits</span>::<span class="ident">Error</span>, <span class="ident">strategy</span>: <span class="ident">DeleteStrategy</span><span class="op">|</span> {
+                <span class="macro">panic</span><span class="macro">!</span>(
+                    <span class="string">&quot;{} failed to delete {:?} in ranges [{}, {}): {:?}&quot;</span>,
+                    <span class="self">self</span>.<span class="ident">tag</span>,
+                    <span class="ident">strategy</span>,
+                    <span class="ident">hex</span>::<span class="ident">encode_upper</span>(<span class="kw-2">&amp;</span><span class="ident">start_key</span>),
+                    <span class="ident">hex</span>::<span class="ident">encode_upper</span>(<span class="kw-2">&amp;</span><span class="ident">end_key</span>),
+                    <span class="ident">e</span>
+                )
+            };
             <span class="ident">engine</span>
-                .<span class="ident">delete_files_in_range_cf</span>(<span class="ident">cf</span>, <span class="kw-2">&amp;</span><span class="ident">start_key</span>, <span class="kw-2">&amp;</span><span class="ident">end_key</span>, <span class="comment">/* include_end */</span> <span class="bool-val">false</span>)
-                .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
-                    <span class="macro">panic</span><span class="macro">!</span>(
-                        <span class="string">&quot;{} failed to delete files in range [{}, {}): {:?}&quot;</span>,
-                        <span class="self">self</span>.<span class="ident">tag</span>,
-                        <span class="ident">hex</span>::<span class="ident">encode_upper</span>(<span class="kw-2">&amp;</span><span class="ident">start_key</span>),
-                        <span class="ident">hex</span>::<span class="ident">encode_upper</span>(<span class="kw-2">&amp;</span><span class="ident">end_key</span>),
-                        <span class="ident">e</span>
-                    )
-                });
+                .<span class="ident">delete_ranges_cf</span>(<span class="ident">cf</span>, <span class="ident">DeleteStrategy</span>::<span class="ident">DeleteFiles</span>, <span class="kw-2">&amp;</span><span class="ident">range</span>)
+                .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">fail_f</span>(<span class="ident">e</span>, <span class="ident">DeleteStrategy</span>::<span class="ident">DeleteFiles</span>));
 
+            <span class="kw">let</span> <span class="ident">strategy</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">use_delete_range</span> {
+                <span class="ident">DeleteStrategy</span>::<span class="ident">DeleteByRange</span>
+            } <span class="kw">else</span> {
+                <span class="ident">DeleteStrategy</span>::<span class="ident">DeleteByKey</span>
+            };
             <span class="comment">// Delete all remaining keys.</span>
             <span class="ident">engine</span>
-                .<span class="ident">delete_all_in_range_cf</span>(<span class="ident">cf</span>, <span class="kw-2">&amp;</span><span class="ident">start_key</span>, <span class="kw-2">&amp;</span><span class="ident">end_key</span>, <span class="ident">use_delete_range</span>)
-                .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
-                    <span class="macro">panic</span><span class="macro">!</span>(
-                        <span class="string">&quot;{} failed to delete all in range [{}, {}), cf: {}, err: {:?}&quot;</span>,
-                        <span class="self">self</span>.<span class="ident">tag</span>,
-                        <span class="ident">hex</span>::<span class="ident">encode_upper</span>(<span class="kw-2">&amp;</span><span class="ident">start_key</span>),
-                        <span class="ident">hex</span>::<span class="ident">encode_upper</span>(<span class="kw-2">&amp;</span><span class="ident">end_key</span>),
-                        <span class="ident">cf</span>,
-                        <span class="ident">e</span>
-                    );
-                });
+                .<span class="ident">delete_ranges_cf</span>(<span class="ident">cf</span>, <span class="ident">strategy</span>.<span class="ident">clone</span>(), <span class="kw-2">&amp;</span><span class="ident">range</span>)
+                .<span class="ident">unwrap_or_else</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">fail_f</span>(<span class="ident">e</span>, <span class="ident">strategy</span>));
             <span class="ident">engine</span>
-                .<span class="ident">delete_blob_files_in_range_cf</span>(
-                    <span class="ident">cf</span>, <span class="kw-2">&amp;</span><span class="ident">start_key</span>, <span class="kw-2">&amp;</span><span class="ident">end_key</span>, <span class="comment">/* include_end */</span> <span class="bool-val">false</span>,
-                )
-                .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
-                    <span class="macro">panic</span><span class="macro">!</span>(
-                        <span class="string">&quot;{} failed to delete blob files in range [{}, {}): {:?}&quot;</span>,
-                        <span class="self">self</span>.<span class="ident">tag</span>,
-                        <span class="ident">hex</span>::<span class="ident">encode_upper</span>(<span class="kw-2">&amp;</span><span class="ident">start_key</span>),
-                        <span class="ident">hex</span>::<span class="ident">encode_upper</span>(<span class="kw-2">&amp;</span><span class="ident">end_key</span>),
-                        <span class="ident">e</span>
-                    )
-                });
+                .<span class="ident">delete_ranges_cf</span>(<span class="ident">cf</span>, <span class="ident">DeleteStrategy</span>::<span class="ident">DeleteBlobs</span>, <span class="kw-2">&amp;</span><span class="ident">range</span>)
+                .<span class="ident">unwrap_or_else</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">fail_f</span>(<span class="ident">e</span>, <span class="ident">DeleteStrategy</span>::<span class="ident">DeleteBlobs</span>));
         }
 
         <span class="comment">// TODO: Should this be executed when `notify_only` is set?</span>
@@ -6928,7 +6932,7 @@
                         <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">region_id</span>(),
                         <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">id</span>(),
                         <span class="string">&quot;peer&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">peer</span>,
-                        <span class="string">&quot;region&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">region</span>,
+                        <span class="string">&quot;region&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">region</span>
                     );
                     <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(
                         <span class="string">&quot;remove missing peer {:?} from region {:?}&quot;</span>,
@@ -6977,7 +6981,7 @@
                     <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">region_id</span>(),
                     <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">id</span>(),
                     <span class="string">&quot;peer&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">peer</span>,
-                    <span class="string">&quot;region&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">region</span>,
+                    <span class="string">&quot;region&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">region</span>
                 );
             }
         }
@@ -9247,7 +9251,7 @@
             <span class="bool-val">false</span>,
             <span class="number">1</span>,
             <span class="number">0</span>,
-            <span class="ident">Callback</span>::<span class="ident">Write</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">resp</span>: <span class="ident">WriteResponse</span><span class="op">|</span> {
+            <span class="ident">Callback</span>::<span class="ident">write</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">resp</span>: <span class="ident">WriteResponse</span><span class="op">|</span> {
                 <span class="ident">resp_tx</span>.<span class="ident">send</span>(<span class="ident">resp</span>.<span class="ident">response</span>).<span class="ident">unwrap</span>();
             })),
         );
@@ -9275,7 +9279,7 @@
                 <span class="bool-val">false</span>,
                 <span class="number">4</span>,
                 <span class="number">4</span>,
-                <span class="ident">Callback</span>::<span class="ident">Write</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">write</span>: <span class="ident">WriteResponse</span><span class="op">|</span> {
+                <span class="ident">Callback</span>::<span class="ident">write</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">write</span>: <span class="ident">WriteResponse</span><span class="op">|</span> {
                     <span class="ident">cc_tx</span>.<span class="ident">send</span>(<span class="ident">write</span>.<span class="ident">response</span>).<span class="ident">unwrap</span>();
                 })),
             ),
@@ -9363,7 +9367,7 @@
             <span class="bool-val">false</span>,
             <span class="number">1</span>,
             <span class="number">0</span>,
-            <span class="ident">Callback</span>::<span class="ident">Write</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">resp</span>: <span class="ident">WriteResponse</span><span class="op">|</span> {
+            <span class="ident">Callback</span>::<span class="ident">write</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">resp</span>: <span class="ident">WriteResponse</span><span class="op">|</span> {
                 <span class="ident">resp_tx</span>.<span class="ident">send</span>(<span class="ident">resp</span>.<span class="ident">response</span>).<span class="ident">unwrap</span>();
             })),
         );
@@ -9397,7 +9401,7 @@
             <span class="bool-val">false</span>,
             <span class="ident">idx</span>,
             <span class="ident">term</span>,
-            <span class="ident">Callback</span>::<span class="ident">Write</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">resp</span>: <span class="ident">WriteResponse</span><span class="op">|</span> {
+            <span class="ident">Callback</span>::<span class="ident">write</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">resp</span>: <span class="ident">WriteResponse</span><span class="op">|</span> {
                 <span class="ident">tx</span>.<span class="ident">send</span>(<span class="ident">resp</span>.<span class="ident">response</span>).<span class="ident">unwrap</span>();
             })),
         )
@@ -9854,7 +9858,7 @@
                         <span class="bool-val">false</span>,
                         <span class="number">10</span>,
                         <span class="number">3</span>,
-                        <span class="ident">Callback</span>::<span class="ident">Write</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">resp</span>: <span class="ident">WriteResponse</span><span class="op">|</span> {
+                        <span class="ident">Callback</span>::<span class="ident">write</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">resp</span>: <span class="ident">WriteResponse</span><span class="op">|</span> {
                             <span class="comment">// Sleep until yield timeout.</span>
                             <span class="ident">thread</span>::<span class="ident">sleep</span>(<span class="ident">Duration</span>::<span class="ident">from_millis</span>(<span class="number">500</span>));
                             <span class="ident">capture_tx_clone</span>.<span class="ident">send</span>(<span class="ident">resp</span>.<span class="ident">response</span>).<span class="ident">unwrap</span>();

@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["GC_MAX_ROW_VERSIONS_THRESHOLD",""]],"enum":[["TxnCommitRecord","The result of `get_txn_commit_record`, which is used to get the status of a specified transaction from write cf."]],"fn":[["check_need_gc",""],["get_mvcc_properties",""]],"struct":[["MvccReader",""]]});
+initSidebarItems({"constant":[["GC_MAX_ROW_VERSIONS_THRESHOLD",""]],"enum":[["TxnCommitRecord","The result of `get_txn_commit_record`, which is used to get the status of a specified transaction from write cf."]],"fn":[["check_need_gc",""]],"struct":[["MvccReader",""]]});

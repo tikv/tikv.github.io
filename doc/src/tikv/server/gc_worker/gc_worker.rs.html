@@ -1209,6 +1209,23 @@
 <span id="1209">1209</span>
 <span id="1210">1210</span>
 <span id="1211">1211</span>
+<span id="1212">1212</span>
+<span id="1213">1213</span>
+<span id="1214">1214</span>
+<span id="1215">1215</span>
+<span id="1216">1216</span>
+<span id="1217">1217</span>
+<span id="1218">1218</span>
+<span id="1219">1219</span>
+<span id="1220">1220</span>
+<span id="1221">1221</span>
+<span id="1222">1222</span>
+<span id="1223">1223</span>
+<span id="1224">1224</span>
+<span id="1225">1225</span>
+<span id="1226">1226</span>
+<span id="1227">1227</span>
+<span id="1228">1228</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1221,7 +1238,7 @@
 
 <span class="kw">use</span> <span class="ident">concurrency_manager</span>::<span class="ident">ConcurrencyManager</span>;
 <span class="kw">use</span> <span class="ident">engine_rocks</span>::<span class="ident">RocksEngine</span>;
-<span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">MiscExt</span>, <span class="ident">CF_WRITE</span>};
+<span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">DeleteStrategy</span>, <span class="ident">MiscExt</span>, <span class="ident">Range</span>, <span class="ident">CF_DEFAULT</span>, <span class="ident">CF_LOCK</span>, <span class="ident">CF_WRITE</span>};
 <span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">executor</span>::<span class="ident">block_on</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">kvrpcpb</span>::{<span class="ident">Context</span>, <span class="ident">IsolationLevel</span>, <span class="ident">LockInfo</span>};
 <span class="kw">use</span> <span class="ident">pd_client</span>::{<span class="ident">ClusterVersion</span>, <span class="ident">PdClient</span>};
@@ -1385,14 +1402,14 @@
     <span class="doccomment">/// If this is not supported or any error happens, returns true to do further check after</span>
     <span class="doccomment">/// getting snapshot.</span>
     <span class="kw">fn</span> <span class="ident">need_gc</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">start_key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">end_key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">safe_point</span>: <span class="ident">TimeStamp</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="kw">let</span> <span class="ident">collection</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>
+        <span class="kw">let</span> <span class="ident">props</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>
             .<span class="ident">engine</span>
-            .<span class="ident">get_properties_cf</span>(<span class="ident">CF_WRITE</span>, <span class="kw-2">&amp;</span><span class="ident">start_key</span>, <span class="kw-2">&amp;</span><span class="ident">end_key</span>)
+            .<span class="ident">get_mvcc_properties_cf</span>(<span class="ident">CF_WRITE</span>, <span class="ident">safe_point</span>, <span class="kw-2">&amp;</span><span class="ident">start_key</span>, <span class="kw-2">&amp;</span><span class="ident">end_key</span>)
         {
-            <span class="prelude-val">Ok</span>(<span class="ident">c</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">c</span>,
-            <span class="prelude-val">Err</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="bool-val">true</span>,
+            <span class="prelude-val">Some</span>(<span class="ident">c</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">c</span>,
+            <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="bool-val">true</span>,
         };
-        <span class="ident">check_need_gc</span>(<span class="ident">safe_point</span>, <span class="self">self</span>.<span class="ident">cfg</span>.<span class="ident">ratio_threshold</span>, <span class="kw-2">&amp;</span><span class="ident">collection</span>)
+        <span class="ident">check_need_gc</span>(<span class="ident">safe_point</span>, <span class="self">self</span>.<span class="ident">cfg</span>.<span class="ident">ratio_threshold</span>, <span class="ident">props</span>)
     }
 
     <span class="doccomment">/// Cleans up outdated data.</span>
@@ -1515,15 +1532,23 @@
         <span class="kw">let</span> <span class="ident">start_data_key</span> <span class="op">=</span> <span class="ident">keys</span>::<span class="ident">data_key</span>(<span class="ident">start_key</span>.<span class="ident">as_encoded</span>());
         <span class="kw">let</span> <span class="ident">end_data_key</span> <span class="op">=</span> <span class="ident">keys</span>::<span class="ident">data_end_key</span>(<span class="ident">end_key</span>.<span class="ident">as_encoded</span>());
 
-        <span class="comment">// First, call delete_files_in_range to free as much disk space as possible</span>
+        <span class="kw">let</span> <span class="ident">cfs</span> <span class="op">=</span> <span class="kw-2">&amp;</span>[<span class="ident">CF_LOCK</span>, <span class="ident">CF_DEFAULT</span>, <span class="ident">CF_WRITE</span>];
+
+        <span class="comment">// First, use DeleteStrategy::DeleteFiles to free as much disk space as possible</span>
         <span class="kw">let</span> <span class="ident">delete_files_start_time</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now</span>();
-        <span class="ident">local_storage</span>
-            .<span class="ident">delete_all_files_in_range</span>(<span class="kw-2">&amp;</span><span class="ident">start_data_key</span>, <span class="kw-2">&amp;</span><span class="ident">end_data_key</span>)
-            .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
-                <span class="kw">let</span> <span class="ident">e</span>: <span class="ident">Error</span> <span class="op">=</span> <span class="macro">box_err</span><span class="macro">!</span>(<span class="ident">e</span>);
-                <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;unsafe destroy range failed at delete_files_in_range&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
-                <span class="ident">e</span>
-            })<span class="question-mark">?</span>;
+        <span class="kw">for</span> <span class="ident">cf</span> <span class="kw">in</span> <span class="ident">cfs</span> {
+            <span class="ident">local_storage</span>
+                .<span class="ident">delete_ranges_cf</span>(
+                    <span class="ident">cf</span>,
+                    <span class="ident">DeleteStrategy</span>::<span class="ident">DeleteFiles</span>,
+                    <span class="kw-2">&amp;</span>[<span class="ident">Range</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">start_data_key</span>, <span class="kw-2">&amp;</span><span class="ident">end_data_key</span>)],
+                )
+                .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
+                    <span class="kw">let</span> <span class="ident">e</span>: <span class="ident">Error</span> <span class="op">=</span> <span class="macro">box_err</span><span class="macro">!</span>(<span class="ident">e</span>);
+                    <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;unsafe destroy range failed at delete_files_in_range_cf&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
+                    <span class="ident">e</span>
+                })<span class="question-mark">?</span>;
+        }
 
         <span class="macro">info</span><span class="macro">!</span>(
             <span class="string">&quot;unsafe destroy range finished deleting files in range&quot;</span>;
@@ -1533,27 +1558,36 @@
 
         <span class="comment">// Then, delete all remaining keys in the range.</span>
         <span class="kw">let</span> <span class="ident">cleanup_all_start_time</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now</span>();
-        <span class="comment">// TODO: set use_delete_range with config here.</span>
-        <span class="ident">local_storage</span>
-            .<span class="ident">delete_all_in_range</span>(<span class="kw-2">&amp;</span><span class="ident">start_data_key</span>, <span class="kw-2">&amp;</span><span class="ident">end_data_key</span>, <span class="bool-val">false</span>)
-            .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
-                <span class="kw">let</span> <span class="ident">e</span>: <span class="ident">Error</span> <span class="op">=</span> <span class="macro">box_err</span><span class="macro">!</span>(<span class="ident">e</span>);
-                <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;unsafe destroy range failed at delete_all_in_range&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
-                <span class="ident">e</span>
-            })<span class="question-mark">?</span>;
+        <span class="kw">for</span> <span class="ident">cf</span> <span class="kw">in</span> <span class="ident">cfs</span> {
+            <span class="comment">// TODO: set use_delete_range with config here.</span>
+            <span class="ident">local_storage</span>
+                .<span class="ident">delete_ranges_cf</span>(
+                    <span class="ident">cf</span>,
+                    <span class="ident">DeleteStrategy</span>::<span class="ident">DeleteByKey</span>,
+                    <span class="kw-2">&amp;</span>[<span class="ident">Range</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">start_data_key</span>, <span class="kw-2">&amp;</span><span class="ident">end_data_key</span>)],
+                )
+                .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
+                    <span class="kw">let</span> <span class="ident">e</span>: <span class="ident">Error</span> <span class="op">=</span> <span class="macro">box_err</span><span class="macro">!</span>(<span class="ident">e</span>);
+                    <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;unsafe destroy range failed at delete_all_in_range_cf&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
+                    <span class="ident">e</span>
+                })<span class="question-mark">?</span>;
+            <span class="ident">local_storage</span>
+                .<span class="ident">delete_ranges_cf</span>(
+                    <span class="ident">cf</span>,
+                    <span class="ident">DeleteStrategy</span>::<span class="ident">DeleteBlobs</span>,
+                    <span class="kw-2">&amp;</span>[<span class="ident">Range</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">start_data_key</span>, <span class="kw-2">&amp;</span><span class="ident">end_data_key</span>)],
+                )
+                .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
+                    <span class="kw">let</span> <span class="ident">e</span>: <span class="ident">Error</span> <span class="op">=</span> <span class="macro">box_err</span><span class="macro">!</span>(<span class="ident">e</span>);
+                    <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;unsafe destroy range failed at delete_blob_files_in_range&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
+                    <span class="ident">e</span>
+                })<span class="question-mark">?</span>;
+        }
 
         <span class="macro">info</span><span class="macro">!</span>(
             <span class="string">&quot;unsafe destroy range finished cleaning up all&quot;</span>;
             <span class="string">&quot;start_key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">start_key</span>, <span class="string">&quot;end_key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">end_key</span>, <span class="string">&quot;cost_time&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">cleanup_all_start_time</span>.<span class="ident">elapsed</span>(),
         );
-
-        <span class="ident">local_storage</span>
-            .<span class="ident">delete_blob_files_in_range</span>(<span class="kw-2">&amp;</span><span class="ident">start_data_key</span>, <span class="kw-2">&amp;</span><span class="ident">end_data_key</span>)
-            .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
-                <span class="kw">let</span> <span class="ident">e</span>: <span class="ident">Error</span> <span class="op">=</span> <span class="macro">box_err</span><span class="macro">!</span>(<span class="ident">e</span>);
-                <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;unsafe destroy range failed at delete_blob_files_in_range&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
-                <span class="ident">e</span>
-            })<span class="question-mark">?</span>;
 
         <span class="self">self</span>.<span class="ident">raft_store_router</span>
             .<span class="ident">send_store_msg</span>(<span class="ident">StoreMsg</span>::<span class="ident">ClearRegionSizeInRange</span> {
@@ -1843,7 +1877,7 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start_auto_gc</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">GcSafePointProvider</span>, <span class="ident">R</span>: <span class="ident">RegionInfoProvider</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">cfg</span>: <span class="ident">AutoGcConfig</span><span class="op">&lt;</span><span class="ident">S</span>, <span class="ident">R</span><span class="op">&gt;</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicU64</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">safe_point</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">AtomicU64</span>::<span class="ident">new</span>(<span class="number">0</span>));
 
         <span class="kw">let</span> <span class="ident">kvdb</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">engine</span>.<span class="ident">kv_engine</span>();
@@ -1855,14 +1889,14 @@
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">handle</span>.<span class="ident">is_none</span>());
         <span class="kw">let</span> <span class="ident">new_handle</span> <span class="op">=</span> <span class="ident">GcManager</span>::<span class="ident">new</span>(
             <span class="ident">cfg</span>,
-            <span class="ident">safe_point</span>,
+            <span class="ident">safe_point</span>.<span class="ident">clone</span>(),
             <span class="self">self</span>.<span class="ident">worker_scheduler</span>.<span class="ident">clone</span>(),
             <span class="self">self</span>.<span class="ident">config_manager</span>.<span class="ident">clone</span>(),
             <span class="self">self</span>.<span class="ident">cluster_version</span>.<span class="ident">clone</span>(),
         )
         .<span class="ident">start</span>()<span class="question-mark">?</span>;
         <span class="kw-2">*</span><span class="ident">handle</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">new_handle</span>);
-        <span class="prelude-val">Ok</span>(())
+        <span class="prelude-val">Ok</span>(<span class="ident">safe_point</span>)
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {

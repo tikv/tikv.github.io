@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["activate_prof",""],["deactivate_prof",""],["dump_prof",""]]});
+initSidebarItems({"constant":[["PROF_ACTIVE",""],["PROF_DUMP",""]],"fn":[["activate_prof",""],["deactivate_prof",""],["dump_prof","Dump the profile to the `path`."]]});
