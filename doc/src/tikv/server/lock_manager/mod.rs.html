@@ -467,6 +467,15 @@
 <span id="467">467</span>
 <span id="468">468</span>
 <span id="469">469</span>
+<span id="470">470</span>
+<span id="471">471</span>
+<span id="472">472</span>
+<span id="473">473</span>
+<span id="474">474</span>
+<span id="475">475</span>
+<span id="476">476</span>
+<span id="477">477</span>
+<span id="478">478</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -482,7 +491,7 @@
 
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">collections</span>::<span class="ident">hash_map</span>::<span class="ident">DefaultHasher</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">hash</span>::{<span class="ident">Hash</span>, <span class="ident">Hasher</span>};
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::{<span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>};
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::{<span class="ident">AtomicBool</span>, <span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">Arc</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">thread</span>::<span class="ident">JoinHandle</span>;
 
@@ -528,6 +537,8 @@
 
     <span class="doccomment">/// Record transactions which have sent requests to detect deadlock.</span>
     <span class="ident">detected</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">CachePadded</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">HashSet</span><span class="op">&lt;</span><span class="ident">TimeStamp</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+
+    <span class="ident">pipelined</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicBool</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">Clone</span> <span class="kw">for</span> <span class="ident">LockManager</span> {
@@ -539,12 +550,13 @@
             <span class="ident">detector_scheduler</span>: <span class="self">self</span>.<span class="ident">detector_scheduler</span>.<span class="ident">clone</span>(),
             <span class="ident">waiter_count</span>: <span class="self">self</span>.<span class="ident">waiter_count</span>.<span class="ident">clone</span>(),
             <span class="ident">detected</span>: <span class="self">self</span>.<span class="ident">detected</span>.<span class="ident">clone</span>(),
+            <span class="ident">pipelined</span>: <span class="self">self</span>.<span class="ident">pipelined</span>.<span class="ident">clone</span>(),
         }
     }
 }
 
 <span class="kw">impl</span> <span class="ident">LockManager</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">pipelined</span>: <span class="ident">bool</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="kw">let</span> <span class="ident">waiter_mgr_worker</span> <span class="op">=</span> <span class="ident">FutureWorker</span>::<span class="ident">new</span>(<span class="string">&quot;waiter-manager&quot;</span>);
         <span class="kw">let</span> <span class="ident">detector_worker</span> <span class="op">=</span> <span class="ident">FutureWorker</span>::<span class="ident">new</span>(<span class="string">&quot;deadlock-detector&quot;</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">detected</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">with_capacity</span>(<span class="ident">DETECTED_SLOTS_NUM</span>);
@@ -557,6 +569,7 @@
             <span class="ident">detector_worker</span>: <span class="prelude-val">Some</span>(<span class="ident">detector_worker</span>),
             <span class="ident">waiter_count</span>: <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">AtomicUsize</span>::<span class="ident">new</span>(<span class="number">0</span>)),
             <span class="ident">detected</span>: <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">detected</span>),
+            <span class="ident">pipelined</span>: <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">AtomicBool</span>::<span class="ident">new</span>(<span class="ident">pipelined</span>)),
         }
     }
 
@@ -672,7 +685,12 @@
         <span class="ident">LockManagerConfigManager</span>::<span class="ident">new</span>(
             <span class="self">self</span>.<span class="ident">waiter_mgr_scheduler</span>.<span class="ident">clone</span>(),
             <span class="self">self</span>.<span class="ident">detector_scheduler</span>.<span class="ident">clone</span>(),
+            <span class="self">self</span>.<span class="ident">pipelined</span>.<span class="ident">clone</span>(),
         )
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_pipelined</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicBool</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">pipelined</span>.<span class="ident">clone</span>()
     }
 
     <span class="kw">fn</span> <span class="ident">add_to_detected</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">txn_ts</span>: <span class="ident">TimeStamp</span>) {
@@ -762,7 +780,7 @@
     <span class="kw">fn</span> <span class="ident">start_lock_manager</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">LockManager</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">coprocessor_host</span> <span class="op">=</span> <span class="ident">CoprocessorHost</span>::<span class="ident">default</span>();
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">lock_mgr</span> <span class="op">=</span> <span class="ident">LockManager</span>::<span class="ident">new</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">lock_mgr</span> <span class="op">=</span> <span class="ident">LockManager</span>::<span class="ident">new</span>(<span class="bool-val">false</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cfg</span> <span class="op">=</span> <span class="ident">Config</span>::<span class="ident">default</span>();
         <span class="ident">cfg</span>.<span class="ident">wait_for_lock_timeout</span> <span class="op">=</span> <span class="ident">ReadableDuration</span>::<span class="ident">millis</span>(<span class="number">3000</span>);
         <span class="ident">cfg</span>.<span class="ident">wake_up_delay_duration</span> <span class="op">=</span> <span class="ident">ReadableDuration</span>::<span class="ident">millis</span>(<span class="number">100</span>);
@@ -931,7 +949,7 @@
 
     <span class="attribute">#[<span class="ident">bench</span>]</span>
     <span class="kw">fn</span> <span class="ident">bench_lock_mgr_clone</span>(<span class="ident">b</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">test</span>::<span class="ident">Bencher</span>) {
-        <span class="kw">let</span> <span class="ident">lock_mgr</span> <span class="op">=</span> <span class="ident">LockManager</span>::<span class="ident">new</span>();
+        <span class="kw">let</span> <span class="ident">lock_mgr</span> <span class="op">=</span> <span class="ident">LockManager</span>::<span class="ident">new</span>(<span class="bool-val">false</span>);
         <span class="ident">b</span>.<span class="ident">iter</span>(<span class="op">|</span><span class="op">|</span> {
             <span class="ident">test</span>::<span class="ident">black_box</span>(<span class="ident">lock_mgr</span>.<span class="ident">clone</span>());
         });

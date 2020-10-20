@@ -113,6 +113,14 @@
 <span id="113">113</span>
 <span id="114">114</span>
 <span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
+<span id="118">118</span>
+<span id="119">119</span>
+<span id="120">120</span>
+<span id="121">121</span>
+<span id="122">122</span>
+<span id="123">123</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -122,6 +130,8 @@
 <span class="kw">use</span> <span class="ident">serde</span>::<span class="ident">de</span>::{<span class="ident">Deserialize</span>, <span class="ident">Deserializer</span>, <span class="ident">IntoDeserializer</span>};
 
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">error</span>::<span class="ident">Error</span>;
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::{<span class="ident">AtomicBool</span>, <span class="ident">Ordering</span>};
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">Arc</span>;
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">config</span>::<span class="ident">ReadableDuration</span>;
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Serialize</span>, <span class="ident">Deserialize</span>, <span class="ident">PartialEq</span>, <span class="ident">Debug</span>, <span class="ident">Configuration</span>)]</span>
@@ -179,16 +189,19 @@
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">LockManagerConfigManager</span> {
     <span class="kw">pub</span> <span class="ident">waiter_mgr_scheduler</span>: <span class="ident">WaiterMgrScheduler</span>,
     <span class="kw">pub</span> <span class="ident">detector_scheduler</span>: <span class="ident">DeadlockScheduler</span>,
+    <span class="kw">pub</span> <span class="ident">pipelined</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicBool</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">LockManagerConfigManager</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
         <span class="ident">waiter_mgr_scheduler</span>: <span class="ident">WaiterMgrScheduler</span>,
         <span class="ident">detector_scheduler</span>: <span class="ident">DeadlockScheduler</span>,
+        <span class="ident">pipelined</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicBool</span><span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="ident">LockManagerConfigManager</span> {
             <span class="ident">waiter_mgr_scheduler</span>,
             <span class="ident">detector_scheduler</span>,
+            <span class="ident">pipelined</span>,
         }
     }
 }
@@ -206,6 +219,9 @@
             (<span class="prelude-val">None</span>, <span class="ident">delay</span> @ <span class="prelude-val">Some</span>(<span class="kw">_</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">waiter_mgr_scheduler</span>.<span class="ident">change_config</span>(<span class="prelude-val">None</span>, <span class="ident">delay</span>),
             (<span class="prelude-val">None</span>, <span class="prelude-val">None</span>) <span class="op">=</span><span class="op">&gt;</span> {}
         };
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">p</span>) <span class="op">=</span> <span class="ident">change</span>.<span class="ident">remove</span>(<span class="string">&quot;pipelined&quot;</span>).<span class="ident">map</span>(<span class="ident">Into</span>::<span class="ident">into</span>) {
+            <span class="self">self</span>.<span class="ident">pipelined</span>.<span class="ident">store</span>(<span class="ident">p</span>, <span class="ident">Ordering</span>::<span class="ident">Relaxed</span>);
+        }
         <span class="prelude-val">Ok</span>(())
     }
 }
