@@ -1,4 +1,4 @@
 (function() {var implementors = {};
 implementors["raftstore"] = [];
-implementors["tikv"] = [{"text":"impl&lt;E:&nbsp;<a class=\"trait\" href=\"engine_traits/engine/trait.KvEngine.html\" title=\"trait engine_traits::engine::KvEngine\">KvEngine</a>&gt; <a class=\"trait\" href=\"raftstore/coprocessor/consistency_check/trait.ConsistencyCheckObserver.html\" title=\"trait raftstore::coprocessor::consistency_check::ConsistencyCheckObserver\">ConsistencyCheckObserver</a>&lt;E&gt; for <a class=\"struct\" href=\"tikv/storage/mvcc/struct.MvccConsistencyCheckObserver.html\" title=\"struct tikv::storage::mvcc::MvccConsistencyCheckObserver\">Mvcc</a>&lt;E&gt;","synthetic":false,"types":["tikv::storage::mvcc::consistency_check::Mvcc"]}];
+implementors["tikv"] = [{"text":"impl&lt;E:&nbsp;KvEngine&gt; ConsistencyCheckObserver&lt;E&gt; for Mvcc&lt;E&gt;","synthetic":false,"types":[]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

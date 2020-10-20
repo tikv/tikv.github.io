@@ -1,3 +1,3 @@
 (function() {var implementors = {};
-implementors["tikv_util"] = [{"text":"impl&lt;T:&nbsp;<a class=\"trait\" href=\"tikv_util/yatp_pool/trait.PoolTicker.html\" title=\"trait tikv_util::yatp_pool::PoolTicker\">PoolTicker</a>&gt; <a class=\"trait\" href=\"yatp/pool/runner/trait.Runner.html\" title=\"trait yatp::pool::runner::Runner\">Runner</a> for <a class=\"struct\" href=\"tikv_util/yatp_pool/struct.YatpPoolRunner.html\" title=\"struct tikv_util::yatp_pool::YatpPoolRunner\">YatpPoolRunner</a>&lt;T&gt;","synthetic":false,"types":["tikv_util::yatp_pool::YatpPoolRunner"]}];
+implementors["tikv_util"] = [{"text":"impl&lt;T:&nbsp;PoolTicker&gt; Runner for YatpPoolRunner&lt;T&gt;","synthetic":false,"types":[]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

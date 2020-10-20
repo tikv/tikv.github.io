@@ -1,3 +1,3 @@
 (function() {var implementors = {};
-implementors["tikv"] = [{"text":"impl <a class=\"trait\" href=\"kvproto/protos/diagnosticspb_grpc/trait.Diagnostics.html\" title=\"trait kvproto::protos::diagnosticspb_grpc::Diagnostics\">Diagnostics</a> for <a class=\"struct\" href=\"tikv/server/service/struct.DiagnosticsService.html\" title=\"struct tikv::server::service::DiagnosticsService\">Service</a>","synthetic":false,"types":["tikv::server::service::diagnostics::Service"]}];
+implementors["tikv"] = [{"text":"impl Diagnostics for Service","synthetic":false,"types":[]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

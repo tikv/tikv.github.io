@@ -1,4 +1,4 @@
 (function() {var implementors = {};
-implementors["engine_rocks"] = [{"text":"impl <a class=\"trait\" href=\"engine_traits/raft_engine/trait.RaftEngine.html\" title=\"trait engine_traits::raft_engine::RaftEngine\">RaftEngine</a> for <a class=\"struct\" href=\"engine_rocks/struct.RocksEngine.html\" title=\"struct engine_rocks::RocksEngine\">RocksEngine</a>","synthetic":false,"types":["engine_rocks::engine::RocksEngine"]}];
-implementors["raft_log_engine"] = [{"text":"impl <a class=\"trait\" href=\"engine_traits/raft_engine/trait.RaftEngine.html\" title=\"trait engine_traits::raft_engine::RaftEngine\">RaftEngine</a> for <a class=\"struct\" href=\"raft_log_engine/struct.RaftLogEngine.html\" title=\"struct raft_log_engine::RaftLogEngine\">RaftLogEngine</a>","synthetic":false,"types":["raft_log_engine::engine::RaftLogEngine"]}];
+implementors["engine_rocks"] = [{"text":"impl RaftEngine for RocksEngine","synthetic":false,"types":[]}];
+implementors["raft_log_engine"] = [{"text":"impl RaftEngine for RaftLogEngine","synthetic":false,"types":[]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

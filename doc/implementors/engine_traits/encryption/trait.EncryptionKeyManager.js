@@ -1,3 +1,3 @@
 (function() {var implementors = {};
-implementors["encryption"] = [{"text":"impl <a class=\"trait\" href=\"engine_traits/encryption/trait.EncryptionKeyManager.html\" title=\"trait engine_traits::encryption::EncryptionKeyManager\">EncryptionKeyManager</a> for <a class=\"struct\" href=\"encryption/struct.DataKeyManager.html\" title=\"struct encryption::DataKeyManager\">DataKeyManager</a>","synthetic":false,"types":["encryption::manager::DataKeyManager"]}];
+implementors["encryption"] = [{"text":"impl EncryptionKeyManager for DataKeyManager","synthetic":false,"types":[]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

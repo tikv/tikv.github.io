@@ -1,4 +1,4 @@
 (function() {var implementors = {};
-implementors["engine_panic"] = [{"text":"impl <a class=\"trait\" href=\"engine_traits/sst/trait.SstReader.html\" title=\"trait engine_traits::sst::SstReader\">SstReader</a> for <a class=\"struct\" href=\"engine_panic/struct.PanicSstReader.html\" title=\"struct engine_panic::PanicSstReader\">PanicSstReader</a>","synthetic":false,"types":["engine_panic::sst::PanicSstReader"]}];
-implementors["engine_rocks"] = [{"text":"impl <a class=\"trait\" href=\"engine_traits/sst/trait.SstReader.html\" title=\"trait engine_traits::sst::SstReader\">SstReader</a> for <a class=\"struct\" href=\"engine_rocks/struct.RocksSstReader.html\" title=\"struct engine_rocks::RocksSstReader\">RocksSstReader</a>","synthetic":false,"types":["engine_rocks::sst::RocksSstReader"]}];
+implementors["engine_panic"] = [{"text":"impl SstReader for PanicSstReader","synthetic":false,"types":[]}];
+implementors["engine_rocks"] = [{"text":"impl SstReader for RocksSstReader","synthetic":false,"types":[]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

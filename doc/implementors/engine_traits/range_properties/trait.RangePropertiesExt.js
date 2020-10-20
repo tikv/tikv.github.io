@@ -1,4 +1,4 @@
 (function() {var implementors = {};
-implementors["engine_panic"] = [{"text":"impl <a class=\"trait\" href=\"engine_traits/range_properties/trait.RangePropertiesExt.html\" title=\"trait engine_traits::range_properties::RangePropertiesExt\">RangePropertiesExt</a> for <a class=\"struct\" href=\"engine_panic/struct.PanicEngine.html\" title=\"struct engine_panic::PanicEngine\">PanicEngine</a>","synthetic":false,"types":["engine_panic::engine::PanicEngine"]}];
-implementors["engine_rocks"] = [{"text":"impl <a class=\"trait\" href=\"engine_traits/range_properties/trait.RangePropertiesExt.html\" title=\"trait engine_traits::range_properties::RangePropertiesExt\">RangePropertiesExt</a> for <a class=\"struct\" href=\"engine_rocks/struct.RocksEngine.html\" title=\"struct engine_rocks::RocksEngine\">RocksEngine</a>","synthetic":false,"types":["engine_rocks::engine::RocksEngine"]}];
+implementors["engine_panic"] = [{"text":"impl RangePropertiesExt for PanicEngine","synthetic":false,"types":[]}];
+implementors["engine_rocks"] = [{"text":"impl RangePropertiesExt for RocksEngine","synthetic":false,"types":[]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

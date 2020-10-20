@@ -1,4 +1,4 @@
 (function() {var implementors = {};
-implementors["engine_panic"] = [{"text":"impl <a class=\"trait\" href=\"engine_traits/cf_options/trait.ColumnFamilyOptions.html\" title=\"trait engine_traits::cf_options::ColumnFamilyOptions\">ColumnFamilyOptions</a> for <a class=\"struct\" href=\"engine_panic/struct.PanicColumnFamilyOptions.html\" title=\"struct engine_panic::PanicColumnFamilyOptions\">PanicColumnFamilyOptions</a>","synthetic":false,"types":["engine_panic::cf_options::PanicColumnFamilyOptions"]}];
-implementors["engine_rocks"] = [{"text":"impl <a class=\"trait\" href=\"engine_traits/cf_options/trait.ColumnFamilyOptions.html\" title=\"trait engine_traits::cf_options::ColumnFamilyOptions\">ColumnFamilyOptions</a> for <a class=\"struct\" href=\"engine_rocks/struct.RocksColumnFamilyOptions.html\" title=\"struct engine_rocks::RocksColumnFamilyOptions\">RocksColumnFamilyOptions</a>","synthetic":false,"types":["engine_rocks::cf_options::RocksColumnFamilyOptions"]}];
+implementors["engine_panic"] = [{"text":"impl ColumnFamilyOptions for PanicColumnFamilyOptions","synthetic":false,"types":[]}];
+implementors["engine_rocks"] = [{"text":"impl ColumnFamilyOptions for RocksColumnFamilyOptions","synthetic":false,"types":[]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

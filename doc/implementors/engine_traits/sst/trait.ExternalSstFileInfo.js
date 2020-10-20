@@ -1,4 +1,4 @@
 (function() {var implementors = {};
-implementors["engine_panic"] = [{"text":"impl <a class=\"trait\" href=\"engine_traits/sst/trait.ExternalSstFileInfo.html\" title=\"trait engine_traits::sst::ExternalSstFileInfo\">ExternalSstFileInfo</a> for <a class=\"struct\" href=\"engine_panic/struct.PanicExternalSstFileInfo.html\" title=\"struct engine_panic::PanicExternalSstFileInfo\">PanicExternalSstFileInfo</a>","synthetic":false,"types":["engine_panic::sst::PanicExternalSstFileInfo"]}];
-implementors["engine_rocks"] = [{"text":"impl <a class=\"trait\" href=\"engine_traits/sst/trait.ExternalSstFileInfo.html\" title=\"trait engine_traits::sst::ExternalSstFileInfo\">ExternalSstFileInfo</a> for <a class=\"struct\" href=\"engine_rocks/struct.RocksExternalSstFileInfo.html\" title=\"struct engine_rocks::RocksExternalSstFileInfo\">RocksExternalSstFileInfo</a>","synthetic":false,"types":["engine_rocks::sst::RocksExternalSstFileInfo"]}];
+implementors["engine_panic"] = [{"text":"impl ExternalSstFileInfo for PanicExternalSstFileInfo","synthetic":false,"types":[]}];
+implementors["engine_rocks"] = [{"text":"impl ExternalSstFileInfo for RocksExternalSstFileInfo","synthetic":false,"types":[]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

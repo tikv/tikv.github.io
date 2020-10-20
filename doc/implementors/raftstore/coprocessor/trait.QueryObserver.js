@@ -1,3 +1,3 @@
 (function() {var implementors = {};
-implementors["tikv"] = [{"text":"impl <a class=\"trait\" href=\"raftstore/coprocessor/trait.QueryObserver.html\" title=\"trait raftstore::coprocessor::QueryObserver\">QueryObserver</a> for <a class=\"struct\" href=\"tikv/server/gc_worker/applied_lock_collector/struct.LockObserver.html\" title=\"struct tikv::server::gc_worker::applied_lock_collector::LockObserver\">LockObserver</a>","synthetic":false,"types":["tikv::server::gc_worker::applied_lock_collector::LockObserver"]}];
+implementors["tikv"] = [{"text":"impl QueryObserver for LockObserver","synthetic":false,"types":[]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

@@ -1,3 +1,3 @@
 (function() {var implementors = {};
-implementors["tidb_query_codegen"] = [{"text":"impl <a class=\"trait\" href=\"darling_core/from_derive_input/trait.FromDeriveInput.html\" title=\"trait darling_core::from_derive_input::FromDeriveInput\">FromDeriveInput</a> for <a class=\"struct\" href=\"tidb_query_codegen/aggr_function/struct.AggrFunctionOpts.html\" title=\"struct tidb_query_codegen::aggr_function::AggrFunctionOpts\">AggrFunctionOpts</a>","synthetic":false,"types":["tidb_query_codegen::aggr_function::AggrFunctionOpts"]}];
+implementors["tidb_query_codegen"] = [{"text":"impl FromDeriveInput for AggrFunctionOpts","synthetic":false,"types":[]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

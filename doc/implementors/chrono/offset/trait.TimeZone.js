@@ -1,5 +1,5 @@
 (function() {var implementors = {};
 implementors["chrono"] = [];
-implementors["chrono_tz"] = [{"text":"impl <a class=\"trait\" href=\"chrono/offset/trait.TimeZone.html\" title=\"trait chrono::offset::TimeZone\">TimeZone</a> for <a class=\"enum\" href=\"chrono_tz/enum.Tz.html\" title=\"enum chrono_tz::Tz\">Tz</a>","synthetic":false,"types":["chrono_tz::timezones::Tz"]}];
-implementors["tidb_query_datatype"] = [{"text":"impl <a class=\"trait\" href=\"chrono/offset/trait.TimeZone.html\" title=\"trait chrono::offset::TimeZone\">TimeZone</a> for <a class=\"enum\" href=\"tidb_query_datatype/codec/mysql/enum.Tz.html\" title=\"enum tidb_query_datatype::codec::mysql::Tz\">Tz</a>","synthetic":false,"types":["tidb_query_datatype::codec::mysql::time::tz::Tz"]}];
+implementors["chrono_tz"] = [{"text":"impl TimeZone for Tz","synthetic":false,"types":[]}];
+implementors["tidb_query_datatype"] = [{"text":"impl TimeZone for Tz","synthetic":false,"types":[]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

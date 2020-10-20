@@ -1,4 +1,4 @@
 (function() {var implementors = {};
 implementors["chrono"] = [];
-implementors["tidb_query_datatype"] = [{"text":"impl <a class=\"trait\" href=\"chrono/offset/trait.Offset.html\" title=\"trait chrono::offset::Offset\">Offset</a> for <a class=\"enum\" href=\"tidb_query_datatype/codec/mysql/time/tz/enum.TzOffset.html\" title=\"enum tidb_query_datatype::codec::mysql::time::tz::TzOffset\">TzOffset</a>","synthetic":false,"types":["tidb_query_datatype::codec::mysql::time::tz::TzOffset"]}];
+implementors["tidb_query_datatype"] = [{"text":"impl Offset for TzOffset","synthetic":false,"types":[]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

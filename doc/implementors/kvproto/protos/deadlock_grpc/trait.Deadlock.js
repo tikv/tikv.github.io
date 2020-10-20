@@ -1,3 +1,3 @@
 (function() {var implementors = {};
-implementors["tikv"] = [{"text":"impl <a class=\"trait\" href=\"kvproto/protos/deadlock_grpc/trait.Deadlock.html\" title=\"trait kvproto::protos::deadlock_grpc::Deadlock\">Deadlock</a> for <a class=\"struct\" href=\"tikv/server/lock_manager/deadlock/struct.Service.html\" title=\"struct tikv::server::lock_manager::deadlock::Service\">Service</a>","synthetic":false,"types":["tikv::server::lock_manager::deadlock::Service"]}];
+implementors["tikv"] = [{"text":"impl Deadlock for Service","synthetic":false,"types":[]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

@@ -1,3 +1,3 @@
 (function() {var implementors = {};
-implementors["security"] = [{"text":"impl <a class=\"trait\" href=\"grpcio/security/credentials/trait.ServerCredentialsFetcher.html\" title=\"trait grpcio::security::credentials::ServerCredentialsFetcher\">ServerCredentialsFetcher</a> for <a class=\"struct\" href=\"security/struct.Fetcher.html\" title=\"struct security::Fetcher\">Fetcher</a>","synthetic":false,"types":["security::Fetcher"]}];
+implementors["security"] = [{"text":"impl ServerCredentialsFetcher for Fetcher","synthetic":false,"types":[]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

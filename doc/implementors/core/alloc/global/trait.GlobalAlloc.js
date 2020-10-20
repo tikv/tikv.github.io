@@ -1,3 +1,3 @@
 (function() {var implementors = {};
-implementors["tikv_jemallocator"] = [{"text":"impl <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/alloc/global/trait.GlobalAlloc.html\" title=\"trait core::alloc::global::GlobalAlloc\">GlobalAlloc</a> for <a class=\"struct\" href=\"tikv_jemallocator/struct.Jemalloc.html\" title=\"struct tikv_jemallocator::Jemalloc\">Jemalloc</a>","synthetic":false,"types":["tikv_jemallocator::Jemalloc"]}];
+implementors["tikv_jemallocator"] = [{"text":"impl GlobalAlloc for Jemalloc","synthetic":false,"types":[]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

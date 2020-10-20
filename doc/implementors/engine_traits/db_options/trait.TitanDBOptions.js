@@ -1,4 +1,4 @@
 (function() {var implementors = {};
-implementors["engine_panic"] = [{"text":"impl <a class=\"trait\" href=\"engine_traits/db_options/trait.TitanDBOptions.html\" title=\"trait engine_traits::db_options::TitanDBOptions\">TitanDBOptions</a> for <a class=\"struct\" href=\"engine_panic/struct.PanicTitanDBOptions.html\" title=\"struct engine_panic::PanicTitanDBOptions\">PanicTitanDBOptions</a>","synthetic":false,"types":["engine_panic::db_options::PanicTitanDBOptions"]}];
-implementors["engine_rocks"] = [{"text":"impl <a class=\"trait\" href=\"engine_traits/db_options/trait.TitanDBOptions.html\" title=\"trait engine_traits::db_options::TitanDBOptions\">TitanDBOptions</a> for <a class=\"struct\" href=\"engine_rocks/struct.RocksTitanDBOptions.html\" title=\"struct engine_rocks::RocksTitanDBOptions\">RocksTitanDBOptions</a>","synthetic":false,"types":["engine_rocks::db_options::RocksTitanDBOptions"]}];
+implementors["engine_panic"] = [{"text":"impl TitanDBOptions for PanicTitanDBOptions","synthetic":false,"types":[]}];
+implementors["engine_rocks"] = [{"text":"impl TitanDBOptions for RocksTitanDBOptions","synthetic":false,"types":[]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

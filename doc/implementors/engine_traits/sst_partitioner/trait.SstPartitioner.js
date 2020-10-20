@@ -1,3 +1,3 @@
 (function() {var implementors = {};
-implementors["raftstore"] = [{"text":"impl <a class=\"trait\" href=\"engine_traits/sst_partitioner/trait.SstPartitioner.html\" title=\"trait engine_traits::sst_partitioner::SstPartitioner\">SstPartitioner</a> for <a class=\"struct\" href=\"raftstore/store/compaction_guard/struct.CompactionGuardGenerator.html\" title=\"struct raftstore::store::compaction_guard::CompactionGuardGenerator\">CompactionGuardGenerator</a>","synthetic":false,"types":["raftstore::store::compaction_guard::CompactionGuardGenerator"]}];
+implementors["raftstore"] = [{"text":"impl SstPartitioner for CompactionGuardGenerator","synthetic":false,"types":[]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

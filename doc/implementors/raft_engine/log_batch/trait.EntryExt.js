@@ -1,3 +1,3 @@
 (function() {var implementors = {};
-implementors["raft_log_engine"] = [{"text":"impl <a class=\"trait\" href=\"raft_engine/log_batch/trait.EntryExt.html\" title=\"trait raft_engine::log_batch::EntryExt\">EntryExt</a>&lt;<a class=\"struct\" href=\"raft_proto/protos/eraftpb/struct.Entry.html\" title=\"struct raft_proto::protos::eraftpb::Entry\">Entry</a>&gt; for <a class=\"struct\" href=\"raft_log_engine/engine/struct.EntryExtTyped.html\" title=\"struct raft_log_engine::engine::EntryExtTyped\">EntryExtTyped</a>","synthetic":false,"types":["raft_log_engine::engine::EntryExtTyped"]}];
+implementors["raft_log_engine"] = [{"text":"impl EntryExt&lt;Entry&gt; for EntryExtTyped","synthetic":false,"types":[]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

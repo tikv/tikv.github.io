@@ -1,3 +1,3 @@
 (function() {var implementors = {};
-implementors["cdc"] = [{"text":"impl&lt;E:&nbsp;<a class=\"trait\" href=\"engine_traits/engine/trait.KvEngine.html\" title=\"trait engine_traits::engine::KvEngine\">KvEngine</a>&gt; <a class=\"trait\" href=\"raftstore/coprocessor/trait.CmdObserver.html\" title=\"trait raftstore::coprocessor::CmdObserver\">CmdObserver</a>&lt;E&gt; for <a class=\"struct\" href=\"cdc/struct.CdcObserver.html\" title=\"struct cdc::CdcObserver\">CdcObserver</a>","synthetic":false,"types":["cdc::observer::CdcObserver"]}];
+implementors["cdc"] = [{"text":"impl&lt;E:&nbsp;KvEngine&gt; CmdObserver&lt;E&gt; for CdcObserver","synthetic":false,"types":[]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
