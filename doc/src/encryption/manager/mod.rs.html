@@ -1009,16 +1009,57 @@
 <span id="1006">1006</span>
 <span id="1007">1007</span>
 <span id="1008">1008</span>
+<span id="1009">1009</span>
+<span id="1010">1010</span>
+<span id="1011">1011</span>
+<span id="1012">1012</span>
+<span id="1013">1013</span>
+<span id="1014">1014</span>
+<span id="1015">1015</span>
+<span id="1016">1016</span>
+<span id="1017">1017</span>
+<span id="1018">1018</span>
+<span id="1019">1019</span>
+<span id="1020">1020</span>
+<span id="1021">1021</span>
+<span id="1022">1022</span>
+<span id="1023">1023</span>
+<span id="1024">1024</span>
+<span id="1025">1025</span>
+<span id="1026">1026</span>
+<span id="1027">1027</span>
+<span id="1028">1028</span>
+<span id="1029">1029</span>
+<span id="1030">1030</span>
+<span id="1031">1031</span>
+<span id="1032">1032</span>
+<span id="1033">1033</span>
+<span id="1034">1034</span>
+<span id="1035">1035</span>
+<span id="1036">1036</span>
+<span id="1037">1037</span>
+<span id="1038">1038</span>
+<span id="1039">1039</span>
+<span id="1040">1040</span>
+<span id="1041">1041</span>
+<span id="1042">1042</span>
+<span id="1043">1043</span>
+<span id="1044">1044</span>
+<span id="1045">1045</span>
+<span id="1046">1046</span>
+<span id="1047">1047</span>
+<span id="1048">1048</span>
+<span id="1049">1049</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">collections</span>::<span class="ident">hash_map</span>::<span class="ident">Entry</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">fs</span>::<span class="ident">File</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::{<span class="ident">Error</span> <span class="kw">as</span> <span class="ident">IoError</span>, <span class="ident">ErrorKind</span>, <span class="prelude-ty">Result</span> <span class="kw">as</span> <span class="ident">IoResult</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">path</span>::{<span class="ident">Path</span>, <span class="ident">PathBuf</span>};
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::{<span class="ident">Arc</span>, <span class="ident">RwLock</span>};
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::{<span class="ident">atomic</span>::<span class="ident">AtomicU64</span>, <span class="ident">atomic</span>::<span class="ident">Ordering</span>, <span class="ident">Arc</span>, <span class="ident">Mutex</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">time</span>::{<span class="ident">Duration</span>, <span class="ident">SystemTime</span>, <span class="ident">UNIX_EPOCH</span>};
 
+<span class="kw">use</span> <span class="ident">crossbeam</span>::<span class="ident">channel</span>::{<span class="self">self</span>, <span class="ident">select</span>, <span class="ident">tick</span>};
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">EncryptionKeyManager</span>, <span class="ident">FileEncryptionInfo</span>};
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">encryptionpb</span>::{<span class="ident">DataKey</span>, <span class="ident">EncryptionMethod</span>, <span class="ident">FileDictionary</span>, <span class="ident">FileInfo</span>, <span class="ident">KeyDictionary</span>};
 <span class="kw">use</span> <span class="ident">protobuf</span>::<span class="ident">Message</span>;
@@ -1033,10 +1074,21 @@
 
 <span class="kw">const</span> <span class="ident">KEY_DICT_NAME</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;key.dict&quot;</span>;
 <span class="kw">const</span> <span class="ident">FILE_DICT_NAME</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;file.dict&quot;</span>;
+<span class="kw">const</span> <span class="ident">ROTATE_CHECK_PERIOD</span>: <span class="ident">u64</span> <span class="op">=</span> <span class="number">600</span>; <span class="comment">// 10min</span>
 
 <span class="kw">struct</span> <span class="ident">Dicts</span> {
-    <span class="ident">file_dict</span>: <span class="ident">FileDictionary</span>,
-    <span class="ident">key_dict</span>: <span class="ident">KeyDictionary</span>,
+    <span class="comment">// Maps data file paths to key id and metadata. This file is stored as plaintext.</span>
+    <span class="ident">file_dict</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">FileDictionary</span><span class="op">&gt;</span>,
+    <span class="comment">// Lock to make sure there&#39;s no concurrent update operations to file dictionary.</span>
+    <span class="ident">file_lock</span>: <span class="ident">Mutex</span><span class="op">&lt;</span>()<span class="op">&gt;</span>,
+    <span class="comment">// Maps data key id to data keys, together with metadata. Also stores the data</span>
+    <span class="comment">// key id used to encrypt the encryption file dictionary. The content is encrypted</span>
+    <span class="comment">// using master key.</span>
+    <span class="ident">key_dict</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">KeyDictionary</span><span class="op">&gt;</span>,
+    <span class="comment">// Thread-safe version of current_key_id. Only when writing back to key_dict,</span>
+    <span class="comment">// write it back to `key_dict`. Reader should always use this atomic, instead of</span>
+    <span class="comment">// key_dict.current_key_id, since the latter can reflect an update-in-progress key.</span>
+    <span class="ident">current_key_id</span>: <span class="ident">AtomicU64</span>,
     <span class="ident">rotation_period</span>: <span class="ident">Duration</span>,
     <span class="ident">base</span>: <span class="ident">PathBuf</span>,
 }
@@ -1044,11 +1096,13 @@
 <span class="kw">impl</span> <span class="ident">Dicts</span> {
     <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">path</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">rotation_period</span>: <span class="ident">Duration</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Dicts</span> {
         <span class="ident">Dicts</span> {
-            <span class="ident">file_dict</span>: <span class="ident">FileDictionary</span>::<span class="ident">default</span>(),
-            <span class="ident">key_dict</span>: <span class="ident">KeyDictionary</span> {
+            <span class="ident">file_dict</span>: <span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">FileDictionary</span>::<span class="ident">default</span>()),
+            <span class="ident">key_dict</span>: <span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">KeyDictionary</span> {
                 <span class="ident">current_key_id</span>: <span class="number">0</span>,
                 ..<span class="ident">Default</span>::<span class="ident">default</span>()
-            },
+            }),
+            <span class="ident">current_key_id</span>: <span class="ident">AtomicU64</span>::<span class="ident">new</span>(<span class="number">0</span>),
+            <span class="ident">file_lock</span>: <span class="ident">Mutex</span>::<span class="ident">new</span>(()),
             <span class="ident">rotation_period</span>,
             <span class="ident">base</span>: <span class="ident">Path</span>::<span class="ident">new</span>(<span class="ident">path</span>).<span class="ident">to_owned</span>(),
         }
@@ -1078,13 +1132,16 @@
                 <span class="ident">file_dict</span>.<span class="ident">merge_from_bytes</span>(<span class="kw-2">&amp;</span><span class="ident">file_bytes</span>)<span class="question-mark">?</span>;
                 <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">key_dict</span> <span class="op">=</span> <span class="ident">KeyDictionary</span>::<span class="ident">default</span>();
                 <span class="ident">key_dict</span>.<span class="ident">merge_from_bytes</span>(<span class="kw-2">&amp;</span><span class="ident">key_bytes</span>)<span class="question-mark">?</span>;
+                <span class="kw">let</span> <span class="ident">current_key_id</span> <span class="op">=</span> <span class="ident">AtomicU64</span>::<span class="ident">new</span>(<span class="ident">key_dict</span>.<span class="ident">current_key_id</span>);
 
                 <span class="ident">ENCRYPTION_DATA_KEY_GAUGE</span>.<span class="ident">set</span>(<span class="ident">key_dict</span>.<span class="ident">keys</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="kw">_</span>);
                 <span class="ident">ENCRYPTION_FILE_NUM_GAUGE</span>.<span class="ident">set</span>(<span class="ident">file_dict</span>.<span class="ident">files</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="kw">_</span>);
 
                 <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">Dicts</span> {
-                    <span class="ident">file_dict</span>,
-                    <span class="ident">key_dict</span>,
+                    <span class="ident">file_dict</span>: <span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">file_dict</span>),
+                    <span class="ident">key_dict</span>: <span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">key_dict</span>),
+                    <span class="ident">current_key_id</span>,
+                    <span class="ident">file_lock</span>: <span class="ident">Mutex</span>::<span class="ident">new</span>(()),
                     <span class="ident">rotation_period</span>,
                     <span class="ident">base</span>: <span class="ident">base</span>.<span class="ident">to_owned</span>(),
                 }))
@@ -1110,75 +1167,93 @@
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">save_key_dict</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">master_key</span>: <span class="kw-2">&amp;</span><span class="ident">dyn</span> <span class="ident">Backend</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">save_key_dict</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">master_key</span>: <span class="kw-2">&amp;</span><span class="ident">dyn</span> <span class="ident">Backend</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">file</span> <span class="op">=</span> <span class="ident">EncryptedFile</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">base</span>, <span class="ident">KEY_DICT_NAME</span>);
-        <span class="kw">if</span> <span class="op">!</span><span class="ident">master_key</span>.<span class="ident">is_secure</span>() {
-            <span class="kw">for</span> <span class="ident">value</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">key_dict</span>.<span class="ident">keys</span>.<span class="ident">values_mut</span>() {
-                <span class="ident">value</span>.<span class="ident">was_exposed</span> <span class="op">=</span> <span class="bool-val">true</span>
+        <span class="kw">let</span> (<span class="ident">keys_len</span>, <span class="ident">key_bytes</span>) <span class="op">=</span> {
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">key_dict</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">key_dict</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+            <span class="kw">if</span> <span class="op">!</span><span class="ident">master_key</span>.<span class="ident">is_secure</span>() {
+                <span class="kw">for</span> <span class="ident">value</span> <span class="kw">in</span> <span class="ident">key_dict</span>.<span class="ident">keys</span>.<span class="ident">values_mut</span>() {
+                    <span class="ident">value</span>.<span class="ident">was_exposed</span> <span class="op">=</span> <span class="bool-val">true</span>
+                }
             }
-        }
-        <span class="kw">let</span> <span class="ident">key_bytes</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">key_dict</span>.<span class="ident">write_to_bytes</span>()<span class="question-mark">?</span>;
+            <span class="kw">let</span> <span class="ident">keys_len</span> <span class="op">=</span> <span class="ident">key_dict</span>.<span class="ident">keys</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="kw">_</span>;
+            <span class="kw">let</span> <span class="ident">key_bytes</span> <span class="op">=</span> <span class="ident">key_dict</span>.<span class="ident">write_to_bytes</span>()<span class="question-mark">?</span>;
+            (<span class="ident">keys_len</span>, <span class="ident">key_bytes</span>)
+        };
         <span class="ident">file</span>.<span class="ident">write</span>(<span class="kw-2">&amp;</span><span class="ident">key_bytes</span>, <span class="ident">master_key</span>)<span class="question-mark">?</span>;
 
         <span class="ident">ENCRYPTION_FILE_SIZE_GAUGE</span>
             .<span class="ident">with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="string">&quot;key_dictionary&quot;</span>])
             .<span class="ident">set</span>(<span class="ident">key_bytes</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="kw">_</span>);
-        <span class="ident">ENCRYPTION_DATA_KEY_GAUGE</span>.<span class="ident">set</span>(<span class="self">self</span>.<span class="ident">key_dict</span>.<span class="ident">keys</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="kw">_</span>);
+        <span class="ident">ENCRYPTION_DATA_KEY_GAUGE</span>.<span class="ident">set</span>(<span class="ident">keys_len</span>);
 
         <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">fn</span> <span class="ident">save_file_dict</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">file</span> <span class="op">=</span> <span class="ident">EncryptedFile</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">base</span>, <span class="ident">FILE_DICT_NAME</span>);
-        <span class="kw">let</span> <span class="ident">file_bytes</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">file_dict</span>.<span class="ident">write_to_bytes</span>()<span class="question-mark">?</span>;
+        <span class="kw">let</span> (<span class="ident">file_bytes</span>, <span class="ident">file_num</span>) <span class="op">=</span> {
+            <span class="kw">let</span> <span class="ident">file_dict</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">file_dict</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+            <span class="kw">let</span> <span class="ident">file_bytes</span> <span class="op">=</span> <span class="ident">file_dict</span>.<span class="ident">write_to_bytes</span>()<span class="question-mark">?</span>;
+            <span class="kw">let</span> <span class="ident">file_num</span> <span class="op">=</span> <span class="ident">file_dict</span>.<span class="ident">files</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="kw">_</span>;
+            (<span class="ident">file_bytes</span>, <span class="ident">file_num</span>)
+        };
         <span class="comment">// File dict is saved in plaintext.</span>
         <span class="ident">file</span>.<span class="ident">write</span>(<span class="kw-2">&amp;</span><span class="ident">file_bytes</span>, <span class="kw-2">&amp;</span><span class="ident">PlaintextBackend</span>::<span class="ident">default</span>())<span class="question-mark">?</span>;
 
         <span class="ident">ENCRYPTION_FILE_SIZE_GAUGE</span>
             .<span class="ident">with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="string">&quot;file_dictionary&quot;</span>])
             .<span class="ident">set</span>(<span class="ident">file_bytes</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="kw">_</span>);
-        <span class="ident">ENCRYPTION_FILE_NUM_GAUGE</span>.<span class="ident">set</span>(<span class="self">self</span>.<span class="ident">file_dict</span>.<span class="ident">files</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="kw">_</span>);
+        <span class="ident">ENCRYPTION_FILE_NUM_GAUGE</span>.<span class="ident">set</span>(<span class="ident">file_num</span>);
 
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="kw">fn</span> <span class="ident">get_key</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">key_id</span>: <span class="ident">u64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">DataKey</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">key_dict</span>.<span class="ident">keys</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">key_id</span>)
-    }
-
-    <span class="kw">fn</span> <span class="ident">current_data_key</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> (<span class="ident">u64</span>, <span class="kw-2">&amp;</span><span class="ident">DataKey</span>) {
+    <span class="kw">fn</span> <span class="ident">current_data_key</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> (<span class="ident">u64</span>, <span class="ident">DataKey</span>) {
+        <span class="kw">let</span> <span class="ident">key_dict</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">key_dict</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">current_key_id</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">current_key_id</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
         (
-            <span class="self">self</span>.<span class="ident">key_dict</span>.<span class="ident">current_key_id</span>,
-            <span class="self">self</span>.<span class="ident">key_dict</span>
+            <span class="ident">current_key_id</span>,
+            <span class="ident">key_dict</span>
                 .<span class="ident">keys</span>
-                .<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">key_dict</span>.<span class="ident">current_key_id</span>)
+                .<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">current_key_id</span>)
+                .<span class="ident">cloned</span>()
                 .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="op">|</span> {
                     <span class="macro">panic</span><span class="macro">!</span>(
                         <span class="string">&quot;current data key not found! Number of keys {}&quot;</span>,
-                        <span class="self">self</span>.<span class="ident">key_dict</span>.<span class="ident">keys</span>.<span class="ident">len</span>()
+                        <span class="ident">key_dict</span>.<span class="ident">keys</span>.<span class="ident">len</span>()
                     );
                 }),
         )
     }
 
-    <span class="kw">fn</span> <span class="ident">get_file</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">fname</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">FileInfo</span> {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">file_dict</span>.<span class="ident">files</span>.<span class="ident">get</span>(<span class="ident">fname</span>).<span class="ident">is_none</span>() {
-            <span class="comment">// Return Plaintext if file not found</span>
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">file</span> <span class="op">=</span> <span class="ident">FileInfo</span>::<span class="ident">default</span>();
-            <span class="ident">file</span>.<span class="ident">method</span> <span class="op">=</span> <span class="ident">compat</span>(<span class="ident">EncryptionMethod</span>::<span class="ident">Plaintext</span>);
-            <span class="self">self</span>.<span class="ident">file_dict</span>.<span class="ident">files</span>.<span class="ident">insert</span>(<span class="ident">fname</span>.<span class="ident">to_owned</span>(), <span class="ident">file</span>);
+    <span class="kw">fn</span> <span class="ident">get_file</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">fname</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">FileInfo</span> {
+        <span class="kw">let</span> <span class="ident">dict</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">file_dict</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">file_info</span> <span class="op">=</span> <span class="ident">dict</span>.<span class="ident">files</span>.<span class="ident">get</span>(<span class="ident">fname</span>);
+        <span class="kw">match</span> <span class="ident">file_info</span> {
+            <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="comment">// Return Plaintext if file not found</span>
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">file</span> <span class="op">=</span> <span class="ident">FileInfo</span>::<span class="ident">default</span>();
+                <span class="ident">file</span>.<span class="ident">method</span> <span class="op">=</span> <span class="ident">compat</span>(<span class="ident">EncryptionMethod</span>::<span class="ident">Plaintext</span>);
+                <span class="ident">file</span>
+            }
+            <span class="prelude-val">Some</span>(<span class="ident">info</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">info</span>.<span class="ident">clone</span>(),
         }
-        <span class="self">self</span>.<span class="ident">file_dict</span>.<span class="ident">files</span>.<span class="ident">get</span>(<span class="ident">fname</span>).<span class="ident">unwrap</span>()
     }
 
-    <span class="kw">fn</span> <span class="ident">new_file</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">fname</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">method</span>: <span class="ident">EncryptionMethod</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">FileInfo</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">new_file</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">fname</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">method</span>: <span class="ident">EncryptionMethod</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">FileInfo</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="ident">_lock</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">file_lock</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">iv</span> <span class="op">=</span> <span class="ident">Iv</span>::<span class="ident">new_ctr</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">file</span> <span class="op">=</span> <span class="ident">FileInfo</span>::<span class="ident">default</span>();
         <span class="ident">file</span>.<span class="ident">iv</span> <span class="op">=</span> <span class="ident">iv</span>.<span class="ident">as_slice</span>().<span class="ident">to_vec</span>();
-        <span class="ident">file</span>.<span class="ident">key_id</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">key_dict</span>.<span class="ident">current_key_id</span>;
+        <span class="ident">file</span>.<span class="ident">key_id</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">current_key_id</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
         <span class="ident">file</span>.<span class="ident">method</span> <span class="op">=</span> <span class="ident">compat</span>(<span class="ident">method</span>);
-        <span class="self">self</span>.<span class="ident">file_dict</span>.<span class="ident">files</span>.<span class="ident">insert</span>(<span class="ident">fname</span>.<span class="ident">to_owned</span>(), <span class="ident">file</span>);
+        {
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">file_dict</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">file_dict</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+            <span class="ident">file_dict</span>.<span class="ident">files</span>.<span class="ident">insert</span>(<span class="ident">fname</span>.<span class="ident">to_owned</span>(), <span class="ident">file</span>.<span class="ident">clone</span>());
+        }
         <span class="self">self</span>.<span class="ident">save_file_dict</span>()<span class="question-mark">?</span>;
+
         <span class="kw">if</span> <span class="ident">method</span> <span class="op">!</span><span class="op">=</span> <span class="ident">EncryptionMethod</span>::<span class="ident">Plaintext</span> {
             <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;new encrypted file&quot;</span>; 
                   <span class="string">&quot;fname&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fname</span>, 
@@ -1187,16 +1262,20 @@
         } <span class="kw">else</span> {
             <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;new plaintext file&quot;</span>; <span class="string">&quot;fname&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fname</span>);
         }
-        <span class="prelude-val">Ok</span>(<span class="self">self</span>.<span class="ident">file_dict</span>.<span class="ident">files</span>.<span class="ident">get</span>(<span class="ident">fname</span>).<span class="ident">unwrap</span>())
+        <span class="prelude-val">Ok</span>(<span class="ident">file</span>)
     }
 
-    <span class="kw">fn</span> <span class="ident">delete_file</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">fname</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">file</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">file_dict</span>.<span class="ident">files</span>.<span class="ident">remove</span>(<span class="ident">fname</span>) {
-            <span class="prelude-val">Some</span>(<span class="ident">file_info</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">file_info</span>,
-            <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="comment">// Could be a plaintext file not tracked by file dictionary.</span>
-                <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;delete untracked plaintext file&quot;</span>; <span class="string">&quot;fname&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fname</span>);
-                <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
+    <span class="kw">fn</span> <span class="ident">delete_file</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">fname</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="ident">_lock</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">file_lock</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">file</span> <span class="op">=</span> {
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">file_dict</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">file_dict</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+            <span class="kw">match</span> <span class="ident">file_dict</span>.<span class="ident">files</span>.<span class="ident">remove</span>(<span class="ident">fname</span>) {
+                <span class="prelude-val">Some</span>(<span class="ident">file_info</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">file_info</span>,
+                <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="comment">// Could be a plaintext file not tracked by file dictionary.</span>
+                    <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;delete untracked plaintext file&quot;</span>; <span class="string">&quot;fname&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fname</span>);
+                    <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
+                }
             }
         };
 
@@ -1210,24 +1289,31 @@
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="kw">fn</span> <span class="ident">link_file</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">src_fname</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">dst_fname</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">file</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">file_dict</span>.<span class="ident">files</span>.<span class="ident">get</span>(<span class="ident">src_fname</span>) {
-            <span class="prelude-val">Some</span>(<span class="ident">file_info</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">file_info</span>.<span class="ident">clone</span>(),
-            <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="comment">// Could be a plaintext file not tracked by file dictionary.</span>
-                <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;link untracked plaintext file&quot;</span>; <span class="string">&quot;src&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">src_fname</span>, <span class="string">&quot;dst&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">dst_fname</span>);
-                <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
+    <span class="kw">fn</span> <span class="ident">link_file</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">src_fname</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">dst_fname</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="ident">_lock</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">file_lock</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+
+        <span class="kw">let</span> <span class="ident">method</span> <span class="op">=</span> {
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">file_dict</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">file_dict</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+            <span class="kw">let</span> <span class="ident">file</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">file_dict</span>.<span class="ident">files</span>.<span class="ident">get</span>(<span class="ident">src_fname</span>) {
+                <span class="prelude-val">Some</span>(<span class="ident">file_info</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">file_info</span>.<span class="ident">clone</span>(),
+                <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="comment">// Could be a plaintext file not tracked by file dictionary.</span>
+                    <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;link untracked plaintext file&quot;</span>; <span class="string">&quot;src&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">src_fname</span>, <span class="string">&quot;dst&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">dst_fname</span>);
+                    <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
+                }
+            };
+            <span class="kw">if</span> <span class="ident">file_dict</span>.<span class="ident">files</span>.<span class="ident">get</span>(<span class="ident">dst_fname</span>).<span class="ident">is_some</span>() {
+                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">Io</span>(<span class="ident">IoError</span>::<span class="ident">new</span>(
+                    <span class="ident">ErrorKind</span>::<span class="ident">AlreadyExists</span>,
+                    <span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;file already exists, {}&quot;</span>, <span class="ident">dst_fname</span>),
+                )));
             }
+            <span class="kw">let</span> <span class="ident">method</span> <span class="op">=</span> <span class="ident">file</span>.<span class="ident">method</span>;
+            <span class="ident">file_dict</span>.<span class="ident">files</span>.<span class="ident">insert</span>(<span class="ident">dst_fname</span>.<span class="ident">to_owned</span>(), <span class="ident">file</span>);
+            <span class="ident">method</span>
         };
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">file_dict</span>.<span class="ident">files</span>.<span class="ident">get</span>(<span class="ident">dst_fname</span>).<span class="ident">is_some</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">Io</span>(<span class="ident">IoError</span>::<span class="ident">new</span>(
-                <span class="ident">ErrorKind</span>::<span class="ident">AlreadyExists</span>,
-                <span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;file already exists, {}&quot;</span>, <span class="ident">dst_fname</span>),
-            )));
-        }
-        <span class="kw">let</span> <span class="ident">method</span> <span class="op">=</span> <span class="ident">file</span>.<span class="ident">method</span>;
-        <span class="self">self</span>.<span class="ident">file_dict</span>.<span class="ident">files</span>.<span class="ident">insert</span>(<span class="ident">dst_fname</span>.<span class="ident">to_owned</span>(), <span class="ident">file</span>);
         <span class="self">self</span>.<span class="ident">save_file_dict</span>()<span class="question-mark">?</span>;
+
         <span class="kw">if</span> <span class="ident">method</span> <span class="op">!</span><span class="op">=</span> <span class="ident">compat</span>(<span class="ident">EncryptionMethod</span>::<span class="ident">Plaintext</span>) {
             <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;link encrypted file&quot;</span>; <span class="string">&quot;src&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">src_fname</span>, <span class="string">&quot;dst&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">dst_fname</span>);
         } <span class="kw">else</span> {
@@ -1236,18 +1322,24 @@
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="kw">fn</span> <span class="ident">rename_file</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">src_fname</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">dst_fname</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">file</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">file_dict</span>.<span class="ident">files</span>.<span class="ident">remove</span>(<span class="ident">src_fname</span>) {
-            <span class="prelude-val">Some</span>(<span class="ident">file_info</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">file_info</span>,
-            <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="comment">// Could be a plaintext file not tracked by file dictionary.</span>
-                <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;rename untracked plaintext file&quot;</span>; <span class="string">&quot;src&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">src_fname</span>, <span class="string">&quot;dst&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">dst_fname</span>);
-                <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
-            }
+    <span class="kw">fn</span> <span class="ident">rename_file</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">src_fname</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">dst_fname</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="ident">_lock</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">file_lock</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">method</span> <span class="op">=</span> {
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">file_dict</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">file_dict</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+            <span class="kw">let</span> <span class="ident">file</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">file_dict</span>.<span class="ident">files</span>.<span class="ident">remove</span>(<span class="ident">src_fname</span>) {
+                <span class="prelude-val">Some</span>(<span class="ident">file_info</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">file_info</span>,
+                <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="comment">// Could be a plaintext file not tracked by file dictionary.</span>
+                    <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;rename untracked plaintext file&quot;</span>; <span class="string">&quot;src&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">src_fname</span>, <span class="string">&quot;dst&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">dst_fname</span>);
+                    <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
+                }
+            };
+            <span class="kw">let</span> <span class="ident">method</span> <span class="op">=</span> <span class="ident">file</span>.<span class="ident">method</span>;
+            <span class="ident">file_dict</span>.<span class="ident">files</span>.<span class="ident">insert</span>(<span class="ident">dst_fname</span>.<span class="ident">to_owned</span>(), <span class="ident">file</span>);
+            <span class="ident">method</span>
         };
-        <span class="kw">let</span> <span class="ident">method</span> <span class="op">=</span> <span class="ident">file</span>.<span class="ident">method</span>;
-        <span class="self">self</span>.<span class="ident">file_dict</span>.<span class="ident">files</span>.<span class="ident">insert</span>(<span class="ident">dst_fname</span>.<span class="ident">to_owned</span>(), <span class="ident">file</span>);
         <span class="self">self</span>.<span class="ident">save_file_dict</span>()<span class="question-mark">?</span>;
+
         <span class="kw">if</span> <span class="ident">method</span> <span class="op">!</span><span class="op">=</span> <span class="ident">compat</span>(<span class="ident">EncryptionMethod</span>::<span class="ident">Plaintext</span>) {
             <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;rename encrypted file&quot;</span>; <span class="string">&quot;src&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">src_fname</span>, <span class="string">&quot;dst&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">dst_fname</span>);
         } <span class="kw">else</span> {
@@ -1256,31 +1348,32 @@
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="kw">fn</span> <span class="ident">rotate_key</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">key_id</span>: <span class="ident">u64</span>, <span class="ident">key</span>: <span class="ident">DataKey</span>, <span class="ident">master_key</span>: <span class="kw-2">&amp;</span><span class="ident">dyn</span> <span class="ident">Backend</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">bool</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">rotate_key</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">key_id</span>: <span class="ident">u64</span>, <span class="ident">key</span>: <span class="ident">DataKey</span>, <span class="ident">master_key</span>: <span class="kw-2">&amp;</span><span class="ident">dyn</span> <span class="ident">Backend</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;encryption: rotate data key.&quot;</span>; <span class="string">&quot;key_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">key_id</span>);
-        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">key_dict</span>.<span class="ident">keys</span>.<span class="ident">entry</span>(<span class="ident">key_id</span>) {
-            <span class="comment">// key id collides</span>
-            <span class="ident">Entry</span>::<span class="ident">Occupied</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="bool-val">false</span>),
-            <span class="ident">Entry</span>::<span class="ident">Vacant</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">e</span>.<span class="ident">insert</span>(<span class="ident">key</span>),
+        {
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">key_dict</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">key_dict</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+            <span class="ident">key_dict</span>.<span class="ident">keys</span>.<span class="ident">insert</span>(<span class="ident">key_id</span>, <span class="ident">key</span>);
+            <span class="ident">key_dict</span>.<span class="ident">current_key_id</span> <span class="op">=</span> <span class="ident">key_id</span>;
         };
-        <span class="comment">// Update current data key id.</span>
-        <span class="self">self</span>.<span class="ident">key_dict</span>.<span class="ident">current_key_id</span> <span class="op">=</span> <span class="ident">key_id</span>;
+
         <span class="comment">// re-encrypt key dict file.</span>
-        <span class="self">self</span>.<span class="ident">save_key_dict</span>(<span class="ident">master_key</span>).<span class="ident">map</span>(<span class="op">|</span>()<span class="op">|</span> <span class="bool-val">true</span>)
+        <span class="self">self</span>.<span class="ident">save_key_dict</span>(<span class="ident">master_key</span>)<span class="question-mark">?</span>;
+        <span class="comment">// Update current data key id.</span>
+        <span class="self">self</span>.<span class="ident">current_key_id</span>.<span class="ident">store</span>(<span class="ident">key_id</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">fn</span> <span class="ident">maybe_rotate_data_key</span>(
-        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">method</span>: <span class="ident">EncryptionMethod</span>,
         <span class="ident">master_key</span>: <span class="kw-2">&amp;</span><span class="ident">dyn</span> <span class="ident">Backend</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">now</span> <span class="op">=</span> <span class="ident">SystemTime</span>::<span class="ident">now</span>();
         <span class="comment">// 0 means it&#39;s a new key dict</span>
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">key_dict</span>.<span class="ident">current_key_id</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">current_key_id</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
             <span class="comment">// It&#39;s not a new dict, then check current data key</span>
             <span class="comment">// creation time.</span>
             <span class="kw">let</span> (<span class="kw">_</span>, <span class="ident">key</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">current_data_key</span>();
-
             <span class="comment">// Generate a new data key if</span>
             <span class="comment">//   1. encryption method is not the same, or</span>
             <span class="comment">//   2. the current data key was exposed and the new master key is secure.</span>
@@ -1305,28 +1398,39 @@
         <span class="kw">let</span> <span class="ident">duration</span> <span class="op">=</span> <span class="ident">now</span>.<span class="ident">duration_since</span>(<span class="ident">UNIX_EPOCH</span>).<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">creation_time</span> <span class="op">=</span> <span class="ident">duration</span>.<span class="ident">as_secs</span>();
 
-        <span class="comment">// Generate new data key.</span>
-        <span class="kw">let</span> <span class="ident">generate_limit</span> <span class="op">=</span> <span class="number">10</span>;
-        <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">generate_limit</span> {
-            <span class="kw">let</span> (<span class="ident">key_id</span>, <span class="ident">key</span>) <span class="op">=</span> <span class="ident">generate_data_key</span>(<span class="ident">method</span>);
-            <span class="kw">if</span> <span class="ident">key_id</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
-                <span class="comment">// 0 is invalid</span>
-                <span class="kw">continue</span>;
-            }
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">data_key</span> <span class="op">=</span> <span class="ident">DataKey</span>::<span class="ident">default</span>();
-            <span class="ident">data_key</span>.<span class="ident">key</span> <span class="op">=</span> <span class="ident">key</span>;
-            <span class="ident">data_key</span>.<span class="ident">method</span> <span class="op">=</span> <span class="ident">compat</span>(<span class="ident">method</span>);
-            <span class="ident">data_key</span>.<span class="ident">creation_time</span> <span class="op">=</span> <span class="ident">creation_time</span>;
-            <span class="ident">data_key</span>.<span class="ident">was_exposed</span> <span class="op">=</span> <span class="bool-val">false</span>;
+        <span class="kw">let</span> (<span class="ident">key_id</span>, <span class="ident">key</span>) <span class="op">=</span> <span class="ident">generate_data_key</span>(<span class="ident">method</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">data_key</span> <span class="op">=</span> <span class="ident">DataKey</span>::<span class="ident">default</span>();
+        <span class="ident">data_key</span>.<span class="ident">key</span> <span class="op">=</span> <span class="ident">key</span>;
+        <span class="ident">data_key</span>.<span class="ident">method</span> <span class="op">=</span> <span class="ident">compat</span>(<span class="ident">method</span>);
+        <span class="ident">data_key</span>.<span class="ident">creation_time</span> <span class="op">=</span> <span class="ident">creation_time</span>;
+        <span class="ident">data_key</span>.<span class="ident">was_exposed</span> <span class="op">=</span> <span class="bool-val">false</span>;
+        <span class="self">self</span>.<span class="ident">rotate_key</span>(<span class="ident">key_id</span>, <span class="ident">data_key</span>, <span class="ident">master_key</span>)
+    }
+}
 
-            <span class="kw">let</span> <span class="ident">ok</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">rotate_key</span>(<span class="ident">key_id</span>, <span class="ident">data_key</span>, <span class="ident">master_key</span>)<span class="question-mark">?</span>;
-            <span class="kw">if</span> <span class="op">!</span><span class="ident">ok</span> {
-                <span class="comment">// key id collides, retry</span>
-                <span class="kw">continue</span>;
-            }
-            <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
+<span class="kw">fn</span> <span class="ident">run_background_rotate_work</span>(
+    <span class="ident">dict</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Dicts</span><span class="op">&gt;</span>,
+    <span class="ident">method</span>: <span class="ident">EncryptionMethod</span>,
+    <span class="ident">master_key</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">Backend</span><span class="op">&gt;</span>,
+    <span class="ident">terminal_recv</span>: <span class="ident">channel</span>::<span class="ident">Receiver</span><span class="op">&lt;</span>()<span class="op">&gt;</span>,
+) {
+    <span class="kw">let</span> <span class="ident">check_period</span> <span class="op">=</span> <span class="ident">std</span>::<span class="ident">cmp</span>::<span class="ident">min</span>(
+        <span class="ident">Duration</span>::<span class="ident">from_secs</span>(<span class="ident">ROTATE_CHECK_PERIOD</span>),
+        <span class="ident">dict</span>.<span class="ident">rotation_period</span>,
+    );
+
+    <span class="kw">loop</span> {
+        <span class="macro">select</span><span class="macro">!</span> {
+            <span class="ident">recv</span>(<span class="ident">tick</span>(<span class="ident">check_period</span>)) <span class="op">-</span><span class="op">&gt;</span> <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;Try to rotate data key, current method:{:?}&quot;</span>, <span class="ident">method</span>);
+                <span class="ident">dict</span>.<span class="ident">maybe_rotate_data_key</span>(<span class="ident">method</span>, <span class="ident">master_key</span>.<span class="ident">as_ref</span>())
+                    .<span class="ident">expect</span>(<span class="string">&quot;Rotating key operation encountered error in the background worker&quot;</span>);
+            },
+            <span class="ident">recv</span>(<span class="ident">terminal_recv</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;Key rotate worker has been cancelled.&quot;</span>);
+                <span class="kw">break</span>
+            },
         }
-        <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(<span class="string">&quot;key id collides {} times!&quot;</span>, <span class="ident">generate_limit</span>))
     }
 }
 
@@ -1340,11 +1444,10 @@
     (<span class="ident">key_id</span>, <span class="ident">key</span>)
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">DataKeyManager</span> {
-    <span class="ident">master_key</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">Backend</span><span class="op">&gt;</span>,
-    <span class="ident">dicts</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">Dicts</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">dicts</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Dicts</span><span class="op">&gt;</span>,
     <span class="ident">method</span>: <span class="ident">EncryptionMethod</span>,
+    <span class="ident">rotate_terminal</span>: <span class="ident">channel</span>::<span class="ident">Sender</span><span class="op">&lt;</span>()<span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">DataKeyManager</span> {
@@ -1377,7 +1480,7 @@
                 <span class="string">&quot;encryption is to enable but master key is either absent or insecure.&quot;</span>
             ));
         }
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">dicts</span> <span class="op">=</span> <span class="kw">match</span> (
+        <span class="kw">let</span> <span class="ident">dicts</span> <span class="op">=</span> <span class="kw">match</span> (
             <span class="ident">Dicts</span>::<span class="ident">open</span>(<span class="ident">dict_path</span>, <span class="ident">rotation_period</span>, <span class="ident">master_key</span>.<span class="ident">as_ref</span>()),
             <span class="ident">method</span>,
         ) {
@@ -1406,21 +1509,22 @@
                     <span class="ident">master_key_config</span>, <span class="ident">previous_master_key_config</span>
                 );
                 <span class="kw">let</span> <span class="ident">previous_master_key</span> <span class="op">=</span> <span class="ident">create_backend</span>(<span class="ident">previous_master_key_config</span>)<span class="question-mark">?</span>;
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">dicts</span> <span class="op">=</span>
-                    <span class="ident">Dicts</span>::<span class="ident">open</span>(<span class="ident">dict_path</span>, <span class="ident">rotation_period</span>, <span class="ident">previous_master_key</span>.<span class="ident">as_ref</span>())
-                        .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
-                            <span class="kw">if</span> <span class="kw">let</span> <span class="ident">Error</span>::<span class="ident">WrongMasterKey</span>(<span class="ident">e_previous</span>) <span class="op">=</span> <span class="ident">e</span> {
-                                <span class="ident">Error</span>::<span class="ident">BothMasterKeyFail</span>(<span class="ident">e_current</span>, <span class="ident">e_previous</span>)
-                            } <span class="kw">else</span> {
-                                <span class="ident">e</span>
-                            }
-                        })<span class="question-mark">?</span>
-                        .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> {
-                            <span class="ident">Error</span>::<span class="ident">Other</span>(<span class="macro">box_err</span><span class="macro">!</span>(
-                            <span class="string">&quot;Fallback to previous master key but find dictionaries to be empty.&quot;</span>))
-                        })<span class="question-mark">?</span>;
+                <span class="kw">let</span> <span class="ident">dicts</span> <span class="op">=</span> <span class="ident">Dicts</span>::<span class="ident">open</span>(<span class="ident">dict_path</span>, <span class="ident">rotation_period</span>, <span class="ident">previous_master_key</span>.<span class="ident">as_ref</span>())
+                    .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
+                        <span class="kw">if</span> <span class="kw">let</span> <span class="ident">Error</span>::<span class="ident">WrongMasterKey</span>(<span class="ident">e_previous</span>) <span class="op">=</span> <span class="ident">e</span> {
+                            <span class="ident">Error</span>::<span class="ident">BothMasterKeyFail</span>(<span class="ident">e_current</span>, <span class="ident">e_previous</span>)
+                        } <span class="kw">else</span> {
+                            <span class="ident">e</span>
+                        }
+                    })<span class="question-mark">?</span>
+                    .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> {
+                        <span class="ident">Error</span>::<span class="ident">Other</span>(<span class="macro">box_err</span><span class="macro">!</span>(
+                            <span class="string">&quot;Fallback to previous master key but find dictionaries to be empty.&quot;</span>
+                        ))
+                    })<span class="question-mark">?</span>;
                 <span class="comment">// Rewrite key_dict after replace master key.</span>
                 <span class="ident">dicts</span>.<span class="ident">save_key_dict</span>(<span class="ident">master_key</span>.<span class="ident">as_ref</span>())<span class="question-mark">?</span>;
+
                 <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;encryption: persisted result after replace master key.&quot;</span>);
 
                 <span class="ident">dicts</span>
@@ -1430,12 +1534,21 @@
         };
         <span class="ident">dicts</span>.<span class="ident">maybe_rotate_data_key</span>(<span class="ident">method</span>, <span class="ident">master_key</span>.<span class="ident">as_ref</span>())<span class="question-mark">?</span>;
 
+        <span class="kw">let</span> <span class="ident">dicts</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">dicts</span>);
+        <span class="kw">let</span> <span class="ident">dict_clone</span> <span class="op">=</span> <span class="ident">dicts</span>.<span class="ident">clone</span>();
+        <span class="kw">let</span> (<span class="ident">rotate_terminal</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">channel</span>::<span class="ident">bounded</span>(<span class="number">1</span>);
+        <span class="ident">std</span>::<span class="ident">thread</span>::<span class="ident">Builder</span>::<span class="ident">new</span>()
+            .<span class="ident">name</span>(<span class="macro">thd_name</span><span class="macro">!</span>(<span class="string">&quot;encryption-rotate-key&quot;</span>))
+            .<span class="ident">spawn</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
+                <span class="ident">run_background_rotate_work</span>(<span class="ident">dict_clone</span>, <span class="ident">method</span>, <span class="ident">master_key</span>, <span class="ident">rx</span>);
+            })<span class="question-mark">?</span>;
+
         <span class="ident">ENCRYPTION_INITIALIZED_GAUGE</span>.<span class="ident">set</span>(<span class="number">1</span>);
 
         <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">DataKeyManager</span> {
-            <span class="ident">dicts</span>: <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">RwLock</span>::<span class="ident">new</span>(<span class="ident">dicts</span>)),
-            <span class="ident">master_key</span>,
+            <span class="ident">dicts</span>,
             <span class="ident">method</span>,
+            <span class="ident">rotate_terminal</span>,
         }))
     }
 
@@ -1503,19 +1616,24 @@
     }
 }
 
+<span class="kw">impl</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">DataKeyManager</span> {
+    <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
+        <span class="self">self</span>.<span class="ident">rotate_terminal</span>.<span class="ident">send</span>(()).<span class="ident">unwrap</span>();
+    }
+}
+
 <span class="kw">impl</span> <span class="ident">EncryptionKeyManager</span> <span class="kw">for</span> <span class="ident">DataKeyManager</span> {
     <span class="comment">// Get key to open existing file.</span>
     <span class="kw">fn</span> <span class="ident">get_file</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">fname</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">IoResult</span><span class="op">&lt;</span><span class="ident">FileEncryptionInfo</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">dicts</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">dicts</span>.<span class="ident">write</span>().<span class="ident">unwrap</span>();
         <span class="kw">let</span> (<span class="ident">method</span>, <span class="ident">key_id</span>, <span class="ident">iv</span>) <span class="op">=</span> {
-            <span class="kw">let</span> <span class="ident">file</span> <span class="op">=</span> <span class="ident">dicts</span>.<span class="ident">get_file</span>(<span class="ident">fname</span>);
-            (<span class="ident">file</span>.<span class="ident">method</span>, <span class="ident">file</span>.<span class="ident">key_id</span>, <span class="ident">file</span>.<span class="ident">iv</span>.<span class="ident">to_owned</span>())
+            <span class="kw">let</span> <span class="ident">file</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">dicts</span>.<span class="ident">get_file</span>(<span class="ident">fname</span>);
+            (<span class="ident">file</span>.<span class="ident">method</span>, <span class="ident">file</span>.<span class="ident">key_id</span>, <span class="ident">file</span>.<span class="ident">iv</span>)
         };
         <span class="comment">// Fail if key is specified but not found.</span>
         <span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">method</span> <span class="kw">as</span> <span class="ident">i32</span> <span class="op">=</span><span class="op">=</span> <span class="ident">EncryptionMethod</span>::<span class="ident">Plaintext</span> <span class="kw">as</span> <span class="ident">i32</span> {
             <span class="macro">vec</span><span class="macro">!</span>[]
         } <span class="kw">else</span> {
-            <span class="kw">match</span> <span class="ident">dicts</span>.<span class="ident">get_key</span>(<span class="ident">key_id</span>) {
+            <span class="kw">match</span> <span class="self">self</span>.<span class="ident">dicts</span>.<span class="ident">key_dict</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">keys</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">key_id</span>) {
                 <span class="prelude-val">Some</span>(<span class="ident">k</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">k</span>.<span class="ident">key</span>.<span class="ident">clone</span>(),
                 <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> {
                     <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">IoError</span>::<span class="ident">new</span>(
@@ -1534,12 +1652,9 @@
     }
 
     <span class="kw">fn</span> <span class="ident">new_file</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">fname</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">IoResult</span><span class="op">&lt;</span><span class="ident">FileEncryptionInfo</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">dicts</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">dicts</span>.<span class="ident">write</span>().<span class="ident">unwrap</span>();
-        <span class="comment">// Rotate data key if necessary.</span>
-        <span class="ident">dicts</span>.<span class="ident">maybe_rotate_data_key</span>(<span class="self">self</span>.<span class="ident">method</span>, <span class="self">self</span>.<span class="ident">master_key</span>.<span class="ident">as_ref</span>())<span class="question-mark">?</span>;
-        <span class="kw">let</span> (<span class="kw">_</span>, <span class="ident">data_key</span>) <span class="op">=</span> <span class="ident">dicts</span>.<span class="ident">current_data_key</span>();
+        <span class="kw">let</span> (<span class="kw">_</span>, <span class="ident">data_key</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">dicts</span>.<span class="ident">current_data_key</span>();
         <span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> <span class="ident">data_key</span>.<span class="ident">get_key</span>().<span class="ident">to_owned</span>();
-        <span class="kw">let</span> <span class="ident">file</span> <span class="op">=</span> <span class="ident">dicts</span>.<span class="ident">new_file</span>(<span class="ident">fname</span>, <span class="self">self</span>.<span class="ident">method</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">file</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">dicts</span>.<span class="ident">new_file</span>(<span class="ident">fname</span>, <span class="self">self</span>.<span class="ident">method</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">encrypted_file</span> <span class="op">=</span> <span class="ident">FileEncryptionInfo</span> {
             <span class="ident">key</span>,
             <span class="ident">method</span>: <span class="ident">crypter</span>::<span class="ident">encryption_method_to_db_encryption_method</span>(<span class="ident">file</span>.<span class="ident">method</span>),
@@ -1549,23 +1664,17 @@
     }
 
     <span class="kw">fn</span> <span class="ident">delete_file</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">fname</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">IoResult</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">dicts</span>.<span class="ident">write</span>().<span class="ident">unwrap</span>().<span class="ident">delete_file</span>(<span class="ident">fname</span>)<span class="question-mark">?</span>;
+        <span class="self">self</span>.<span class="ident">dicts</span>.<span class="ident">delete_file</span>(<span class="ident">fname</span>)<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">fn</span> <span class="ident">link_file</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">src_fname</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">dst_fname</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">IoResult</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">dicts</span>
-            .<span class="ident">write</span>()
-            .<span class="ident">unwrap</span>()
-            .<span class="ident">link_file</span>(<span class="ident">src_fname</span>, <span class="ident">dst_fname</span>)<span class="question-mark">?</span>;
+        <span class="self">self</span>.<span class="ident">dicts</span>.<span class="ident">link_file</span>(<span class="ident">src_fname</span>, <span class="ident">dst_fname</span>)<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">fn</span> <span class="ident">rename_file</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">src_fname</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">dst_fname</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">IoResult</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">dicts</span>
-            .<span class="ident">write</span>()
-            .<span class="ident">unwrap</span>()
-            .<span class="ident">rename_file</span>(<span class="ident">src_fname</span>, <span class="ident">dst_fname</span>)<span class="question-mark">?</span>;
+        <span class="self">self</span>.<span class="ident">dicts</span>.<span class="ident">rename_file</span>(<span class="ident">src_fname</span>, <span class="ident">dst_fname</span>)<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
 }
@@ -1582,7 +1691,6 @@
         <span class="ident">fs</span>::{<span class="ident">remove_file</span>, <span class="ident">File</span>},
         <span class="ident">io</span>::<span class="ident">Write</span>,
         <span class="ident">sync</span>::{<span class="ident">Arc</span>, <span class="ident">Mutex</span>},
-        <span class="ident">thread</span>::<span class="ident">sleep</span>,
     };
     <span class="kw">use</span> <span class="ident">tempfile</span>::<span class="ident">TempDir</span>;
 
@@ -1788,9 +1896,9 @@
         <span class="ident">file</span>.<span class="ident">key_id</span> <span class="op">=</span> <span class="number">7</span>; <span class="comment">// Not exists.</span>
         <span class="ident">manager</span>
             .<span class="ident">dicts</span>
-            .<span class="ident">write</span>()
-            .<span class="ident">unwrap</span>()
             .<span class="ident">file_dict</span>
+            .<span class="ident">lock</span>()
+            .<span class="ident">unwrap</span>()
             .<span class="ident">files</span>
             .<span class="ident">insert</span>(<span class="string">&quot;foo&quot;</span>.<span class="ident">to_owned</span>(), <span class="ident">file</span>);
         <span class="ident">manager</span>.<span class="ident">get_file</span>(<span class="string">&quot;foo&quot;</span>).<span class="ident">unwrap_err</span>();
@@ -1842,55 +1950,43 @@
     <span class="kw">fn</span> <span class="ident">test_key_manager_rotate</span>() {
         <span class="kw">let</span> (<span class="ident">_tmp</span>, <span class="ident">manager</span>) <span class="op">=</span> <span class="ident">new_tmp_key_manager</span>(<span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>);
         <span class="kw">let</span> <span class="ident">manager</span> <span class="op">=</span> <span class="ident">manager</span>.<span class="ident">unwrap</span>().<span class="ident">unwrap</span>();
-
         <span class="kw">let</span> (<span class="ident">key_id</span>, <span class="ident">key</span>) <span class="op">=</span> {
-            <span class="kw">let</span> <span class="ident">dicts</span> <span class="op">=</span> <span class="ident">manager</span>.<span class="ident">dicts</span>.<span class="ident">read</span>().<span class="ident">unwrap</span>();
-            <span class="kw">let</span> (<span class="ident">id</span>, <span class="ident">k</span>) <span class="op">=</span> <span class="ident">dicts</span>.<span class="ident">current_data_key</span>();
-            (<span class="ident">id</span>, <span class="ident">k</span>.<span class="ident">clone</span>())
+            <span class="kw">let</span> (<span class="ident">id</span>, <span class="ident">k</span>) <span class="op">=</span> <span class="ident">manager</span>.<span class="ident">dicts</span>.<span class="ident">current_data_key</span>();
+            (<span class="ident">id</span>, <span class="ident">k</span>)
         };
 
         <span class="comment">// Do not rotate.</span>
+        <span class="kw">let</span> <span class="ident">mock_config</span> <span class="op">=</span> <span class="ident">MasterKeyConfig</span>::<span class="ident">Mock</span>(<span class="ident">Mock</span>(<span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">MockBackend</span>::<span class="ident">default</span>()))));
+        <span class="kw">let</span> <span class="ident">master_key</span> <span class="op">=</span> <span class="ident">create_backend</span>(<span class="kw-2">&amp;</span><span class="ident">mock_config</span>).<span class="ident">unwrap</span>();
         <span class="ident">manager</span>
             .<span class="ident">dicts</span>
-            .<span class="ident">write</span>()
-            .<span class="ident">unwrap</span>()
-            .<span class="ident">maybe_rotate_data_key</span>(<span class="ident">manager</span>.<span class="ident">method</span>, <span class="ident">manager</span>.<span class="ident">master_key</span>.<span class="ident">as_ref</span>())
+            .<span class="ident">maybe_rotate_data_key</span>(<span class="ident">manager</span>.<span class="ident">method</span>, <span class="ident">master_key</span>.<span class="ident">as_ref</span>())
             .<span class="ident">unwrap</span>();
         <span class="kw">let</span> (<span class="ident">current_key_id1</span>, <span class="ident">current_key1</span>) <span class="op">=</span> {
-            <span class="kw">let</span> <span class="ident">dicts</span> <span class="op">=</span> <span class="ident">manager</span>.<span class="ident">dicts</span>.<span class="ident">read</span>().<span class="ident">unwrap</span>();
-            <span class="kw">let</span> (<span class="ident">id</span>, <span class="ident">k</span>) <span class="op">=</span> <span class="ident">dicts</span>.<span class="ident">current_data_key</span>();
-            (<span class="ident">id</span>, <span class="ident">k</span>.<span class="ident">clone</span>())
+            <span class="kw">let</span> (<span class="ident">id</span>, <span class="ident">k</span>) <span class="op">=</span> <span class="ident">manager</span>.<span class="ident">dicts</span>.<span class="ident">current_data_key</span>();
+            (<span class="ident">id</span>, <span class="ident">k</span>)
         };
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">current_key_id1</span>, <span class="ident">key_id</span>);
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">current_key1</span>, <span class="ident">key</span>);
 
         <span class="comment">// Change rotateion period to a smaller value, must rotate.</span>
-        <span class="ident">manager</span>.<span class="ident">dicts</span>.<span class="ident">write</span>().<span class="ident">unwrap</span>().<span class="ident">rotation_period</span> <span class="op">=</span> <span class="ident">Duration</span>::<span class="ident">from_millis</span>(<span class="number">1</span>);
-        <span class="ident">sleep</span>(<span class="ident">Duration</span>::<span class="ident">from_secs</span>(<span class="number">1</span>));
+        <span class="kw">unsafe</span> {
+            <span class="kw">let</span> <span class="ident">ptr</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">Dicts</span> <span class="op">=</span> <span class="ident">manager</span>.<span class="ident">dicts</span>.<span class="ident">as_ref</span>() <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="ident">Dicts</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">Dicts</span>;
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">dict</span> <span class="op">=</span> <span class="ident">Box</span>::<span class="ident">from_raw</span>(<span class="ident">ptr</span>);
+            <span class="ident">dict</span>.<span class="ident">rotation_period</span> <span class="op">=</span> <span class="ident">Duration</span>::<span class="ident">from_millis</span>(<span class="number">1</span>);
+            <span class="ident">Box</span>::<span class="ident">leak</span>(<span class="ident">dict</span>);
+        }
+        <span class="ident">std</span>::<span class="ident">thread</span>::<span class="ident">sleep</span>(<span class="ident">Duration</span>::<span class="ident">from_secs</span>(<span class="number">1</span>));
         <span class="ident">manager</span>
             .<span class="ident">dicts</span>
-            .<span class="ident">write</span>()
-            .<span class="ident">unwrap</span>()
-            .<span class="ident">maybe_rotate_data_key</span>(<span class="ident">manager</span>.<span class="ident">method</span>, <span class="ident">manager</span>.<span class="ident">master_key</span>.<span class="ident">as_ref</span>())
+            .<span class="ident">maybe_rotate_data_key</span>(<span class="ident">manager</span>.<span class="ident">method</span>, <span class="ident">master_key</span>.<span class="ident">as_ref</span>())
             .<span class="ident">unwrap</span>();
         <span class="kw">let</span> (<span class="ident">current_key_id2</span>, <span class="ident">current_key2</span>) <span class="op">=</span> {
-            <span class="kw">let</span> <span class="ident">dicts</span> <span class="op">=</span> <span class="ident">manager</span>.<span class="ident">dicts</span>.<span class="ident">read</span>().<span class="ident">unwrap</span>();
-            <span class="kw">let</span> (<span class="ident">id</span>, <span class="ident">k</span>) <span class="op">=</span> <span class="ident">dicts</span>.<span class="ident">current_data_key</span>();
-            (<span class="ident">id</span>, <span class="ident">k</span>.<span class="ident">clone</span>())
+            <span class="kw">let</span> (<span class="ident">id</span>, <span class="ident">k</span>) <span class="op">=</span> <span class="ident">manager</span>.<span class="ident">dicts</span>.<span class="ident">current_data_key</span>();
+            (<span class="ident">id</span>, <span class="ident">k</span>)
         };
         <span class="macro">assert_ne</span><span class="macro">!</span>(<span class="ident">current_key_id2</span>, <span class="ident">key_id</span>);
         <span class="macro">assert_ne</span><span class="macro">!</span>(<span class="ident">current_key2</span>, <span class="ident">key</span>);
-
-        <span class="comment">// Sleep and must rotate when new a file.</span>
-        <span class="ident">sleep</span>(<span class="ident">Duration</span>::<span class="ident">from_secs</span>(<span class="number">1</span>));
-        <span class="ident">manager</span>.<span class="ident">new_file</span>(<span class="string">&quot;foo&quot;</span>).<span class="ident">unwrap</span>();
-        <span class="kw">let</span> (<span class="ident">current_key_id3</span>, <span class="ident">current_key3</span>) <span class="op">=</span> {
-            <span class="kw">let</span> <span class="ident">dicts</span> <span class="op">=</span> <span class="ident">manager</span>.<span class="ident">dicts</span>.<span class="ident">read</span>().<span class="ident">unwrap</span>();
-            <span class="kw">let</span> (<span class="ident">id</span>, <span class="ident">k</span>) <span class="op">=</span> <span class="ident">dicts</span>.<span class="ident">current_data_key</span>();
-            (<span class="ident">id</span>, <span class="ident">k</span>.<span class="ident">clone</span>())
-        };
-        <span class="macro">assert_ne</span><span class="macro">!</span>(<span class="ident">current_key_id3</span>, <span class="ident">current_key_id2</span>);
-        <span class="macro">assert_ne</span><span class="macro">!</span>(<span class="ident">current_key3</span>, <span class="ident">current_key2</span>);
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
@@ -1901,36 +1997,18 @@
         <span class="comment">// Create a file and a datakey.</span>
         <span class="ident">manager</span>.<span class="ident">new_file</span>(<span class="string">&quot;foo&quot;</span>).<span class="ident">unwrap</span>();
 
-        <span class="kw">let</span> (<span class="ident">files</span>, <span class="ident">keys</span>) <span class="op">=</span> {
-            <span class="kw">let</span> <span class="ident">dicts</span> <span class="op">=</span> <span class="ident">manager</span>.<span class="ident">dicts</span>.<span class="ident">read</span>().<span class="ident">unwrap</span>();
-            (<span class="ident">dicts</span>.<span class="ident">file_dict</span>.<span class="ident">clone</span>(), <span class="ident">dicts</span>.<span class="ident">key_dict</span>.<span class="ident">clone</span>())
-        };
+        <span class="kw">let</span> <span class="ident">files</span> <span class="op">=</span> <span class="ident">manager</span>.<span class="ident">dicts</span>.<span class="ident">file_dict</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">clone</span>();
+        <span class="kw">let</span> <span class="ident">keys</span> <span class="op">=</span> <span class="ident">manager</span>.<span class="ident">dicts</span>.<span class="ident">key_dict</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">clone</span>();
 
         <span class="comment">// Close and re-open.</span>
         <span class="ident">drop</span>(<span class="ident">manager</span>);
         <span class="kw">let</span> (<span class="ident">_tmp</span>, <span class="ident">manager1</span>) <span class="op">=</span> <span class="ident">new_tmp_key_manager</span>(<span class="prelude-val">Some</span>(<span class="ident">tmp</span>), <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>);
         <span class="kw">let</span> <span class="ident">manager1</span> <span class="op">=</span> <span class="ident">manager1</span>.<span class="ident">unwrap</span>().<span class="ident">unwrap</span>();
 
-        <span class="kw">let</span> <span class="ident">dicts</span> <span class="op">=</span> <span class="ident">manager1</span>.<span class="ident">dicts</span>.<span class="ident">read</span>().<span class="ident">unwrap</span>();
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">files</span>, <span class="ident">dicts</span>.<span class="ident">file_dict</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">keys</span>, <span class="ident">dicts</span>.<span class="ident">key_dict</span>);
-    }
-
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_dcit_rotate_key_collides</span>() {
-        <span class="kw">let</span> (<span class="ident">_tmp</span>, <span class="ident">manager</span>) <span class="op">=</span> <span class="ident">new_tmp_key_manager</span>(<span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>);
-        <span class="kw">let</span> <span class="ident">manager</span> <span class="op">=</span> <span class="ident">manager</span>.<span class="ident">unwrap</span>().<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">dict</span> <span class="op">=</span> <span class="ident">manager</span>.<span class="ident">dicts</span>.<span class="ident">write</span>().<span class="ident">unwrap</span>();
-
-        <span class="kw">let</span> <span class="ident">ok</span> <span class="op">=</span> <span class="ident">dict</span>
-            .<span class="ident">rotate_key</span>(<span class="number">1</span>, <span class="ident">DataKey</span>::<span class="ident">default</span>(), <span class="ident">manager</span>.<span class="ident">master_key</span>.<span class="ident">as_ref</span>())
-            .<span class="ident">unwrap</span>();
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">ok</span>);
-
-        <span class="kw">let</span> <span class="ident">ok</span> <span class="op">=</span> <span class="ident">dict</span>
-            .<span class="ident">rotate_key</span>(<span class="number">1</span>, <span class="ident">DataKey</span>::<span class="ident">default</span>(), <span class="ident">manager</span>.<span class="ident">master_key</span>.<span class="ident">as_ref</span>())
-            .<span class="ident">unwrap</span>();
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">ok</span>);
+        <span class="kw">let</span> <span class="ident">files1</span> <span class="op">=</span> <span class="ident">manager1</span>.<span class="ident">dicts</span>.<span class="ident">file_dict</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">clone</span>();
+        <span class="kw">let</span> <span class="ident">keys1</span> <span class="op">=</span> <span class="ident">manager1</span>.<span class="ident">dicts</span>.<span class="ident">key_dict</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">clone</span>();
+        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">files</span>, <span class="ident">files1</span>);
+        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">keys</span>, <span class="ident">keys1</span>);
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
@@ -1941,39 +2019,43 @@
                 <span class="ident">path</span>: <span class="ident">key_path</span>.<span class="ident">to_str</span>().<span class="ident">unwrap</span>().<span class="ident">to_owned</span>(),
             },
         };
+        <span class="kw">let</span> <span class="ident">master_key_backend</span> <span class="op">=</span> <span class="ident">create_backend</span>(<span class="kw-2">&amp;</span><span class="ident">master_key</span>).<span class="ident">unwrap</span>();
         <span class="kw">let</span> (<span class="ident">_tmp_data_dir</span>, <span class="ident">manager</span>) <span class="op">=</span> <span class="ident">new_tmp_key_manager</span>(<span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="ident">master_key</span>), <span class="prelude-val">None</span>);
         <span class="kw">let</span> <span class="ident">manager</span> <span class="op">=</span> <span class="ident">manager</span>.<span class="ident">unwrap</span>().<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">dicts</span> <span class="op">=</span> <span class="ident">manager</span>.<span class="ident">dicts</span>.<span class="ident">write</span>().<span class="ident">unwrap</span>();
-
         <span class="kw">let</span> (<span class="ident">key_id</span>, <span class="ident">key</span>) <span class="op">=</span> {
-            <span class="kw">let</span> (<span class="ident">id</span>, <span class="ident">k</span>) <span class="op">=</span> <span class="ident">dicts</span>.<span class="ident">current_data_key</span>();
-            (<span class="ident">id</span>, <span class="ident">k</span>.<span class="ident">clone</span>())
+            <span class="kw">let</span> (<span class="ident">id</span>, <span class="ident">k</span>) <span class="op">=</span> <span class="ident">manager</span>.<span class="ident">dicts</span>.<span class="ident">current_data_key</span>();
+            (<span class="ident">id</span>, <span class="ident">k</span>)
         };
 
         <span class="comment">// Do not rotate.</span>
-        <span class="ident">dicts</span>
-            .<span class="ident">maybe_rotate_data_key</span>(<span class="ident">manager</span>.<span class="ident">method</span>, <span class="ident">manager</span>.<span class="ident">master_key</span>.<span class="ident">as_ref</span>())
+        <span class="ident">manager</span>
+            .<span class="ident">dicts</span>
+            .<span class="ident">maybe_rotate_data_key</span>(<span class="ident">manager</span>.<span class="ident">method</span>, <span class="ident">master_key_backend</span>.<span class="ident">as_ref</span>())
             .<span class="ident">unwrap</span>();
         <span class="kw">let</span> (<span class="ident">current_key_id1</span>, <span class="ident">current_key1</span>) <span class="op">=</span> {
-            <span class="kw">let</span> (<span class="ident">id</span>, <span class="ident">k</span>) <span class="op">=</span> <span class="ident">dicts</span>.<span class="ident">current_data_key</span>();
-            (<span class="ident">id</span>, <span class="ident">k</span>.<span class="ident">clone</span>())
+            <span class="kw">let</span> (<span class="ident">id</span>, <span class="ident">k</span>) <span class="op">=</span> <span class="ident">manager</span>.<span class="ident">dicts</span>.<span class="ident">current_data_key</span>();
+            (<span class="ident">id</span>, <span class="ident">k</span>)
         };
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">current_key_id1</span>, <span class="ident">key_id</span>);
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">current_key1</span>, <span class="ident">key</span>);
 
         <span class="comment">// Expose the current data key and must rotate.</span>
-        <span class="ident">dicts</span>
+        <span class="ident">manager</span>
+            .<span class="ident">dicts</span>
             .<span class="ident">key_dict</span>
+            .<span class="ident">lock</span>()
+            .<span class="ident">unwrap</span>()
             .<span class="ident">keys</span>
             .<span class="ident">get_mut</span>(<span class="kw-2">&amp;</span><span class="ident">current_key_id1</span>)
             .<span class="ident">unwrap</span>()
             .<span class="ident">was_exposed</span> <span class="op">=</span> <span class="bool-val">true</span>;
-        <span class="ident">dicts</span>
-            .<span class="ident">maybe_rotate_data_key</span>(<span class="ident">manager</span>.<span class="ident">method</span>, <span class="ident">manager</span>.<span class="ident">master_key</span>.<span class="ident">as_ref</span>())
+        <span class="ident">manager</span>
+            .<span class="ident">dicts</span>
+            .<span class="ident">maybe_rotate_data_key</span>(<span class="ident">manager</span>.<span class="ident">method</span>, <span class="ident">master_key_backend</span>.<span class="ident">as_ref</span>())
             .<span class="ident">unwrap</span>();
         <span class="kw">let</span> (<span class="ident">current_key_id2</span>, <span class="ident">current_key2</span>) <span class="op">=</span> {
-            <span class="kw">let</span> (<span class="ident">id</span>, <span class="ident">k</span>) <span class="op">=</span> <span class="ident">dicts</span>.<span class="ident">current_data_key</span>();
-            (<span class="ident">id</span>, <span class="ident">k</span>.<span class="ident">clone</span>())
+            <span class="kw">let</span> (<span class="ident">id</span>, <span class="ident">k</span>) <span class="op">=</span> <span class="ident">manager</span>.<span class="ident">dicts</span>.<span class="ident">current_data_key</span>();
+            (<span class="ident">id</span>, <span class="ident">k</span>)
         };
         <span class="macro">assert_ne</span><span class="macro">!</span>(<span class="ident">current_key_id2</span>, <span class="ident">key_id</span>);
         <span class="macro">assert_ne</span><span class="macro">!</span>(<span class="ident">current_key2</span>, <span class="ident">key</span>);
@@ -1988,30 +2070,30 @@
             },
         };
 
+        <span class="kw">let</span> <span class="ident">master_key_backend</span> <span class="op">=</span> <span class="ident">create_backend</span>(<span class="kw-2">&amp;</span><span class="ident">master_key</span>).<span class="ident">unwrap</span>();
         <span class="kw">let</span> (<span class="ident">_tmp_data_dir</span>, <span class="ident">manager</span>) <span class="op">=</span> <span class="ident">new_tmp_key_manager</span>(<span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="ident">master_key</span>), <span class="prelude-val">None</span>);
         <span class="kw">let</span> <span class="ident">manager</span> <span class="op">=</span> <span class="ident">manager</span>.<span class="ident">unwrap</span>().<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">dicts</span> <span class="op">=</span> <span class="ident">manager</span>.<span class="ident">dicts</span>.<span class="ident">write</span>().<span class="ident">unwrap</span>();
 
         <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="number">100</span> {
-            <span class="kw">let</span> <span class="ident">ok</span> <span class="op">=</span> <span class="ident">dicts</span>
-                .<span class="ident">rotate_key</span>(<span class="ident">i</span>, <span class="ident">DataKey</span>::<span class="ident">default</span>(), <span class="ident">manager</span>.<span class="ident">master_key</span>.<span class="ident">as_ref</span>())
+            <span class="ident">manager</span>
+                .<span class="ident">dicts</span>
+                .<span class="ident">rotate_key</span>(<span class="ident">i</span>, <span class="ident">DataKey</span>::<span class="ident">default</span>(), <span class="ident">master_key_backend</span>.<span class="ident">as_ref</span>())
                 .<span class="ident">unwrap</span>();
-            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">ok</span>);
         }
-        <span class="kw">for</span> <span class="ident">value</span> <span class="kw">in</span> <span class="ident">dicts</span>.<span class="ident">key_dict</span>.<span class="ident">keys</span>.<span class="ident">values</span>() {
+        <span class="kw">for</span> <span class="ident">value</span> <span class="kw">in</span> <span class="ident">manager</span>.<span class="ident">dicts</span>.<span class="ident">key_dict</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">keys</span>.<span class="ident">values</span>() {
             <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">value</span>.<span class="ident">was_exposed</span>);
         }
 
         <span class="comment">// Change it insecure backend and save dicts,</span>
         <span class="comment">// must set expose for all keys.</span>
         <span class="kw">let</span> <span class="ident">insecure</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">PlaintextBackend</span>::<span class="ident">default</span>());
-        <span class="kw">let</span> <span class="ident">ok</span> <span class="op">=</span> <span class="ident">dicts</span>
+        <span class="ident">manager</span>
+            .<span class="ident">dicts</span>
             .<span class="ident">rotate_key</span>(<span class="number">100</span>, <span class="ident">DataKey</span>::<span class="ident">default</span>(), <span class="ident">insecure</span>.<span class="ident">as_ref</span>())
             .<span class="ident">unwrap</span>();
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">ok</span>);
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">count</span> <span class="op">=</span> <span class="number">0</span>;
-        <span class="kw">for</span> <span class="ident">value</span> <span class="kw">in</span> <span class="ident">dicts</span>.<span class="ident">key_dict</span>.<span class="ident">keys</span>.<span class="ident">values</span>() {
+        <span class="kw">for</span> <span class="ident">value</span> <span class="kw">in</span> <span class="ident">manager</span>.<span class="ident">dicts</span>.<span class="ident">key_dict</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">keys</span>.<span class="ident">values</span>() {
             <span class="ident">count</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
             <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">value</span>.<span class="ident">was_exposed</span>);
         }

@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `/rust/registry/src/github.com-1ecc6299db9ec823/nix-0.17.0/src/sys/select.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>select.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled ><script src="../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../favicon.svg">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `/rust/registry/src/github.com-1ecc6299db9ec823/nix-0.11.1/src/sys/select.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>select.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled ><script src="../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../favicon.svg">
 <link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png">
 <link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../nix/index.html'><div class='logo-container rust-logo'><img src='../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><span class="help-button">?</span>
                 <a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
@@ -342,6 +342,9 @@
 <span id="339">339</span>
 <span id="340">340</span>
 <span id="341">341</span>
+<span id="342">342</span>
+<span id="343">343</span>
+<span id="344">344</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">mem</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">os</span>::<span class="ident">unix</span>::<span class="ident">io</span>::<span class="ident">RawFd</span>;
@@ -354,17 +357,17 @@
 
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">libc</span>::<span class="ident">FD_SETSIZE</span>;
 
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">transparent</span>)]</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>, <span class="ident">Eq</span>, <span class="ident">Hash</span>, <span class="ident">PartialEq</span>)]</span>
+<span class="comment">// FIXME: Change to repr(transparent) once it&#39;s stable</span>
+<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>)]</span>
+<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">missing_debug_implementations</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">FdSet</span>(<span class="ident">libc</span>::<span class="ident">fd_set</span>);
 
 <span class="kw">impl</span> <span class="ident">FdSet</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">FdSet</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">fdset</span> <span class="op">=</span> <span class="ident">mem</span>::<span class="ident">MaybeUninit</span>::<span class="ident">uninit</span>();
-        <span class="kw">unsafe</span> {
-            <span class="ident">libc</span>::<span class="ident">FD_ZERO</span>(<span class="ident">fdset</span>.<span class="ident">as_mut_ptr</span>());
-            <span class="ident">FdSet</span>(<span class="ident">fdset</span>.<span class="ident">assume_init</span>())
-        }
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">fdset</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">mem</span>::<span class="ident">uninitialized</span>() };
+        <span class="kw">unsafe</span> { <span class="ident">libc</span>::<span class="ident">FD_ZERO</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fdset</span>) };
+        <span class="ident">FdSet</span>(<span class="ident">fdset</span>)
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">insert</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">fd</span>: <span class="ident">RawFd</span>) {
@@ -412,12 +415,6 @@
         }
 
         <span class="prelude-val">None</span>
-    }
-}
-
-<span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">FdSet</span> {
-    <span class="kw">fn</span> <span class="ident">default</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="self">Self</span>::<span class="ident">new</span>()
     }
 }
 
@@ -624,7 +621,14 @@
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">set</span>.<span class="ident">highest</span>(), <span class="prelude-val">Some</span>(<span class="number">7</span>));
     }
 
+    <span class="comment">// powerpc-unknown-linux-gnu currently fails on the first `assert_eq` because</span>
+    <span class="comment">// `select()` returns a 0 instead of a 1. Since this test has only been run on</span>
+    <span class="comment">// qemu, it&#39;s unclear if this is a OS or qemu bug. Just disable it on that arch</span>
+    <span class="comment">// for now.</span>
+    <span class="comment">// FIXME: Fix tests for powerpc and mips</span>
+    <span class="comment">// FIXME: Add a link to an upstream qemu bug if there is one</span>
     <span class="attribute">#[<span class="ident">test</span>]</span>
+    <span class="attribute">#[<span class="ident">cfg_attr</span>(<span class="ident">any</span>(<span class="ident">target_arch</span> <span class="op">=</span> <span class="string">&quot;powerpc&quot;</span>, <span class="ident">target_arch</span> <span class="op">=</span> <span class="string">&quot;mips&quot;</span>), <span class="ident">ignore</span>)]</span>
     <span class="kw">fn</span> <span class="ident">test_select</span>() {
         <span class="kw">let</span> (<span class="ident">r1</span>, <span class="ident">w1</span>) <span class="op">=</span> <span class="ident">pipe</span>().<span class="ident">unwrap</span>();
         <span class="ident">write</span>(<span class="ident">w1</span>, <span class="string">b&quot;hi!&quot;</span>).<span class="ident">unwrap</span>();
@@ -645,6 +649,7 @@
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
+    <span class="attribute">#[<span class="ident">cfg_attr</span>(<span class="ident">any</span>(<span class="ident">target_arch</span> <span class="op">=</span> <span class="string">&quot;powerpc&quot;</span>, <span class="ident">target_arch</span> <span class="op">=</span> <span class="string">&quot;mips&quot;</span>), <span class="ident">ignore</span>)]</span>
     <span class="kw">fn</span> <span class="ident">test_select_nfds</span>() {
         <span class="kw">let</span> (<span class="ident">r1</span>, <span class="ident">w1</span>) <span class="op">=</span> <span class="ident">pipe</span>().<span class="ident">unwrap</span>();
         <span class="ident">write</span>(<span class="ident">w1</span>, <span class="string">b&quot;hi!&quot;</span>).<span class="ident">unwrap</span>();
@@ -665,6 +670,7 @@
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
+    <span class="attribute">#[<span class="ident">cfg_attr</span>(<span class="ident">any</span>(<span class="ident">target_arch</span> <span class="op">=</span> <span class="string">&quot;powerpc&quot;</span>, <span class="ident">target_arch</span> <span class="op">=</span> <span class="string">&quot;mips&quot;</span>), <span class="ident">ignore</span>)]</span>
     <span class="kw">fn</span> <span class="ident">test_select_nfds2</span>() {
         <span class="kw">let</span> (<span class="ident">r1</span>, <span class="ident">w1</span>) <span class="op">=</span> <span class="ident">pipe</span>().<span class="ident">unwrap</span>();
         <span class="ident">write</span>(<span class="ident">w1</span>, <span class="string">b&quot;hi!&quot;</span>).<span class="ident">unwrap</span>();

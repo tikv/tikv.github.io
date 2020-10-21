@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["FILE_DICT_NAME",""],["KEY_DICT_NAME",""]],"fn":[["generate_data_key",""]],"struct":[["DataKeyManager",""],["Dicts",""]]});
+initSidebarItems({"constant":[["FILE_DICT_NAME",""],["KEY_DICT_NAME",""],["ROTATE_CHECK_PERIOD",""]],"fn":[["generate_data_key",""],["run_background_rotate_work",""]],"struct":[["DataKeyManager",""],["Dicts",""]]});
