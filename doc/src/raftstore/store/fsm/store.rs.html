@@ -2441,6 +2441,7 @@
 <span id="2438">2438</span>
 <span id="2439">2439</span>
 <span id="2440">2440</span>
+<span id="2441">2441</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -2521,7 +2522,7 @@
 
 <span class="kw">const</span> <span class="ident">KV_WB_SHRINK_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">256</span> <span class="op">*</span> <span class="number">1024</span>;
 <span class="kw">const</span> <span class="ident">RAFT_WB_SHRINK_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1024</span> <span class="op">*</span> <span class="number">1024</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">PENDING_VOTES_CAP</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">20</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">PENDING_MSG_CAP</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">100</span>;
 <span class="kw">const</span> <span class="ident">UNREACHABLE_BACKOFF</span>: <span class="ident">Duration</span> <span class="op">=</span> <span class="ident">Duration</span>::<span class="ident">from_secs</span>(<span class="number">10</span>);
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">StoreInfo</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
@@ -2538,9 +2539,10 @@
     <span class="kw">pub</span> <span class="ident">regions</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">u64</span>, <span class="ident">Region</span><span class="op">&gt;</span>,
     <span class="doccomment">/// region_id -&gt; reader</span>
     <span class="kw">pub</span> <span class="ident">readers</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">u64</span>, <span class="ident">ReadDelegate</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// `MsgRequestPreVote` or `MsgRequestVote` messages from newly split Regions shouldn&#39;t be dropped if there is no</span>
-    <span class="doccomment">/// such Region in this store now. So the messages are recorded temporarily and will be handled later.</span>
-    <span class="kw">pub</span> <span class="ident">pending_votes</span>: <span class="ident">RingQueue</span><span class="op">&lt;</span><span class="ident">RaftMessage</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// `MsgRequestPreVote`, `MsgRequestVote` or `MsgAppend` messages from newly split Regions shouldn&#39;t be</span>
+    <span class="doccomment">/// dropped if there is no such Region in this store now. So the messages are recorded temporarily and</span>
+    <span class="doccomment">/// will be handled later.</span>
+    <span class="kw">pub</span> <span class="ident">pending_msgs</span>: <span class="ident">RingQueue</span><span class="op">&lt;</span><span class="ident">RaftMessage</span><span class="op">&gt;</span>,
     <span class="doccomment">/// The regions with pending snapshots.</span>
     <span class="kw">pub</span> <span class="ident">pending_snapshot_regions</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Region</span><span class="op">&gt;</span>,
     <span class="doccomment">/// A marker used to indicate the peer of a Region has received a merge target message and waits to be destroyed.</span>
@@ -2566,7 +2568,7 @@
             <span class="ident">region_ranges</span>: <span class="ident">BTreeMap</span>::<span class="ident">default</span>(),
             <span class="ident">regions</span>: <span class="ident">HashMap</span>::<span class="ident">default</span>(),
             <span class="ident">readers</span>: <span class="ident">HashMap</span>::<span class="ident">default</span>(),
-            <span class="ident">pending_votes</span>: <span class="ident">RingQueue</span>::<span class="ident">with_capacity</span>(<span class="ident">vote_capacity</span>),
+            <span class="ident">pending_msgs</span>: <span class="ident">RingQueue</span>::<span class="ident">with_capacity</span>(<span class="ident">vote_capacity</span>),
             <span class="ident">pending_snapshot_regions</span>: <span class="ident">Vec</span>::<span class="ident">default</span>(),
             <span class="ident">pending_merge_targets</span>: <span class="ident">HashMap</span>::<span class="ident">default</span>(),
             <span class="ident">targets_map</span>: <span class="ident">HashMap</span>::<span class="ident">default</span>(),
@@ -3836,8 +3838,8 @@
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">PartialEq</span>)]</span>
 <span class="kw">enum</span> <span class="ident">CheckMsgStatus</span> {
-    <span class="comment">// The message is the first request vote message to an existing peer.</span>
-    <span class="ident">FirstRequestVote</span>,
+    <span class="comment">// The message is the first message to an existing peer.</span>
+    <span class="ident">FirstRequest</span>,
     <span class="comment">// The message can be dropped silently</span>
     <span class="ident">DropMsg</span>,
     <span class="comment">// Try to create the peer</span>
@@ -3867,7 +3869,7 @@
 
         <span class="kw">if</span> <span class="ident">local_state</span>.<span class="ident">get_state</span>() <span class="op">!</span><span class="op">=</span> <span class="ident">PeerState</span>::<span class="ident">Tombstone</span> {
             <span class="comment">// Maybe split, but not registered yet.</span>
-            <span class="kw">if</span> <span class="op">!</span><span class="ident">util</span>::<span class="ident">is_first_vote_msg</span>(<span class="ident">msg</span>.<span class="ident">get_message</span>()) {
+            <span class="kw">if</span> <span class="op">!</span><span class="ident">util</span>::<span class="ident">is_first_message</span>(<span class="ident">msg</span>.<span class="ident">get_message</span>()) {
                 <span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">raft_metrics</span>.<span class="ident">message_dropped</span>.<span class="ident">region_nonexistent</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
                 <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(
                     <span class="string">&quot;[region {}] region not exist but not tombstone: {:?}&quot;</span>,
@@ -3879,7 +3881,7 @@
                 <span class="string">&quot;region doesn&#39;t exist yet, wait for it to be split&quot;</span>;
                 <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>
             );
-            <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">CheckMsgStatus</span>::<span class="ident">FirstRequestVote</span>);
+            <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">CheckMsgStatus</span>::<span class="ident">FirstRequest</span>);
         }
         <span class="macro">debug</span><span class="macro">!</span>(
             <span class="string">&quot;region is in tombstone state&quot;</span>;
@@ -4021,45 +4023,45 @@
             <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
         }
         <span class="kw">let</span> <span class="ident">check_msg_status</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">check_msg</span>(<span class="kw-2">&amp;</span><span class="ident">msg</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">is_first_request_vote</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">check_msg_status</span> {
+        <span class="kw">let</span> <span class="ident">is_first_request</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">check_msg_status</span> {
             <span class="ident">CheckMsgStatus</span>::<span class="ident">DropMsg</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="prelude-val">Ok</span>(()),
-            <span class="ident">CheckMsgStatus</span>::<span class="ident">FirstRequestVote</span> <span class="op">=</span><span class="op">&gt;</span> <span class="bool-val">true</span>,
+            <span class="ident">CheckMsgStatus</span>::<span class="ident">FirstRequest</span> <span class="op">=</span><span class="op">&gt;</span> <span class="bool-val">true</span>,
             <span class="ident">CheckMsgStatus</span>::<span class="ident">NewPeer</span> <span class="op">|</span> <span class="ident">CheckMsgStatus</span>::<span class="ident">NewPeerFirst</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">maybe_create_peer</span>(
+                <span class="kw">if</span> <span class="self">self</span>.<span class="ident">maybe_create_peer</span>(
                     <span class="ident">region_id</span>,
                     <span class="kw-2">&amp;</span><span class="ident">msg</span>,
                     <span class="ident">check_msg_status</span> <span class="op">=</span><span class="op">=</span> <span class="ident">CheckMsgStatus</span>::<span class="ident">NewPeerFirst</span>,
                 )<span class="question-mark">?</span> {
-                    <span class="kw">if</span> <span class="op">!</span><span class="ident">util</span>::<span class="ident">is_first_vote_msg</span>(<span class="ident">msg</span>.<span class="ident">get_message</span>()) {
-                        <span class="comment">// Can not create peer from the message and it&#39;s not the</span>
-                        <span class="comment">// first request vote message.</span>
-                        <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
-                    }
-                    <span class="bool-val">true</span>
-                } <span class="kw">else</span> {
-                    <span class="bool-val">false</span>
+                    <span class="comment">// Peer created, send the message again</span>
+                    <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">router</span>.<span class="ident">send</span>(<span class="ident">region_id</span>, <span class="ident">PeerMsg</span>::<span class="ident">RaftMessage</span>(<span class="ident">msg</span>));
+                    <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
                 }
+                <span class="comment">// Can&#39;t create peer, see if we should keep this message</span>
+                <span class="ident">util</span>::<span class="ident">is_first_message</span>(<span class="ident">msg</span>.<span class="ident">get_message</span>())
             }
         };
-        <span class="kw">if</span> <span class="ident">is_first_request_vote</span> {
-            <span class="comment">// To void losing request vote messages, either put it to</span>
-            <span class="comment">// pending_votes or force send.</span>
+        <span class="kw">if</span> <span class="ident">is_first_request</span> {
+            <span class="comment">// To void losing messages, either put it to pending_msg or force send.</span>
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">store_meta</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">store_meta</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
             <span class="kw">if</span> <span class="op">!</span><span class="ident">store_meta</span>.<span class="ident">regions</span>.<span class="ident">contains_key</span>(<span class="kw-2">&amp;</span><span class="ident">region_id</span>) {
-                <span class="ident">store_meta</span>.<span class="ident">pending_votes</span>.<span class="ident">push</span>(<span class="ident">msg</span>);
-                <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
-            }
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="self">self</span>
-                .<span class="ident">ctx</span>
-                .<span class="ident">router</span>
-                .<span class="ident">force_send</span>(<span class="ident">region_id</span>, <span class="ident">PeerMsg</span>::<span class="ident">RaftMessage</span>(<span class="ident">msg</span>))
-            {
-                <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;handle first request vote failed&quot;</span>; <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>, <span class="string">&quot;error&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
-            }
-            <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
-        }
+                <span class="comment">// Save one pending message for a peer is enough, remove</span>
+                <span class="comment">// the previous pending message of this peer</span>
+                <span class="ident">store_meta</span>
+                    .<span class="ident">pending_msgs</span>
+                    .<span class="ident">swap_remove_front</span>(<span class="op">|</span><span class="ident">m</span><span class="op">|</span> <span class="ident">m</span>.<span class="ident">get_to_peer</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">msg</span>.<span class="ident">get_to_peer</span>());
 
-        <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">router</span>.<span class="ident">send</span>(<span class="ident">region_id</span>, <span class="ident">PeerMsg</span>::<span class="ident">RaftMessage</span>(<span class="ident">msg</span>));
+                <span class="ident">store_meta</span>.<span class="ident">pending_msgs</span>.<span class="ident">push</span>(<span class="ident">msg</span>);
+            } <span class="kw">else</span> {
+                <span class="ident">drop</span>(<span class="ident">store_meta</span>);
+                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="self">self</span>
+                    .<span class="ident">ctx</span>
+                    .<span class="ident">router</span>
+                    .<span class="ident">force_send</span>(<span class="ident">region_id</span>, <span class="ident">PeerMsg</span>::<span class="ident">RaftMessage</span>(<span class="ident">msg</span>))
+                {
+                    <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;handle first request failed&quot;</span>; <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>, <span class="string">&quot;error&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
+                }
+            }
+        }
         <span class="prelude-val">Ok</span>(())
     }
 

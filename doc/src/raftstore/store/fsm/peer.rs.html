@@ -4038,6 +4038,33 @@
 <span id="4035">4035</span>
 <span id="4036">4036</span>
 <span id="4037">4037</span>
+<span id="4038">4038</span>
+<span id="4039">4039</span>
+<span id="4040">4040</span>
+<span id="4041">4041</span>
+<span id="4042">4042</span>
+<span id="4043">4043</span>
+<span id="4044">4044</span>
+<span id="4045">4045</span>
+<span id="4046">4046</span>
+<span id="4047">4047</span>
+<span id="4048">4048</span>
+<span id="4049">4049</span>
+<span id="4050">4050</span>
+<span id="4051">4051</span>
+<span id="4052">4052</span>
+<span id="4053">4053</span>
+<span id="4054">4054</span>
+<span id="4055">4055</span>
+<span id="4056">4056</span>
+<span id="4057">4057</span>
+<span id="4058">4058</span>
+<span id="4059">4059</span>
+<span id="4060">4060</span>
+<span id="4061">4061</span>
+<span id="4062">4062</span>
+<span id="4063">4063</span>
+<span id="4064">4064</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -4628,6 +4655,28 @@
                 <span class="self">self</span>.<span class="ident">on_raft_gc_log_tick</span>(<span class="bool-val">true</span>);
             }
             <span class="ident">CasualMessage</span>::<span class="ident">AccessPeer</span>(<span class="ident">cb</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">cb</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span> <span class="kw">as</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">dyn</span> <span class="ident">AbstractPeer</span>),
+            <span class="ident">CasualMessage</span>::<span class="ident">QueryRegionLeaderResp</span> { <span class="ident">region</span>, <span class="ident">leader</span> } <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="comment">// the leader already updated</span>
+                <span class="kw">if</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">raft_group</span>.<span class="ident">raft</span>.<span class="ident">leader_id</span> <span class="op">!</span><span class="op">=</span> <span class="ident">raft</span>::<span class="ident">INVALID_ID</span>
+                    <span class="comment">// the returned region is stale</span>
+                    <span class="op">|</span><span class="op">|</span> <span class="ident">util</span>::<span class="ident">is_epoch_stale</span>(
+                        <span class="ident">region</span>.<span class="ident">get_region_epoch</span>(),
+                        <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">region</span>().<span class="ident">get_region_epoch</span>(),
+                    )
+                {
+                    <span class="comment">// Stale message</span>
+                    <span class="kw">return</span>;
+                }
+
+                <span class="comment">// Wake up the leader if the peer is on the leader&#39;s peer list</span>
+                <span class="kw">if</span> <span class="ident">region</span>
+                    .<span class="ident">get_peers</span>()
+                    .<span class="ident">iter</span>()
+                    .<span class="ident">any</span>(<span class="op">|</span><span class="ident">p</span><span class="op">|</span> <span class="ident">p</span>.<span class="ident">get_id</span>() <span class="op">=</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer_id</span>())
+                {
+                    <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">send_wake_up_message</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">ctx</span>, <span class="kw-2">&amp;</span><span class="ident">leader</span>);
+                }
+            }
         }
     }
 
@@ -5274,6 +5323,11 @@
             <span class="ident">ExtraMessageType</span>::<span class="ident">MsgRegionWakeUp</span> <span class="op">|</span> <span class="ident">ExtraMessageType</span>::<span class="ident">MsgCheckStalePeer</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">if</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">group_state</span> <span class="op">=</span><span class="op">=</span> <span class="ident">GroupState</span>::<span class="ident">Idle</span> {
                     <span class="self">self</span>.<span class="ident">reset_raft_tick</span>(<span class="ident">GroupState</span>::<span class="ident">Ordered</span>);
+                }
+                <span class="kw">if</span> <span class="ident">msg</span>.<span class="ident">get_extra_msg</span>().<span class="ident">get_type</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">ExtraMessageType</span>::<span class="ident">MsgRegionWakeUp</span>
+                    <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">is_leader</span>()
+                {
+                    <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">raft_group</span>.<span class="ident">raft</span>.<span class="ident">ping</span>();
                 }
             }
             <span class="ident">ExtraMessageType</span>::<span class="ident">MsgWantRollbackMerge</span> <span class="op">=</span><span class="op">&gt;</span> {
@@ -6240,7 +6294,7 @@
 
             <span class="kw">if</span> <span class="op">!</span><span class="ident">campaigned</span> {
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">msg</span>) <span class="op">=</span> <span class="ident">meta</span>
-                    .<span class="ident">pending_votes</span>
+                    .<span class="ident">pending_msgs</span>
                     .<span class="ident">swap_remove_front</span>(<span class="op">|</span><span class="ident">m</span><span class="op">|</span> <span class="ident">m</span>.<span class="ident">get_to_peer</span>() <span class="op">=</span><span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">meta_peer</span>)
                 {
                     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="self">self</span>
@@ -6248,7 +6302,7 @@
                         .<span class="ident">router</span>
                         .<span class="ident">force_send</span>(<span class="ident">new_region_id</span>, <span class="ident">PeerMsg</span>::<span class="ident">RaftMessage</span>(<span class="ident">msg</span>))
                     {
-                        <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;handle first requset vote failed&quot;</span>; <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>, <span class="string">&quot;error&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
+                        <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;handle first requset failed&quot;</span>; <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>, <span class="string">&quot;error&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
                     }
                 }
             }
