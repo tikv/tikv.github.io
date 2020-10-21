@@ -2503,6 +2503,13 @@
 <span id="2500">2500</span>
 <span id="2501">2501</span>
 <span id="2502">2502</span>
+<span id="2503">2503</span>
+<span id="2504">2504</span>
+<span id="2505">2505</span>
+<span id="2506">2506</span>
+<span id="2507">2507</span>
+<span id="2508">2508</span>
+<span id="2509">2509</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2017 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -4044,11 +4051,13 @@
     <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::{<span class="ident">AtomicU64</span>, <span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>};
     <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::{<span class="ident">Arc</span>, <span class="ident">RwLock</span>};
 
-    <span class="kw">use</span> <span class="ident">engine_rocks</span>::<span class="ident">raw</span>::{<span class="ident">DBOptions</span>, <span class="ident">Env</span>, <span class="ident">DB</span>};
-    <span class="kw">use</span> <span class="ident">engine_rocks</span>::<span class="ident">raw_util</span>::<span class="ident">CFOptions</span>;
-    <span class="kw">use</span> <span class="ident">engine_rocks</span>::{<span class="ident">Compat</span>, <span class="ident">RocksEngine</span>, <span class="ident">RocksSnapshot</span>, <span class="ident">RocksSstWriterBuilder</span>};
-    <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">Engines</span>, <span class="ident">ExternalSstFileInfo</span>, <span class="ident">SstWriter</span>};
-    <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">Iterable</span>, <span class="ident">Peekable</span>, <span class="ident">SstWriterBuilder</span>, <span class="ident">SyncMutable</span>};
+    <span class="kw">use</span> <span class="ident">engine_test</span>::<span class="ident">ctor</span>::{<span class="ident">CFOptions</span>, <span class="ident">ColumnFamilyOptions</span>, <span class="ident">DBOptions</span>, <span class="ident">EngineConstructorExt</span>};
+    <span class="kw">use</span> <span class="ident">engine_test</span>::<span class="ident">kv</span>::<span class="ident">KvTestEngine</span>;
+    <span class="kw">use</span> <span class="ident">engine_test</span>::<span class="ident">raft</span>::<span class="ident">RaftTestEngine</span>;
+    <span class="kw">use</span> <span class="ident">engine_traits</span>::<span class="ident">Engines</span>;
+    <span class="kw">use</span> <span class="ident">engine_traits</span>::<span class="ident">SyncMutable</span>;
+    <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">ExternalSstFileInfo</span>, <span class="ident">SstExt</span>, <span class="ident">SstWriter</span>, <span class="ident">SstWriterBuilder</span>};
+    <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">KvEngine</span>, <span class="ident">Snapshot</span> <span class="kw">as</span> <span class="ident">EngineSnapshot</span>};
     <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">ALL_CFS</span>, <span class="ident">CF_DEFAULT</span>, <span class="ident">CF_LOCK</span>, <span class="ident">CF_RAFT</span>, <span class="ident">CF_WRITE</span>};
     <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">metapb</span>::{<span class="ident">Peer</span>, <span class="ident">Region</span>};
     <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">raft_serverpb</span>::{
@@ -4078,37 +4087,39 @@
     <span class="kw">const</span> <span class="ident">TEST_META_FILE_BUFFER_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1000</span>;
     <span class="kw">const</span> <span class="ident">BYTE_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span>;
 
-    <span class="kw">type</span> <span class="ident">DBBuilder</span> <span class="op">=</span> <span class="kw">fn</span>(
-        <span class="ident">p</span>: <span class="kw-2">&amp;</span><span class="ident">Path</span>,
-        <span class="ident">db_opt</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">DBOptions</span><span class="op">&gt;</span>,
-        <span class="ident">cf_opts</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">CFOptions</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">DB</span><span class="op">&gt;</span><span class="op">&gt;</span>;
+    <span class="kw">type</span> <span class="ident">DBBuilder</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> <span class="op">=</span>
+        <span class="kw">fn</span>(<span class="ident">p</span>: <span class="kw-2">&amp;</span><span class="ident">Path</span>, <span class="ident">db_opt</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">DBOptions</span><span class="op">&gt;</span>, <span class="ident">cf_opts</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">CFOptions</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>;
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">open_test_empty_db</span>(
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">open_test_empty_db</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>(
         <span class="ident">path</span>: <span class="kw-2">&amp;</span><span class="ident">Path</span>,
         <span class="ident">db_opt</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">DBOptions</span><span class="op">&gt;</span>,
         <span class="ident">cf_opts</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">CFOptions</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">DB</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>
+    <span class="kw">where</span>
+        <span class="ident">E</span>: <span class="ident">KvEngine</span> <span class="op">+</span> <span class="ident">EngineConstructorExt</span>,
+    {
         <span class="kw">let</span> <span class="ident">p</span> <span class="op">=</span> <span class="ident">path</span>.<span class="ident">to_str</span>().<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">db</span> <span class="op">=</span> <span class="ident">engine_rocks</span>::<span class="ident">raw_util</span>::<span class="ident">new_engine</span>(<span class="ident">p</span>, <span class="ident">db_opt</span>, <span class="ident">ALL_CFS</span>, <span class="ident">cf_opts</span>).<span class="ident">unwrap</span>();
-        <span class="prelude-val">Ok</span>(<span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">db</span>))
+        <span class="kw">let</span> <span class="ident">db</span> <span class="op">=</span> <span class="ident">E</span>::<span class="ident">new_engine</span>(<span class="ident">p</span>, <span class="ident">db_opt</span>, <span class="ident">ALL_CFS</span>, <span class="ident">cf_opts</span>).<span class="ident">unwrap</span>();
+        <span class="prelude-val">Ok</span>(<span class="ident">db</span>)
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">open_test_db</span>(
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">open_test_db</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>(
         <span class="ident">path</span>: <span class="kw-2">&amp;</span><span class="ident">Path</span>,
         <span class="ident">db_opt</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">DBOptions</span><span class="op">&gt;</span>,
         <span class="ident">cf_opts</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">CFOptions</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">DB</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>
+    <span class="kw">where</span>
+        <span class="ident">E</span>: <span class="ident">KvEngine</span> <span class="op">+</span> <span class="ident">EngineConstructorExt</span>,
+    {
         <span class="kw">let</span> <span class="ident">p</span> <span class="op">=</span> <span class="ident">path</span>.<span class="ident">to_str</span>().<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">db</span> <span class="op">=</span> <span class="ident">engine_rocks</span>::<span class="ident">raw_util</span>::<span class="ident">new_engine</span>(<span class="ident">p</span>, <span class="ident">db_opt</span>, <span class="ident">ALL_CFS</span>, <span class="ident">cf_opts</span>).<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">db</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">db</span>);
+        <span class="kw">let</span> <span class="ident">db</span> <span class="op">=</span> <span class="ident">E</span>::<span class="ident">new_engine</span>(<span class="ident">p</span>, <span class="ident">db_opt</span>, <span class="ident">ALL_CFS</span>, <span class="ident">cf_opts</span>).<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> <span class="ident">keys</span>::<span class="ident">data_key</span>(<span class="ident">TEST_KEY</span>);
         <span class="comment">// write some data into each cf</span>
         <span class="kw">for</span> (<span class="ident">i</span>, <span class="ident">cf</span>) <span class="kw">in</span> <span class="ident">db</span>.<span class="ident">cf_names</span>().<span class="ident">into_iter</span>().<span class="ident">enumerate</span>() {
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">p</span> <span class="op">=</span> <span class="ident">Peer</span>::<span class="ident">default</span>();
             <span class="ident">p</span>.<span class="ident">set_store_id</span>(<span class="ident">TEST_STORE_ID</span>);
             <span class="ident">p</span>.<span class="ident">set_id</span>((<span class="ident">i</span> <span class="op">+</span> <span class="number">1</span>) <span class="kw">as</span> <span class="ident">u64</span>);
-            <span class="ident">db</span>.<span class="ident">c</span>().<span class="ident">put_msg_cf</span>(<span class="ident">cf</span>, <span class="kw-2">&amp;</span><span class="ident">key</span>[..], <span class="kw-2">&amp;</span><span class="ident">p</span>)<span class="question-mark">?</span>;
+            <span class="ident">db</span>.<span class="ident">put_msg_cf</span>(<span class="ident">cf</span>, <span class="kw-2">&amp;</span><span class="ident">key</span>[..], <span class="kw-2">&amp;</span><span class="ident">p</span>)<span class="question-mark">?</span>;
         }
         <span class="prelude-val">Ok</span>(<span class="ident">db</span>)
     }
@@ -4120,10 +4131,10 @@
         <span class="ident">kv_db_opt</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">DBOptions</span><span class="op">&gt;</span>,
         <span class="ident">kv_cf_opts</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">CFOptions</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">regions</span>: <span class="kw-2">&amp;</span>[<span class="ident">u64</span>],
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Engines</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Engines</span><span class="op">&lt;</span><span class="ident">KvTestEngine</span>, <span class="ident">RaftTestEngine</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">p</span> <span class="op">=</span> <span class="ident">path</span>.<span class="ident">path</span>();
-        <span class="kw">let</span> <span class="ident">kv</span> <span class="op">=</span> <span class="ident">open_test_db</span>(<span class="ident">p</span>.<span class="ident">join</span>(<span class="string">&quot;kv&quot;</span>).<span class="ident">as_path</span>(), <span class="ident">kv_db_opt</span>, <span class="ident">kv_cf_opts</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">raft</span> <span class="op">=</span> <span class="ident">open_test_db</span>(
+        <span class="kw">let</span> <span class="ident">kv</span>: <span class="ident">KvTestEngine</span> <span class="op">=</span> <span class="ident">open_test_db</span>(<span class="ident">p</span>.<span class="ident">join</span>(<span class="string">&quot;kv&quot;</span>).<span class="ident">as_path</span>(), <span class="ident">kv_db_opt</span>, <span class="ident">kv_cf_opts</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">raft</span>: <span class="ident">RaftTestEngine</span> <span class="op">=</span> <span class="ident">open_test_db</span>(
             <span class="ident">p</span>.<span class="ident">join</span>(<span class="string">&quot;raft&quot;</span>).<span class="ident">as_path</span>(),
             <span class="ident">raft_db_opt</span>,
             <span class="ident">raft_cf_opt</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">opt</span><span class="op">|</span> <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">opt</span>]),
@@ -4136,25 +4147,19 @@
             <span class="ident">apply_entry</span>.<span class="ident">set_index</span>(<span class="number">10</span>);
             <span class="ident">apply_entry</span>.<span class="ident">set_term</span>(<span class="number">0</span>);
             <span class="ident">apply_state</span>.<span class="ident">mut_truncated_state</span>().<span class="ident">set_index</span>(<span class="number">10</span>);
-            <span class="ident">kv</span>.<span class="ident">c</span>()
-                .<span class="ident">put_msg_cf</span>(<span class="ident">CF_RAFT</span>, <span class="kw-2">&amp;</span><span class="ident">keys</span>::<span class="ident">apply_state_key</span>(<span class="ident">region_id</span>), <span class="kw-2">&amp;</span><span class="ident">apply_state</span>)<span class="question-mark">?</span>;
-            <span class="ident">raft</span>.<span class="ident">c</span>()
-                .<span class="ident">put_msg</span>(<span class="kw-2">&amp;</span><span class="ident">keys</span>::<span class="ident">raft_log_key</span>(<span class="ident">region_id</span>, <span class="number">10</span>), <span class="kw-2">&amp;</span><span class="ident">apply_entry</span>)<span class="question-mark">?</span>;
+            <span class="ident">kv</span>.<span class="ident">put_msg_cf</span>(<span class="ident">CF_RAFT</span>, <span class="kw-2">&amp;</span><span class="ident">keys</span>::<span class="ident">apply_state_key</span>(<span class="ident">region_id</span>), <span class="kw-2">&amp;</span><span class="ident">apply_state</span>)<span class="question-mark">?</span>;
+            <span class="ident">raft</span>.<span class="ident">put_msg</span>(<span class="kw-2">&amp;</span><span class="ident">keys</span>::<span class="ident">raft_log_key</span>(<span class="ident">region_id</span>, <span class="number">10</span>), <span class="kw-2">&amp;</span><span class="ident">apply_entry</span>)<span class="question-mark">?</span>;
 
             <span class="comment">// Put region info into kv engine.</span>
             <span class="kw">let</span> <span class="ident">region</span> <span class="op">=</span> <span class="ident">gen_test_region</span>(<span class="ident">region_id</span>, <span class="number">1</span>, <span class="number">1</span>);
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">region_state</span> <span class="op">=</span> <span class="ident">RegionLocalState</span>::<span class="ident">default</span>();
             <span class="ident">region_state</span>.<span class="ident">set_region</span>(<span class="ident">region</span>);
-            <span class="ident">kv</span>.<span class="ident">c</span>()
-                .<span class="ident">put_msg_cf</span>(<span class="ident">CF_RAFT</span>, <span class="kw-2">&amp;</span><span class="ident">keys</span>::<span class="ident">region_state_key</span>(<span class="ident">region_id</span>), <span class="kw-2">&amp;</span><span class="ident">region_state</span>)<span class="question-mark">?</span>;
+            <span class="ident">kv</span>.<span class="ident">put_msg_cf</span>(<span class="ident">CF_RAFT</span>, <span class="kw-2">&amp;</span><span class="ident">keys</span>::<span class="ident">region_state_key</span>(<span class="ident">region_id</span>), <span class="kw-2">&amp;</span><span class="ident">region_state</span>)<span class="question-mark">?</span>;
         }
-        <span class="prelude-val">Ok</span>(<span class="ident">Engines</span> {
-            <span class="ident">kv</span>: <span class="ident">kv</span>.<span class="ident">c</span>().<span class="ident">clone</span>(),
-            <span class="ident">raft</span>: <span class="ident">raft</span>.<span class="ident">c</span>().<span class="ident">clone</span>(),
-        })
+        <span class="prelude-val">Ok</span>(<span class="ident">Engines</span> { <span class="ident">kv</span>, <span class="ident">raft</span> })
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_kv_count</span>(<span class="ident">snap</span>: <span class="kw-2">&amp;</span><span class="ident">RocksSnapshot</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_kv_count</span>(<span class="ident">snap</span>: <span class="kw-2">&amp;</span><span class="kw">impl</span> <span class="ident">EngineSnapshot</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">kv_count</span> <span class="op">=</span> <span class="number">0</span>;
         <span class="kw">for</span> <span class="ident">cf</span> <span class="kw">in</span> <span class="ident">SNAPSHOT_CFS</span> {
             <span class="ident">snap</span>.<span class="ident">scan_cf</span>(
@@ -4186,12 +4191,12 @@
         <span class="ident">region</span>
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">assert_eq_db</span>(<span class="ident">expected_db</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">DB</span><span class="op">&gt;</span>, <span class="ident">db</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">DB</span><span class="op">&gt;</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">assert_eq_db</span>(<span class="ident">expected_db</span>: <span class="kw-2">&amp;</span><span class="kw">impl</span> <span class="ident">KvEngine</span>, <span class="ident">db</span>: <span class="kw-2">&amp;</span><span class="kw">impl</span> <span class="ident">KvEngine</span>) {
         <span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> <span class="ident">keys</span>::<span class="ident">data_key</span>(<span class="ident">TEST_KEY</span>);
         <span class="kw">for</span> <span class="ident">cf</span> <span class="kw">in</span> <span class="ident">SNAPSHOT_CFS</span> {
-            <span class="kw">let</span> <span class="ident">p1</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Peer</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">expected_db</span>.<span class="ident">c</span>().<span class="ident">get_msg_cf</span>(<span class="ident">cf</span>, <span class="kw-2">&amp;</span><span class="ident">key</span>[..]).<span class="ident">unwrap</span>();
+            <span class="kw">let</span> <span class="ident">p1</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Peer</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">expected_db</span>.<span class="ident">get_msg_cf</span>(<span class="ident">cf</span>, <span class="kw-2">&amp;</span><span class="ident">key</span>[..]).<span class="ident">unwrap</span>();
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">p1</span>) <span class="op">=</span> <span class="ident">p1</span> {
-                <span class="kw">let</span> <span class="ident">p2</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Peer</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">db</span>.<span class="ident">c</span>().<span class="ident">get_msg_cf</span>(<span class="ident">cf</span>, <span class="kw-2">&amp;</span><span class="ident">key</span>[..]).<span class="ident">unwrap</span>();
+                <span class="kw">let</span> <span class="ident">p2</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Peer</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">db</span>.<span class="ident">get_msg_cf</span>(<span class="ident">cf</span>, <span class="kw-2">&amp;</span><span class="ident">key</span>[..]).<span class="ident">unwrap</span>();
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">p2</span>) <span class="op">=</span> <span class="ident">p2</span> {
                     <span class="kw">if</span> <span class="ident">p2</span> <span class="op">!</span><span class="op">=</span> <span class="ident">p1</span> {
                         <span class="macro">panic</span><span class="macro">!</span>(
@@ -4218,9 +4223,8 @@
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">gen_db_options_with_encryption</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">DBOptions</span> {
-        <span class="kw">let</span> <span class="ident">env</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">Env</span>::<span class="ident">new_default_ctr_encrypted_env</span>(<span class="string">b&quot;abcd&quot;</span>).<span class="ident">unwrap</span>());
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">db_opt</span> <span class="op">=</span> <span class="ident">DBOptions</span>::<span class="ident">new</span>();
-        <span class="ident">db_opt</span>.<span class="ident">set_env</span>(<span class="ident">env</span>);
+        <span class="ident">db_opt</span>.<span class="ident">with_default_ctr_encrypted_env</span>(<span class="string">b&quot;abcd&quot;</span>.<span class="ident">to_vec</span>());
         <span class="ident">db_opt</span>
     }
 
@@ -4289,7 +4293,7 @@
         <span class="ident">test_snap_file</span>(<span class="ident">open_test_db</span>, <span class="prelude-val">Some</span>(<span class="ident">gen_db_options_with_encryption</span>()));
     }
 
-    <span class="kw">fn</span> <span class="ident">test_snap_file</span>(<span class="ident">get_db</span>: <span class="ident">DBBuilder</span>, <span class="ident">db_opt</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">DBOptions</span><span class="op">&gt;</span>) {
+    <span class="kw">fn</span> <span class="ident">test_snap_file</span>(<span class="ident">get_db</span>: <span class="ident">DBBuilder</span><span class="op">&lt;</span><span class="ident">KvTestEngine</span><span class="op">&gt;</span>, <span class="ident">db_opt</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">DBOptions</span><span class="op">&gt;</span>) {
         <span class="kw">let</span> <span class="ident">region_id</span> <span class="op">=</span> <span class="number">1</span>;
         <span class="kw">let</span> <span class="ident">region</span> <span class="op">=</span> <span class="ident">gen_test_region</span>(<span class="ident">region_id</span>, <span class="number">1</span>, <span class="number">1</span>);
         <span class="kw">let</span> <span class="ident">src_db_dir</span> <span class="op">=</span> <span class="ident">Builder</span>::<span class="ident">new</span>()
@@ -4297,7 +4301,7 @@
             .<span class="ident">tempdir</span>()
             .<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">db</span> <span class="op">=</span> <span class="ident">get_db</span>(<span class="kw-2">&amp;</span><span class="ident">src_db_dir</span>.<span class="ident">path</span>(), <span class="ident">db_opt</span>.<span class="ident">clone</span>(), <span class="prelude-val">None</span>).<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">RocksSnapshot</span>::<span class="ident">new</span>(<span class="ident">Arc</span>::<span class="ident">clone</span>(<span class="kw-2">&amp;</span><span class="ident">db</span>));
+        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">db</span>.<span class="ident">snapshot</span>();
 
         <span class="kw">let</span> <span class="ident">src_dir</span> <span class="op">=</span> <span class="ident">Builder</span>::<span class="ident">new</span>()
             .<span class="ident">prefix</span>(<span class="string">&quot;test-snap-file-db-src&quot;</span>)
@@ -4317,9 +4321,9 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">snap_data</span> <span class="op">=</span> <span class="ident">RaftSnapshotData</span>::<span class="ident">default</span>();
         <span class="ident">snap_data</span>.<span class="ident">set_region</span>(<span class="ident">region</span>.<span class="ident">clone</span>());
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stat</span> <span class="op">=</span> <span class="ident">SnapshotStatistics</span>::<span class="ident">new</span>();
-        <span class="ident">Snapshot</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>::<span class="ident">build</span>(
+        <span class="ident">Snapshot</span>::<span class="op">&lt;</span><span class="ident">KvTestEngine</span><span class="op">&gt;</span>::<span class="ident">build</span>(
             <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">s1</span>,
-            <span class="ident">db</span>.<span class="ident">c</span>(),
+            <span class="kw-2">&amp;</span><span class="ident">db</span>,
             <span class="kw-2">&amp;</span><span class="ident">snapshot</span>,
             <span class="kw-2">&amp;</span><span class="ident">region</span>,
             <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">snap_data</span>,
@@ -4380,15 +4384,13 @@
         <span class="kw">let</span> <span class="ident">dst_db_path</span> <span class="op">=</span> <span class="ident">dst_db_dir</span>.<span class="ident">path</span>().<span class="ident">to_str</span>().<span class="ident">unwrap</span>();
         <span class="comment">// Change arbitrarily the cf order of ALL_CFS at destination db.</span>
         <span class="kw">let</span> <span class="ident">dst_cfs</span> <span class="op">=</span> [<span class="ident">CF_WRITE</span>, <span class="ident">CF_DEFAULT</span>, <span class="ident">CF_LOCK</span>, <span class="ident">CF_RAFT</span>];
-        <span class="kw">let</span> <span class="ident">dst_db</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(
-            <span class="ident">engine_rocks</span>::<span class="ident">raw_util</span>::<span class="ident">new_engine</span>(<span class="ident">dst_db_path</span>, <span class="ident">db_opt</span>, <span class="kw-2">&amp;</span><span class="ident">dst_cfs</span>, <span class="prelude-val">None</span>).<span class="ident">unwrap</span>(),
-        );
+        <span class="kw">let</span> <span class="ident">dst_db</span> <span class="op">=</span> <span class="ident">engine_test</span>::<span class="ident">kv</span>::<span class="ident">new_engine</span>(<span class="ident">dst_db_path</span>, <span class="ident">db_opt</span>, <span class="kw-2">&amp;</span><span class="ident">dst_cfs</span>, <span class="prelude-val">None</span>).<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">options</span> <span class="op">=</span> <span class="ident">ApplyOptions</span> {
-            <span class="ident">db</span>: <span class="ident">dst_db</span>.<span class="ident">c</span>().<span class="ident">clone</span>(),
+            <span class="ident">db</span>: <span class="ident">dst_db</span>.<span class="ident">clone</span>(),
             <span class="ident">region</span>,
             <span class="ident">abort</span>: <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">AtomicUsize</span>::<span class="ident">new</span>(<span class="ident">JOB_STATUS_RUNNING</span>)),
             <span class="ident">write_batch_size</span>: <span class="ident">TEST_WRITE_BATCH_SIZE</span>,
-            <span class="ident">coprocessor_host</span>: <span class="ident">CoprocessorHost</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>::<span class="ident">default</span>(),
+            <span class="ident">coprocessor_host</span>: <span class="ident">CoprocessorHost</span>::<span class="op">&lt;</span><span class="ident">KvTestEngine</span><span class="op">&gt;</span>::<span class="ident">default</span>(),
         };
         <span class="comment">// Verify thte snapshot applying is ok.</span>
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">s4</span>.<span class="ident">apply</span>(<span class="ident">options</span>).<span class="ident">is_ok</span>());
@@ -4413,7 +4415,7 @@
         <span class="ident">test_snap_validation</span>(<span class="ident">open_test_db</span>);
     }
 
-    <span class="kw">fn</span> <span class="ident">test_snap_validation</span>(<span class="ident">get_db</span>: <span class="ident">DBBuilder</span>) {
+    <span class="kw">fn</span> <span class="ident">test_snap_validation</span>(<span class="ident">get_db</span>: <span class="ident">DBBuilder</span><span class="op">&lt;</span><span class="ident">KvTestEngine</span><span class="op">&gt;</span>) {
         <span class="kw">let</span> <span class="ident">region_id</span> <span class="op">=</span> <span class="number">1</span>;
         <span class="kw">let</span> <span class="ident">region</span> <span class="op">=</span> <span class="ident">gen_test_region</span>(<span class="ident">region_id</span>, <span class="number">1</span>, <span class="number">1</span>);
         <span class="kw">let</span> <span class="ident">db_dir</span> <span class="op">=</span> <span class="ident">Builder</span>::<span class="ident">new</span>()
@@ -4421,7 +4423,7 @@
             .<span class="ident">tempdir</span>()
             .<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">db</span> <span class="op">=</span> <span class="ident">get_db</span>(<span class="kw-2">&amp;</span><span class="ident">db_dir</span>.<span class="ident">path</span>(), <span class="prelude-val">None</span>, <span class="prelude-val">None</span>).<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">RocksSnapshot</span>::<span class="ident">new</span>(<span class="ident">Arc</span>::<span class="ident">clone</span>(<span class="kw-2">&amp;</span><span class="ident">db</span>));
+        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">db</span>.<span class="ident">snapshot</span>();
 
         <span class="kw">let</span> <span class="ident">dir</span> <span class="op">=</span> <span class="ident">Builder</span>::<span class="ident">new</span>()
             .<span class="ident">prefix</span>(<span class="string">&quot;test-snap-validation&quot;</span>)
@@ -4436,9 +4438,9 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">snap_data</span> <span class="op">=</span> <span class="ident">RaftSnapshotData</span>::<span class="ident">default</span>();
         <span class="ident">snap_data</span>.<span class="ident">set_region</span>(<span class="ident">region</span>.<span class="ident">clone</span>());
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stat</span> <span class="op">=</span> <span class="ident">SnapshotStatistics</span>::<span class="ident">new</span>();
-        <span class="ident">Snapshot</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>::<span class="ident">build</span>(
+        <span class="ident">Snapshot</span>::<span class="op">&lt;</span><span class="ident">KvTestEngine</span><span class="op">&gt;</span>::<span class="ident">build</span>(
             <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">s1</span>,
-            <span class="ident">db</span>.<span class="ident">c</span>(),
+            <span class="kw-2">&amp;</span><span class="ident">db</span>,
             <span class="kw-2">&amp;</span><span class="ident">snapshot</span>,
             <span class="kw-2">&amp;</span><span class="ident">region</span>,
             <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">snap_data</span>,
@@ -4450,9 +4452,9 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">s2</span> <span class="op">=</span> <span class="ident">Snap</span>::<span class="ident">new_for_building</span>(<span class="ident">dir</span>.<span class="ident">path</span>(), <span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="kw-2">&amp;</span><span class="ident">mgr_core</span>).<span class="ident">unwrap</span>();
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">s2</span>.<span class="ident">exists</span>());
 
-        <span class="ident">Snapshot</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>::<span class="ident">build</span>(
+        <span class="ident">Snapshot</span>::<span class="op">&lt;</span><span class="ident">KvTestEngine</span><span class="op">&gt;</span>::<span class="ident">build</span>(
             <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">s2</span>,
-            <span class="ident">db</span>.<span class="ident">c</span>(),
+            <span class="kw-2">&amp;</span><span class="ident">db</span>,
             <span class="kw-2">&amp;</span><span class="ident">snapshot</span>,
             <span class="kw-2">&amp;</span><span class="ident">region</span>,
             <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">snap_data</span>,
@@ -4587,8 +4589,8 @@
             .<span class="ident">prefix</span>(<span class="string">&quot;test-snap-corruption-db&quot;</span>)
             .<span class="ident">tempdir</span>()
             .<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">db</span> <span class="op">=</span> <span class="ident">open_test_db</span>(<span class="kw-2">&amp;</span><span class="ident">db_dir</span>.<span class="ident">path</span>(), <span class="prelude-val">None</span>, <span class="prelude-val">None</span>).<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">RocksSnapshot</span>::<span class="ident">new</span>(<span class="ident">db</span>.<span class="ident">clone</span>());
+        <span class="kw">let</span> <span class="ident">db</span>: <span class="ident">KvTestEngine</span> <span class="op">=</span> <span class="ident">open_test_db</span>(<span class="kw-2">&amp;</span><span class="ident">db_dir</span>.<span class="ident">path</span>(), <span class="prelude-val">None</span>, <span class="prelude-val">None</span>).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">db</span>.<span class="ident">snapshot</span>();
 
         <span class="kw">let</span> <span class="ident">dir</span> <span class="op">=</span> <span class="ident">Builder</span>::<span class="ident">new</span>()
             .<span class="ident">prefix</span>(<span class="string">&quot;test-snap-corruption&quot;</span>)
@@ -4602,9 +4604,9 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">snap_data</span> <span class="op">=</span> <span class="ident">RaftSnapshotData</span>::<span class="ident">default</span>();
         <span class="ident">snap_data</span>.<span class="ident">set_region</span>(<span class="ident">region</span>.<span class="ident">clone</span>());
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stat</span> <span class="op">=</span> <span class="ident">SnapshotStatistics</span>::<span class="ident">new</span>();
-        <span class="ident">Snapshot</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>::<span class="ident">build</span>(
+        <span class="ident">Snapshot</span>::<span class="op">&lt;</span><span class="ident">KvTestEngine</span><span class="op">&gt;</span>::<span class="ident">build</span>(
             <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">s1</span>,
-            <span class="ident">db</span>.<span class="ident">c</span>(),
+            <span class="kw-2">&amp;</span><span class="ident">db</span>,
             <span class="kw-2">&amp;</span><span class="ident">snapshot</span>,
             <span class="kw-2">&amp;</span><span class="ident">region</span>,
             <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">snap_data</span>,
@@ -4619,9 +4621,9 @@
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">s2</span> <span class="op">=</span> <span class="ident">Snap</span>::<span class="ident">new_for_building</span>(<span class="ident">dir</span>.<span class="ident">path</span>(), <span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="kw-2">&amp;</span><span class="ident">mgr_core</span>).<span class="ident">unwrap</span>();
         <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">s2</span>.<span class="ident">exists</span>());
-        <span class="ident">Snapshot</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>::<span class="ident">build</span>(
+        <span class="ident">Snapshot</span>::<span class="op">&lt;</span><span class="ident">KvTestEngine</span><span class="op">&gt;</span>::<span class="ident">build</span>(
             <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">s2</span>,
-            <span class="ident">db</span>.<span class="ident">c</span>(),
+            <span class="kw-2">&amp;</span><span class="ident">db</span>,
             <span class="kw-2">&amp;</span><span class="ident">snapshot</span>,
             <span class="kw-2">&amp;</span><span class="ident">region</span>,
             <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">snap_data</span>,
@@ -4653,13 +4655,13 @@
             .<span class="ident">prefix</span>(<span class="string">&quot;test-snap-corruption-dst-db&quot;</span>)
             .<span class="ident">tempdir</span>()
             .<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">dst_db</span> <span class="op">=</span> <span class="ident">open_test_empty_db</span>(<span class="kw-2">&amp;</span><span class="ident">dst_db_dir</span>.<span class="ident">path</span>(), <span class="prelude-val">None</span>, <span class="prelude-val">None</span>).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">dst_db</span>: <span class="ident">KvTestEngine</span> <span class="op">=</span> <span class="ident">open_test_empty_db</span>(<span class="kw-2">&amp;</span><span class="ident">dst_db_dir</span>.<span class="ident">path</span>(), <span class="prelude-val">None</span>, <span class="prelude-val">None</span>).<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">options</span> <span class="op">=</span> <span class="ident">ApplyOptions</span> {
-            <span class="ident">db</span>: <span class="ident">dst_db</span>.<span class="ident">c</span>().<span class="ident">clone</span>(),
+            <span class="ident">db</span>: <span class="ident">dst_db</span>,
             <span class="ident">region</span>,
             <span class="ident">abort</span>: <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">AtomicUsize</span>::<span class="ident">new</span>(<span class="ident">JOB_STATUS_RUNNING</span>)),
             <span class="ident">write_batch_size</span>: <span class="ident">TEST_WRITE_BATCH_SIZE</span>,
-            <span class="ident">coprocessor_host</span>: <span class="ident">CoprocessorHost</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>::<span class="ident">default</span>(),
+            <span class="ident">coprocessor_host</span>: <span class="ident">CoprocessorHost</span>::<span class="op">&lt;</span><span class="ident">KvTestEngine</span><span class="op">&gt;</span>::<span class="ident">default</span>(),
         };
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">s5</span>.<span class="ident">apply</span>(<span class="ident">options</span>).<span class="ident">is_err</span>());
 
@@ -4676,8 +4678,8 @@
             .<span class="ident">prefix</span>(<span class="string">&quot;test-snapshot-corruption-meta-db&quot;</span>)
             .<span class="ident">tempdir</span>()
             .<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">db</span> <span class="op">=</span> <span class="ident">open_test_db</span>(<span class="kw-2">&amp;</span><span class="ident">db_dir</span>.<span class="ident">path</span>(), <span class="prelude-val">None</span>, <span class="prelude-val">None</span>).<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">RocksSnapshot</span>::<span class="ident">new</span>(<span class="ident">db</span>.<span class="ident">clone</span>());
+        <span class="kw">let</span> <span class="ident">db</span>: <span class="ident">KvTestEngine</span> <span class="op">=</span> <span class="ident">open_test_db</span>(<span class="kw-2">&amp;</span><span class="ident">db_dir</span>.<span class="ident">path</span>(), <span class="prelude-val">None</span>, <span class="prelude-val">None</span>).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">db</span>.<span class="ident">snapshot</span>();
 
         <span class="kw">let</span> <span class="ident">dir</span> <span class="op">=</span> <span class="ident">Builder</span>::<span class="ident">new</span>()
             .<span class="ident">prefix</span>(<span class="string">&quot;test-snap-corruption-meta&quot;</span>)
@@ -4691,9 +4693,9 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">snap_data</span> <span class="op">=</span> <span class="ident">RaftSnapshotData</span>::<span class="ident">default</span>();
         <span class="ident">snap_data</span>.<span class="ident">set_region</span>(<span class="ident">region</span>.<span class="ident">clone</span>());
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stat</span> <span class="op">=</span> <span class="ident">SnapshotStatistics</span>::<span class="ident">new</span>();
-        <span class="ident">Snapshot</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>::<span class="ident">build</span>(
+        <span class="ident">Snapshot</span>::<span class="op">&lt;</span><span class="ident">KvTestEngine</span><span class="op">&gt;</span>::<span class="ident">build</span>(
             <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">s1</span>,
-            <span class="ident">db</span>.<span class="ident">c</span>(),
+            <span class="kw-2">&amp;</span><span class="ident">db</span>,
             <span class="kw-2">&amp;</span><span class="ident">snapshot</span>,
             <span class="kw-2">&amp;</span><span class="ident">region</span>,
             <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">snap_data</span>,
@@ -4708,9 +4710,9 @@
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">s2</span> <span class="op">=</span> <span class="ident">Snap</span>::<span class="ident">new_for_building</span>(<span class="ident">dir</span>.<span class="ident">path</span>(), <span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="kw-2">&amp;</span><span class="ident">mgr_core</span>).<span class="ident">unwrap</span>();
         <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">s2</span>.<span class="ident">exists</span>());
-        <span class="ident">Snapshot</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>::<span class="ident">build</span>(
+        <span class="ident">Snapshot</span>::<span class="op">&lt;</span><span class="ident">KvTestEngine</span><span class="op">&gt;</span>::<span class="ident">build</span>(
             <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">s2</span>,
-            <span class="ident">db</span>.<span class="ident">c</span>(),
+            <span class="kw-2">&amp;</span><span class="ident">db</span>,
             <span class="kw-2">&amp;</span><span class="ident">snapshot</span>,
             <span class="kw-2">&amp;</span><span class="ident">region</span>,
             <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">snap_data</span>,
@@ -4774,8 +4776,8 @@
             .<span class="ident">prefix</span>(<span class="string">&quot;test-snap-mgr-delete-temp-files-v2-db&quot;</span>)
             .<span class="ident">tempdir</span>()
             .<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">db</span> <span class="op">=</span> <span class="ident">open_test_db</span>(<span class="kw-2">&amp;</span><span class="ident">db_dir</span>.<span class="ident">path</span>(), <span class="prelude-val">None</span>, <span class="prelude-val">None</span>).<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">RocksSnapshot</span>::<span class="ident">new</span>(<span class="ident">db</span>.<span class="ident">clone</span>());
+        <span class="kw">let</span> <span class="ident">db</span>: <span class="ident">KvTestEngine</span> <span class="op">=</span> <span class="ident">open_test_db</span>(<span class="kw-2">&amp;</span><span class="ident">db_dir</span>.<span class="ident">path</span>(), <span class="prelude-val">None</span>, <span class="prelude-val">None</span>).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">db</span>.<span class="ident">snapshot</span>();
         <span class="kw">let</span> <span class="ident">key1</span> <span class="op">=</span> <span class="ident">SnapKey</span>::<span class="ident">new</span>(<span class="number">1</span>, <span class="number">1</span>, <span class="number">1</span>);
         <span class="kw">let</span> <span class="ident">mgr_core</span> <span class="op">=</span> <span class="ident">create_manager_core</span>(<span class="kw-2">&amp;</span><span class="ident">path</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">s1</span> <span class="op">=</span> <span class="ident">Snap</span>::<span class="ident">new_for_building</span>(<span class="kw-2">&amp;</span><span class="ident">path</span>, <span class="kw-2">&amp;</span><span class="ident">key1</span>, <span class="kw-2">&amp;</span><span class="ident">mgr_core</span>).<span class="ident">unwrap</span>();
@@ -4783,9 +4785,9 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">snap_data</span> <span class="op">=</span> <span class="ident">RaftSnapshotData</span>::<span class="ident">default</span>();
         <span class="ident">snap_data</span>.<span class="ident">set_region</span>(<span class="ident">region</span>.<span class="ident">clone</span>());
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stat</span> <span class="op">=</span> <span class="ident">SnapshotStatistics</span>::<span class="ident">new</span>();
-        <span class="ident">Snapshot</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>::<span class="ident">build</span>(
+        <span class="ident">Snapshot</span>::<span class="op">&lt;</span><span class="ident">KvTestEngine</span><span class="op">&gt;</span>::<span class="ident">build</span>(
             <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">s1</span>,
-            <span class="ident">db</span>.<span class="ident">c</span>(),
+            <span class="kw-2">&amp;</span><span class="ident">db</span>,
             <span class="kw-2">&amp;</span><span class="ident">snapshot</span>,
             <span class="kw-2">&amp;</span><span class="ident">region</span>,
             <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">snap_data</span>,
@@ -4852,8 +4854,8 @@
             .<span class="ident">prefix</span>(<span class="string">&quot;test-snap-deletion-on-registry-src-db&quot;</span>)
             .<span class="ident">tempdir</span>()
             .<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">db</span> <span class="op">=</span> <span class="ident">open_test_db</span>(<span class="kw-2">&amp;</span><span class="ident">src_db_dir</span>.<span class="ident">path</span>(), <span class="prelude-val">None</span>, <span class="prelude-val">None</span>).<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">RocksSnapshot</span>::<span class="ident">new</span>(<span class="ident">db</span>.<span class="ident">clone</span>());
+        <span class="kw">let</span> <span class="ident">db</span>: <span class="ident">KvTestEngine</span> <span class="op">=</span> <span class="ident">open_test_db</span>(<span class="kw-2">&amp;</span><span class="ident">src_db_dir</span>.<span class="ident">path</span>(), <span class="prelude-val">None</span>, <span class="prelude-val">None</span>).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">db</span>.<span class="ident">snapshot</span>();
 
         <span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> <span class="ident">SnapKey</span>::<span class="ident">new</span>(<span class="number">1</span>, <span class="number">1</span>, <span class="number">1</span>);
         <span class="kw">let</span> <span class="ident">region</span> <span class="op">=</span> <span class="ident">gen_test_region</span>(<span class="number">1</span>, <span class="number">1</span>, <span class="number">1</span>);
@@ -4864,7 +4866,7 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">snap_data</span> <span class="op">=</span> <span class="ident">RaftSnapshotData</span>::<span class="ident">default</span>();
         <span class="ident">snap_data</span>.<span class="ident">set_region</span>(<span class="ident">region</span>.<span class="ident">clone</span>());
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stat</span> <span class="op">=</span> <span class="ident">SnapshotStatistics</span>::<span class="ident">new</span>();
-        <span class="ident">s1</span>.<span class="ident">build</span>(<span class="ident">db</span>.<span class="ident">c</span>(), <span class="kw-2">&amp;</span><span class="ident">snapshot</span>, <span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">snap_data</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">stat</span>)
+        <span class="ident">s1</span>.<span class="ident">build</span>(<span class="kw-2">&amp;</span><span class="ident">db</span>, <span class="kw-2">&amp;</span><span class="ident">snapshot</span>, <span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">snap_data</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">stat</span>)
             .<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">v</span> <span class="op">=</span> <span class="ident">snap_data</span>.<span class="ident">write_to_bytes</span>().<span class="ident">unwrap</span>();
 
@@ -4913,7 +4915,20 @@
             .<span class="ident">prefix</span>(<span class="string">&quot;test-snapshot-max-total-size-db&quot;</span>)
             .<span class="ident">tempdir</span>()
             .<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span> <span class="ident">get_test_db_for_regions</span>(<span class="kw-2">&amp;</span><span class="ident">kv_path</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="kw-2">&amp;</span><span class="ident">regions</span>).<span class="ident">unwrap</span>();
+        <span class="comment">// Disable property collection so that the total snapshot size</span>
+        <span class="comment">// isn&#39;t dependent on them.</span>
+        <span class="kw">let</span> <span class="ident">kv_cf_opts</span> <span class="op">=</span> <span class="ident">ALL_CFS</span>
+            .<span class="ident">iter</span>()
+            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">cf</span><span class="op">|</span> {
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cf_opts</span> <span class="op">=</span> <span class="ident">ColumnFamilyOptions</span>::<span class="ident">new</span>();
+                <span class="ident">cf_opts</span>.<span class="ident">set_no_range_properties</span>(<span class="bool-val">true</span>);
+                <span class="ident">cf_opts</span>.<span class="ident">set_no_table_properties</span>(<span class="bool-val">true</span>);
+                <span class="ident">CFOptions</span>::<span class="ident">new</span>(<span class="ident">cf</span>, <span class="ident">cf_opts</span>)
+            })
+            .<span class="ident">collect</span>();
+        <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span>
+            <span class="ident">get_test_db_for_regions</span>(<span class="kw-2">&amp;</span><span class="ident">kv_path</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="ident">kv_cf_opts</span>), <span class="kw-2">&amp;</span><span class="ident">regions</span>)
+                .<span class="ident">unwrap</span>();
 
         <span class="kw">let</span> <span class="ident">snapfiles_path</span> <span class="op">=</span> <span class="ident">Builder</span>::<span class="ident">new</span>()
             .<span class="ident">prefix</span>(<span class="string">&quot;test-snapshot-max-total-size-snapshots&quot;</span>)
@@ -4923,7 +4938,7 @@
         <span class="kw">let</span> <span class="ident">snap_mgr</span> <span class="op">=</span> <span class="ident">SnapManagerBuilder</span>::<span class="ident">default</span>()
             .<span class="ident">max_total_size</span>(<span class="ident">max_total_size</span>)
             .<span class="ident">build</span>::<span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span>(<span class="ident">snapfiles_path</span>.<span class="ident">path</span>().<span class="ident">to_str</span>().<span class="ident">unwrap</span>());
-        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">RocksSnapshot</span>::<span class="ident">new</span>(<span class="ident">engine</span>.<span class="ident">kv</span>.<span class="ident">as_inner</span>().<span class="ident">clone</span>());
+        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">kv</span>.<span class="ident">snapshot</span>();
 
         <span class="comment">// Add an oldest snapshot for receiving.</span>
         <span class="kw">let</span> <span class="ident">recv_key</span> <span class="op">=</span> <span class="ident">SnapKey</span>::<span class="ident">new</span>(<span class="number">100</span>, <span class="number">100</span>, <span class="number">100</span>);
@@ -4988,10 +5003,9 @@
             .<span class="ident">prefix</span>(<span class="string">&quot;test_snap_temp_file_delete_kv&quot;</span>)
             .<span class="ident">tempdir</span>()
             .<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">db</span> <span class="op">=</span> <span class="ident">open_test_db</span>(<span class="kw-2">&amp;</span><span class="ident">kv_temp_dir</span>.<span class="ident">path</span>(), <span class="prelude-val">None</span>, <span class="prelude-val">None</span>).<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span> <span class="ident">RocksEngine</span>::<span class="ident">from_db</span>(<span class="ident">db</span>);
+        <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span> <span class="ident">open_test_db</span>(<span class="kw-2">&amp;</span><span class="ident">kv_temp_dir</span>.<span class="ident">path</span>(), <span class="prelude-val">None</span>, <span class="prelude-val">None</span>).<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">sst_path</span> <span class="op">=</span> <span class="ident">src_mgr</span>.<span class="ident">get_temp_path_for_ingest</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">writer</span> <span class="op">=</span> <span class="ident">RocksSstWriterBuilder</span>::<span class="ident">new</span>()
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">writer</span> <span class="op">=</span> <span class="op">&lt;</span><span class="ident">KvTestEngine</span> <span class="kw">as</span> <span class="ident">SstExt</span><span class="op">&gt;</span>::<span class="ident">SstWriterBuilder</span>::<span class="ident">new</span>()
             .<span class="ident">set_db</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>)
             .<span class="ident">build</span>(<span class="kw-2">&amp;</span><span class="ident">sst_path</span>)
             .<span class="ident">unwrap</span>();

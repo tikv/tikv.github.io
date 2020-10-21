@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["new_engine",""],["new_engine_opt",""]],"struct":[["RaftTestEngine",""],["RaftTestSnapshot",""],["RaftTestWriteBatch",""]]});
