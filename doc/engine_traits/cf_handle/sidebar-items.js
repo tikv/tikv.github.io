@@ -1,1 +1,0 @@
-initSidebarItems({"trait":[["CFHandle",""],["CFHandleExt","Trait for engines with column family handles."]]});

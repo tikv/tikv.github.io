@@ -1,1 +1,1 @@
-initSidebarItems({"trait":[["ColumnFamilyOptions",""]]});
+initSidebarItems({"trait":[["CFOptionsExt","Trait for engines with column family options"],["ColumnFamilyOptions",""]]});
