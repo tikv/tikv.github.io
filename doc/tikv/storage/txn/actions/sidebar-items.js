@@ -1,1 +1,1 @@
-initSidebarItems({"mod":[["commit",""],["pessimistic_prewrite",""],["prewrite",""],["shared",""],["tests","This file contains tests and testing tools which affects multiple actions"]]});
+initSidebarItems({"mod":[["acquire_pessimistic_lock",""],["commit",""],["pessimistic_prewrite",""],["prewrite",""],["shared",""],["tests","This file contains tests and testing tools which affects multiple actions"]]});
