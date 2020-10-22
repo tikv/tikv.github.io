@@ -1810,18 +1810,6 @@
 <span id="1807">1807</span>
 <span id="1808">1808</span>
 <span id="1809">1809</span>
-<span id="1810">1810</span>
-<span id="1811">1811</span>
-<span id="1812">1812</span>
-<span id="1813">1813</span>
-<span id="1814">1814</span>
-<span id="1815">1815</span>
-<span id="1816">1816</span>
-<span id="1817">1817</span>
-<span id="1818">1818</span>
-<span id="1819">1819</span>
-<span id="1820">1820</span>
-<span id="1821">1821</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1848,10 +1836,11 @@
 <span class="kw">use</span> <span class="ident">encryption</span>::<span class="ident">DataKeyManager</span>;
 <span class="kw">use</span> <span class="ident">engine_rocks</span>::{<span class="ident">encryption</span>::<span class="ident">get_env</span>, <span class="ident">RocksSstReader</span>};
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{
-    <span class="ident">EncryptionKeyManager</span>, <span class="ident">IngestExternalFileOptions</span>, <span class="ident">Iterator</span>, <span class="ident">KvEngine</span>, <span class="ident">SeekKey</span>, <span class="ident">SstExt</span>,
-    <span class="ident">SstReader</span>, <span class="ident">SstWriter</span>, <span class="ident">CF_DEFAULT</span>, <span class="ident">CF_WRITE</span>,
+    <span class="ident">EncryptionKeyManager</span>, <span class="ident">IngestExternalFileOptions</span>, <span class="ident">Iterator</span>, <span class="ident">KvEngine</span>, <span class="ident">SeekKey</span>, <span class="ident">SstReader</span>,
+    <span class="ident">SstWriter</span>, <span class="ident">SstWriterBuilder</span>, <span class="ident">CF_DEFAULT</span>, <span class="ident">CF_WRITE</span>,
 };
 <span class="kw">use</span> <span class="ident">external_storage</span>::{<span class="ident">block_on_external_io</span>, <span class="ident">create_storage</span>, <span class="ident">url_of_backend</span>, <span class="ident">READ_BUF_SIZE</span>};
+<span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">file</span>::<span class="ident">sync_dir</span>;
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">time</span>::<span class="ident">Limiter</span>;
 <span class="kw">use</span> <span class="ident">txn_types</span>::{<span class="ident">is_short_value</span>, <span class="ident">Key</span>, <span class="ident">TimeStamp</span>, <span class="ident">Write</span> <span class="kw">as</span> <span class="ident">KvWrite</span>, <span class="ident">WriteRef</span>, <span class="ident">WriteType</span>};
 
@@ -2241,19 +2230,25 @@
         <span class="self">self</span>.<span class="ident">dir</span>.<span class="ident">list_ssts</span>()
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_writer</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">KvEngine</span><span class="op">&gt;</span>(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">default</span>: <span class="ident">E</span>::<span class="ident">SstWriter</span>,
-        <span class="ident">write</span>: <span class="ident">E</span>::<span class="ident">SstWriter</span>,
-        <span class="ident">meta</span>: <span class="ident">SstMeta</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">SSTWriter</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_writer</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">KvEngine</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">db</span>: <span class="kw-2">&amp;</span><span class="ident">E</span>, <span class="ident">meta</span>: <span class="ident">SstMeta</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">SSTWriter</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">default_meta</span> <span class="op">=</span> <span class="ident">meta</span>.<span class="ident">clone</span>();
         <span class="ident">default_meta</span>.<span class="ident">set_cf_name</span>(<span class="ident">CF_DEFAULT</span>.<span class="ident">to_owned</span>());
         <span class="kw">let</span> <span class="ident">default_path</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">dir</span>.<span class="ident">join</span>(<span class="kw-2">&amp;</span><span class="ident">default_meta</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">default</span> <span class="op">=</span> <span class="ident">E</span>::<span class="ident">SstWriterBuilder</span>::<span class="ident">new</span>()
+            .<span class="ident">set_db</span>(<span class="kw-2">&amp;</span><span class="ident">db</span>)
+            .<span class="ident">set_cf</span>(<span class="ident">CF_DEFAULT</span>)
+            .<span class="ident">build</span>(<span class="ident">default_path</span>.<span class="ident">temp</span>.<span class="ident">to_str</span>().<span class="ident">unwrap</span>())
+            .<span class="ident">unwrap</span>();
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">write_meta</span> <span class="op">=</span> <span class="ident">meta</span>;
         <span class="ident">write_meta</span>.<span class="ident">set_cf_name</span>(<span class="ident">CF_WRITE</span>.<span class="ident">to_owned</span>());
         <span class="kw">let</span> <span class="ident">write_path</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">dir</span>.<span class="ident">join</span>(<span class="kw-2">&amp;</span><span class="ident">write_meta</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">write</span> <span class="op">=</span> <span class="ident">E</span>::<span class="ident">SstWriterBuilder</span>::<span class="ident">new</span>()
+            .<span class="ident">set_db</span>(<span class="kw-2">&amp;</span><span class="ident">db</span>)
+            .<span class="ident">set_cf</span>(<span class="ident">CF_WRITE</span>)
+            .<span class="ident">build</span>(<span class="ident">write_path</span>.<span class="ident">temp</span>.<span class="ident">to_str</span>().<span class="ident">unwrap</span>())
+            .<span class="ident">unwrap</span>();
+
         <span class="prelude-val">Ok</span>(<span class="ident">SSTWriter</span>::<span class="ident">new</span>(
             <span class="ident">default</span>,
             <span class="ident">write</span>,
@@ -2331,13 +2326,13 @@
         <span class="kw">let</span> (<span class="ident">p1</span>, <span class="ident">p2</span>) <span class="op">=</span> (<span class="self">self</span>.<span class="ident">default_path</span>.<span class="ident">clone</span>(), <span class="self">self</span>.<span class="ident">write_path</span>.<span class="ident">clone</span>());
         <span class="kw">let</span> (<span class="ident">w1</span>, <span class="ident">w2</span>) <span class="op">=</span> (<span class="self">self</span>.<span class="ident">default</span>, <span class="self">self</span>.<span class="ident">write</span>);
         <span class="kw">if</span> <span class="ident">default_entries</span> <span class="op">&gt;</span> <span class="number">0</span> {
-            <span class="kw">let</span> (<span class="kw">_</span>, <span class="ident">sst_reader</span>) <span class="op">=</span> <span class="ident">w1</span>.<span class="ident">finish_read</span>()<span class="question-mark">?</span>;
-            <span class="self">Self</span>::<span class="ident">save</span>(<span class="ident">sst_reader</span>, <span class="ident">p1</span>)<span class="question-mark">?</span>;
+            <span class="ident">w1</span>.<span class="ident">finish</span>()<span class="question-mark">?</span>;
+            <span class="self">Self</span>::<span class="ident">save</span>(<span class="ident">p1</span>)<span class="question-mark">?</span>;
             <span class="ident">metas</span>.<span class="ident">push</span>(<span class="ident">default_meta</span>);
         }
         <span class="kw">if</span> <span class="ident">write_entries</span> <span class="op">&gt;</span> <span class="number">0</span> {
-            <span class="kw">let</span> (<span class="kw">_</span>, <span class="ident">sst_reader</span>) <span class="op">=</span> <span class="ident">w2</span>.<span class="ident">finish_read</span>()<span class="question-mark">?</span>;
-            <span class="self">Self</span>::<span class="ident">save</span>(<span class="ident">sst_reader</span>, <span class="ident">p2</span>)<span class="question-mark">?</span>;
+            <span class="ident">w2</span>.<span class="ident">finish</span>()<span class="question-mark">?</span>;
+            <span class="self">Self</span>::<span class="ident">save</span>(<span class="ident">p2</span>)<span class="question-mark">?</span>;
             <span class="ident">metas</span>.<span class="ident">push</span>(<span class="ident">write_meta</span>);
         }
         <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;finish write to sst&quot;</span>;
@@ -2347,16 +2342,12 @@
         <span class="prelude-val">Ok</span>(<span class="ident">metas</span>)
     }
 
-    <span class="kw">fn</span> <span class="ident">save</span>(
-        <span class="kw-2">mut</span> <span class="ident">sst_reader</span>: <span class="op">&lt;</span><span class="op">&lt;</span><span class="ident">E</span> <span class="kw">as</span> <span class="ident">SstExt</span><span class="op">&gt;</span>::<span class="ident">SstWriter</span> <span class="kw">as</span> <span class="ident">SstWriter</span><span class="op">&gt;</span>::<span class="ident">ExternalSstFileReader</span>,
-        <span class="ident">import_path</span>: <span class="ident">ImportPath</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">tmp_path</span> <span class="op">=</span> <span class="ident">import_path</span>.<span class="ident">temp</span>;
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tmp_f</span> <span class="op">=</span> <span class="ident">File</span>::<span class="ident">create</span>(<span class="kw-2">&amp;</span><span class="ident">tmp_path</span>)<span class="question-mark">?</span>;
-        <span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">copy</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">sst_reader</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">tmp_f</span>)<span class="question-mark">?</span>;
-        <span class="ident">tmp_f</span>.<span class="ident">metadata</span>()<span class="question-mark">?</span>.<span class="ident">permissions</span>().<span class="ident">set_readonly</span>(<span class="bool-val">true</span>);
-        <span class="ident">tmp_f</span>.<span class="ident">sync_all</span>()<span class="question-mark">?</span>;
-        <span class="ident">fs</span>::<span class="ident">rename</span>(<span class="ident">tmp_path</span>, <span class="ident">import_path</span>.<span class="ident">save</span>)<span class="question-mark">?</span>;
+    <span class="comment">// move file from temp to save.</span>
+    <span class="kw">fn</span> <span class="ident">save</span>(<span class="kw-2">mut</span> <span class="ident">import_path</span>: <span class="ident">ImportPath</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+        <span class="ident">fs</span>::<span class="ident">rename</span>(<span class="kw-2">&amp;</span><span class="ident">import_path</span>.<span class="ident">temp</span>, <span class="kw-2">&amp;</span><span class="ident">import_path</span>.<span class="ident">save</span>)<span class="question-mark">?</span>;
+        <span class="comment">// sync the directory after rename</span>
+        <span class="ident">import_path</span>.<span class="ident">save</span>.<span class="ident">pop</span>();
+        <span class="ident">sync_dir</span>(<span class="kw-2">&amp;</span><span class="ident">import_path</span>.<span class="ident">save</span>)<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
 }
@@ -3448,25 +3439,10 @@
 
         <span class="kw">let</span> <span class="ident">importer_dir</span> <span class="op">=</span> <span class="ident">tempfile</span>::<span class="ident">tempdir</span>().<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">importer</span> <span class="op">=</span> <span class="ident">SSTImporter</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">importer_dir</span>, <span class="prelude-val">None</span>).<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">name</span> <span class="op">=</span> <span class="ident">importer</span>.<span class="ident">get_path</span>(<span class="kw-2">&amp;</span><span class="ident">meta</span>);
         <span class="kw">let</span> <span class="ident">db_path</span> <span class="op">=</span> <span class="ident">importer_dir</span>.<span class="ident">path</span>().<span class="ident">join</span>(<span class="string">&quot;db&quot;</span>);
         <span class="kw">let</span> <span class="ident">db</span> <span class="op">=</span> <span class="ident">new_test_engine</span>(<span class="ident">db_path</span>.<span class="ident">to_str</span>().<span class="ident">unwrap</span>(), <span class="ident">DATA_CFS</span>);
-        <span class="kw">let</span> <span class="ident">default</span> <span class="op">=</span> <span class="op">&lt;</span><span class="ident">TestEngine</span> <span class="kw">as</span> <span class="ident">SstExt</span><span class="op">&gt;</span>::<span class="ident">SstWriterBuilder</span>::<span class="ident">new</span>()
-            .<span class="ident">set_in_memory</span>(<span class="bool-val">true</span>)
-            .<span class="ident">set_db</span>(<span class="kw-2">&amp;</span><span class="ident">db</span>)
-            .<span class="ident">set_cf</span>(<span class="ident">CF_DEFAULT</span>)
-            .<span class="ident">build</span>(<span class="kw-2">&amp;</span><span class="ident">name</span>.<span class="ident">to_str</span>().<span class="ident">unwrap</span>())
-            .<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">write</span> <span class="op">=</span> <span class="op">&lt;</span><span class="ident">TestEngine</span> <span class="kw">as</span> <span class="ident">SstExt</span><span class="op">&gt;</span>::<span class="ident">SstWriterBuilder</span>::<span class="ident">new</span>()
-            .<span class="ident">set_in_memory</span>(<span class="bool-val">true</span>)
-            .<span class="ident">set_db</span>(<span class="kw-2">&amp;</span><span class="ident">db</span>)
-            .<span class="ident">set_cf</span>(<span class="ident">CF_WRITE</span>)
-            .<span class="ident">build</span>(<span class="kw-2">&amp;</span><span class="ident">name</span>.<span class="ident">to_str</span>().<span class="ident">unwrap</span>())
-            .<span class="ident">unwrap</span>();
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">w</span> <span class="op">=</span> <span class="ident">importer</span>
-            .<span class="ident">new_writer</span>::<span class="op">&lt;</span><span class="ident">TestEngine</span><span class="op">&gt;</span>(<span class="ident">default</span>, <span class="ident">write</span>, <span class="ident">meta</span>)
-            .<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">w</span> <span class="op">=</span> <span class="ident">importer</span>.<span class="ident">new_writer</span>::<span class="op">&lt;</span><span class="ident">TestEngine</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">db</span>, <span class="ident">meta</span>).<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">batch</span> <span class="op">=</span> <span class="ident">WriteBatch</span>::<span class="ident">default</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">pairs</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[];
 
