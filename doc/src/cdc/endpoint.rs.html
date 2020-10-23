@@ -1627,6 +1627,12 @@
 <span id="1624">1624</span>
 <span id="1625">1625</span>
 <span id="1626">1626</span>
+<span id="1627">1627</span>
+<span id="1628">1628</span>
+<span id="1629">1629</span>
+<span id="1630">1630</span>
+<span id="1631">1631</span>
+<span id="1632">1632</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1656,6 +1662,7 @@
 <span class="kw">use</span> <span class="ident">tikv</span>::<span class="ident">storage</span>::<span class="ident">mvcc</span>::{<span class="ident">DeltaScanner</span>, <span class="ident">ScannerBuilder</span>};
 <span class="kw">use</span> <span class="ident">tikv</span>::<span class="ident">storage</span>::<span class="ident">txn</span>::<span class="ident">TxnEntry</span>;
 <span class="kw">use</span> <span class="ident">tikv</span>::<span class="ident">storage</span>::<span class="ident">txn</span>::<span class="ident">TxnEntryScanner</span>;
+<span class="kw">use</span> <span class="ident">tikv</span>::<span class="ident">storage</span>::<span class="ident">Statistics</span>;
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">collections</span>::<span class="ident">HashMap</span>;
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">lru</span>::<span class="ident">LruCache</span>;
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">time</span>::<span class="ident">Instant</span>;
@@ -1728,7 +1735,7 @@
 
 <span class="kw">type</span> <span class="ident">InitCallback</span> <span class="op">=</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">FnOnce</span>() <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span>;
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">type</span> <span class="ident">OldValueCallback</span> <span class="op">=</span>
-    <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">FnMut</span>(<span class="ident">Key</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">OldValueCache</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span>;
+    <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">FnMut</span>(<span class="ident">Key</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">OldValueCache</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Statistics</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span>;
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">OldValueCache</span> {
     <span class="kw">pub</span> <span class="ident">cache</span>: <span class="ident">LruCache</span><span class="op">&lt;</span><span class="ident">Key</span>, (<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">OldValue</span><span class="op">&gt;</span>, <span class="ident">MutationType</span>)<span class="op">&gt;</span>,
@@ -1946,6 +1953,7 @@
 
     <span class="kw">fn</span> <span class="ident">on_deregister</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">deregister</span>: <span class="ident">Deregister</span>) {
         <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;cdc deregister&quot;</span>; <span class="string">&quot;deregister&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">deregister</span>);
+        <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;cdc_before_handle_deregister&quot;</span>, <span class="op">|</span><span class="kw">_</span><span class="op">|</span> {});
         <span class="kw">match</span> <span class="ident">deregister</span> {
             <span class="ident">Deregister</span>::<span class="ident">Downstream</span> {
                 <span class="ident">region_id</span>,
@@ -2188,6 +2196,7 @@
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">on_multi_batch</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">multi</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">CmdBatch</span><span class="op">&gt;</span>, <span class="ident">old_value_cb</span>: <span class="ident">OldValueCallback</span>) {
+        <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;cdc_before_handle_multi_batch&quot;</span>, <span class="op">|</span><span class="kw">_</span><span class="op">|</span> {});
         <span class="kw">let</span> <span class="ident">old_value_cb</span> <span class="op">=</span> <span class="ident">Rc</span>::<span class="ident">new</span>(<span class="ident">RefCell</span>::<span class="ident">new</span>(<span class="ident">old_value_cb</span>));
         <span class="kw">for</span> <span class="ident">batch</span> <span class="kw">in</span> <span class="ident">multi</span> {
             <span class="kw">let</span> <span class="ident">region_id</span> <span class="op">=</span> <span class="ident">batch</span>.<span class="ident">region_id</span>;
@@ -2354,16 +2363,18 @@
                     <span class="ident">min_ts</span> <span class="op">=</span> <span class="ident">min_mem_lock_ts</span>;
                 }
             }
-
             <span class="comment">// TODO: send a message to raftstore would consume too much cpu time,</span>
             <span class="comment">// try to handle it outside raftstore.</span>
-            <span class="kw">let</span> <span class="ident">regions</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">regions</span>.<span class="ident">iter</span>().<span class="ident">copied</span>().<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">region_id</span>, <span class="ident">observe_id</span>)<span class="op">|</span> {
-                <span class="kw">let</span> <span class="ident">scheduler_clone</span> <span class="op">=</span> <span class="ident">scheduler</span>.<span class="ident">clone</span>();
-                <span class="kw">let</span> <span class="ident">raft_router_clone</span> <span class="op">=</span> <span class="ident">raft_router</span>.<span class="ident">clone</span>();
-                <span class="ident">async</span> <span class="kw">move</span> {
-                    <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">futures</span>::<span class="ident">channel</span>::<span class="ident">oneshot</span>::<span class="ident">channel</span>();
-                    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">raft_router_clone</span>.<span class="ident">significant_send</span>(
-                        <span class="ident">region_id</span>,
+            <span class="kw">let</span> <span class="ident">regions</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">regions</span>
+                .<span class="ident">iter</span>()
+                .<span class="ident">copied</span>()
+                .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">region_id</span>, <span class="ident">observe_id</span>)<span class="op">|</span> {
+                    <span class="kw">let</span> <span class="ident">scheduler_clone</span> <span class="op">=</span> <span class="ident">scheduler</span>.<span class="ident">clone</span>();
+                    <span class="kw">let</span> <span class="ident">raft_router_clone</span> <span class="op">=</span> <span class="ident">raft_router</span>.<span class="ident">clone</span>();
+                    <span class="ident">async</span> <span class="kw">move</span> {
+                        <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">tokio</span>::<span class="ident">sync</span>::<span class="ident">oneshot</span>::<span class="ident">channel</span>();
+                        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">raft_router_clone</span>.<span class="ident">significant_send</span>(
+                            <span class="ident">region_id</span>,
                         <span class="ident">SignificantMsg</span>::<span class="ident">LeaderCallback</span>(<span class="ident">Callback</span>::<span class="ident">Read</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">resp</span><span class="op">|</span> {
                             <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">resp</span>.<span class="ident">response</span>.<span class="ident">get_header</span>().<span class="ident">has_error</span>() {
                                 <span class="prelude-val">None</span>
@@ -2371,7 +2382,7 @@
                                 <span class="prelude-val">Some</span>(<span class="ident">region_id</span>)
                             };
                             <span class="kw">if</span> <span class="ident">tx</span>.<span class="ident">send</span>(<span class="ident">resp</span>).<span class="ident">is_err</span>() {
-                                <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;cdc send tso response failed&quot;</span>);
+                                <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;cdc send tso response failed&quot;</span>; <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>);
                             }
                         }))),
                     ) {
@@ -2383,12 +2394,19 @@
                         };
                         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">scheduler_clone</span>.<span class="ident">schedule</span>(<span class="ident">Task</span>::<span class="ident">Deregister</span>(<span class="ident">deregister</span>)) {
                             <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;schedule cdc task failed&quot;</span>; <span class="string">&quot;error&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
-                            <span class="kw">return</span> <span class="prelude-val">None</span>;
                         }
+                        <span class="kw">return</span> <span class="prelude-val">None</span>;
                     }
-                    <span class="ident">rx</span>.<span class="ident">await</span>.<span class="ident">unwrap_or</span>(<span class="prelude-val">None</span>)
-                }
-            }).<span class="ident">collect</span>();
+                        <span class="ident">rx</span>.<span class="ident">await</span>.<span class="ident">unwrap_or</span>(<span class="prelude-val">None</span>)
+                    }
+                })
+                .<span class="ident">collect</span>();
+            <span class="kw">match</span> <span class="ident">scheduler</span>.<span class="ident">schedule</span>(<span class="ident">Task</span>::<span class="ident">RegisterMinTsEvent</span>) {
+                <span class="prelude-val">Ok</span>(<span class="kw">_</span>) <span class="op">|</span> <span class="prelude-val">Err</span>(<span class="ident">ScheduleError</span>::<span class="ident">Stopped</span>(<span class="kw">_</span>)) <span class="op">=</span><span class="op">&gt;</span> (),
+                <span class="comment">// Must schedule `RegisterMinTsEvent` event otherwise resolved ts can not</span>
+                <span class="comment">// advance normally.</span>
+                <span class="prelude-val">Err</span>(<span class="ident">err</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;failed to regiester min ts event, error: {:?}&quot;</span>, <span class="ident">err</span>),
+            }
             <span class="kw">let</span> <span class="ident">resps</span> <span class="op">=</span> <span class="ident">futures</span>::<span class="ident">future</span>::<span class="ident">join_all</span>(<span class="ident">regions</span>).<span class="ident">await</span>;
             <span class="kw">let</span> <span class="ident">regions</span> <span class="op">=</span> <span class="ident">resps</span>
                 .<span class="ident">into_iter</span>()
@@ -2401,12 +2419,6 @@
                     <span class="comment">// advance normally.</span>
                     <span class="prelude-val">Err</span>(<span class="ident">err</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;failed to schedule min ts event, error: {:?}&quot;</span>, <span class="ident">err</span>),
                 }
-            }
-            <span class="kw">match</span> <span class="ident">scheduler</span>.<span class="ident">schedule</span>(<span class="ident">Task</span>::<span class="ident">RegisterMinTsEvent</span>) {
-                <span class="prelude-val">Ok</span>(<span class="kw">_</span>) <span class="op">|</span> <span class="prelude-val">Err</span>(<span class="ident">ScheduleError</span>::<span class="ident">Stopped</span>(<span class="kw">_</span>)) <span class="op">=</span><span class="op">&gt;</span> (),
-                <span class="comment">// Must schedule `RegisterMinTsEvent` event otherwise resolved ts can not</span>
-                <span class="comment">// advance normally.</span>
-                <span class="prelude-val">Err</span>(<span class="ident">err</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;failed to regiester min ts event, error: {:?}&quot;</span>, <span class="ident">err</span>),
             }
         };
         <span class="self">self</span>.<span class="ident">tso_worker</span>.<span class="ident">spawn</span>(<span class="ident">fut</span>);
