@@ -503,6 +503,25 @@
 <span id="500">500</span>
 <span id="501">501</span>
 <span id="502">502</span>
+<span id="503">503</span>
+<span id="504">504</span>
+<span id="505">505</span>
+<span id="506">506</span>
+<span id="507">507</span>
+<span id="508">508</span>
+<span id="509">509</span>
+<span id="510">510</span>
+<span id="511">511</span>
+<span id="512">512</span>
+<span id="513">513</span>
+<span id="514">514</span>
+<span id="515">515</span>
+<span id="516">516</span>
+<span id="517">517</span>
+<span id="518">518</span>
+<span id="519">519</span>
+<span id="520">520</span>
+<span id="521">521</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -578,6 +597,9 @@
         <span class="doccomment">/// It&#39;s used to notify the caller to move on early because it&#39;s very likely the request</span>
         <span class="doccomment">/// will be applied to the raftstore.</span>
         <span class="ident">proposed_cb</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ExtCallback</span><span class="op">&gt;</span>,
+        <span class="doccomment">/// `committed_cb` is called after a request is committed and before it&#39;s being applied, and</span>
+        <span class="doccomment">/// it&#39;s guaranteed that the request will be successfully applied soon.</span>
+        <span class="ident">committed_cb</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ExtCallback</span><span class="op">&gt;</span>,
     },
 }
 
@@ -586,11 +608,19 @@
     <span class="ident">S</span>: <span class="ident">Snapshot</span>,
 {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">write</span>(<span class="ident">cb</span>: <span class="ident">WriteCallback</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="self">Self</span>::<span class="ident">write_ext</span>(<span class="ident">cb</span>, <span class="prelude-val">None</span>)
+        <span class="self">Self</span>::<span class="ident">write_ext</span>(<span class="ident">cb</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>)
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">write_ext</span>(<span class="ident">cb</span>: <span class="ident">WriteCallback</span>, <span class="ident">proposed_cb</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ExtCallback</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="ident">Callback</span>::<span class="ident">Write</span> { <span class="ident">cb</span>, <span class="ident">proposed_cb</span> }
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">write_ext</span>(
+        <span class="ident">cb</span>: <span class="ident">WriteCallback</span>,
+        <span class="ident">proposed_cb</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ExtCallback</span><span class="op">&gt;</span>,
+        <span class="ident">committed_cb</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ExtCallback</span><span class="op">&gt;</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+        <span class="ident">Callback</span>::<span class="ident">Write</span> {
+            <span class="ident">cb</span>,
+            <span class="ident">proposed_cb</span>,
+            <span class="ident">committed_cb</span>,
+        }
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">invoke_with_response</span>(<span class="self">self</span>, <span class="ident">resp</span>: <span class="ident">RaftCmdResponse</span>) {
@@ -614,6 +644,14 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">invoke_proposed</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
         <span class="kw">if</span> <span class="kw">let</span> <span class="ident">Callback</span>::<span class="ident">Write</span> { <span class="ident">proposed_cb</span>, .. } <span class="op">=</span> <span class="self">self</span> {
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">cb</span>) <span class="op">=</span> <span class="ident">proposed_cb</span>.<span class="ident">take</span>() {
+                <span class="ident">cb</span>()
+            }
+        }
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">invoke_committed</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
+        <span class="kw">if</span> <span class="kw">let</span> <span class="ident">Callback</span>::<span class="ident">Write</span> { <span class="ident">committed_cb</span>, .. } <span class="op">=</span> <span class="self">self</span> {
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">cb</span>) <span class="op">=</span> <span class="ident">committed_cb</span>.<span class="ident">take</span>() {
                 <span class="ident">cb</span>()
             }
         }

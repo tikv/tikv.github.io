@@ -4065,6 +4065,28 @@
 <span id="4062">4062</span>
 <span id="4063">4063</span>
 <span id="4064">4064</span>
+<span id="4065">4065</span>
+<span id="4066">4066</span>
+<span id="4067">4067</span>
+<span id="4068">4068</span>
+<span id="4069">4069</span>
+<span id="4070">4070</span>
+<span id="4071">4071</span>
+<span id="4072">4072</span>
+<span id="4073">4073</span>
+<span id="4074">4074</span>
+<span id="4075">4075</span>
+<span id="4076">4076</span>
+<span id="4077">4077</span>
+<span id="4078">4078</span>
+<span id="4079">4079</span>
+<span id="4080">4080</span>
+<span id="4081">4081</span>
+<span id="4082">4082</span>
+<span id="4083">4083</span>
+<span id="4084">4084</span>
+<span id="4085">4085</span>
+<span id="4086">4086</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -4443,6 +4465,25 @@
                     }
                 }))
             };
+            <span class="kw">let</span> <span class="ident">committed_cbs</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">cbs</span>
+                .<span class="ident">iter_mut</span>()
+                .<span class="ident">filter_map</span>(<span class="op">|</span><span class="ident">cb</span><span class="op">|</span> {
+                    <span class="kw">if</span> <span class="kw">let</span> <span class="ident">Callback</span>::<span class="ident">Write</span> { <span class="ident">committed_cb</span>, .. } <span class="op">=</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">cb</span>.<span class="number">0</span> {
+                        <span class="ident">committed_cb</span>.<span class="ident">take</span>()
+                    } <span class="kw">else</span> {
+                        <span class="prelude-val">None</span>
+                    }
+                })
+                .<span class="ident">collect</span>();
+            <span class="kw">let</span> <span class="ident">committed_cb</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ExtCallback</span><span class="op">&gt;</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">committed_cbs</span>.<span class="ident">is_empty</span>() {
+                <span class="prelude-val">None</span>
+            } <span class="kw">else</span> {
+                <span class="prelude-val">Some</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
+                    <span class="kw">for</span> <span class="ident">committed_cb</span> <span class="kw">in</span> <span class="ident">committed_cbs</span> {
+                        <span class="ident">committed_cb</span>();
+                    }
+                }))
+            };
             <span class="kw">let</span> <span class="ident">cb</span> <span class="op">=</span> <span class="ident">Callback</span>::<span class="ident">write_ext</span>(
                 <span class="ident">Box</span>::<span class="ident">new</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">resp</span><span class="op">|</span> {
                     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">last_index</span> <span class="op">=</span> <span class="number">0</span>;
@@ -4461,6 +4502,7 @@
                     }
                 }),
                 <span class="ident">proposed_cb</span>,
+                <span class="ident">committed_cb</span>,
             );
             <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">RaftCommand</span>::<span class="ident">new</span>(<span class="ident">req</span>, <span class="ident">cb</span>));
         }
@@ -8113,6 +8155,8 @@
                     <span class="ident">flag</span>.<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering</span>::<span class="ident">Release</span>);
                 }),
                 <span class="ident">proposed_cb</span>,
+                <span class="comment">// TODO(MyonKeminta): Fill test for committed cb</span>
+                <span class="prelude-val">None</span>,
             );
             <span class="ident">response</span>.<span class="ident">mut_responses</span>().<span class="ident">push</span>(<span class="ident">Response</span>::<span class="ident">default</span>());
             <span class="kw">let</span> <span class="ident">cmd</span> <span class="op">=</span> <span class="ident">RaftCommand</span>::<span class="ident">new</span>(<span class="ident">req</span>.<span class="ident">clone</span>(), <span class="ident">cb</span>);

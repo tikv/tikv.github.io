@@ -3806,6 +3806,17 @@
 <span id="3803">3803</span>
 <span id="3804">3804</span>
 <span id="3805">3805</span>
+<span id="3806">3806</span>
+<span id="3807">3807</span>
+<span id="3808">3808</span>
+<span id="3809">3809</span>
+<span id="3810">3810</span>
+<span id="3811">3811</span>
+<span id="3812">3812</span>
+<span id="3813">3813</span>
+<span id="3814">3814</span>
+<span id="3815">3815</span>
+<span id="3816">3816</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -5537,7 +5548,14 @@
                 }
                 <span class="kw">let</span> <span class="ident">committed_index</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">raft</span>.<span class="ident">raft_log</span>.<span class="ident">committed</span>;
                 <span class="kw">let</span> <span class="ident">term</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">raft</span>.<span class="ident">raft_log</span>.<span class="ident">term</span>(<span class="ident">committed_index</span>).<span class="ident">unwrap</span>();
-                <span class="kw">let</span> <span class="ident">cbs</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">proposals</span>.<span class="ident">take</span>(<span class="ident">committed_index</span>, <span class="ident">term</span>);
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cbs</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">proposals</span>.<span class="ident">take</span>(<span class="ident">committed_index</span>, <span class="ident">term</span>);
+                <span class="ident">cbs</span>.<span class="ident">iter_mut</span>().<span class="ident">for_each</span>(<span class="op">|</span><span class="ident">p</span><span class="op">|</span> {
+                    <span class="kw">if</span> <span class="ident">p</span>.<span class="ident">must_pass_epoch_check</span> {
+                        <span class="comment">// In this case the apply can be guaranteed to be successful. Invoke the</span>
+                        <span class="comment">// on_committed callback if necessary.</span>
+                        <span class="ident">p</span>.<span class="ident">cb</span>.<span class="ident">invoke_committed</span>();
+                    }
+                });
                 <span class="kw">let</span> <span class="ident">apply</span> <span class="op">=</span> <span class="ident">Apply</span>::<span class="ident">new</span>(
                     <span class="self">self</span>.<span class="ident">peer_id</span>(),
                     <span class="self">self</span>.<span class="ident">region_id</span>,
@@ -5876,7 +5894,8 @@
                 <span class="bool-val">false</span>
             }
             <span class="prelude-val">Ok</span>(<span class="ident">Either</span>::<span class="ident">Left</span>(<span class="ident">idx</span>)) <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">if</span> <span class="self">self</span>.<span class="ident">has_applied_to_current_term</span>() {
+                <span class="kw">let</span> <span class="ident">has_applied_to_current_term</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">has_applied_to_current_term</span>();
+                <span class="kw">if</span> <span class="ident">has_applied_to_current_term</span> {
                     <span class="comment">// After this peer has applied to current term and passed above checking including `cmd_epoch_checker`,</span>
                     <span class="comment">// we can safely guarantee that this proposal will be committed if there is no abnormal leader transfer</span>
                     <span class="comment">// in the near future. Thus proposed callback can be called.</span>
@@ -5895,6 +5914,7 @@
                     <span class="ident">term</span>: <span class="self">self</span>.<span class="ident">term</span>(),
                     <span class="ident">cb</span>,
                     <span class="ident">renew_lease_time</span>: <span class="prelude-val">None</span>,
+                    <span class="ident">must_pass_epoch_check</span>: <span class="ident">has_applied_to_current_term</span>,
                 };
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">cmd_type</span>) <span class="op">=</span> <span class="ident">req_admin_cmd_type</span> {
                     <span class="self">self</span>.<span class="ident">cmd_epoch_checker</span>
@@ -6307,6 +6327,7 @@
                     <span class="ident">term</span>: <span class="self">self</span>.<span class="ident">term</span>(),
                     <span class="ident">cb</span>: <span class="ident">Callback</span>::<span class="prelude-val">None</span>,
                     <span class="ident">renew_lease_time</span>: <span class="prelude-val">Some</span>(<span class="ident">renew_lease_time</span>),
+                    <span class="ident">must_pass_epoch_check</span>: <span class="bool-val">false</span>,
                 };
                 <span class="self">self</span>.<span class="ident">post_propose</span>(<span class="ident">poll_ctx</span>, <span class="ident">p</span>);
             }
@@ -7517,6 +7538,7 @@
                 <span class="ident">term</span>: (<span class="ident">index</span> <span class="op">/</span> <span class="number">10</span>) <span class="op">+</span> <span class="number">1</span>,
                 <span class="ident">cb</span>: <span class="ident">Callback</span>::<span class="prelude-val">None</span>,
                 <span class="ident">renew_lease_time</span>,
+                <span class="ident">must_pass_epoch_check</span>: <span class="bool-val">false</span>,
             });
         }
         <span class="kw">for</span> <span class="ident">remove_i</span> <span class="kw">in</span> <span class="kw-2">&amp;</span>[<span class="number">0</span>, <span class="number">65</span>, <span class="number">98</span>] {

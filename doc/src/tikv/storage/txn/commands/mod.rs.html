@@ -591,6 +591,25 @@
 <span id="588">588</span>
 <span id="589">589</span>
 <span id="590">590</span>
+<span id="591">591</span>
+<span id="592">592</span>
+<span id="593">593</span>
+<span id="594">594</span>
+<span id="595">595</span>
+<span id="596">596</span>
+<span id="597">597</span>
+<span id="598">598</span>
+<span id="599">599</span>
+<span id="600">600</span>
+<span id="601">601</span>
+<span id="602">602</span>
+<span id="603">603</span>
+<span id="604">604</span>
+<span id="605">605</span>
+<span id="606">606</span>
+<span id="607">607</span>
+<span id="608">608</span>
+<span id="609">609</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -929,6 +948,23 @@
     <span class="ident">pessimistic</span>: <span class="ident">bool</span>,
 }
 
+<span class="doccomment">/// Represents for a scheduler command, when should the response sent to the client.</span>
+<span class="doccomment">/// For most cases, the response should be sent after the result being successfully applied to</span>
+<span class="doccomment">/// the storage (if needed). But in some special cases, some optimizations allows the response to be</span>
+<span class="doccomment">/// returned at an earlier phase.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Note that this doesn&#39;t affect latch releasing. The latch and the memory lock (if any) are always</span>
+<span class="doccomment">/// released after applying, regardless of when the response is sent.</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>)]</span>
+<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">ResponsePolicy</span> {
+    <span class="doccomment">/// Return the response to the client when the command has finished applying.</span>
+    <span class="ident">OnApplied</span>,
+    <span class="doccomment">/// Return the response after finishing Raft committing.</span>
+    <span class="ident">OnCommitted</span>,
+    <span class="doccomment">/// Return the response after finishing raft porposing.</span>
+    <span class="ident">OnProposed</span>,
+}
+
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">WriteResult</span> {
     <span class="kw">pub</span> <span class="ident">ctx</span>: <span class="ident">Context</span>,
     <span class="kw">pub</span> <span class="ident">to_be_write</span>: <span class="ident">WriteData</span>,
@@ -937,6 +973,7 @@
     <span class="comment">// (lock, is_first_lock, wait_timeout)</span>
     <span class="kw">pub</span> <span class="ident">lock_info</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">lock_manager</span>::<span class="ident">Lock</span>, <span class="ident">bool</span>, <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">WaitTimeout</span><span class="op">&gt;</span>)<span class="op">&gt;</span>,
     <span class="kw">pub</span> <span class="ident">lock_guards</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">KeyHandleGuard</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">response_policy</span>: <span class="ident">ResponsePolicy</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">ReleasedLocks</span> {
@@ -1029,6 +1066,7 @@
     <span class="kw">pub</span> <span class="ident">extra_op</span>: <span class="ident">ExtraOp</span>,
     <span class="kw">pub</span> <span class="ident">statistics</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw-2">mut</span> <span class="ident">Statistics</span>,
     <span class="kw">pub</span> <span class="ident">pipelined_pessimistic_lock</span>: <span class="ident">bool</span>,
+    <span class="kw">pub</span> <span class="ident">async_apply_prewrite</span>: <span class="ident">bool</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">Command</span> {
