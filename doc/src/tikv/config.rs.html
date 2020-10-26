@@ -3405,18 +3405,6 @@
 <span id="3402">3402</span>
 <span id="3403">3403</span>
 <span id="3404">3404</span>
-<span id="3405">3405</span>
-<span id="3406">3406</span>
-<span id="3407">3407</span>
-<span id="3408">3408</span>
-<span id="3409">3409</span>
-<span id="3410">3410</span>
-<span id="3411">3411</span>
-<span id="3412">3412</span>
-<span id="3413">3413</span>
-<span id="3414">3414</span>
-<span id="3415">3415</span>
-<span id="3416">3416</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2017 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -5120,6 +5108,26 @@
                 }
             }
 
+            <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">use_unified_pool</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+                <span class="comment">// The unified pool is used by default unless the corresponding module has</span>
+                <span class="comment">// customized configurations.</span>
+                <span class="self">self</span>.<span class="ident">use_unified_pool</span>
+                    .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span><span class="op">=</span> <span class="ident">Default</span>::<span class="ident">default</span>())
+            }
+
+            <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">adjust_use_unified_pool</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
+                <span class="kw">if</span> <span class="self">self</span>.<span class="ident">use_unified_pool</span>.<span class="ident">is_none</span>() {
+                    <span class="comment">// The unified pool is used by default unless the corresponding module has customized configurations.</span>
+                    <span class="kw">if</span> <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span><span class="op">=</span> <span class="ident">Default</span>::<span class="ident">default</span>() {
+                        <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;readpool.{}.use-unified-pool is not set, set to true by default&quot;</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">display_name</span>);
+                        <span class="self">self</span>.<span class="ident">use_unified_pool</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="bool-val">true</span>);
+                    } <span class="kw">else</span> {
+                        <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;readpool.{}.use-unified-pool is not set, set to false because there are other customized configurations&quot;</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">display_name</span>);
+                        <span class="self">self</span>.<span class="ident">use_unified_pool</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="bool-val">false</span>);
+                    }
+                }
+            }
+
             <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">validate</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">Error</span><span class="op">&gt;</span><span class="op">&gt;</span> {
                 <span class="kw">if</span> <span class="self">self</span>.<span class="ident">use_unified_pool</span>() {
                     <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
@@ -5269,21 +5277,6 @@
     }
 }
 
-<span class="kw">impl</span> <span class="ident">StorageReadPoolConfig</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">use_unified_pool</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="comment">// The storage module does not use the unified pool by default.</span>
-        <span class="self">self</span>.<span class="ident">use_unified_pool</span>.<span class="ident">unwrap_or</span>(<span class="bool-val">false</span>)
-    }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">adjust_use_unified_pool</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">use_unified_pool</span>.<span class="ident">is_none</span>() {
-            <span class="comment">// The storage module does not use the unified pool by default.</span>
-            <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;readpool.storage.use-unified-pool is not set, set to false by default&quot;</span>);
-            <span class="self">self</span>.<span class="ident">use_unified_pool</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="bool-val">false</span>);
-        }
-    }
-}
-
 <span class="kw">const</span> <span class="ident">DEFAULT_COPROCESSOR_READPOOL_MIN_CONCURRENCY</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">2</span>;
 
 <span class="macro">readpool_config</span><span class="macro">!</span>(
@@ -5306,27 +5299,6 @@
             <span class="ident">max_tasks_per_worker_normal</span>: <span class="ident">DEFAULT_READPOOL_MAX_TASKS_PER_WORKER</span>,
             <span class="ident">max_tasks_per_worker_low</span>: <span class="ident">DEFAULT_READPOOL_MAX_TASKS_PER_WORKER</span>,
             <span class="ident">stack_size</span>: <span class="ident">ReadableSize</span>::<span class="ident">mb</span>(<span class="ident">DEFAULT_READPOOL_STACK_SIZE_MB</span>),
-        }
-    }
-}
-
-<span class="kw">impl</span> <span class="ident">CoprReadPoolConfig</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">use_unified_pool</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="comment">// The coprocessor module uses the unified pool unless it has customized configurations.</span>
-        <span class="self">self</span>.<span class="ident">use_unified_pool</span>
-            .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span><span class="op">=</span> <span class="ident">Default</span>::<span class="ident">default</span>())
-    }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">adjust_use_unified_pool</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">use_unified_pool</span>.<span class="ident">is_none</span>() {
-            <span class="comment">// The coprocessor module uses the unified pool unless it has customized configurations.</span>
-            <span class="kw">if</span> <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span><span class="op">=</span> <span class="ident">Default</span>::<span class="ident">default</span>() {
-                <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;readpool.coprocessor.use-unified-pool is not set, set to true by default&quot;</span>);
-                <span class="self">self</span>.<span class="ident">use_unified_pool</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="bool-val">true</span>);
-            } <span class="kw">else</span> {
-                <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;readpool.coprocessor.use-unified-pool is not set, set to false because there are other customized configurations&quot;</span>);
-                <span class="self">self</span>.<span class="ident">use_unified_pool</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="bool-val">false</span>);
-            }
         }
     }
 }
@@ -5442,7 +5414,10 @@
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_is_unified</span>() {
-        <span class="kw">let</span> <span class="ident">storage</span> <span class="op">=</span> <span class="ident">StorageReadPoolConfig</span>::<span class="ident">default</span>();
+        <span class="kw">let</span> <span class="ident">storage</span> <span class="op">=</span> <span class="ident">StorageReadPoolConfig</span> {
+            <span class="ident">use_unified_pool</span>: <span class="prelude-val">Some</span>(<span class="bool-val">false</span>),
+            ..<span class="ident">Default</span>::<span class="ident">default</span>()
+        };
         <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">storage</span>.<span class="ident">use_unified_pool</span>());
         <span class="kw">let</span> <span class="ident">coprocessor</span> <span class="op">=</span> <span class="ident">CoprReadPoolConfig</span>::<span class="ident">default</span>();
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">coprocessor</span>.<span class="ident">use_unified_pool</span>());
@@ -5454,6 +5429,7 @@
         };
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">cfg</span>.<span class="ident">is_unified_pool_enabled</span>());
 
+        <span class="ident">cfg</span>.<span class="ident">storage</span>.<span class="ident">use_unified_pool</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="bool-val">false</span>);
         <span class="ident">cfg</span>.<span class="ident">coprocessor</span>.<span class="ident">use_unified_pool</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="bool-val">false</span>);
         <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">cfg</span>.<span class="ident">is_unified_pool_enabled</span>());
     }
@@ -6747,12 +6723,12 @@
         &quot;#</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cfg</span>: <span class="ident">TiKvConfig</span> <span class="op">=</span> <span class="ident">toml</span>::<span class="ident">from_str</span>(<span class="ident">content</span>).<span class="ident">unwrap</span>();
         <span class="ident">cfg</span>.<span class="ident">compatible_adjust</span>();
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">cfg</span>.<span class="ident">readpool</span>.<span class="ident">storage</span>.<span class="ident">use_unified_pool</span>, <span class="prelude-val">Some</span>(<span class="bool-val">false</span>));
+        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">cfg</span>.<span class="ident">readpool</span>.<span class="ident">storage</span>.<span class="ident">use_unified_pool</span>, <span class="prelude-val">Some</span>(<span class="bool-val">true</span>));
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">cfg</span>.<span class="ident">readpool</span>.<span class="ident">coprocessor</span>.<span class="ident">use_unified_pool</span>, <span class="prelude-val">Some</span>(<span class="bool-val">true</span>));
 
         <span class="kw">let</span> <span class="ident">content</span> <span class="op">=</span> <span class="string">r#&quot;
         [readpool.storage]
-        stack-size = &quot;10MB&quot;
+        stack-size = &quot;1MB&quot;
         [readpool.coprocessor]
         normal-concurrency = 1
         &quot;#</span>;
