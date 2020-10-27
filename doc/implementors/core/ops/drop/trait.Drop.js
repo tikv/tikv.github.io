@@ -1,6 +1,6 @@
 (function() {var implementors = {};
 implementors["anyhow"] = [{"text":"impl Drop for Error","synthetic":false,"types":[]}];
-implementors["arc_swap"] = [{"text":"impl&lt;'a, T:&nbsp;RefCnt&gt; Drop for Guard&lt;'a, T&gt;","synthetic":false,"types":[]},{"text":"impl&lt;T:&nbsp;RefCnt, S:&nbsp;LockStorage&gt; Drop for ArcSwapAny&lt;T, S&gt;","synthetic":false,"types":[]}];
+implementors["arc_swap"] = [{"text":"impl&lt;'a, T:&nbsp;RefCnt, S:&nbsp;LockStorage&gt; Drop for Guard&lt;'a, T, S&gt;","synthetic":false,"types":[]},{"text":"impl&lt;T:&nbsp;RefCnt&gt; Drop for Lease&lt;T&gt;","synthetic":false,"types":[]},{"text":"impl&lt;T:&nbsp;RefCnt, S:&nbsp;LockStorage&gt; Drop for ArcSwapAny&lt;T, S&gt;","synthetic":false,"types":[]}];
 implementors["arrayvec"] = [{"text":"impl&lt;A:&nbsp;Array&gt; Drop for ArrayVec&lt;A&gt;","synthetic":false,"types":[]},{"text":"impl&lt;A:&nbsp;Array&gt; Drop for IntoIter&lt;A&gt;","synthetic":false,"types":[]},{"text":"impl&lt;'a, A:&nbsp;Array&gt; Drop for Drain&lt;'a, A&gt; <span class=\"where fmt-newline\">where<br>&nbsp;&nbsp;&nbsp;&nbsp;A::Item: 'a,&nbsp;</span>","synthetic":false,"types":[]}];
 implementors["backtrace"] = [{"text":"impl&lt;'_, '_, '_&gt; Drop for BacktraceFrameFmt&lt;'_, '_, '_&gt;","synthetic":false,"types":[]}];
 implementors["base64"] = [{"text":"impl&lt;'a, W:&nbsp;Write&gt; Drop for EncoderWriter&lt;'a, W&gt;","synthetic":false,"types":[]}];

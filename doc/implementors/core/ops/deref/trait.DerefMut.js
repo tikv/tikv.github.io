@@ -40,5 +40,6 @@ implementors["tikv_util"] = [{"text":"impl DerefMut for DefaultRng","synthetic":
 implementors["tokio"] = [{"text":"impl&lt;T:&nbsp;?Sized, '_&gt; DerefMut for MutexGuard&lt;'_, T&gt;","synthetic":false,"types":[]},{"text":"impl&lt;T:&nbsp;?Sized&gt; DerefMut for OwnedMutexGuard&lt;T&gt;","synthetic":false,"types":[]},{"text":"impl&lt;T:&nbsp;?Sized, '_&gt; DerefMut for RwLockWriteGuard&lt;'_, T&gt;","synthetic":false,"types":[]}];
 implementors["try_lock"] = [{"text":"impl&lt;'a, T&gt; DerefMut for Locked&lt;'a, T&gt;","synthetic":false,"types":[]}];
 implementors["unchecked_index"] = [{"text":"impl&lt;T&gt; DerefMut for UncheckedIndex&lt;T&gt;","synthetic":false,"types":[]}];
+implementors["unicase"] = [{"text":"impl&lt;S&gt; DerefMut for Ascii&lt;S&gt;","synthetic":false,"types":[]},{"text":"impl&lt;S&gt; DerefMut for UniCase&lt;S&gt;","synthetic":false,"types":[]}];
 implementors["zeroize"] = [{"text":"impl&lt;Z&gt; DerefMut for Zeroizing&lt;Z&gt; <span class=\"where fmt-newline\">where<br>&nbsp;&nbsp;&nbsp;&nbsp;Z: Zeroize,&nbsp;</span>","synthetic":false,"types":[]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

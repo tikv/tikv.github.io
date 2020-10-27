@@ -455,6 +455,11 @@
 <span id="452">452</span>
 <span id="453">453</span>
 <span id="454">454</span>
+<span id="455">455</span>
+<span id="456">456</span>
+<span id="457">457</span>
+<span id="458">458</span>
+<span id="459">459</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -642,13 +647,18 @@
         <span class="kw">let</span> <span class="ident">timer</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now_coarse</span>();
         <span class="kw">let</span> <span class="ident">importer</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">importer</span>);
         <span class="kw">let</span> <span class="ident">limiter</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">limiter</span>.<span class="ident">clone</span>();
-        <span class="kw">let</span> <span class="ident">sst_writer</span> <span class="op">=</span> <span class="op">&lt;</span><span class="ident">E</span> <span class="kw">as</span> <span class="ident">SstExt</span><span class="op">&gt;</span>::<span class="ident">SstWriterBuilder</span>::<span class="ident">new</span>()
-            .<span class="ident">set_db</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">engine</span>)
-            .<span class="ident">set_cf</span>(<span class="ident">name_to_cf</span>(<span class="ident">req</span>.<span class="ident">get_sst</span>().<span class="ident">get_cf_name</span>()).<span class="ident">unwrap</span>())
-            .<span class="ident">build</span>(<span class="self">self</span>.<span class="ident">importer</span>.<span class="ident">get_path</span>(<span class="ident">req</span>.<span class="ident">get_sst</span>()).<span class="ident">to_str</span>().<span class="ident">unwrap</span>())
-            .<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">engine</span>.<span class="ident">clone</span>();
 
         <span class="kw">let</span> <span class="ident">handle_task</span> <span class="op">=</span> <span class="ident">async</span> <span class="kw">move</span> {
+            <span class="comment">// SST writer must not be opened in gRPC threads, because it may be</span>
+            <span class="comment">// blocked for a long time due to IO, especially, when encryption at rest</span>
+            <span class="comment">// is enabled, and it leads to gRPC keepalive timeout.</span>
+            <span class="kw">let</span> <span class="ident">sst_writer</span> <span class="op">=</span> <span class="op">&lt;</span><span class="ident">E</span> <span class="kw">as</span> <span class="ident">SstExt</span><span class="op">&gt;</span>::<span class="ident">SstWriterBuilder</span>::<span class="ident">new</span>()
+                .<span class="ident">set_db</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>)
+                .<span class="ident">set_cf</span>(<span class="ident">name_to_cf</span>(<span class="ident">req</span>.<span class="ident">get_sst</span>().<span class="ident">get_cf_name</span>()).<span class="ident">unwrap</span>())
+                .<span class="ident">build</span>(<span class="ident">importer</span>.<span class="ident">get_path</span>(<span class="ident">req</span>.<span class="ident">get_sst</span>()).<span class="ident">to_str</span>().<span class="ident">unwrap</span>())
+                .<span class="ident">unwrap</span>();
+
             <span class="comment">// FIXME: download() should be an async fn, to allow BR to cancel</span>
             <span class="comment">// a download task.</span>
             <span class="comment">// Unfortunately, this currently can&#39;t happen because the S3Storage</span>

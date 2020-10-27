@@ -14,6 +14,7 @@ implementors["openssl"] = [{"text":"impl&lt;S:&nbsp;Read + Write&gt; Read for Ss
 implementors["protobuf"] = [{"text":"impl&lt;'a&gt; Read for CodedInputStream&lt;'a&gt;","synthetic":false,"types":[]}];
 implementors["raftstore"] = [{"text":"impl Read for Snap","synthetic":false,"types":[]}];
 implementors["rand_core"] = [{"text":"impl Read for dyn RngCore","synthetic":false,"types":[]}];
+implementors["reqwest"] = [{"text":"impl Read for Response","synthetic":false,"types":[]}];
 implementors["rocksdb"] = [{"text":"impl Read for SequentialFile","synthetic":false,"types":[]}];
 implementors["tame_gcs"] = [{"text":"impl Read for DownloadObjectResponse","synthetic":false,"types":[]},{"text":"impl&lt;B&gt; Read for Multipart&lt;B&gt; <span class=\"where fmt-newline\">where<br>&nbsp;&nbsp;&nbsp;&nbsp;B: Read,&nbsp;</span>","synthetic":false,"types":[]}];
 implementors["tempfile"] = [{"text":"impl Read for NamedTempFile","synthetic":false,"types":[]},{"text":"impl&lt;'a&gt; Read for &amp;'a NamedTempFile","synthetic":false,"types":[]},{"text":"impl Read for SpooledTempFile","synthetic":false,"types":[]}];
