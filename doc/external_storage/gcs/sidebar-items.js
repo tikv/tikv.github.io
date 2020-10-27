@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["HARDCODED_ENDPOINTS",""]],"enum":[["RequestError",""]],"fn":[["copy_predefined_acl",""],["parse_predefined_acl",""],["parse_storage_class",""]],"struct":[["GCSStorage",""]],"trait":[["ResultExt",""]]});
+initSidebarItems({"constant":[["HARDCODED_ENDPOINTS",""]],"enum":[["RequestError",""]],"fn":[["parse_predefined_acl",""],["parse_storage_class",""]],"struct":[["GCSStorage",""]],"trait":[["ResultExt",""]]});
