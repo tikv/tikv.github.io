@@ -3405,6 +3405,14 @@
 <span id="3402">3402</span>
 <span id="3403">3403</span>
 <span id="3404">3404</span>
+<span id="3405">3405</span>
+<span id="3406">3406</span>
+<span id="3407">3407</span>
+<span id="3408">3408</span>
+<span id="3409">3409</span>
+<span id="3410">3410</span>
+<span id="3411">3411</span>
+<span id="3412">3412</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2017 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -4364,10 +4372,10 @@
             <span class="ident">info_log_keep_log_file_num</span>: <span class="number">10</span>,
             <span class="ident">info_log_dir</span>: <span class="string">&quot;&quot;</span>.<span class="ident">to_owned</span>(),
             <span class="ident">info_log_level</span>: <span class="ident">LogLevel</span>::<span class="ident">Info</span>,
-            <span class="ident">rate_bytes_per_sec</span>: <span class="ident">ReadableSize</span>::<span class="ident">kb</span>(<span class="number">0</span>),
+            <span class="ident">rate_bytes_per_sec</span>: <span class="ident">ReadableSize</span>::<span class="ident">gb</span>(<span class="number">10</span>),
             <span class="ident">rate_limiter_refill_period</span>: <span class="ident">ReadableDuration</span>::<span class="ident">millis</span>(<span class="number">100</span>),
             <span class="ident">rate_limiter_mode</span>: <span class="ident">DBRateLimiterMode</span>::<span class="ident">WriteOnly</span>,
-            <span class="ident">auto_tuned</span>: <span class="bool-val">false</span>,
+            <span class="ident">auto_tuned</span>: <span class="bool-val">true</span>,
             <span class="ident">bytes_per_sync</span>: <span class="ident">ReadableSize</span>::<span class="ident">mb</span>(<span class="number">1</span>),
             <span class="ident">wal_bytes_per_sync</span>: <span class="ident">ReadableSize</span>::<span class="ident">kb</span>(<span class="number">512</span>),
             <span class="ident">max_sub_compactions</span>,
@@ -4407,12 +4415,21 @@
         <span class="ident">opts</span>.<span class="ident">set_log_file_time_to_roll</span>(<span class="self">self</span>.<span class="ident">info_log_roll_time</span>.<span class="ident">as_secs</span>());
         <span class="ident">opts</span>.<span class="ident">set_keep_log_file_num</span>(<span class="self">self</span>.<span class="ident">info_log_keep_log_file_num</span>);
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">rate_bytes_per_sec</span>.<span class="number">0</span> <span class="op">&gt;</span> <span class="number">0</span> {
-            <span class="ident">opts</span>.<span class="ident">set_ratelimiter_with_auto_tuned</span>(
-                <span class="self">self</span>.<span class="ident">rate_bytes_per_sec</span>.<span class="number">0</span> <span class="kw">as</span> <span class="ident">i64</span>,
-                (<span class="self">self</span>.<span class="ident">rate_limiter_refill_period</span>.<span class="ident">as_millis</span>() <span class="op">*</span> <span class="number">1000</span>) <span class="kw">as</span> <span class="ident">i64</span>,
-                <span class="self">self</span>.<span class="ident">rate_limiter_mode</span>,
-                <span class="self">self</span>.<span class="ident">auto_tuned</span>,
-            );
+            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">auto_tuned</span> {
+                <span class="ident">opts</span>.<span class="ident">set_writeampbasedratelimiter_with_auto_tuned</span>(
+                    <span class="self">self</span>.<span class="ident">rate_bytes_per_sec</span>.<span class="number">0</span> <span class="kw">as</span> <span class="ident">i64</span>,
+                    (<span class="self">self</span>.<span class="ident">rate_limiter_refill_period</span>.<span class="ident">as_millis</span>() <span class="op">*</span> <span class="number">1000</span>) <span class="kw">as</span> <span class="ident">i64</span>,
+                    <span class="self">self</span>.<span class="ident">rate_limiter_mode</span>,
+                    <span class="self">self</span>.<span class="ident">auto_tuned</span>,
+                );
+            } <span class="kw">else</span> {
+                <span class="ident">opts</span>.<span class="ident">set_ratelimiter_with_auto_tuned</span>(
+                    <span class="self">self</span>.<span class="ident">rate_bytes_per_sec</span>.<span class="number">0</span> <span class="kw">as</span> <span class="ident">i64</span>,
+                    (<span class="self">self</span>.<span class="ident">rate_limiter_refill_period</span>.<span class="ident">as_millis</span>() <span class="op">*</span> <span class="number">1000</span>) <span class="kw">as</span> <span class="ident">i64</span>,
+                    <span class="self">self</span>.<span class="ident">rate_limiter_mode</span>,
+                    <span class="self">self</span>.<span class="ident">auto_tuned</span>,
+                );
+            }
         }
 
         <span class="ident">opts</span>.<span class="ident">set_bytes_per_sync</span>(<span class="self">self</span>.<span class="ident">bytes_per_sync</span>.<span class="number">0</span> <span class="kw">as</span> <span class="ident">u64</span>);
@@ -6595,13 +6612,13 @@
         <span class="ident">cfg</span>.<span class="ident">rocksdb</span>.<span class="ident">defaultcf</span>.<span class="ident">target_file_size_base</span> <span class="op">=</span> <span class="ident">ReadableSize</span>::<span class="ident">mb</span>(<span class="number">64</span>);
         <span class="ident">cfg</span>.<span class="ident">rocksdb</span>.<span class="ident">defaultcf</span>.<span class="ident">block_cache_size</span> <span class="op">=</span> <span class="ident">ReadableSize</span>::<span class="ident">mb</span>(<span class="number">8</span>);
         <span class="ident">cfg</span>.<span class="ident">rocksdb</span>.<span class="ident">rate_bytes_per_sec</span> <span class="op">=</span> <span class="ident">ReadableSize</span>::<span class="ident">mb</span>(<span class="number">64</span>);
+        <span class="ident">cfg</span>.<span class="ident">rocksdb</span>.<span class="ident">auto_tuned</span> <span class="op">=</span> <span class="bool-val">false</span>;
         <span class="ident">cfg</span>.<span class="ident">storage</span>.<span class="ident">block_cache</span>.<span class="ident">shared</span> <span class="op">=</span> <span class="bool-val">false</span>;
         <span class="ident">cfg</span>.<span class="ident">validate</span>().<span class="ident">unwrap</span>();
         <span class="kw">let</span> (<span class="ident">db</span>, <span class="ident">cfg_controller</span>) <span class="op">=</span> <span class="ident">new_engines</span>(<span class="ident">cfg</span>);
 
         <span class="comment">// update max_background_jobs</span>
-        <span class="kw">let</span> <span class="ident">db_opts</span> <span class="op">=</span> <span class="ident">db</span>.<span class="ident">get_db_options</span>();
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">db_opts</span>.<span class="ident">get_max_background_jobs</span>(), <span class="number">2</span>);
+        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">db</span>.<span class="ident">get_db_options</span>().<span class="ident">get_max_background_jobs</span>(), <span class="number">2</span>);
 
         <span class="ident">cfg_controller</span>
             .<span class="ident">update_config</span>(<span class="string">&quot;rocksdb.max-background-jobs&quot;</span>, <span class="string">&quot;8&quot;</span>)
@@ -6609,9 +6626,8 @@
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">db</span>.<span class="ident">get_db_options</span>().<span class="ident">get_max_background_jobs</span>(), <span class="number">8</span>);
 
         <span class="comment">// update rate_bytes_per_sec</span>
-        <span class="kw">let</span> <span class="ident">db_opts</span> <span class="op">=</span> <span class="ident">db</span>.<span class="ident">get_db_options</span>();
         <span class="macro">assert_eq</span><span class="macro">!</span>(
-            <span class="ident">db_opts</span>.<span class="ident">get_rate_bytes_per_sec</span>().<span class="ident">unwrap</span>(),
+            <span class="ident">db</span>.<span class="ident">get_db_options</span>().<span class="ident">get_rate_bytes_per_sec</span>().<span class="ident">unwrap</span>(),
             <span class="ident">ReadableSize</span>::<span class="ident">mb</span>(<span class="number">64</span>).<span class="number">0</span> <span class="kw">as</span> <span class="ident">i64</span>
         );
 
