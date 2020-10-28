@@ -4087,6 +4087,19 @@
 <span id="4084">4084</span>
 <span id="4085">4085</span>
 <span id="4086">4086</span>
+<span id="4087">4087</span>
+<span id="4088">4088</span>
+<span id="4089">4089</span>
+<span id="4090">4090</span>
+<span id="4091">4091</span>
+<span id="4092">4092</span>
+<span id="4093">4093</span>
+<span id="4094">4094</span>
+<span id="4095">4095</span>
+<span id="4096">4096</span>
+<span id="4097">4097</span>
+<span id="4098">4098</span>
+<span id="4099">4099</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -8136,6 +8149,7 @@
         <span class="ident">req</span>.<span class="ident">mut_requests</span>().<span class="ident">push</span>(<span class="ident">q</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cbs_flags</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[];
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">proposed_cbs_flags</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[];
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">committed_cbs_flags</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[];
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">response</span> <span class="op">=</span> <span class="ident">RaftCmdResponse</span>::<span class="ident">default</span>();
         <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="number">10</span> {
             <span class="kw">let</span> <span class="ident">flag</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">AtomicBool</span>::<span class="ident">new</span>(<span class="bool-val">false</span>));
@@ -8150,13 +8164,21 @@
             } <span class="kw">else</span> {
                 <span class="prelude-val">None</span>
             };
+            <span class="kw">let</span> <span class="ident">committed_cb</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ExtCallback</span><span class="op">&gt;</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">i</span> <span class="op">%</span> <span class="number">3</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
+                <span class="kw">let</span> <span class="ident">committed_flag</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">AtomicBool</span>::<span class="ident">new</span>(<span class="bool-val">false</span>));
+                <span class="ident">committed_cbs_flags</span>.<span class="ident">push</span>(<span class="ident">committed_flag</span>.<span class="ident">clone</span>());
+                <span class="prelude-val">Some</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
+                    <span class="ident">committed_flag</span>.<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering</span>::<span class="ident">Release</span>);
+                }))
+            } <span class="kw">else</span> {
+                <span class="prelude-val">None</span>
+            };
             <span class="kw">let</span> <span class="ident">cb</span> <span class="op">=</span> <span class="ident">Callback</span>::<span class="ident">write_ext</span>(
                 <span class="ident">Box</span>::<span class="ident">new</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">_resp</span><span class="op">|</span> {
                     <span class="ident">flag</span>.<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering</span>::<span class="ident">Release</span>);
                 }),
                 <span class="ident">proposed_cb</span>,
-                <span class="comment">// TODO(MyonKeminta): Fill test for committed cb</span>
-                <span class="prelude-val">None</span>,
+                <span class="ident">committed_cb</span>,
             );
             <span class="ident">response</span>.<span class="ident">mut_responses</span>().<span class="ident">push</span>(<span class="ident">Response</span>::<span class="ident">default</span>());
             <span class="kw">let</span> <span class="ident">cmd</span> <span class="op">=</span> <span class="ident">RaftCommand</span>::<span class="ident">new</span>(<span class="ident">req</span>.<span class="ident">clone</span>(), <span class="ident">cb</span>);
@@ -8165,6 +8187,10 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cmd</span> <span class="op">=</span> <span class="ident">builder</span>.<span class="ident">build</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">metric</span>).<span class="ident">unwrap</span>();
         <span class="ident">cmd</span>.<span class="ident">callback</span>.<span class="ident">invoke_proposed</span>();
         <span class="kw">for</span> <span class="ident">flag</span> <span class="kw">in</span> <span class="ident">proposed_cbs_flags</span> {
+            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">flag</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">Acquire</span>));
+        }
+        <span class="ident">cmd</span>.<span class="ident">callback</span>.<span class="ident">invoke_committed</span>();
+        <span class="kw">for</span> <span class="ident">flag</span> <span class="kw">in</span> <span class="ident">committed_cbs_flags</span> {
             <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">flag</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">Acquire</span>));
         }
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="number">10</span>, <span class="ident">cmd</span>.<span class="ident">request</span>.<span class="ident">get_requests</span>().<span class="ident">len</span>());
