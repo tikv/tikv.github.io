@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["CollatorBinary","Collator for binary collation without padding."]]});

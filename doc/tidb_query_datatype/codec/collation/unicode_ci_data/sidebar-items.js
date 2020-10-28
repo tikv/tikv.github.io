@@ -1,1 +1,0 @@
-initSidebarItems({"fn":[["map_long_rune",""]],"static":[["LONG_RUNE",""],["UNICODE_CI_TABLE",""]]});

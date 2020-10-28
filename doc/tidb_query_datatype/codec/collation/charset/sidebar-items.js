@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["CharsetBinary",""],["CharsetUtf8mb4",""]]});

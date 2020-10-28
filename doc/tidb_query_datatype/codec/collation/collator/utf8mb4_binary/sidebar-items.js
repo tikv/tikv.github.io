@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["CollatorUtf8Mb4Bin","Collator for utf8mb4_bin collation with padding behavior (trims right spaces)."],["CollatorUtf8Mb4BinNoPadding","Collator for utf8mb4_bin collation without padding."]]});
