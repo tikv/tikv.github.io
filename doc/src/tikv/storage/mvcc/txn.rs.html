@@ -2140,6 +2140,24 @@
 <span id="2137">2137</span>
 <span id="2138">2138</span>
 <span id="2139">2139</span>
+<span id="2140">2140</span>
+<span id="2141">2141</span>
+<span id="2142">2142</span>
+<span id="2143">2143</span>
+<span id="2144">2144</span>
+<span id="2145">2145</span>
+<span id="2146">2146</span>
+<span id="2147">2147</span>
+<span id="2148">2148</span>
+<span id="2149">2149</span>
+<span id="2150">2150</span>
+<span id="2151">2151</span>
+<span id="2152">2152</span>
+<span id="2153">2153</span>
+<span id="2154">2154</span>
+<span id="2155">2155</span>
+<span id="2156">2156</span>
+<span id="2157">2157</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -2251,6 +2269,10 @@
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">start_ts</span>: <span class="ident">TimeStamp</span>,
     <span class="ident">write_size</span>: <span class="ident">usize</span>,
     <span class="ident">writes</span>: <span class="ident">WriteData</span>,
+    <span class="comment">// When 1PC is enabled, locks will be collected here instead of marshalled and put into `writes`,</span>
+    <span class="comment">// so it can be further processed. The elements are tuples representing</span>
+    <span class="comment">// (key, lock, remove_pessimistic_lock)</span>
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">locks_for_1pc</span>: <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">Key</span>, <span class="ident">Lock</span>, <span class="ident">bool</span>)<span class="op">&gt;</span>,
     <span class="comment">// collapse continuous rollbacks.</span>
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">collapse_rollback</span>: <span class="ident">bool</span>,
     <span class="kw">pub</span> <span class="ident">extra_op</span>: <span class="ident">ExtraOp</span>,
@@ -2314,6 +2336,7 @@
             <span class="ident">start_ts</span>,
             <span class="ident">write_size</span>: <span class="number">0</span>,
             <span class="ident">writes</span>: <span class="ident">WriteData</span>::<span class="ident">default</span>(),
+            <span class="ident">locks_for_1pc</span>: <span class="ident">Vec</span>::<span class="ident">new</span>(),
             <span class="ident">collapse_rollback</span>: <span class="bool-val">true</span>,
             <span class="ident">extra_op</span>: <span class="ident">ExtraOp</span>::<span class="ident">Noop</span>,
             <span class="ident">concurrency_manager</span>,
@@ -2330,6 +2353,7 @@
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">into_modifies</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Modify</span><span class="op">&gt;</span> {
+        <span class="macro">assert</span><span class="macro">!</span>(<span class="self">self</span>.<span class="ident">locks_for_1pc</span>.<span class="ident">is_empty</span>());
         <span class="self">self</span>.<span class="ident">writes</span>.<span class="ident">modifies</span>
     }
 
@@ -2355,6 +2379,10 @@
         <span class="kw">let</span> <span class="ident">write</span> <span class="op">=</span> <span class="ident">Modify</span>::<span class="ident">Put</span>(<span class="ident">CF_LOCK</span>, <span class="ident">key</span>, <span class="ident">lock</span>.<span class="ident">to_bytes</span>());
         <span class="self">self</span>.<span class="ident">write_size</span> <span class="op">+</span><span class="op">=</span> <span class="ident">write</span>.<span class="ident">size</span>();
         <span class="self">self</span>.<span class="ident">writes</span>.<span class="ident">modifies</span>.<span class="ident">push</span>(<span class="ident">write</span>);
+    }
+
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">put_locks_for_1pc</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">key</span>: <span class="ident">Key</span>, <span class="ident">lock</span>: <span class="ident">Lock</span>, <span class="ident">remove_pessimstic_lock</span>: <span class="ident">bool</span>) {
+        <span class="self">self</span>.<span class="ident">locks_for_1pc</span>.<span class="ident">push</span>((<span class="ident">key</span>, <span class="ident">lock</span>, <span class="ident">remove_pessimstic_lock</span>));
     }
 
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">unlock_key</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">key</span>: <span class="ident">Key</span>, <span class="ident">pessimistic</span>: <span class="ident">bool</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ReleasedLock</span><span class="op">&gt;</span> {
@@ -3454,6 +3482,7 @@
             <span class="number">0</span>,
             <span class="ident">TimeStamp</span>::<span class="ident">default</span>(),
             <span class="ident">TimeStamp</span>::<span class="ident">default</span>(),
+            <span class="bool-val">false</span>,
         )
         .<span class="ident">unwrap</span>();
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">txn</span>.<span class="ident">write_size</span>() <span class="op">&gt;</span> <span class="number">0</span>);
@@ -3500,6 +3529,7 @@
             <span class="number">0</span>,
             <span class="ident">TimeStamp</span>::<span class="ident">default</span>(),
             <span class="ident">TimeStamp</span>::<span class="ident">default</span>(),
+            <span class="bool-val">false</span>
         )
         .<span class="ident">is_err</span>());
 
@@ -3516,6 +3546,7 @@
             <span class="number">0</span>,
             <span class="ident">TimeStamp</span>::<span class="ident">default</span>(),
             <span class="ident">TimeStamp</span>::<span class="ident">default</span>(),
+            <span class="bool-val">false</span>
         )
         .<span class="ident">is_ok</span>());
     }
@@ -3999,6 +4030,7 @@
                     <span class="ident">TimeStamp</span>::<span class="ident">zero</span>(),
                     <span class="ident">TimeStamp</span>::<span class="ident">zero</span>(),
                     <span class="bool-val">false</span>,
+                    <span class="bool-val">false</span>,
                 )
                 .<span class="ident">unwrap</span>();
             } <span class="kw">else</span> {
@@ -4012,6 +4044,7 @@
                     <span class="number">0</span>,
                     <span class="ident">TimeStamp</span>::<span class="ident">default</span>(),
                     <span class="ident">TimeStamp</span>::<span class="ident">default</span>(),
+                    <span class="bool-val">false</span>,
                 )
                 .<span class="ident">unwrap</span>();
             }
@@ -4057,6 +4090,7 @@
                 <span class="number">4</span>,
                 <span class="ident">TimeStamp</span>::<span class="ident">zero</span>(),
                 <span class="ident">TimeStamp</span>::<span class="ident">zero</span>(),
+                <span class="bool-val">false</span>,
             )
             .<span class="ident">unwrap</span>();
             <span class="kw">let</span> <span class="ident">modifies</span> <span class="op">=</span> <span class="ident">txn</span>.<span class="ident">into_modifies</span>();
@@ -4111,6 +4145,7 @@
                 <span class="ident">TimeStamp</span>::<span class="ident">zero</span>(),
                 <span class="ident">TimeStamp</span>::<span class="ident">zero</span>(),
                 <span class="bool-val">false</span>,
+                <span class="bool-val">false</span>,
             )
             .<span class="ident">unwrap</span>();
             <span class="kw">let</span> <span class="ident">modifies</span> <span class="op">=</span> <span class="ident">txn</span>.<span class="ident">into_modifies</span>();
@@ -4164,6 +4199,7 @@
             <span class="number">4</span>,
             <span class="ident">TimeStamp</span>::<span class="ident">zero</span>(),
             <span class="ident">TimeStamp</span>::<span class="ident">zero</span>(),
+            <span class="bool-val">false</span>,
             <span class="bool-val">false</span>,
         )
         .<span class="ident">unwrap</span>();

@@ -534,6 +534,16 @@
 <span id="531">531</span>
 <span id="532">532</span>
 <span id="533">533</span>
+<span id="534">534</span>
+<span id="535">535</span>
+<span id="536">536</span>
+<span id="537">537</span>
+<span id="538">538</span>
+<span id="539">539</span>
+<span id="540">540</span>
+<span id="541">541</span>
+<span id="542">542</span>
+<span id="543">543</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -546,6 +556,7 @@
     <span class="ident">has_data_in_range</span>, <span class="ident">Error</span> <span class="kw">as</span> <span class="ident">MvccError</span>, <span class="ident">ErrorInner</span> <span class="kw">as</span> <span class="ident">MvccErrorInner</span>, <span class="ident">MvccTxn</span>,
 };
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">txn</span>::<span class="ident">actions</span>::<span class="ident">prewrite</span>::<span class="ident">prewrite</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">txn</span>::<span class="ident">actions</span>::<span class="ident">shared</span>::<span class="ident">handle_1pc</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">txn</span>::<span class="ident">commands</span>::{<span class="ident">ResponsePolicy</span>, <span class="ident">WriteCommand</span>, <span class="ident">WriteContext</span>, <span class="ident">WriteResult</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">txn</span>::{<span class="ident">Error</span>, <span class="ident">ErrorInner</span>, <span class="prelude-ty">Result</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::{
@@ -576,10 +587,15 @@
             <span class="doccomment">/// How many keys this transaction involved.</span>
             <span class="ident">txn_size</span>: <span class="ident">u64</span>,
             <span class="ident">min_commit_ts</span>: <span class="ident">TimeStamp</span>,
+            <span class="doccomment">/// Limits the maximum value of commit ts of async commit and 1PC, which can be used to</span>
+            <span class="doccomment">/// avoid inconsistency with schema change.</span>
             <span class="ident">max_commit_ts</span>: <span class="ident">TimeStamp</span>,
             <span class="doccomment">/// All secondary keys in the whole transaction (i.e., as sent to all nodes, not only</span>
             <span class="doccomment">/// this node). Only present if using async commit.</span>
             <span class="ident">secondary_keys</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+            <span class="doccomment">/// When the transaction involves only one region, it&#39;s possible to commit the</span>
+            <span class="doccomment">/// transaction directly with 1PC protocol.</span>
+            <span class="ident">try_one_pc</span>: <span class="ident">bool</span>,
         }
 }
 
@@ -625,6 +641,29 @@
             <span class="ident">TimeStamp</span>::<span class="ident">default</span>(),
             <span class="ident">TimeStamp</span>::<span class="ident">default</span>(),
             <span class="prelude-val">None</span>,
+            <span class="bool-val">false</span>,
+            <span class="ident">Context</span>::<span class="ident">default</span>(),
+        )
+    }
+
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">with_1pc</span>(
+        <span class="ident">mutations</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Mutation</span><span class="op">&gt;</span>,
+        <span class="ident">primary</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
+        <span class="ident">start_ts</span>: <span class="ident">TimeStamp</span>,
+        <span class="ident">max_commit_ts</span>: <span class="ident">TimeStamp</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">TypedCommand</span><span class="op">&lt;</span><span class="ident">PrewriteResult</span><span class="op">&gt;</span> {
+        <span class="ident">Prewrite</span>::<span class="ident">new</span>(
+            <span class="ident">mutations</span>,
+            <span class="ident">primary</span>,
+            <span class="ident">start_ts</span>,
+            <span class="number">0</span>,
+            <span class="bool-val">false</span>,
+            <span class="number">0</span>,
+            <span class="ident">TimeStamp</span>::<span class="ident">default</span>(),
+            <span class="ident">max_commit_ts</span>,
+            <span class="prelude-val">None</span>,
+            <span class="bool-val">true</span>,
             <span class="ident">Context</span>::<span class="ident">default</span>(),
         )
     }
@@ -646,6 +685,7 @@
             <span class="ident">TimeStamp</span>::<span class="ident">default</span>(),
             <span class="ident">TimeStamp</span>::<span class="ident">default</span>(),
             <span class="prelude-val">None</span>,
+            <span class="bool-val">false</span>,
             <span class="ident">Context</span>::<span class="ident">default</span>(),
         )
     }
@@ -666,6 +706,7 @@
             <span class="ident">TimeStamp</span>::<span class="ident">default</span>(),
             <span class="ident">TimeStamp</span>::<span class="ident">default</span>(),
             <span class="prelude-val">None</span>,
+            <span class="bool-val">false</span>,
             <span class="ident">ctx</span>,
         )
     }
@@ -699,7 +740,7 @@
         <span class="comment">// Async commit requires the max timestamp in the concurrency manager to be up-to-date.</span>
         <span class="comment">// If it is possibly stale due to leader transfer or region merge, return an error.</span>
         <span class="comment">// TODO: Fallback to non-async commit if not synced instead of returning an error.</span>
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">secondary_keys</span>.<span class="ident">is_some</span>() <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="ident">snapshot</span>.<span class="ident">is_max_ts_synced</span>() {
+        <span class="kw">if</span> (<span class="self">self</span>.<span class="ident">secondary_keys</span>.<span class="ident">is_some</span>() <span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">try_one_pc</span>) <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="ident">snapshot</span>.<span class="ident">is_max_ts_synced</span>() {
             <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">ErrorInner</span>::<span class="ident">MaxTimestampNotSynced</span> {
                 <span class="ident">region_id</span>: <span class="self">self</span>.<span class="ident">get_ctx</span>().<span class="ident">get_region_id</span>(),
                 <span class="ident">start_ts</span>: <span class="self">self</span>.<span class="ident">start_ts</span>,
@@ -724,7 +765,7 @@
             .<span class="ident">map</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">Key</span>::<span class="ident">from_raw</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">primary</span>));
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">locks</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[];
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">async_commit_ts</span> <span class="op">=</span> <span class="ident">TimeStamp</span>::<span class="ident">zero</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">final_min_commit_ts</span> <span class="op">=</span> <span class="ident">TimeStamp</span>::<span class="ident">zero</span>();
         <span class="kw">for</span> <span class="ident">m</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">mutations</span> {
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">secondaries</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">secondary_keys</span>.<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="macro">vec</span><span class="macro">!</span>[]);
 
@@ -741,10 +782,11 @@
                 <span class="self">self</span>.<span class="ident">txn_size</span>,
                 <span class="self">self</span>.<span class="ident">min_commit_ts</span>,
                 <span class="self">self</span>.<span class="ident">max_commit_ts</span>,
+                <span class="self">self</span>.<span class="ident">try_one_pc</span>,
             ) {
                 <span class="prelude-val">Ok</span>(<span class="ident">ts</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="kw">if</span> <span class="ident">secondaries</span>.<span class="ident">is_some</span>() <span class="op">&amp;&amp;</span> <span class="ident">async_commit_ts</span> <span class="op">&lt;</span> <span class="ident">ts</span> {
-                        <span class="ident">async_commit_ts</span> <span class="op">=</span> <span class="ident">ts</span>;
+                    <span class="kw">if</span> (<span class="ident">secondaries</span>.<span class="ident">is_some</span>() <span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">try_one_pc</span>) <span class="op">&amp;&amp;</span> <span class="ident">final_min_commit_ts</span> <span class="op">&lt;</span> <span class="ident">ts</span> {
+                        <span class="ident">final_min_commit_ts</span> <span class="op">=</span> <span class="ident">ts</span>;
                     }
                 }
                 <span class="ident">e</span> @ <span class="prelude-val">Err</span>(<span class="ident">MvccError</span>(<span class="kw">box</span> <span class="ident">MvccErrorInner</span>::<span class="ident">KeyIsLocked</span> { .. })) <span class="op">=</span><span class="op">&gt;</span> {
@@ -757,13 +799,33 @@
                 <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">from</span>(<span class="ident">e</span>)),
             }
         }
-
         <span class="ident">context</span>.<span class="ident">statistics</span>.<span class="ident">add</span>(<span class="kw-2">&amp;</span><span class="ident">txn</span>.<span class="ident">take_statistics</span>());
+
+        <span class="kw">let</span> <span class="ident">async_commit_ts</span> <span class="op">=</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">secondary_keys</span>.<span class="ident">is_some</span>() {
+            <span class="ident">final_min_commit_ts</span>
+        } <span class="kw">else</span> {
+            <span class="ident">TimeStamp</span>::<span class="ident">zero</span>()
+        };
+
         <span class="kw">let</span> (<span class="ident">pr</span>, <span class="ident">to_be_write</span>, <span class="ident">rows</span>, <span class="ident">ctx</span>, <span class="ident">lock_info</span>, <span class="ident">lock_guards</span>) <span class="op">=</span> <span class="kw">if</span> <span class="ident">locks</span>.<span class="ident">is_empty</span>() {
+            <span class="kw">let</span> <span class="ident">one_pc_commit_ts</span> <span class="op">=</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">try_one_pc</span> {
+                <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">txn</span>.<span class="ident">locks_for_1pc</span>.<span class="ident">len</span>(), <span class="ident">rows</span>);
+                <span class="macro">assert_ne</span><span class="macro">!</span>(<span class="ident">final_min_commit_ts</span>, <span class="ident">TimeStamp</span>::<span class="ident">zero</span>());
+                <span class="comment">// All keys can be successfully locked and `try_one_pc` is set. Try to directly</span>
+                <span class="comment">// commit them.</span>
+                <span class="kw">let</span> <span class="ident">released_locks</span> <span class="op">=</span> <span class="ident">handle_1pc</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">txn</span>, <span class="ident">final_min_commit_ts</span>);
+                <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">released_locks</span>.<span class="ident">is_empty</span>());
+                <span class="ident">final_min_commit_ts</span>
+            } <span class="kw">else</span> {
+                <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">txn</span>.<span class="ident">locks_for_1pc</span>.<span class="ident">is_empty</span>());
+                <span class="ident">TimeStamp</span>::<span class="ident">zero</span>()
+            };
+
             <span class="kw">let</span> <span class="ident">pr</span> <span class="op">=</span> <span class="ident">ProcessResult</span>::<span class="ident">PrewriteResult</span> {
                 <span class="ident">result</span>: <span class="ident">PrewriteResult</span> {
                     <span class="ident">locks</span>: <span class="macro">vec</span><span class="macro">!</span>[],
                     <span class="ident">min_commit_ts</span>: <span class="ident">async_commit_ts</span>,
+                    <span class="ident">one_pc_commit_ts</span>,
                 },
             };
             <span class="kw">let</span> <span class="ident">txn_extra</span> <span class="op">=</span> <span class="ident">txn</span>.<span class="ident">take_extra</span>();
@@ -779,6 +841,7 @@
                 <span class="ident">result</span>: <span class="ident">PrewriteResult</span> {
                     <span class="ident">locks</span>,
                     <span class="ident">min_commit_ts</span>: <span class="ident">async_commit_ts</span>,
+                    <span class="ident">one_pc_commit_ts</span>: <span class="ident">TimeStamp</span>::<span class="ident">zero</span>(),
                 },
             };
             (<span class="ident">pr</span>, <span class="ident">WriteData</span>::<span class="ident">default</span>(), <span class="number">0</span>, <span class="self">self</span>.<span class="ident">ctx</span>, <span class="prelude-val">None</span>, <span class="macro">vec</span><span class="macro">!</span>[])
@@ -802,23 +865,16 @@
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
 <span class="kw">mod</span> <span class="ident">tests</span> {
-    <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">kvrpcpb</span>::{<span class="ident">Context</span>, <span class="ident">ExtraOp</span>};
+    <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">kvrpcpb</span>::<span class="ident">Context</span>;
 
-    <span class="kw">use</span> <span class="ident">concurrency_manager</span>::<span class="ident">ConcurrencyManager</span>;
     <span class="kw">use</span> <span class="ident">engine_traits</span>::<span class="ident">CF_WRITE</span>;
-    <span class="kw">use</span> <span class="ident">txn_types</span>::<span class="ident">TimeStamp</span>;
     <span class="kw">use</span> <span class="ident">txn_types</span>::{<span class="ident">Key</span>, <span class="ident">Mutation</span>};
 
     <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">mvcc</span>::{<span class="ident">Error</span> <span class="kw">as</span> <span class="ident">MvccError</span>, <span class="ident">ErrorInner</span> <span class="kw">as</span> <span class="ident">MvccErrorInner</span>};
-    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">txn</span>::<span class="ident">commands</span>::{
-        <span class="ident">Commit</span>, <span class="ident">Prewrite</span>, <span class="ident">Rollback</span>, <span class="ident">WriteContext</span>, <span class="ident">FORWARD_MIN_MUTATIONS_NUM</span>,
-    };
-    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">txn</span>::<span class="ident">LockInfo</span>;
-    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">txn</span>::{<span class="ident">Error</span>, <span class="ident">ErrorInner</span>, <span class="prelude-ty">Result</span>};
-    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">DummyLockManager</span>;
-    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::{
-        <span class="ident">Engine</span>, <span class="ident">PrewriteResult</span>, <span class="ident">ProcessResult</span>, <span class="ident">Snapshot</span>, <span class="ident">Statistics</span>, <span class="ident">TestEngineBuilder</span>,
-    };
+    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">txn</span>::<span class="ident">commands</span>::<span class="ident">test_util</span>::{<span class="ident">commit</span>, <span class="ident">prewrite</span>, <span class="ident">prewrite_with_cm</span>, <span class="ident">rollback</span>};
+    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">txn</span>::<span class="ident">commands</span>::<span class="ident">FORWARD_MIN_MUTATIONS_NUM</span>;
+    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">txn</span>::{<span class="ident">Error</span>, <span class="ident">ErrorInner</span>};
+    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::{<span class="ident">Engine</span>, <span class="ident">Snapshot</span>, <span class="ident">Statistics</span>, <span class="ident">TestEngineBuilder</span>};
 
     <span class="kw">fn</span> <span class="ident">inner_test_prewrite_skip_constraint_check</span>(<span class="ident">pri_key_number</span>: <span class="ident">u8</span>, <span class="ident">write_num</span>: <span class="ident">usize</span>) {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">mutations</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">default</span>();
@@ -840,6 +896,7 @@
             ))],
             <span class="ident">pri_key</span>.<span class="ident">to_vec</span>(),
             <span class="number">99</span>,
+            <span class="prelude-val">None</span>,
         )
         .<span class="ident">unwrap</span>();
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="number">1</span>, <span class="ident">statistic</span>.<span class="ident">write</span>.<span class="ident">seek</span>);
@@ -849,6 +906,7 @@
             <span class="ident">mutations</span>.<span class="ident">clone</span>(),
             <span class="ident">pri_key</span>.<span class="ident">to_vec</span>(),
             <span class="number">100</span>,
+            <span class="prelude-val">None</span>,
         )
         .<span class="ident">err</span>()
         .<span class="ident">unwrap</span>();
@@ -872,6 +930,7 @@
             <span class="ident">mutations</span>.<span class="ident">clone</span>(),
             <span class="ident">pri_key</span>.<span class="ident">to_vec</span>(),
             <span class="number">101</span>,
+            <span class="prelude-val">None</span>,
         )
         .<span class="ident">err</span>()
         .<span class="ident">unwrap</span>();
@@ -887,6 +946,7 @@
             <span class="ident">mutations</span>.<span class="ident">clone</span>(),
             <span class="ident">pri_key</span>.<span class="ident">to_vec</span>(),
             <span class="number">104</span>,
+            <span class="prelude-val">None</span>,
         )
         .<span class="ident">err</span>()
         .<span class="ident">unwrap</span>();
@@ -910,6 +970,7 @@
             <span class="ident">mutations</span>.<span class="ident">clone</span>(),
             <span class="ident">pri_key</span>.<span class="ident">to_vec</span>(),
             <span class="number">104</span>,
+            <span class="prelude-val">None</span>,
         )
         .<span class="ident">unwrap</span>();
         <span class="comment">// All keys are prewrited successful with only one seek operations.</span>
@@ -956,6 +1017,7 @@
             <span class="ident">mutations</span>.<span class="ident">clone</span>(),
             <span class="ident">pri_key</span>.<span class="ident">to_vec</span>(),
             <span class="number">100</span>,
+            <span class="prelude-val">None</span>,
         )
         .<span class="ident">unwrap</span>();
         <span class="comment">// Rollback to make tombstones in lock-cf.</span>
@@ -969,103 +1031,61 @@
         <span class="kw">while</span> <span class="ident">mutations</span>.<span class="ident">len</span>() <span class="op">&gt;</span> <span class="ident">FORWARD_MIN_MUTATIONS_NUM</span> <span class="op">+</span> <span class="number">1</span> {
             <span class="ident">mutations</span>.<span class="ident">pop</span>();
         }
-        <span class="ident">prewrite</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">statistic</span>, <span class="ident">mutations</span>, <span class="ident">pri_key</span>.<span class="ident">to_vec</span>(), <span class="number">110</span>).<span class="ident">unwrap</span>();
+        <span class="ident">prewrite</span>(
+            <span class="kw-2">&amp;</span><span class="ident">engine</span>,
+            <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">statistic</span>,
+            <span class="ident">mutations</span>,
+            <span class="ident">pri_key</span>.<span class="ident">to_vec</span>(),
+            <span class="number">110</span>,
+            <span class="prelude-val">None</span>,
+        )
+        .<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">d</span> <span class="op">=</span> <span class="ident">perf</span>.<span class="ident">delta</span>();
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="number">1</span>, <span class="ident">statistic</span>.<span class="ident">write</span>.<span class="ident">seek</span>);
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">d</span>.<span class="number">0</span>.<span class="ident">internal_delete_skipped_count</span>, <span class="number">0</span>);
     }
 
-    <span class="kw">fn</span> <span class="ident">prewrite</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">Engine</span><span class="op">&gt;</span>(
-        <span class="ident">engine</span>: <span class="kw-2">&amp;</span><span class="ident">E</span>,
-        <span class="ident">statistics</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Statistics</span>,
-        <span class="ident">mutations</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Mutation</span><span class="op">&gt;</span>,
-        <span class="ident">primary</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
-        <span class="ident">start_ts</span>: <span class="ident">u64</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">ctx</span> <span class="op">=</span> <span class="ident">Context</span>::<span class="ident">default</span>();
-        <span class="kw">let</span> <span class="ident">snap</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="kw-2">&amp;</span><span class="ident">ctx</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">concurrency_manager</span> <span class="op">=</span> <span class="ident">ConcurrencyManager</span>::<span class="ident">new</span>(<span class="ident">start_ts</span>.<span class="ident">into</span>());
-        <span class="kw">let</span> <span class="ident">cmd</span> <span class="op">=</span> <span class="ident">Prewrite</span>::<span class="ident">with_defaults</span>(<span class="ident">mutations</span>, <span class="ident">primary</span>, <span class="ident">TimeStamp</span>::<span class="ident">from</span>(<span class="ident">start_ts</span>));
-        <span class="kw">let</span> <span class="ident">context</span> <span class="op">=</span> <span class="ident">WriteContext</span> {
-            <span class="ident">lock_mgr</span>: <span class="kw-2">&amp;</span><span class="ident">DummyLockManager</span> {},
-            <span class="ident">concurrency_manager</span>,
-            <span class="ident">extra_op</span>: <span class="ident">ExtraOp</span>::<span class="ident">Noop</span>,
-            <span class="ident">statistics</span>,
-            <span class="ident">pipelined_pessimistic_lock</span>: <span class="bool-val">false</span>,
-            <span class="ident">async_apply_prewrite</span>: <span class="bool-val">false</span>,
-        };
-        <span class="kw">let</span> <span class="ident">ret</span> <span class="op">=</span> <span class="ident">cmd</span>.<span class="ident">cmd</span>.<span class="ident">process_write</span>(<span class="ident">snap</span>, <span class="ident">context</span>)<span class="question-mark">?</span>;
-        <span class="kw">if</span> <span class="kw">let</span> <span class="ident">ProcessResult</span>::<span class="ident">PrewriteResult</span> {
-            <span class="ident">result</span>: <span class="ident">PrewriteResult</span> { <span class="ident">locks</span>, .. },
-        } <span class="op">=</span> <span class="ident">ret</span>.<span class="ident">pr</span>
-        {
-            <span class="kw">if</span> <span class="op">!</span><span class="ident">locks</span>.<span class="ident">is_empty</span>() {
-                <span class="kw">let</span> <span class="ident">info</span> <span class="op">=</span> <span class="ident">LockInfo</span>::<span class="ident">default</span>();
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">from</span>(<span class="ident">ErrorInner</span>::<span class="ident">Mvcc</span>(<span class="ident">MvccError</span>::<span class="ident">from</span>(
-                    <span class="ident">MvccErrorInner</span>::<span class="ident">KeyIsLocked</span>(<span class="ident">info</span>),
-                ))));
-            }
-        }
-        <span class="kw">let</span> <span class="ident">ctx</span> <span class="op">=</span> <span class="ident">Context</span>::<span class="ident">default</span>();
-        <span class="ident">engine</span>.<span class="ident">write</span>(<span class="kw-2">&amp;</span><span class="ident">ctx</span>, <span class="ident">ret</span>.<span class="ident">to_be_write</span>).<span class="ident">unwrap</span>();
-        <span class="prelude-val">Ok</span>(())
-    }
+    <span class="attribute">#[<span class="ident">test</span>]</span>
+    <span class="kw">fn</span> <span class="ident">test_prewrite_1pc</span>() {
+        <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">mvcc</span>::<span class="ident">tests</span>::{<span class="ident">must_get</span>, <span class="ident">must_get_commit_ts</span>, <span class="ident">must_unlocked</span>};
 
-    <span class="kw">fn</span> <span class="ident">commit</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">Engine</span><span class="op">&gt;</span>(
-        <span class="ident">engine</span>: <span class="kw-2">&amp;</span><span class="ident">E</span>,
-        <span class="ident">statistics</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Statistics</span>,
-        <span class="ident">keys</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Key</span><span class="op">&gt;</span>,
-        <span class="ident">lock_ts</span>: <span class="ident">u64</span>,
-        <span class="ident">commit_ts</span>: <span class="ident">u64</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">ctx</span> <span class="op">=</span> <span class="ident">Context</span>::<span class="ident">default</span>();
-        <span class="kw">let</span> <span class="ident">snap</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="kw-2">&amp;</span><span class="ident">ctx</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">concurrency_manager</span> <span class="op">=</span> <span class="ident">ConcurrencyManager</span>::<span class="ident">new</span>(<span class="ident">lock_ts</span>.<span class="ident">into</span>());
-        <span class="kw">let</span> <span class="ident">cmd</span> <span class="op">=</span> <span class="ident">Commit</span>::<span class="ident">new</span>(
-            <span class="ident">keys</span>,
-            <span class="ident">TimeStamp</span>::<span class="ident">from</span>(<span class="ident">lock_ts</span>),
-            <span class="ident">TimeStamp</span>::<span class="ident">from</span>(<span class="ident">commit_ts</span>),
-            <span class="ident">ctx</span>,
-        );
+        <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span> <span class="ident">TestEngineBuilder</span>::<span class="ident">new</span>().<span class="ident">build</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">cm</span> <span class="op">=</span> <span class="ident">concurrency_manager</span>::<span class="ident">ConcurrencyManager</span>::<span class="ident">new</span>(<span class="number">1</span>.<span class="ident">into</span>());
 
-        <span class="kw">let</span> <span class="ident">context</span> <span class="op">=</span> <span class="ident">WriteContext</span> {
-            <span class="ident">lock_mgr</span>: <span class="kw-2">&amp;</span><span class="ident">DummyLockManager</span> {},
-            <span class="ident">concurrency_manager</span>,
-            <span class="ident">extra_op</span>: <span class="ident">ExtraOp</span>::<span class="ident">Noop</span>,
-            <span class="ident">statistics</span>,
-            <span class="ident">pipelined_pessimistic_lock</span>: <span class="bool-val">false</span>,
-            <span class="ident">async_apply_prewrite</span>: <span class="bool-val">false</span>,
-        };
+        <span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> <span class="string">b&quot;k&quot;</span>;
+        <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="string">b&quot;v&quot;</span>;
+        <span class="kw">let</span> <span class="ident">mutations</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">Mutation</span>::<span class="ident">Put</span>((<span class="ident">Key</span>::<span class="ident">from_raw</span>(<span class="ident">key</span>), <span class="ident">value</span>.<span class="ident">to_vec</span>()))];
 
-        <span class="kw">let</span> <span class="ident">ret</span> <span class="op">=</span> <span class="ident">cmd</span>.<span class="ident">cmd</span>.<span class="ident">process_write</span>(<span class="ident">snap</span>, <span class="ident">context</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">ctx</span> <span class="op">=</span> <span class="ident">Context</span>::<span class="ident">default</span>();
-        <span class="ident">engine</span>.<span class="ident">write</span>(<span class="kw-2">&amp;</span><span class="ident">ctx</span>, <span class="ident">ret</span>.<span class="ident">to_be_write</span>).<span class="ident">unwrap</span>();
-        <span class="prelude-val">Ok</span>(())
-    }
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">statistics</span> <span class="op">=</span> <span class="ident">Statistics</span>::<span class="ident">default</span>();
+        <span class="ident">prewrite_with_cm</span>(
+            <span class="kw-2">&amp;</span><span class="ident">engine</span>,
+            <span class="ident">cm</span>.<span class="ident">clone</span>(),
+            <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">statistics</span>,
+            <span class="ident">mutations</span>,
+            <span class="ident">key</span>.<span class="ident">to_vec</span>(),
+            <span class="number">10</span>,
+            <span class="prelude-val">Some</span>(<span class="number">15</span>),
+        )
+        .<span class="ident">unwrap</span>();
+        <span class="ident">must_unlocked</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">key</span>);
+        <span class="ident">must_get</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">key</span>, <span class="number">12</span>, <span class="ident">value</span>);
+        <span class="ident">must_get_commit_ts</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">key</span>, <span class="number">10</span>, <span class="number">11</span>);
 
-    <span class="kw">fn</span> <span class="ident">rollback</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">Engine</span><span class="op">&gt;</span>(
-        <span class="ident">engine</span>: <span class="kw-2">&amp;</span><span class="ident">E</span>,
-        <span class="ident">statistics</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Statistics</span>,
-        <span class="ident">keys</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Key</span><span class="op">&gt;</span>,
-        <span class="ident">start_ts</span>: <span class="ident">u64</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">ctx</span> <span class="op">=</span> <span class="ident">Context</span>::<span class="ident">default</span>();
-        <span class="kw">let</span> <span class="ident">snap</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="kw-2">&amp;</span><span class="ident">ctx</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">concurrency_manager</span> <span class="op">=</span> <span class="ident">ConcurrencyManager</span>::<span class="ident">new</span>(<span class="ident">start_ts</span>.<span class="ident">into</span>());
-        <span class="kw">let</span> <span class="ident">cmd</span> <span class="op">=</span> <span class="ident">Rollback</span>::<span class="ident">new</span>(<span class="ident">keys</span>, <span class="ident">TimeStamp</span>::<span class="ident">from</span>(<span class="ident">start_ts</span>), <span class="ident">ctx</span>);
-        <span class="kw">let</span> <span class="ident">context</span> <span class="op">=</span> <span class="ident">WriteContext</span> {
-            <span class="ident">lock_mgr</span>: <span class="kw-2">&amp;</span><span class="ident">DummyLockManager</span> {},
-            <span class="ident">concurrency_manager</span>,
-            <span class="ident">extra_op</span>: <span class="ident">ExtraOp</span>::<span class="ident">Noop</span>,
-            <span class="ident">statistics</span>,
-            <span class="ident">pipelined_pessimistic_lock</span>: <span class="bool-val">false</span>,
-            <span class="ident">async_apply_prewrite</span>: <span class="bool-val">false</span>,
-        };
+        <span class="ident">cm</span>.<span class="ident">update_max_ts</span>(<span class="number">50</span>.<span class="ident">into</span>());
 
-        <span class="kw">let</span> <span class="ident">ret</span> <span class="op">=</span> <span class="ident">cmd</span>.<span class="ident">cmd</span>.<span class="ident">process_write</span>(<span class="ident">snap</span>, <span class="ident">context</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">ctx</span> <span class="op">=</span> <span class="ident">Context</span>::<span class="ident">default</span>();
-        <span class="ident">engine</span>.<span class="ident">write</span>(<span class="kw-2">&amp;</span><span class="ident">ctx</span>, <span class="ident">ret</span>.<span class="ident">to_be_write</span>).<span class="ident">unwrap</span>();
-        <span class="prelude-val">Ok</span>(())
+        <span class="kw">let</span> <span class="ident">mutations</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">Mutation</span>::<span class="ident">Put</span>((<span class="ident">Key</span>::<span class="ident">from_raw</span>(<span class="ident">key</span>), <span class="ident">value</span>.<span class="ident">to_vec</span>()))];
+
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">statistics</span> <span class="op">=</span> <span class="ident">Statistics</span>::<span class="ident">default</span>();
+        <span class="ident">prewrite_with_cm</span>(
+            <span class="kw-2">&amp;</span><span class="ident">engine</span>,
+            <span class="ident">cm</span>,
+            <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">statistics</span>,
+            <span class="ident">mutations</span>,
+            <span class="ident">key</span>.<span class="ident">to_vec</span>(),
+            <span class="number">20</span>,
+            <span class="prelude-val">Some</span>(<span class="number">30</span>),
+        )
+        .<span class="ident">unwrap_err</span>();
     }
 }
 </pre></div>

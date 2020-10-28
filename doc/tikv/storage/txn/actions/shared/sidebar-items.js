@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["prewrite_key_value",""]]});
+initSidebarItems({"fn":[["handle_1pc",""],["prewrite_key_value",""]]});
