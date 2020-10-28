@@ -748,6 +748,10 @@
 <span id="745">745</span>
 <span id="746">746</span>
 <span id="747">747</span>
+<span id="748">748</span>
+<span id="749">749</span>
+<span id="750">750</span>
+<span id="751">751</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -768,6 +772,7 @@
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Cursor</span><span class="op">&lt;</span><span class="ident">I</span>: <span class="ident">Iterator</span><span class="op">&gt;</span> {
     <span class="ident">iter</span>: <span class="ident">I</span>,
     <span class="ident">scan_mode</span>: <span class="ident">ScanMode</span>,
+    <span class="comment">// prefix_seek doesn&#39;t support seek_to_first and seek_to_last.</span>
     <span class="ident">prefix_seek</span>: <span class="ident">bool</span>,
     <span class="comment">// the data cursor can be seen will be</span>
     <span class="ident">min_key</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span>,
@@ -797,9 +802,9 @@
         <span class="self">Self</span> {
             <span class="ident">iter</span>,
             <span class="ident">scan_mode</span>: <span class="ident">mode</span>,
+            <span class="ident">prefix_seek</span>,
             <span class="ident">min_key</span>: <span class="prelude-val">None</span>,
             <span class="ident">max_key</span>: <span class="prelude-val">None</span>,
-            <span class="ident">prefix_seek</span>,
 
             <span class="ident">cur_key_has_read</span>: <span class="ident">Cell</span>::<span class="ident">new</span>(<span class="bool-val">false</span>),
             <span class="ident">cur_value_has_read</span>: <span class="ident">Cell</span>::<span class="ident">new</span>(<span class="bool-val">false</span>),
@@ -1082,6 +1087,7 @@
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">seek_to_first</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">statistics</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">CfStatistics</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="self">self</span>.<span class="ident">prefix_seek</span>);
         <span class="ident">statistics</span>.<span class="ident">seek</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
         <span class="self">self</span>.<span class="ident">mark_unread</span>();
         <span class="kw">let</span> <span class="ident">before</span> <span class="op">=</span> <span class="ident">PerfContext</span>::<span class="ident">get</span>().<span class="ident">internal_delete_skipped_count</span>() <span class="kw">as</span> <span class="ident">usize</span>;
@@ -1093,6 +1099,7 @@
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">seek_to_last</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">statistics</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">CfStatistics</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="self">self</span>.<span class="ident">prefix_seek</span>);
         <span class="ident">statistics</span>.<span class="ident">seek</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
         <span class="self">self</span>.<span class="ident">mark_unread</span>();
         <span class="kw">let</span> <span class="ident">before</span> <span class="op">=</span> <span class="ident">PerfContext</span>::<span class="ident">get</span>().<span class="ident">internal_delete_skipped_count</span>() <span class="kw">as</span> <span class="ident">usize</span>;
@@ -1298,6 +1305,7 @@
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">ts</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">hint_max_ts</span> {
             <span class="ident">iter_opt</span>.<span class="ident">set_hint_max_ts</span>(<span class="ident">Bound</span>::<span class="ident">Included</span>(<span class="ident">ts</span>.<span class="ident">into_inner</span>()));
         }
+        <span class="comment">// prefix_seek is only used for single key, so set prefix_same_as_start for safety.</span>
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">prefix_seek</span> {
             <span class="ident">iter_opt</span> <span class="op">=</span> <span class="ident">iter_opt</span>.<span class="ident">use_prefix_seek</span>().<span class="ident">set_prefix_same_as_start</span>(<span class="bool-val">true</span>);
         }
