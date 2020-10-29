@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["LogRecord",""]],"struct":[["LogFile","LogFile is used to store log style file dictionary."]]});
