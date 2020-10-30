@@ -3413,6 +3413,76 @@
 <span id="3410">3410</span>
 <span id="3411">3411</span>
 <span id="3412">3412</span>
+<span id="3413">3413</span>
+<span id="3414">3414</span>
+<span id="3415">3415</span>
+<span id="3416">3416</span>
+<span id="3417">3417</span>
+<span id="3418">3418</span>
+<span id="3419">3419</span>
+<span id="3420">3420</span>
+<span id="3421">3421</span>
+<span id="3422">3422</span>
+<span id="3423">3423</span>
+<span id="3424">3424</span>
+<span id="3425">3425</span>
+<span id="3426">3426</span>
+<span id="3427">3427</span>
+<span id="3428">3428</span>
+<span id="3429">3429</span>
+<span id="3430">3430</span>
+<span id="3431">3431</span>
+<span id="3432">3432</span>
+<span id="3433">3433</span>
+<span id="3434">3434</span>
+<span id="3435">3435</span>
+<span id="3436">3436</span>
+<span id="3437">3437</span>
+<span id="3438">3438</span>
+<span id="3439">3439</span>
+<span id="3440">3440</span>
+<span id="3441">3441</span>
+<span id="3442">3442</span>
+<span id="3443">3443</span>
+<span id="3444">3444</span>
+<span id="3445">3445</span>
+<span id="3446">3446</span>
+<span id="3447">3447</span>
+<span id="3448">3448</span>
+<span id="3449">3449</span>
+<span id="3450">3450</span>
+<span id="3451">3451</span>
+<span id="3452">3452</span>
+<span id="3453">3453</span>
+<span id="3454">3454</span>
+<span id="3455">3455</span>
+<span id="3456">3456</span>
+<span id="3457">3457</span>
+<span id="3458">3458</span>
+<span id="3459">3459</span>
+<span id="3460">3460</span>
+<span id="3461">3461</span>
+<span id="3462">3462</span>
+<span id="3463">3463</span>
+<span id="3464">3464</span>
+<span id="3465">3465</span>
+<span id="3466">3466</span>
+<span id="3467">3467</span>
+<span id="3468">3468</span>
+<span id="3469">3469</span>
+<span id="3470">3470</span>
+<span id="3471">3471</span>
+<span id="3472">3472</span>
+<span id="3473">3473</span>
+<span id="3474">3474</span>
+<span id="3475">3475</span>
+<span id="3476">3476</span>
+<span id="3477">3477</span>
+<span id="3478">3478</span>
+<span id="3479">3479</span>
+<span id="3480">3480</span>
+<span id="3481">3481</span>
+<span id="3482">3482</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2017 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -3576,9 +3646,10 @@
 
 <span class="kw">fn</span> <span class="ident">get_background_job_limit</span>(
     <span class="ident">default_background_jobs</span>: <span class="ident">i32</span>,
+    <span class="ident">default_background_flushes</span>: <span class="ident">i32</span>,
     <span class="ident">default_sub_compactions</span>: <span class="ident">u32</span>,
     <span class="ident">default_background_gc</span>: <span class="ident">i32</span>,
-) <span class="op">-</span><span class="op">&gt;</span> (<span class="ident">i32</span>, <span class="ident">u32</span>, <span class="ident">i32</span>) {
+) <span class="op">-</span><span class="op">&gt;</span> (<span class="ident">i32</span>, <span class="ident">i32</span>, <span class="ident">u32</span>, <span class="ident">i32</span>) {
     <span class="kw">let</span> <span class="ident">cpu_num</span> <span class="op">=</span> <span class="ident">SysQuota</span>::<span class="ident">new</span>().<span class="ident">cpu_cores_quota</span>();
     <span class="comment">// At the minimum, we should have two background jobs: one for flush and one for compaction.</span>
     <span class="comment">// Otherwise, the number of background jobs should not exceed cpu_num - 1.</span>
@@ -3586,8 +3657,14 @@
     <span class="comment">// the rest shared by flush and compaction.</span>
     <span class="kw">let</span> <span class="ident">max_background_jobs</span>: <span class="ident">i32</span> <span class="op">=</span>
         <span class="ident">cmp</span>::<span class="ident">max</span>(<span class="number">2</span>, <span class="ident">cmp</span>::<span class="ident">min</span>(<span class="ident">default_background_jobs</span>, (<span class="ident">cpu_num</span> <span class="op">-</span> <span class="number">1.0</span>) <span class="kw">as</span> <span class="ident">i32</span>));
+    <span class="comment">// Scale flush threads proportionally to background jobs. Also make sure the number of flush</span>
+    <span class="comment">// threads doesn&#39;t exceed total jobs.</span>
+    <span class="kw">let</span> <span class="ident">max_background_flushes</span>: <span class="ident">i32</span> <span class="op">=</span> <span class="ident">cmp</span>::<span class="ident">min</span>(
+        <span class="ident">cmp</span>::<span class="ident">max</span>(<span class="ident">default_background_flushes</span>, <span class="ident">max_background_jobs</span> <span class="op">/</span> <span class="number">4</span>),
+        <span class="ident">max_background_jobs</span> <span class="op">-</span> <span class="number">1</span>,
+    );
     <span class="comment">// Cap max_sub_compactions to allow at least two compactions.</span>
-    <span class="kw">let</span> <span class="ident">max_compactions</span> <span class="op">=</span> <span class="ident">max_background_jobs</span> <span class="op">-</span> <span class="ident">max_background_jobs</span> <span class="op">/</span> <span class="number">4</span>;
+    <span class="kw">let</span> <span class="ident">max_compactions</span> <span class="op">=</span> <span class="ident">max_background_jobs</span> <span class="op">-</span> <span class="ident">max_background_flushes</span>;
     <span class="kw">let</span> <span class="ident">max_sub_compactions</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="ident">cmp</span>::<span class="ident">max</span>(
         <span class="number">1</span>,
         <span class="ident">cmp</span>::<span class="ident">min</span>(<span class="ident">default_sub_compactions</span>, (<span class="ident">max_compactions</span> <span class="op">-</span> <span class="number">1</span>) <span class="kw">as</span> <span class="ident">u32</span>),
@@ -3595,7 +3672,12 @@
     <span class="comment">// Maximum background GC threads for Titan</span>
     <span class="kw">let</span> <span class="ident">max_background_gc</span>: <span class="ident">i32</span> <span class="op">=</span> <span class="ident">cmp</span>::<span class="ident">min</span>(<span class="ident">default_background_gc</span>, <span class="ident">cpu_num</span> <span class="kw">as</span> <span class="ident">i32</span>);
 
-    (<span class="ident">max_background_jobs</span>, <span class="ident">max_sub_compactions</span>, <span class="ident">max_background_gc</span>)
+    (
+        <span class="ident">max_background_jobs</span>,
+        <span class="ident">max_background_flushes</span>,
+        <span class="ident">max_sub_compactions</span>,
+        <span class="ident">max_background_gc</span>,
+    )
 }
 
 <span class="macro">macro_rules</span><span class="macro">!</span> <span class="ident">cf_config</span> {
@@ -4295,6 +4377,7 @@
     <span class="kw">pub</span> <span class="ident">wal_size_limit</span>: <span class="ident">ReadableSize</span>,
     <span class="kw">pub</span> <span class="ident">max_total_wal_size</span>: <span class="ident">ReadableSize</span>,
     <span class="kw">pub</span> <span class="ident">max_background_jobs</span>: <span class="ident">i32</span>,
+    <span class="kw">pub</span> <span class="ident">max_background_flushes</span>: <span class="ident">i32</span>,
     <span class="attribute">#[<span class="ident">config</span>(<span class="ident">skip</span>)]</span>
     <span class="kw">pub</span> <span class="ident">max_manifest_file_size</span>: <span class="ident">ReadableSize</span>,
     <span class="attribute">#[<span class="ident">config</span>(<span class="ident">skip</span>)]</span>
@@ -4350,8 +4433,8 @@
 
 <span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">DbConfig</span> {
     <span class="kw">fn</span> <span class="ident">default</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">DbConfig</span> {
-        <span class="kw">let</span> (<span class="ident">max_background_jobs</span>, <span class="ident">max_sub_compactions</span>, <span class="ident">max_background_gc</span>) <span class="op">=</span>
-            <span class="ident">get_background_job_limit</span>(<span class="number">8</span>, <span class="number">3</span>, <span class="number">4</span>);
+        <span class="kw">let</span> (<span class="ident">max_background_jobs</span>, <span class="ident">max_background_flushes</span>, <span class="ident">max_sub_compactions</span>, <span class="ident">max_background_gc</span>) <span class="op">=</span>
+            <span class="ident">get_background_job_limit</span>(<span class="number">8</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">titan_config</span> <span class="op">=</span> <span class="ident">TitanDBConfig</span>::<span class="ident">default</span>();
         <span class="ident">titan_config</span>.<span class="ident">max_background_gc</span> <span class="op">=</span> <span class="ident">max_background_gc</span>;
         <span class="ident">DbConfig</span> {
@@ -4361,6 +4444,7 @@
             <span class="ident">wal_size_limit</span>: <span class="ident">ReadableSize</span>::<span class="ident">kb</span>(<span class="number">0</span>),
             <span class="ident">max_total_wal_size</span>: <span class="ident">ReadableSize</span>::<span class="ident">gb</span>(<span class="number">4</span>),
             <span class="ident">max_background_jobs</span>,
+            <span class="ident">max_background_flushes</span>,
             <span class="ident">max_manifest_file_size</span>: <span class="ident">ReadableSize</span>::<span class="ident">mb</span>(<span class="number">128</span>),
             <span class="ident">create_if_missing</span>: <span class="bool-val">true</span>,
             <span class="ident">max_open_files</span>: <span class="number">40960</span>,
@@ -4405,6 +4489,9 @@
         <span class="ident">opts</span>.<span class="ident">set_wal_size_limit_mb</span>(<span class="self">self</span>.<span class="ident">wal_size_limit</span>.<span class="ident">as_mb</span>());
         <span class="ident">opts</span>.<span class="ident">set_max_total_wal_size</span>(<span class="self">self</span>.<span class="ident">max_total_wal_size</span>.<span class="number">0</span>);
         <span class="ident">opts</span>.<span class="ident">set_max_background_jobs</span>(<span class="self">self</span>.<span class="ident">max_background_jobs</span>);
+        <span class="comment">// RocksDB will cap flush and compaction threads to at least one</span>
+        <span class="ident">opts</span>.<span class="ident">set_max_background_flushes</span>(<span class="self">self</span>.<span class="ident">max_background_flushes</span>);
+        <span class="ident">opts</span>.<span class="ident">set_max_background_compactions</span>(<span class="self">self</span>.<span class="ident">max_background_jobs</span> <span class="op">-</span> <span class="self">self</span>.<span class="ident">max_background_flushes</span>);
         <span class="ident">opts</span>.<span class="ident">set_max_manifest_file_size</span>(<span class="self">self</span>.<span class="ident">max_manifest_file_size</span>.<span class="number">0</span>);
         <span class="ident">opts</span>.<span class="ident">create_if_missing</span>(<span class="self">self</span>.<span class="ident">create_if_missing</span>);
         <span class="ident">opts</span>.<span class="ident">set_max_open_files</span>(<span class="self">self</span>.<span class="ident">max_open_files</span>);
@@ -4594,6 +4681,7 @@
     <span class="kw">pub</span> <span class="ident">wal_size_limit</span>: <span class="ident">ReadableSize</span>,
     <span class="kw">pub</span> <span class="ident">max_total_wal_size</span>: <span class="ident">ReadableSize</span>,
     <span class="kw">pub</span> <span class="ident">max_background_jobs</span>: <span class="ident">i32</span>,
+    <span class="kw">pub</span> <span class="ident">max_background_flushes</span>: <span class="ident">i32</span>,
     <span class="attribute">#[<span class="ident">config</span>(<span class="ident">skip</span>)]</span>
     <span class="kw">pub</span> <span class="ident">max_manifest_file_size</span>: <span class="ident">ReadableSize</span>,
     <span class="attribute">#[<span class="ident">config</span>(<span class="ident">skip</span>)]</span>
@@ -4635,8 +4723,8 @@
 
 <span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">RaftDbConfig</span> {
     <span class="kw">fn</span> <span class="ident">default</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">RaftDbConfig</span> {
-        <span class="kw">let</span> (<span class="ident">max_background_jobs</span>, <span class="ident">max_sub_compactions</span>, <span class="ident">max_background_gc</span>) <span class="op">=</span>
-            <span class="ident">get_background_job_limit</span>(<span class="number">4</span>, <span class="number">2</span>, <span class="number">4</span>);
+        <span class="kw">let</span> (<span class="ident">max_background_jobs</span>, <span class="ident">max_background_flushes</span>, <span class="ident">max_sub_compactions</span>, <span class="ident">max_background_gc</span>) <span class="op">=</span>
+            <span class="ident">get_background_job_limit</span>(<span class="number">4</span>, <span class="number">1</span>, <span class="number">2</span>, <span class="number">4</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">titan_config</span> <span class="op">=</span> <span class="ident">TitanDBConfig</span>::<span class="ident">default</span>();
         <span class="ident">titan_config</span>.<span class="ident">max_background_gc</span> <span class="op">=</span> <span class="ident">max_background_gc</span>;
         <span class="ident">RaftDbConfig</span> {
@@ -4646,6 +4734,7 @@
             <span class="ident">wal_size_limit</span>: <span class="ident">ReadableSize</span>::<span class="ident">kb</span>(<span class="number">0</span>),
             <span class="ident">max_total_wal_size</span>: <span class="ident">ReadableSize</span>::<span class="ident">gb</span>(<span class="number">4</span>),
             <span class="ident">max_background_jobs</span>,
+            <span class="ident">max_background_flushes</span>,
             <span class="ident">max_manifest_file_size</span>: <span class="ident">ReadableSize</span>::<span class="ident">mb</span>(<span class="number">20</span>),
             <span class="ident">create_if_missing</span>: <span class="bool-val">true</span>,
             <span class="ident">max_open_files</span>: <span class="number">40960</span>,
@@ -4681,6 +4770,8 @@
         <span class="ident">opts</span>.<span class="ident">set_wal_ttl_seconds</span>(<span class="self">self</span>.<span class="ident">wal_ttl_seconds</span>);
         <span class="ident">opts</span>.<span class="ident">set_wal_size_limit_mb</span>(<span class="self">self</span>.<span class="ident">wal_size_limit</span>.<span class="ident">as_mb</span>());
         <span class="ident">opts</span>.<span class="ident">set_max_background_jobs</span>(<span class="self">self</span>.<span class="ident">max_background_jobs</span>);
+        <span class="ident">opts</span>.<span class="ident">set_max_background_flushes</span>(<span class="self">self</span>.<span class="ident">max_background_flushes</span>);
+        <span class="ident">opts</span>.<span class="ident">set_max_background_compactions</span>(<span class="self">self</span>.<span class="ident">max_background_jobs</span> <span class="op">-</span> <span class="self">self</span>.<span class="ident">max_background_flushes</span>);
         <span class="ident">opts</span>.<span class="ident">set_max_total_wal_size</span>(<span class="self">self</span>.<span class="ident">max_total_wal_size</span>.<span class="number">0</span>);
         <span class="ident">opts</span>.<span class="ident">set_max_manifest_file_size</span>(<span class="self">self</span>.<span class="ident">max_manifest_file_size</span>.<span class="number">0</span>);
         <span class="ident">opts</span>.<span class="ident">create_if_missing</span>(<span class="self">self</span>.<span class="ident">create_if_missing</span>);
@@ -4831,6 +4922,30 @@
         <span class="prelude-val">Ok</span>(())
     }
 
+    <span class="kw">fn</span> <span class="ident">set_max_background_jobs</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">max_background_jobs</span>: <span class="ident">i32</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">Error</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="ident">opt</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">db</span>.<span class="ident">as_inner</span>().<span class="ident">get_db_options</span>();
+        <span class="kw">if</span> <span class="ident">max_background_jobs</span> <span class="op">&lt;</span> <span class="ident">opt</span>.<span class="ident">get_max_background_jobs</span>() {
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;unable to shrink background jobs while the instance is running&quot;</span>.<span class="ident">into</span>());
+        }
+        <span class="self">self</span>.<span class="ident">set_db_config</span>(<span class="kw-2">&amp;</span>[(<span class="string">&quot;max_background_jobs&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">max_background_jobs</span>.<span class="ident">to_string</span>())])<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
+    }
+
+    <span class="kw">fn</span> <span class="ident">set_max_background_flushes</span>(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="ident">max_background_flushes</span>: <span class="ident">i32</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">Error</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="ident">opt</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">db</span>.<span class="ident">as_inner</span>().<span class="ident">get_db_options</span>();
+        <span class="kw">if</span> <span class="ident">max_background_flushes</span> <span class="op">&lt;</span> <span class="ident">opt</span>.<span class="ident">get_max_background_flushes</span>() {
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;unable to shrink background jobs while the instance is running&quot;</span>.<span class="ident">into</span>());
+        }
+        <span class="self">self</span>.<span class="ident">set_db_config</span>(<span class="kw-2">&amp;</span>[(
+            <span class="string">&quot;max_background_flushes&quot;</span>,
+            <span class="kw-2">&amp;</span><span class="ident">max_background_flushes</span>.<span class="ident">to_string</span>(),
+        )])<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
+    }
+
     <span class="kw">fn</span> <span class="ident">validate_cf</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">cf</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">Error</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="kw">match</span> (<span class="self">self</span>.<span class="ident">db_type</span>, <span class="ident">cf</span>) {
             (<span class="ident">DBType</span>::<span class="ident">Kv</span>, <span class="ident">CF_DEFAULT</span>)
@@ -4876,6 +4991,22 @@
         {
             <span class="kw">let</span> <span class="ident">rate_bytes_per_sec</span>: <span class="ident">ReadableSize</span> <span class="op">=</span> <span class="ident">rate_bytes_config</span>.<span class="number">1</span>.<span class="ident">into</span>();
             <span class="self">self</span>.<span class="ident">set_rate_bytes_per_sec</span>(<span class="ident">rate_bytes_per_sec</span>.<span class="number">0</span> <span class="kw">as</span> <span class="ident">i64</span>)<span class="question-mark">?</span>;
+        }
+
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">background_jobs_config</span>) <span class="op">=</span> <span class="ident">change</span>
+            .<span class="ident">drain_filter</span>(<span class="op">|</span>(<span class="ident">name</span>, <span class="kw">_</span>)<span class="op">|</span> <span class="ident">name</span> <span class="op">=</span><span class="op">=</span> <span class="string">&quot;max_background_jobs&quot;</span>)
+            .<span class="ident">next</span>()
+        {
+            <span class="kw">let</span> <span class="ident">max_background_jobs</span> <span class="op">=</span> <span class="ident">background_jobs_config</span>.<span class="number">1</span>.<span class="ident">into</span>();
+            <span class="self">self</span>.<span class="ident">set_max_background_jobs</span>(<span class="ident">max_background_jobs</span>)<span class="question-mark">?</span>;
+        }
+
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">background_flushes_config</span>) <span class="op">=</span> <span class="ident">change</span>
+            .<span class="ident">drain_filter</span>(<span class="op">|</span>(<span class="ident">name</span>, <span class="kw">_</span>)<span class="op">|</span> <span class="ident">name</span> <span class="op">=</span><span class="op">=</span> <span class="string">&quot;max_background_flushes&quot;</span>)
+            .<span class="ident">next</span>()
+        {
+            <span class="kw">let</span> <span class="ident">max_background_flushes</span> <span class="op">=</span> <span class="ident">background_flushes_config</span>.<span class="number">1</span>.<span class="ident">into</span>();
+            <span class="self">self</span>.<span class="ident">set_max_background_flushes</span>(<span class="ident">max_background_flushes</span>)<span class="question-mark">?</span>;
         }
 
         <span class="kw">if</span> <span class="op">!</span><span class="ident">change</span>.<span class="ident">is_empty</span>() {
@@ -6607,7 +6738,8 @@
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_change_rocksdb_config</span>() {
         <span class="kw">let</span> (<span class="kw-2">mut</span> <span class="ident">cfg</span>, <span class="ident">_dir</span>) <span class="op">=</span> <span class="ident">TiKvConfig</span>::<span class="ident">with_tmp</span>().<span class="ident">unwrap</span>();
-        <span class="ident">cfg</span>.<span class="ident">rocksdb</span>.<span class="ident">max_background_jobs</span> <span class="op">=</span> <span class="number">2</span>;
+        <span class="ident">cfg</span>.<span class="ident">rocksdb</span>.<span class="ident">max_background_jobs</span> <span class="op">=</span> <span class="number">4</span>;
+        <span class="ident">cfg</span>.<span class="ident">rocksdb</span>.<span class="ident">max_background_flushes</span> <span class="op">=</span> <span class="number">2</span>;
         <span class="ident">cfg</span>.<span class="ident">rocksdb</span>.<span class="ident">defaultcf</span>.<span class="ident">disable_auto_compactions</span> <span class="op">=</span> <span class="bool-val">false</span>;
         <span class="ident">cfg</span>.<span class="ident">rocksdb</span>.<span class="ident">defaultcf</span>.<span class="ident">target_file_size_base</span> <span class="op">=</span> <span class="ident">ReadableSize</span>::<span class="ident">mb</span>(<span class="number">64</span>);
         <span class="ident">cfg</span>.<span class="ident">rocksdb</span>.<span class="ident">defaultcf</span>.<span class="ident">block_cache_size</span> <span class="op">=</span> <span class="ident">ReadableSize</span>::<span class="ident">mb</span>(<span class="number">8</span>);
@@ -6618,12 +6750,20 @@
         <span class="kw">let</span> (<span class="ident">db</span>, <span class="ident">cfg_controller</span>) <span class="op">=</span> <span class="ident">new_engines</span>(<span class="ident">cfg</span>);
 
         <span class="comment">// update max_background_jobs</span>
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">db</span>.<span class="ident">get_db_options</span>().<span class="ident">get_max_background_jobs</span>(), <span class="number">2</span>);
+        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">db</span>.<span class="ident">get_db_options</span>().<span class="ident">get_max_background_jobs</span>(), <span class="number">4</span>);
 
         <span class="ident">cfg_controller</span>
             .<span class="ident">update_config</span>(<span class="string">&quot;rocksdb.max-background-jobs&quot;</span>, <span class="string">&quot;8&quot;</span>)
             .<span class="ident">unwrap</span>();
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">db</span>.<span class="ident">get_db_options</span>().<span class="ident">get_max_background_jobs</span>(), <span class="number">8</span>);
+
+        <span class="comment">// update max_background_flushes, set to a bigger value</span>
+        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">db</span>.<span class="ident">get_db_options</span>().<span class="ident">get_max_background_flushes</span>(), <span class="number">2</span>);
+
+        <span class="ident">cfg_controller</span>
+            .<span class="ident">update_config</span>(<span class="string">&quot;rocksdb.max-background-flushes&quot;</span>, <span class="string">&quot;5&quot;</span>)
+            .<span class="ident">unwrap</span>();
+        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">db</span>.<span class="ident">get_db_options</span>().<span class="ident">get_max_background_flushes</span>(), <span class="number">5</span>);
 
         <span class="comment">// update rate_bytes_per_sec</span>
         <span class="macro">assert_eq</span><span class="macro">!</span>(
