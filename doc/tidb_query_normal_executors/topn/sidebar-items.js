@@ -1,1 +1,0 @@
-initSidebarItems({"struct":[["OrderBy",""],["TopNExecutor","Retrieves rows from the source executor, orders rows according to expressions and produces part of the rows."]]});

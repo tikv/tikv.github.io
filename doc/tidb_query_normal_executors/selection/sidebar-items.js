@@ -1,1 +1,0 @@
-initSidebarItems({"struct":[["SelectionExecutor","Retrieves rows from the source executor and filter rows by expressions."]]});

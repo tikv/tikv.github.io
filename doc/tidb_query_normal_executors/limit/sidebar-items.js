@@ -1,1 +1,0 @@
-initSidebarItems({"struct":[["LimitExecutor","Retrieves rows from the source executor and only produces part of the rows."]]});

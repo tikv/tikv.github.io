@@ -1,1 +1,0 @@
-initSidebarItems({"fn":[["case_when","See https://dev.mysql.com/doc/refman/5.7/en/case.html"],["if_condition",""],["if_null",""]]});

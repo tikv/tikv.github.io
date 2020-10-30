@@ -1,1 +1,0 @@
-initSidebarItems({"struct":[["TableInnerExecutor",""]],"type":[["TableScanExecutor",""]]});

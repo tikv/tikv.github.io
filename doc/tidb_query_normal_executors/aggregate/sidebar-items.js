@@ -1,1 +1,0 @@
-initSidebarItems({"fn":[["build_aggr_func",""]],"struct":[["AggBitAnd",""],["AggBitOr",""],["AggBitXor",""],["Avg",""],["Count",""],["Extremum",""],["First",""],["Sum",""]],"trait":[["AggrFunc","`AggrFunc` is used to execute aggregate operations."]]});

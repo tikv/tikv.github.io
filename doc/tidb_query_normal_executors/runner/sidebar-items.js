@@ -1,1 +1,0 @@
-initSidebarItems({"fn":[["build_executors","Builds a normal executor pipeline."],["build_first_executor","Builds the inner-most executor for the normal executor pipeline, which can produce rows to other executors and never receive rows from other executors."]],"struct":[["ExecutorsRunner",""]]});
