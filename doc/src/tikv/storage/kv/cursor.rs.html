@@ -748,10 +748,6 @@
 <span id="745">745</span>
 <span id="746">746</span>
 <span id="747">747</span>
-<span id="748">748</span>
-<span id="749">749</span>
-<span id="750">750</span>
-<span id="751">751</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -901,15 +897,13 @@
                 <span class="kw">if</span> <span class="self">self</span>.<span class="ident">key</span>(<span class="ident">statistics</span>) <span class="op">&lt;</span> <span class="ident">key</span>.<span class="ident">as_encoded</span>().<span class="ident">as_slice</span>() {
                     <span class="self">self</span>.<span class="ident">next</span>(<span class="ident">statistics</span>);
                 }
+            } <span class="kw">else</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">prefix_seek</span> {
+                <span class="comment">// When prefixed seek and prefix_same_as_start enabled</span>
+                <span class="comment">// seek_to_first may return false due to no key&#39;s prefix is same as iter lower bound&#39;s</span>
+                <span class="kw">return</span> <span class="self">self</span>.<span class="ident">seek</span>(<span class="ident">key</span>, <span class="ident">statistics</span>);
             } <span class="kw">else</span> {
-                <span class="kw">if</span> <span class="self">self</span>.<span class="ident">prefix_seek</span> {
-                    <span class="comment">// When prefixed seek and prefix_same_as_start enabled</span>
-                    <span class="comment">// seek_to_first may return false due to no key&#39;s prefix is same as iter lower bound&#39;s</span>
-                    <span class="kw">return</span> <span class="self">self</span>.<span class="ident">seek</span>(<span class="ident">key</span>, <span class="ident">statistics</span>);
-                } <span class="kw">else</span> {
-                    <span class="macro">assert</span><span class="macro">!</span>(<span class="self">self</span>.<span class="ident">seek_to_first</span>(<span class="ident">statistics</span>));
-                    <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="bool-val">true</span>);
-                }
+                <span class="macro">assert</span><span class="macro">!</span>(<span class="self">self</span>.<span class="ident">seek_to_first</span>(<span class="ident">statistics</span>));
+                <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="bool-val">true</span>);
             }
         } <span class="kw">else</span> {
             <span class="comment">// ord == Less</span>
@@ -1011,13 +1005,11 @@
                 <span class="kw">if</span> <span class="self">self</span>.<span class="ident">key</span>(<span class="ident">statistics</span>) <span class="op">&gt;</span> <span class="ident">key</span>.<span class="ident">as_encoded</span>().<span class="ident">as_slice</span>() {
                     <span class="self">self</span>.<span class="ident">prev</span>(<span class="ident">statistics</span>);
                 }
+            } <span class="kw">else</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">prefix_seek</span> {
+                <span class="kw">return</span> <span class="self">self</span>.<span class="ident">seek_for_prev</span>(<span class="ident">key</span>, <span class="ident">statistics</span>);
             } <span class="kw">else</span> {
-                <span class="kw">if</span> <span class="self">self</span>.<span class="ident">prefix_seek</span> {
-                    <span class="kw">return</span> <span class="self">self</span>.<span class="ident">seek_for_prev</span>(<span class="ident">key</span>, <span class="ident">statistics</span>);
-                } <span class="kw">else</span> {
-                    <span class="macro">assert</span><span class="macro">!</span>(<span class="self">self</span>.<span class="ident">seek_to_last</span>(<span class="ident">statistics</span>));
-                    <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="bool-val">true</span>);
-                }
+                <span class="macro">assert</span><span class="macro">!</span>(<span class="self">self</span>.<span class="ident">seek_to_last</span>(<span class="ident">statistics</span>));
+                <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="bool-val">true</span>);
             }
         } <span class="kw">else</span> {
             <span class="macro">near_loop</span><span class="macro">!</span>(
@@ -1181,14 +1173,14 @@
             <span class="macro">panic</span><span class="macro">!</span>(
                 <span class="string">&quot;failed to iterate: {:?}, min_key: {:?}, max_key: {:?}&quot;</span>,
                 <span class="ident">e</span>,
-                <span class="self">self</span>.<span class="ident">min_key</span>.<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="ident">hex</span>::<span class="ident">encode_upper</span>(<span class="ident">v</span>)),
-                <span class="self">self</span>.<span class="ident">max_key</span>.<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="ident">hex</span>::<span class="ident">encode_upper</span>(<span class="ident">v</span>)),
+                <span class="self">self</span>.<span class="ident">min_key</span>.<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="ident">hex</span>::<span class="ident">encode_upper</span>),
+                <span class="self">self</span>.<span class="ident">max_key</span>.<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="ident">hex</span>::<span class="ident">encode_upper</span>),
             );
         } <span class="kw">else</span> {
             <span class="macro">error</span><span class="macro">!</span>(<span class="question-mark">?</span><span class="ident">e</span>;
                 <span class="string">&quot;failed to iterate&quot;</span>;
-                <span class="string">&quot;min_key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="self">self</span>.<span class="ident">min_key</span>.<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="ident">hex</span>::<span class="ident">encode_upper</span>(<span class="ident">v</span>)),
-                <span class="string">&quot;max_key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="self">self</span>.<span class="ident">max_key</span>.<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="ident">hex</span>::<span class="ident">encode_upper</span>(<span class="ident">v</span>)),
+                <span class="string">&quot;min_key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="self">self</span>.<span class="ident">min_key</span>.<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="ident">hex</span>::<span class="ident">encode_upper</span>),
+                <span class="string">&quot;max_key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="self">self</span>.<span class="ident">max_key</span>.<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="ident">hex</span>::<span class="ident">encode_upper</span>),
             );
             <span class="prelude-val">Err</span>(<span class="ident">e</span>)
         }
