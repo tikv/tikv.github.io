@@ -44,7 +44,6 @@ implementors["raft_engine"] = [{"text":"impl Error for Error","synthetic":false,
 implementors["raftstore"] = [{"text":"impl Error for Error","synthetic":false,"types":[]},{"text":"impl Error for Error","synthetic":false,"types":[]},{"text":"impl Error for Error","synthetic":false,"types":[]},{"text":"impl Error for Error","synthetic":false,"types":[]},{"text":"impl Error for Error","synthetic":false,"types":[]}];
 implementors["rand"] = [{"text":"impl Error for BernoulliError","synthetic":false,"types":[]},{"text":"impl Error for WeightedError","synthetic":false,"types":[]},{"text":"impl Error for ReadError","synthetic":false,"types":[]}];
 implementors["rand_core"] = [{"text":"impl Error for Error","synthetic":false,"types":[]}];
-implementors["rand_jitter"] = [{"text":"impl Error for TimerError","synthetic":false,"types":[]}];
 implementors["rayon_core"] = [{"text":"impl Error for ThreadPoolBuildError","synthetic":false,"types":[]}];
 implementors["regex"] = [{"text":"impl Error for Error","synthetic":false,"types":[]}];
 implementors["regex_syntax"] = [{"text":"impl Error for Error","synthetic":false,"types":[]},{"text":"impl Error for Error","synthetic":false,"types":[]},{"text":"impl Error for Error","synthetic":false,"types":[]},{"text":"impl Error for CaseFoldError","synthetic":false,"types":[]},{"text":"impl Error for UnicodeWordError","synthetic":false,"types":[]}];
@@ -78,7 +77,7 @@ implementors["tokio_executor"] = [{"text":"impl Error for EnterError","synthetic
 implementors["tokio_openssl"] = [{"text":"impl&lt;S&gt; Error for HandshakeError&lt;S&gt; <span class=\"where fmt-newline\">where<br>&nbsp;&nbsp;&nbsp;&nbsp;S: Debug,&nbsp;</span>","synthetic":false,"types":[]}];
 implementors["tokio_timer"] = [{"text":"impl&lt;T:&nbsp;StdError + 'static&gt; Error for ThrottleError&lt;T&gt;","synthetic":false,"types":[]},{"text":"impl&lt;T:&nbsp;Error&gt; Error for Error&lt;T&gt;","synthetic":false,"types":[]},{"text":"impl Error for Error","synthetic":false,"types":[]}];
 implementors["tokio_util"] = [{"text":"impl Error for LengthDelimitedCodecError","synthetic":false,"types":[]},{"text":"impl Error for LinesCodecError","synthetic":false,"types":[]}];
-implementors["toml"] = [{"text":"impl Error for DatetimeParseError","synthetic":false,"types":[]},{"text":"impl Error for Error","synthetic":false,"types":[]},{"text":"impl Error for Error","synthetic":false,"types":[]}];
+implementors["toml"] = [{"text":"impl Error for Error","synthetic":false,"types":[]},{"text":"impl Error for Error","synthetic":false,"types":[]}];
 implementors["txn_types"] = [{"text":"impl Error for ErrorInner","synthetic":false,"types":[]},{"text":"impl Error for Error","synthetic":false,"types":[]}];
 implementors["url"] = [{"text":"impl Error for ParseError","synthetic":false,"types":[]}];
 implementors["uuid"] = [{"text":"impl Error for Error","synthetic":false,"types":[]}];
