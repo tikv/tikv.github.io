@@ -35,6 +35,7 @@ implementors["ordered_float"] = [{"text":"impl Error for FloatIsNan","synthetic"
 implementors["pd_client"] = [{"text":"impl Error for Error","synthetic":false,"types":[]}];
 implementors["pnet_base"] = [{"text":"impl Error for ParseMacAddrErr","synthetic":false,"types":[]}];
 implementors["pprof"] = [{"text":"impl Error for Error","synthetic":false,"types":[]}];
+implementors["proc_macro2"] = [{"text":"impl Error for LexError","synthetic":false,"types":[]}];
 implementors["procfs"] = [{"text":"impl Error for ProcError","synthetic":false,"types":[]}];
 implementors["prometheus"] = [{"text":"impl Error for Error","synthetic":false,"types":[]}];
 implementors["prost"] = [{"text":"impl Error for DecodeError","synthetic":false,"types":[]},{"text":"impl Error for EncodeError","synthetic":false,"types":[]}];
