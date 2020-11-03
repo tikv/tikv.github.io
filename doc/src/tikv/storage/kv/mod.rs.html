@@ -885,6 +885,24 @@
 <span id="882">882</span>
 <span id="883">883</span>
 <span id="884">884</span>
+<span id="885">885</span>
+<span id="886">886</span>
+<span id="887">887</span>
+<span id="888">888</span>
+<span id="889">889</span>
+<span id="890">890</span>
+<span id="891">891</span>
+<span id="892">892</span>
+<span id="893">893</span>
+<span id="894">894</span>
+<span id="895">895</span>
+<span id="896">896</span>
+<span id="897">897</span>
+<span id="898">898</span>
+<span id="899">899</span>
+<span id="900">900</span>
+<span id="901">901</span>
+<span id="902">902</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -908,7 +926,7 @@
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">IterOptions</span>, <span class="ident">KvEngine</span> <span class="kw">as</span> <span class="ident">LocalEngine</span>, <span class="ident">MvccProperties</span>, <span class="ident">ReadOptions</span>};
 <span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">prelude</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">errorpb</span>::<span class="ident">Error</span> <span class="kw">as</span> <span class="ident">ErrorHeader</span>;
-<span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">kvrpcpb</span>::{<span class="ident">Context</span>, <span class="ident">ExtraOp</span> <span class="kw">as</span> <span class="ident">TxnExtraOp</span>};
+<span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">kvrpcpb</span>::{<span class="ident">Context</span>, <span class="ident">ExtraOp</span> <span class="kw">as</span> <span class="ident">TxnExtraOp</span>, <span class="ident">KeyRange</span>};
 <span class="kw">use</span> <span class="ident">txn_types</span>::{<span class="ident">Key</span>, <span class="ident">TimeStamp</span>, <span class="ident">TxnExtra</span>, <span class="ident">Value</span>};
 
 <span class="kw">pub</span> <span class="kw">use</span> <span class="self">self</span>::<span class="ident">btree_engine</span>::{<span class="ident">BTreeEngine</span>, <span class="ident">BTreeEngineIterator</span>, <span class="ident">BTreeEngineSnapshot</span>};
@@ -985,6 +1003,30 @@
     }
 }
 
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">SnapContext</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="ident">pb_ctx</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">Context</span>,
+    <span class="kw">pub</span> <span class="ident">read_id</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ThreadReadId</span><span class="op">&gt;</span>,
+    <span class="comment">// `start_ts` and `key_ranges` are used in replica read. They are sent to</span>
+    <span class="comment">// the leader via raft &quot;read index&quot; to check memory locks.</span>
+    <span class="kw">pub</span> <span class="ident">start_ts</span>: <span class="ident">TimeStamp</span>,
+    <span class="kw">pub</span> <span class="ident">key_ranges</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">KeyRange</span><span class="op">&gt;</span>,
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">SnapContext</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">default</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+        <span class="ident">SnapContext</span> {
+            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;protobuf-codec&quot;</span>)]</span>
+            <span class="ident">pb_ctx</span>: <span class="ident">Default</span>::<span class="ident">default</span>(),
+            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;prost-codec&quot;</span>)]</span>
+            <span class="ident">pb_ctx</span>: <span class="ident">Context</span>::<span class="ident">default_ref</span>(),
+            <span class="ident">read_id</span>: <span class="prelude-val">None</span>,
+            <span class="ident">start_ts</span>: <span class="ident">Default</span>::<span class="ident">default</span>(),
+            <span class="ident">key_ranges</span>: <span class="ident">Default</span>::<span class="ident">default</span>(),
+        }
+    }
+}
+
 <span class="doccomment">/// Engine defines the common behaviour for a storage engine type.</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Engine</span>: <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Clone</span> <span class="op">+</span> <span class="lifetime">&#39;static</span> {
     <span class="kw">type</span> <span class="ident">Snap</span>: <span class="ident">Snapshot</span>;
@@ -998,12 +1040,7 @@
     <span class="doccomment">/// Write modifications into internal local engine directly.</span>
     <span class="kw">fn</span> <span class="ident">modify_on_kv_engine</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">modifies</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Modify</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span>;
 
-    <span class="kw">fn</span> <span class="ident">async_snapshot</span>(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="ident">Context</span>,
-        <span class="ident">read_id</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ThreadReadId</span><span class="op">&gt;</span>,
-        <span class="ident">cb</span>: <span class="ident">Callback</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Snap</span><span class="op">&gt;</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span>;
+    <span class="kw">fn</span> <span class="ident">async_snapshot</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ctx</span>: <span class="ident">SnapContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>, <span class="ident">cb</span>: <span class="ident">Callback</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Snap</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span>;
 
     <span class="kw">fn</span> <span class="ident">async_write</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="ident">Context</span>, <span class="ident">batch</span>: <span class="ident">WriteData</span>, <span class="ident">write_cb</span>: <span class="ident">Callback</span><span class="op">&lt;</span>()<span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span>;
 
@@ -1032,9 +1069,9 @@
 
     <span class="kw">fn</span> <span class="ident">release_snapshot</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {}
 
-    <span class="kw">fn</span> <span class="ident">snapshot</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="ident">Context</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Snap</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">snapshot</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ctx</span>: <span class="ident">SnapContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Snap</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">timeout</span> <span class="op">=</span> <span class="ident">Duration</span>::<span class="ident">from_secs</span>(<span class="ident">DEFAULT_TIMEOUT_SECS</span>);
-        <span class="kw">match</span> <span class="macro">wait_op</span><span class="macro">!</span>(<span class="op">|</span><span class="ident">cb</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">async_snapshot</span>(<span class="ident">ctx</span>, <span class="prelude-val">None</span>, <span class="ident">cb</span>), <span class="ident">timeout</span>) {
+        <span class="kw">match</span> <span class="macro">wait_op</span><span class="macro">!</span>(<span class="op">|</span><span class="ident">cb</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">async_snapshot</span>(<span class="ident">ctx</span>, <span class="ident">cb</span>), <span class="ident">timeout</span>) {
             <span class="prelude-val">Some</span>((<span class="kw">_</span>, <span class="ident">res</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">res</span>,
             <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">from</span>(<span class="ident">ErrorInner</span>::<span class="ident">Timeout</span>(<span class="ident">timeout</span>))),
         }
@@ -1297,12 +1334,11 @@
 <span class="doccomment">/// Get a snapshot of `engine`.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">snapshot</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">Engine</span><span class="op">&gt;</span>(
     <span class="ident">engine</span>: <span class="kw-2">&amp;</span><span class="ident">E</span>,
-    <span class="ident">read_id</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ThreadReadId</span><span class="op">&gt;</span>,
-    <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="ident">Context</span>,
+    <span class="ident">ctx</span>: <span class="ident">SnapContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>,
 ) <span class="op">-</span><span class="op">&gt;</span> <span class="kw">impl</span> <span class="ident">std</span>::<span class="ident">future</span>::<span class="ident">Future</span><span class="op">&lt;</span><span class="ident">Output</span> <span class="op">=</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">E</span>::<span class="ident">Snap</span><span class="op">&gt;</span><span class="op">&gt;</span> {
     <span class="kw">let</span> (<span class="ident">callback</span>, <span class="ident">future</span>) <span class="op">=</span>
         <span class="ident">tikv_util</span>::<span class="ident">future</span>::<span class="ident">paired_must_called_future_callback</span>(<span class="ident">drop_snapshot_callback</span>::<span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>);
-    <span class="kw">let</span> <span class="ident">val</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">async_snapshot</span>(<span class="ident">ctx</span>, <span class="ident">read_id</span>, <span class="ident">callback</span>);
+    <span class="kw">let</span> <span class="ident">val</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">async_snapshot</span>(<span class="ident">ctx</span>, <span class="ident">callback</span>);
     <span class="comment">// make engine not cross yield point</span>
     <span class="ident">async</span> <span class="kw">move</span> {
         <span class="ident">val</span><span class="question-mark">?</span>; <span class="comment">// propagate error</span>
@@ -1354,12 +1390,12 @@
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">assert_has</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">Engine</span><span class="op">&gt;</span>(<span class="ident">engine</span>: <span class="kw-2">&amp;</span><span class="ident">E</span>, <span class="ident">key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">value</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) {
-        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="kw-2">&amp;</span><span class="ident">Context</span>::<span class="ident">default</span>()).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="ident">Default</span>::<span class="ident">default</span>()).<span class="ident">unwrap</span>();
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">snapshot</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">Key</span>::<span class="ident">from_raw</span>(<span class="ident">key</span>)).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>(), <span class="ident">value</span>);
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">assert_has_cf</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">Engine</span><span class="op">&gt;</span>(<span class="ident">engine</span>: <span class="kw-2">&amp;</span><span class="ident">E</span>, <span class="ident">cf</span>: <span class="ident">CfName</span>, <span class="ident">key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">value</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) {
-        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="kw-2">&amp;</span><span class="ident">Context</span>::<span class="ident">default</span>()).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="ident">Default</span>::<span class="ident">default</span>()).<span class="ident">unwrap</span>();
         <span class="macro">assert_eq</span><span class="macro">!</span>(
             <span class="ident">snapshot</span>.<span class="ident">get_cf</span>(<span class="ident">cf</span>, <span class="kw-2">&amp;</span><span class="ident">Key</span>::<span class="ident">from_raw</span>(<span class="ident">key</span>)).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>(),
             <span class="ident">value</span>
@@ -1367,17 +1403,17 @@
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">assert_none</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">Engine</span><span class="op">&gt;</span>(<span class="ident">engine</span>: <span class="kw-2">&amp;</span><span class="ident">E</span>, <span class="ident">key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) {
-        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="kw-2">&amp;</span><span class="ident">Context</span>::<span class="ident">default</span>()).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="ident">Default</span>::<span class="ident">default</span>()).<span class="ident">unwrap</span>();
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">snapshot</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">Key</span>::<span class="ident">from_raw</span>(<span class="ident">key</span>)).<span class="ident">unwrap</span>(), <span class="prelude-val">None</span>);
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">assert_none_cf</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">Engine</span><span class="op">&gt;</span>(<span class="ident">engine</span>: <span class="kw-2">&amp;</span><span class="ident">E</span>, <span class="ident">cf</span>: <span class="ident">CfName</span>, <span class="ident">key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) {
-        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="kw-2">&amp;</span><span class="ident">Context</span>::<span class="ident">default</span>()).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="ident">Default</span>::<span class="ident">default</span>()).<span class="ident">unwrap</span>();
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">snapshot</span>.<span class="ident">get_cf</span>(<span class="ident">cf</span>, <span class="kw-2">&amp;</span><span class="ident">Key</span>::<span class="ident">from_raw</span>(<span class="ident">key</span>)).<span class="ident">unwrap</span>(), <span class="prelude-val">None</span>);
     }
 
     <span class="kw">fn</span> <span class="ident">assert_seek</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">Engine</span><span class="op">&gt;</span>(<span class="ident">engine</span>: <span class="kw-2">&amp;</span><span class="ident">E</span>, <span class="ident">key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">pair</span>: (<span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="kw-2">&amp;</span>[<span class="ident">u8</span>])) {
-        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="kw-2">&amp;</span><span class="ident">Context</span>::<span class="ident">default</span>()).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="ident">Default</span>::<span class="ident">default</span>()).<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cursor</span> <span class="op">=</span> <span class="ident">snapshot</span>
             .<span class="ident">iter</span>(<span class="ident">IterOptions</span>::<span class="ident">default</span>(), <span class="ident">ScanMode</span>::<span class="ident">Mixed</span>)
             .<span class="ident">unwrap</span>();
@@ -1388,7 +1424,7 @@
     }
 
     <span class="kw">fn</span> <span class="ident">assert_reverse_seek</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">Engine</span><span class="op">&gt;</span>(<span class="ident">engine</span>: <span class="kw-2">&amp;</span><span class="ident">E</span>, <span class="ident">key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">pair</span>: (<span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="kw-2">&amp;</span>[<span class="ident">u8</span>])) {
-        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="kw-2">&amp;</span><span class="ident">Context</span>::<span class="ident">default</span>()).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="ident">Default</span>::<span class="ident">default</span>()).<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cursor</span> <span class="op">=</span> <span class="ident">snapshot</span>
             .<span class="ident">iter</span>(<span class="ident">IterOptions</span>::<span class="ident">default</span>(), <span class="ident">ScanMode</span>::<span class="ident">Mixed</span>)
             .<span class="ident">unwrap</span>();
@@ -1482,7 +1518,7 @@
         <span class="ident">assert_seek</span>(<span class="ident">engine</span>, <span class="string">b&quot;x\x00&quot;</span>, (<span class="string">b&quot;z&quot;</span>, <span class="string">b&quot;2&quot;</span>));
         <span class="ident">assert_reverse_seek</span>(<span class="ident">engine</span>, <span class="string">b&quot;y&quot;</span>, (<span class="string">b&quot;x&quot;</span>, <span class="string">b&quot;1&quot;</span>));
         <span class="ident">assert_reverse_seek</span>(<span class="ident">engine</span>, <span class="string">b&quot;z&quot;</span>, (<span class="string">b&quot;x&quot;</span>, <span class="string">b&quot;1&quot;</span>));
-        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="kw-2">&amp;</span><span class="ident">Context</span>::<span class="ident">default</span>()).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="ident">Default</span>::<span class="ident">default</span>()).<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">iter</span> <span class="op">=</span> <span class="ident">snapshot</span>
             .<span class="ident">iter</span>(<span class="ident">IterOptions</span>::<span class="ident">default</span>(), <span class="ident">ScanMode</span>::<span class="ident">Mixed</span>)
             .<span class="ident">unwrap</span>();
@@ -1500,7 +1536,7 @@
     <span class="kw">fn</span> <span class="ident">test_near_seek</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">Engine</span><span class="op">&gt;</span>(<span class="ident">engine</span>: <span class="kw-2">&amp;</span><span class="ident">E</span>) {
         <span class="ident">must_put</span>(<span class="ident">engine</span>, <span class="string">b&quot;x&quot;</span>, <span class="string">b&quot;1&quot;</span>);
         <span class="ident">must_put</span>(<span class="ident">engine</span>, <span class="string">b&quot;z&quot;</span>, <span class="string">b&quot;2&quot;</span>);
-        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="kw-2">&amp;</span><span class="ident">Context</span>::<span class="ident">default</span>()).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="ident">Default</span>::<span class="ident">default</span>()).<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cursor</span> <span class="op">=</span> <span class="ident">snapshot</span>
             .<span class="ident">iter</span>(<span class="ident">IterOptions</span>::<span class="ident">default</span>(), <span class="ident">ScanMode</span>::<span class="ident">Mixed</span>)
             .<span class="ident">unwrap</span>();
@@ -1519,7 +1555,7 @@
             <span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> <span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;y{}&quot;</span>, <span class="ident">i</span>);
             <span class="ident">must_put</span>(<span class="ident">engine</span>, <span class="ident">key</span>.<span class="ident">as_bytes</span>(), <span class="string">b&quot;3&quot;</span>);
         }
-        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="kw-2">&amp;</span><span class="ident">Context</span>::<span class="ident">default</span>()).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="ident">Default</span>::<span class="ident">default</span>()).<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cursor</span> <span class="op">=</span> <span class="ident">snapshot</span>
             .<span class="ident">iter</span>(<span class="ident">IterOptions</span>::<span class="ident">default</span>(), <span class="ident">ScanMode</span>::<span class="ident">Mixed</span>)
             .<span class="ident">unwrap</span>();
@@ -1535,7 +1571,7 @@
     }
 
     <span class="kw">fn</span> <span class="ident">test_empty_seek</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">Engine</span><span class="op">&gt;</span>(<span class="ident">engine</span>: <span class="kw-2">&amp;</span><span class="ident">E</span>) {
-        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="kw-2">&amp;</span><span class="ident">Context</span>::<span class="ident">default</span>()).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="ident">Default</span>::<span class="ident">default</span>()).<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cursor</span> <span class="op">=</span> <span class="ident">snapshot</span>
             .<span class="ident">iter</span>(<span class="ident">IterOptions</span>::<span class="ident">default</span>(), <span class="ident">ScanMode</span>::<span class="ident">Mixed</span>)
             .<span class="ident">unwrap</span>();
@@ -1662,7 +1698,7 @@
             <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;value_{}&quot;</span>, <span class="ident">i</span>);
             <span class="ident">must_put</span>(<span class="ident">engine</span>, <span class="ident">key</span>.<span class="ident">as_bytes</span>(), <span class="ident">value</span>.<span class="ident">as_bytes</span>());
         }
-        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="kw-2">&amp;</span><span class="ident">Context</span>::<span class="ident">default</span>()).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="ident">Default</span>::<span class="ident">default</span>()).<span class="ident">unwrap</span>();
 
         <span class="kw">for</span> <span class="ident">step</span> <span class="kw">in</span> <span class="number">1</span>..<span class="ident">SEEK_BOUND</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">*</span> <span class="number">3</span> {
             <span class="kw">for</span> <span class="ident">start</span> <span class="kw">in</span> <span class="number">0</span>..<span class="number">10</span> {
@@ -1730,7 +1766,7 @@
         <span class="ident">must_delete</span>(<span class="ident">engine</span>, <span class="string">b&quot;foo42&quot;</span>);
         <span class="ident">must_delete</span>(<span class="ident">engine</span>, <span class="string">b&quot;foo5&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="kw-2">&amp;</span><span class="ident">Context</span>::<span class="ident">default</span>()).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="ident">Default</span>::<span class="ident">default</span>()).<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">iter</span> <span class="op">=</span> <span class="ident">snapshot</span>
             .<span class="ident">iter</span>(<span class="ident">IterOptions</span>::<span class="ident">default</span>(), <span class="ident">ScanMode</span>::<span class="ident">Forward</span>)
             .<span class="ident">unwrap</span>();

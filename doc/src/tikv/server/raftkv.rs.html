@@ -636,14 +636,6 @@
 <span id="633">633</span>
 <span id="634">634</span>
 <span id="635">635</span>
-<span id="636">636</span>
-<span id="637">637</span>
-<span id="638">638</span>
-<span id="639">639</span>
-<span id="640">640</span>
-<span id="641">641</span>
-<span id="642">642</span>
-<span id="643">643</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -671,7 +663,7 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">kv</span>::{
     <span class="ident">write_modifies</span>, <span class="ident">Callback</span>, <span class="ident">CbContext</span>, <span class="ident">Cursor</span>, <span class="ident">Engine</span>, <span class="ident">Error</span> <span class="kw">as</span> <span class="ident">KvError</span>,
     <span class="ident">ErrorInner</span> <span class="kw">as</span> <span class="ident">KvErrorInner</span>, <span class="ident">ExtCallback</span>, <span class="ident">Iterator</span> <span class="kw">as</span> <span class="ident">EngineIterator</span>, <span class="ident">Modify</span>, <span class="ident">ScanMode</span>,
-    <span class="ident">Snapshot</span> <span class="kw">as</span> <span class="ident">EngineSnapshot</span>, <span class="ident">WriteData</span>,
+    <span class="ident">SnapContext</span>, <span class="ident">Snapshot</span> <span class="kw">as</span> <span class="ident">EngineSnapshot</span>, <span class="ident">WriteData</span>,
 };
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::{<span class="self">self</span>, <span class="ident">kv</span>};
 <span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">errors</span>::<span class="ident">Error</span> <span class="kw">as</span> <span class="ident">RaftServerError</span>;
@@ -679,7 +671,6 @@
 <span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">store</span>::{<span class="ident">Callback</span> <span class="kw">as</span> <span class="ident">StoreCallback</span>, <span class="ident">ReadResponse</span>, <span class="ident">WriteResponse</span>};
 <span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">store</span>::{<span class="ident">RegionIterator</span>, <span class="ident">RegionSnapshot</span>};
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">time</span>::<span class="ident">Instant</span>;
-<span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">time</span>::<span class="ident">ThreadReadId</span>;
 
 <span class="macro">quick_error</span><span class="macro">!</span> {
     <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
@@ -849,18 +840,17 @@
 
     <span class="kw">fn</span> <span class="ident">exec_snapshot</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">read_id</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ThreadReadId</span><span class="op">&gt;</span>,
-        <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="ident">Context</span>,
+        <span class="ident">ctx</span>: <span class="ident">SnapContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>,
         <span class="ident">req</span>: <span class="ident">Request</span>,
         <span class="ident">cb</span>: <span class="ident">Callback</span><span class="op">&lt;</span><span class="ident">CmdRes</span><span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">header</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">new_request_header</span>(<span class="ident">ctx</span>);
+        <span class="kw">let</span> <span class="ident">header</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">new_request_header</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">ctx</span>.<span class="ident">pb_ctx</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cmd</span> <span class="op">=</span> <span class="ident">RaftCmdRequest</span>::<span class="ident">default</span>();
         <span class="ident">cmd</span>.<span class="ident">set_header</span>(<span class="ident">header</span>);
         <span class="ident">cmd</span>.<span class="ident">set_requests</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">req</span>].<span class="ident">into</span>());
         <span class="self">self</span>.<span class="ident">router</span>
             .<span class="ident">read</span>(
-                <span class="ident">read_id</span>,
+                <span class="ident">ctx</span>.<span class="ident">read_id</span>,
                 <span class="ident">cmd</span>,
                 <span class="ident">StoreCallback</span>::<span class="ident">Read</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">resp</span><span class="op">|</span> {
                     <span class="kw">let</span> (<span class="ident">cb_ctx</span>, <span class="ident">res</span>) <span class="op">=</span> <span class="ident">on_read_result</span>(<span class="ident">resp</span>, <span class="number">1</span>);
@@ -1091,18 +1081,12 @@
         })
     }
 
-    <span class="kw">fn</span> <span class="ident">async_snapshot</span>(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="ident">Context</span>,
-        <span class="ident">read_id</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ThreadReadId</span><span class="op">&gt;</span>,
-        <span class="ident">cb</span>: <span class="ident">Callback</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Snap</span><span class="op">&gt;</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">kv</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">async_snapshot</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ctx</span>: <span class="ident">SnapContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>, <span class="ident">cb</span>: <span class="ident">Callback</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Snap</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">kv</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">Request</span>::<span class="ident">default</span>();
         <span class="ident">req</span>.<span class="ident">set_cmd_type</span>(<span class="ident">CmdType</span>::<span class="ident">Snap</span>);
         <span class="ident">ASYNC_REQUESTS_COUNTER_VEC</span>.<span class="ident">snapshot</span>.<span class="ident">all</span>.<span class="ident">inc</span>();
         <span class="kw">let</span> <span class="ident">begin_instant</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now_coarse</span>();
         <span class="self">self</span>.<span class="ident">exec_snapshot</span>(
-            <span class="ident">read_id</span>,
             <span class="ident">ctx</span>,
             <span class="ident">req</span>,
             <span class="ident">Box</span>::<span class="ident">new</span>(<span class="kw">move</span> <span class="op">|</span>(<span class="ident">cb_ctx</span>, <span class="ident">res</span>)<span class="op">|</span> <span class="kw">match</span> <span class="ident">res</span> {
