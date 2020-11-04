@@ -1128,45 +1128,6 @@
 <span id="1125">1125</span>
 <span id="1126">1126</span>
 <span id="1127">1127</span>
-<span id="1128">1128</span>
-<span id="1129">1129</span>
-<span id="1130">1130</span>
-<span id="1131">1131</span>
-<span id="1132">1132</span>
-<span id="1133">1133</span>
-<span id="1134">1134</span>
-<span id="1135">1135</span>
-<span id="1136">1136</span>
-<span id="1137">1137</span>
-<span id="1138">1138</span>
-<span id="1139">1139</span>
-<span id="1140">1140</span>
-<span id="1141">1141</span>
-<span id="1142">1142</span>
-<span id="1143">1143</span>
-<span id="1144">1144</span>
-<span id="1145">1145</span>
-<span id="1146">1146</span>
-<span id="1147">1147</span>
-<span id="1148">1148</span>
-<span id="1149">1149</span>
-<span id="1150">1150</span>
-<span id="1151">1151</span>
-<span id="1152">1152</span>
-<span id="1153">1153</span>
-<span id="1154">1154</span>
-<span id="1155">1155</span>
-<span id="1156">1156</span>
-<span id="1157">1157</span>
-<span id="1158">1158</span>
-<span id="1159">1159</span>
-<span id="1160">1160</span>
-<span id="1161">1161</span>
-<span id="1162">1162</span>
-<span id="1163">1163</span>
-<span id="1164">1164</span>
-<span id="1165">1165</span>
-<span id="1166">1166</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1180,7 +1141,7 @@
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">u64</span>;
 
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">DeleteStrategy</span>, <span class="ident">Range</span>, <span class="ident">CF_LOCK</span>, <span class="ident">CF_RAFT</span>};
-<span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">Engines</span>, <span class="ident">KvEngine</span>, <span class="ident">Mutable</span>, <span class="ident">RaftEngine</span>};
+<span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">KvEngine</span>, <span class="ident">Mutable</span>};
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">raft_serverpb</span>::{<span class="ident">PeerState</span>, <span class="ident">RaftApplyState</span>, <span class="ident">RegionLocalState</span>};
 <span class="kw">use</span> <span class="ident">raft</span>::<span class="ident">eraftpb</span>::<span class="ident">Snapshot</span> <span class="kw">as</span> <span class="ident">RaftSnapshot</span>;
 
@@ -1197,7 +1158,6 @@
 <span class="kw">use</span> <span class="ident">yatp</span>::<span class="ident">pool</span>::{<span class="ident">Builder</span>, <span class="ident">ThreadPool</span>};
 <span class="kw">use</span> <span class="ident">yatp</span>::<span class="ident">task</span>::<span class="ident">future</span>::<span class="ident">TaskCell</span>;
 
-<span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">timer</span>::<span class="ident">Timer</span>;
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">worker</span>::{<span class="ident">Runnable</span>, <span class="ident">RunnableWithTimer</span>};
 
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">metrics</span>::<span class="kw-2">*</span>;
@@ -1205,7 +1165,12 @@
 <span class="kw">const</span> <span class="ident">GENERATE_POOL_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">2</span>;
 
 <span class="comment">// used to periodically check whether we should delete a stale peer&#39;s range in region runner</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">STALE_PEER_CHECK_INTERVAL</span>: <span class="ident">u64</span> <span class="op">=</span> <span class="number">10_000</span>; <span class="comment">// 10000 milliseconds</span>
+
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">STALE_PEER_CHECK_TICK</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span>; <span class="comment">// 1000 milliseconds</span>
+
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">test</span>))]</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">STALE_PEER_CHECK_TICK</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">10</span>; <span class="comment">// 10000 milliseconds</span>
 
 <span class="comment">// used to periodically check whether schedule pending applies in region runner</span>
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">PENDING_APPLY_CHECK_INTERVAL</span>: <span class="ident">u64</span> <span class="op">=</span> <span class="number">1_000</span>; <span class="comment">// 1000 milliseconds</span>
@@ -1382,12 +1347,11 @@
 }
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>)]</span>
-<span class="kw">struct</span> <span class="ident">SnapContext</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">R</span><span class="op">&gt;</span>
+<span class="kw">struct</span> <span class="ident">SnapContext</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">R</span><span class="op">&gt;</span>
 <span class="kw">where</span>
     <span class="ident">EK</span>: <span class="ident">KvEngine</span>,
-    <span class="ident">ER</span>: <span class="ident">RaftEngine</span>,
 {
-    <span class="ident">engines</span>: <span class="ident">Engines</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>,
+    <span class="ident">engine</span>: <span class="ident">EK</span>,
     <span class="ident">batch_size</span>: <span class="ident">usize</span>,
     <span class="ident">mgr</span>: <span class="ident">SnapManager</span>,
     <span class="ident">use_delete_range</span>: <span class="ident">bool</span>,
@@ -1396,10 +1360,9 @@
     <span class="ident">router</span>: <span class="ident">R</span>,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">R</span><span class="op">&gt;</span> <span class="ident">SnapContext</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">R</span><span class="op">&gt;</span>
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">R</span><span class="op">&gt;</span> <span class="ident">SnapContext</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">R</span><span class="op">&gt;</span>
 <span class="kw">where</span>
     <span class="ident">EK</span>: <span class="ident">KvEngine</span>,
-    <span class="ident">ER</span>: <span class="ident">RaftEngine</span>,
     <span class="ident">R</span>: <span class="ident">CasualRouter</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>,
 {
     <span class="doccomment">/// Generates the snapshot of the Region.</span>
@@ -1414,7 +1377,7 @@
         <span class="comment">// do we need to check leader here?</span>
         <span class="kw">let</span> <span class="ident">snap</span> <span class="op">=</span> <span class="macro">box_try</span><span class="macro">!</span>(<span class="ident">store</span>::<span class="ident">do_snapshot</span>::<span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>(
             <span class="self">self</span>.<span class="ident">mgr</span>.<span class="ident">clone</span>(),
-            <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">engines</span>.<span class="ident">kv</span>,
+            <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">engine</span>,
             <span class="ident">kv_snap</span>,
             <span class="ident">region_id</span>,
             <span class="ident">last_applied_index_term</span>,
@@ -1471,7 +1434,7 @@
         <span class="ident">check_abort</span>(<span class="kw-2">&amp;</span><span class="ident">abort</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">region_key</span> <span class="op">=</span> <span class="ident">keys</span>::<span class="ident">region_state_key</span>(<span class="ident">region_id</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">region_state</span>: <span class="ident">RegionLocalState</span> <span class="op">=</span>
-            <span class="kw">match</span> <span class="macro">box_try</span><span class="macro">!</span>(<span class="self">self</span>.<span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">get_msg_cf</span>(<span class="ident">CF_RAFT</span>, <span class="kw-2">&amp;</span><span class="ident">region_key</span>)) {
+            <span class="kw">match</span> <span class="macro">box_try</span><span class="macro">!</span>(<span class="self">self</span>.<span class="ident">engine</span>.<span class="ident">get_msg_cf</span>(<span class="ident">CF_RAFT</span>, <span class="kw-2">&amp;</span><span class="ident">region_key</span>)) {
                 <span class="prelude-val">Some</span>(<span class="ident">state</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">state</span>,
                 <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> {
                     <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(
@@ -1493,7 +1456,7 @@
 
         <span class="kw">let</span> <span class="ident">state_key</span> <span class="op">=</span> <span class="ident">keys</span>::<span class="ident">apply_state_key</span>(<span class="ident">region_id</span>);
         <span class="kw">let</span> <span class="ident">apply_state</span>: <span class="ident">RaftApplyState</span> <span class="op">=</span>
-            <span class="kw">match</span> <span class="macro">box_try</span><span class="macro">!</span>(<span class="self">self</span>.<span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">get_msg_cf</span>(<span class="ident">CF_RAFT</span>, <span class="kw-2">&amp;</span><span class="ident">state_key</span>)) {
+            <span class="kw">match</span> <span class="macro">box_try</span><span class="macro">!</span>(<span class="self">self</span>.<span class="ident">engine</span>.<span class="ident">get_msg_cf</span>(<span class="ident">CF_RAFT</span>, <span class="kw-2">&amp;</span><span class="ident">state_key</span>)) {
                 <span class="prelude-val">Some</span>(<span class="ident">state</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">state</span>,
                 <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> {
                     <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(
@@ -1516,7 +1479,7 @@
         <span class="ident">check_abort</span>(<span class="kw-2">&amp;</span><span class="ident">abort</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">timer</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now</span>();
         <span class="kw">let</span> <span class="ident">options</span> <span class="op">=</span> <span class="ident">ApplyOptions</span> {
-            <span class="ident">db</span>: <span class="self">self</span>.<span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">clone</span>(),
+            <span class="ident">db</span>: <span class="self">self</span>.<span class="ident">engine</span>.<span class="ident">clone</span>(),
             <span class="ident">region</span>,
             <span class="ident">abort</span>: <span class="ident">Arc</span>::<span class="ident">clone</span>(<span class="kw-2">&amp;</span><span class="ident">abort</span>),
             <span class="ident">write_batch_size</span>: <span class="self">self</span>.<span class="ident">batch_size</span>,
@@ -1524,11 +1487,11 @@
         };
         <span class="ident">s</span>.<span class="ident">apply</span>(<span class="ident">options</span>)<span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">wb</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">write_batch</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">wb</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">engine</span>.<span class="ident">write_batch</span>();
         <span class="ident">region_state</span>.<span class="ident">set_state</span>(<span class="ident">PeerState</span>::<span class="ident">Normal</span>);
         <span class="macro">box_try</span><span class="macro">!</span>(<span class="ident">wb</span>.<span class="ident">put_msg_cf</span>(<span class="ident">CF_RAFT</span>, <span class="kw-2">&amp;</span><span class="ident">region_key</span>, <span class="kw-2">&amp;</span><span class="ident">region_state</span>));
         <span class="macro">box_try</span><span class="macro">!</span>(<span class="ident">wb</span>.<span class="ident">delete_cf</span>(<span class="ident">CF_RAFT</span>, <span class="kw-2">&amp;</span><span class="ident">keys</span>::<span class="ident">snapshot_raft_state_key</span>(<span class="ident">region_id</span>)));
-        <span class="self">self</span>.<span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">write</span>(<span class="kw-2">&amp;</span><span class="ident">wb</span>).<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
+        <span class="self">self</span>.<span class="ident">engine</span>.<span class="ident">write</span>(<span class="kw-2">&amp;</span><span class="ident">wb</span>).<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
             <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;{} failed to save apply_snap result: {:?}&quot;</span>, <span class="ident">region_id</span>, <span class="ident">e</span>);
         });
         <span class="macro">info</span><span class="macro">!</span>(
@@ -1572,15 +1535,13 @@
 
     <span class="doccomment">/// Cleans up the data within the range.</span>
     <span class="kw">fn</span> <span class="ident">cleanup_range</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ranges</span>: <span class="kw-2">&amp;</span>[<span class="ident">Range</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">engines</span>
-            .<span class="ident">kv</span>
+        <span class="self">self</span>.<span class="ident">engine</span>
             .<span class="ident">delete_all_in_range</span>(<span class="ident">DeleteStrategy</span>::<span class="ident">DeleteFiles</span>, <span class="kw-2">&amp;</span><span class="ident">ranges</span>)
             .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
                 <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;failed to delete files in range&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>);
             });
         <span class="self">self</span>.<span class="ident">delete_all_in_range</span>(<span class="ident">ranges</span>)<span class="question-mark">?</span>;
-        <span class="self">self</span>.<span class="ident">engines</span>
-            .<span class="ident">kv</span>
+        <span class="self">self</span>.<span class="ident">engine</span>
             .<span class="ident">delete_all_in_range</span>(<span class="ident">DeleteStrategy</span>::<span class="ident">DeleteBlobs</span>, <span class="kw-2">&amp;</span><span class="ident">ranges</span>)
             .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
                 <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;failed to delete files in range&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>);
@@ -1597,8 +1558,7 @@
             <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
         }
         <span class="kw">let</span> <span class="ident">oldest_sequence</span> <span class="op">=</span> <span class="self">self</span>
-            .<span class="ident">engines</span>
-            .<span class="ident">kv</span>
+            .<span class="ident">engine</span>
             .<span class="ident">get_oldest_snapshot_sequence_number</span>()
             .<span class="ident">unwrap_or</span>(<span class="ident">u64</span>::<span class="ident">MAX</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ranges</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">with_capacity</span>(<span class="ident">overlap_ranges</span>.<span class="ident">len</span>());
@@ -1618,8 +1578,7 @@
                   <span class="string">&quot;end_key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>(<span class="ident">end_key</span>));
             <span class="ident">ranges</span>.<span class="ident">push</span>(<span class="ident">Range</span>::<span class="ident">new</span>(<span class="ident">start_key</span>, <span class="ident">end_key</span>));
         }
-        <span class="self">self</span>.<span class="ident">engines</span>
-            .<span class="ident">kv</span>
+        <span class="self">self</span>.<span class="ident">engine</span>
             .<span class="ident">delete_all_in_range</span>(<span class="ident">DeleteStrategy</span>::<span class="ident">DeleteFiles</span>, <span class="kw-2">&amp;</span><span class="ident">df_ranges</span>)
             .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
                 <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;failed to delete files in range&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>);
@@ -1645,7 +1604,7 @@
             );
         }
 
-        <span class="kw">let</span> <span class="ident">seq</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">get_latest_sequence_number</span>();
+        <span class="kw">let</span> <span class="ident">seq</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">engine</span>.<span class="ident">get_latest_sequence_number</span>();
         <span class="self">self</span>.<span class="ident">pending_delete_ranges</span>
             .<span class="ident">insert</span>(<span class="ident">region_id</span>, <span class="ident">start_key</span>, <span class="ident">end_key</span>, <span class="ident">seq</span>);
     }
@@ -1655,8 +1614,7 @@
         <span class="ident">STALE_PEER_PENDING_DELETE_RANGE_GAUGE</span>.<span class="ident">set</span>(<span class="self">self</span>.<span class="ident">pending_delete_ranges</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">f64</span>);
 
         <span class="kw">let</span> <span class="ident">oldest_sequence</span> <span class="op">=</span> <span class="self">self</span>
-            .<span class="ident">engines</span>
-            .<span class="ident">kv</span>
+            .<span class="ident">engine</span>
             .<span class="ident">get_oldest_snapshot_sequence_number</span>()
             .<span class="ident">unwrap_or</span>(<span class="ident">u64</span>::<span class="ident">MAX</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cleanup_ranges</span>: <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">u64</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="self">self</span>
@@ -1698,12 +1656,7 @@
             <span class="kw">if</span> <span class="ident">plain_file_used</span>(<span class="ident">cf</span>) {
                 <span class="kw">continue</span>;
             }
-            <span class="kw">if</span> <span class="self">self</span>
-                .<span class="ident">engines</span>
-                .<span class="ident">kv</span>
-                .<span class="ident">ingest_maybe_slowdown_writes</span>(<span class="ident">cf</span>)
-                .<span class="ident">expect</span>(<span class="string">&quot;cf&quot;</span>)
-            {
+            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">engine</span>.<span class="ident">ingest_maybe_slowdown_writes</span>(<span class="ident">cf</span>).<span class="ident">expect</span>(<span class="string">&quot;cf&quot;</span>) {
                 <span class="kw">return</span> <span class="bool-val">true</span>;
             }
         }
@@ -1711,7 +1664,7 @@
     }
 
     <span class="kw">fn</span> <span class="ident">delete_all_in_range</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ranges</span>: <span class="kw-2">&amp;</span>[<span class="ident">Range</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="kw">for</span> <span class="ident">cf</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">cf_names</span>() {
+        <span class="kw">for</span> <span class="ident">cf</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">engine</span>.<span class="ident">cf_names</span>() {
             <span class="kw">let</span> <span class="ident">strategy</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">cf</span> <span class="op">=</span><span class="op">=</span> <span class="ident">CF_LOCK</span> {
                 <span class="ident">DeleteStrategy</span>::<span class="ident">DeleteByKey</span>
             } <span class="kw">else</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">use_delete_range</span> {
@@ -1721,45 +1674,45 @@
                     <span class="ident">sst_path</span>: <span class="self">self</span>.<span class="ident">mgr</span>.<span class="ident">get_temp_path_for_ingest</span>(),
                 }
             };
-            <span class="macro">box_try</span><span class="macro">!</span>(<span class="self">self</span>.<span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">delete_ranges_cf</span>(<span class="ident">cf</span>, <span class="ident">strategy</span>, <span class="ident">ranges</span>));
+            <span class="macro">box_try</span><span class="macro">!</span>(<span class="self">self</span>.<span class="ident">engine</span>.<span class="ident">delete_ranges_cf</span>(<span class="ident">cf</span>, <span class="ident">strategy</span>, <span class="ident">ranges</span>));
         }
 
         <span class="prelude-val">Ok</span>(())
     }
 }
 
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Runner</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">R</span><span class="op">&gt;</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Runner</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">R</span><span class="op">&gt;</span>
 <span class="kw">where</span>
     <span class="ident">EK</span>: <span class="ident">KvEngine</span>,
-    <span class="ident">ER</span>: <span class="ident">RaftEngine</span>,
 {
     <span class="ident">pool</span>: <span class="ident">ThreadPool</span><span class="op">&lt;</span><span class="ident">TaskCell</span><span class="op">&gt;</span>,
-    <span class="ident">ctx</span>: <span class="ident">SnapContext</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">R</span><span class="op">&gt;</span>,
+    <span class="ident">ctx</span>: <span class="ident">SnapContext</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">R</span><span class="op">&gt;</span>,
     <span class="comment">// we may delay some apply tasks if level 0 files to write stall threshold,</span>
     <span class="comment">// pending_applies records all delayed apply task, and will check again later</span>
     <span class="ident">pending_applies</span>: <span class="ident">VecDeque</span><span class="op">&lt;</span><span class="ident">Task</span><span class="op">&lt;</span><span class="ident">EK</span>::<span class="ident">Snapshot</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">clean_stale_tick</span>: <span class="ident">usize</span>,
+    <span class="ident">clean_stale_check_interval</span>: <span class="ident">Duration</span>,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">R</span><span class="op">&gt;</span> <span class="ident">Runner</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">R</span><span class="op">&gt;</span>
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">R</span><span class="op">&gt;</span> <span class="ident">Runner</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">R</span><span class="op">&gt;</span>
 <span class="kw">where</span>
     <span class="ident">EK</span>: <span class="ident">KvEngine</span>,
-    <span class="ident">ER</span>: <span class="ident">RaftEngine</span>,
     <span class="ident">R</span>: <span class="ident">CasualRouter</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>,
 {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
-        <span class="ident">engines</span>: <span class="ident">Engines</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>,
+        <span class="ident">engine</span>: <span class="ident">EK</span>,
         <span class="ident">mgr</span>: <span class="ident">SnapManager</span>,
         <span class="ident">batch_size</span>: <span class="ident">usize</span>,
         <span class="ident">use_delete_range</span>: <span class="ident">bool</span>,
         <span class="ident">coprocessor_host</span>: <span class="ident">CoprocessorHost</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>,
         <span class="ident">router</span>: <span class="ident">R</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Runner</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">R</span><span class="op">&gt;</span> {
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Runner</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">R</span><span class="op">&gt;</span> {
         <span class="ident">Runner</span> {
             <span class="ident">pool</span>: <span class="ident">Builder</span>::<span class="ident">new</span>(<span class="macro">thd_name</span><span class="macro">!</span>(<span class="string">&quot;snap-generator&quot;</span>))
                 .<span class="ident">max_thread_count</span>(<span class="ident">GENERATE_POOL_SIZE</span>)
                 .<span class="ident">build_future_pool</span>(),
             <span class="ident">ctx</span>: <span class="ident">SnapContext</span> {
-                <span class="ident">engines</span>,
+                <span class="ident">engine</span>,
                 <span class="ident">mgr</span>,
                 <span class="ident">batch_size</span>,
                 <span class="ident">use_delete_range</span>,
@@ -1768,20 +1721,9 @@
                 <span class="ident">router</span>,
             },
             <span class="ident">pending_applies</span>: <span class="ident">VecDeque</span>::<span class="ident">new</span>(),
+            <span class="ident">clean_stale_tick</span>: <span class="number">0</span>,
+            <span class="ident">clean_stale_check_interval</span>: <span class="ident">Duration</span>::<span class="ident">from_millis</span>(<span class="ident">PENDING_APPLY_CHECK_INTERVAL</span>),
         }
-    }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_timer</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Timer</span><span class="op">&lt;</span><span class="ident">Event</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">timer</span> <span class="op">=</span> <span class="ident">Timer</span>::<span class="ident">new</span>(<span class="number">2</span>);
-        <span class="ident">timer</span>.<span class="ident">add_task</span>(
-            <span class="ident">Duration</span>::<span class="ident">from_millis</span>(<span class="ident">PENDING_APPLY_CHECK_INTERVAL</span>),
-            <span class="ident">Event</span>::<span class="ident">CheckApply</span>,
-        );
-        <span class="ident">timer</span>.<span class="ident">add_task</span>(
-            <span class="ident">Duration</span>::<span class="ident">from_millis</span>(<span class="ident">STALE_PEER_CHECK_INTERVAL</span>),
-            <span class="ident">Event</span>::<span class="ident">CheckStalePeer</span>,
-        );
-        <span class="ident">timer</span>
     }
 
     <span class="doccomment">/// Tries to apply pending tasks if there is some.</span>
@@ -1800,10 +1742,9 @@
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">R</span><span class="op">&gt;</span> <span class="ident">Runnable</span> <span class="kw">for</span> <span class="ident">Runner</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">R</span><span class="op">&gt;</span>
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">R</span><span class="op">&gt;</span> <span class="ident">Runnable</span> <span class="kw">for</span> <span class="ident">Runner</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">R</span><span class="op">&gt;</span>
 <span class="kw">where</span>
     <span class="ident">EK</span>: <span class="ident">KvEngine</span>,
-    <span class="ident">ER</span>: <span class="ident">RaftEngine</span>,
     <span class="ident">R</span>: <span class="ident">CasualRouter</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Clone</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
 {
     <span class="kw">type</span> <span class="ident">Task</span> <span class="op">=</span> <span class="ident">Task</span><span class="op">&lt;</span><span class="ident">EK</span>::<span class="ident">Snapshot</span><span class="op">&gt;</span>;
@@ -1867,37 +1808,22 @@
     }
 }
 
-<span class="doccomment">/// Region related timeout event</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Event</span> {
-    <span class="ident">CheckStalePeer</span>,
-    <span class="ident">CheckApply</span>,
-}
-
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">R</span><span class="op">&gt;</span> <span class="ident">RunnableWithTimer</span> <span class="kw">for</span> <span class="ident">Runner</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">R</span><span class="op">&gt;</span>
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">R</span><span class="op">&gt;</span> <span class="ident">RunnableWithTimer</span> <span class="kw">for</span> <span class="ident">Runner</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">R</span><span class="op">&gt;</span>
 <span class="kw">where</span>
     <span class="ident">EK</span>: <span class="ident">KvEngine</span>,
-    <span class="ident">ER</span>: <span class="ident">RaftEngine</span>,
     <span class="ident">R</span>: <span class="ident">CasualRouter</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Clone</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
 {
-    <span class="kw">type</span> <span class="ident">TimeoutTask</span> <span class="op">=</span> <span class="ident">Event</span>;
-
-    <span class="kw">fn</span> <span class="ident">on_timeout</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">timer</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Timer</span><span class="op">&lt;</span><span class="ident">Event</span><span class="op">&gt;</span>, <span class="ident">event</span>: <span class="ident">Event</span>) {
-        <span class="kw">match</span> <span class="ident">event</span> {
-            <span class="ident">Event</span>::<span class="ident">CheckApply</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="self">self</span>.<span class="ident">handle_pending_applies</span>();
-                <span class="ident">timer</span>.<span class="ident">add_task</span>(
-                    <span class="ident">Duration</span>::<span class="ident">from_millis</span>(<span class="ident">PENDING_APPLY_CHECK_INTERVAL</span>),
-                    <span class="ident">Event</span>::<span class="ident">CheckApply</span>,
-                );
-            }
-            <span class="ident">Event</span>::<span class="ident">CheckStalePeer</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">clean_stale_ranges</span>();
-                <span class="ident">timer</span>.<span class="ident">add_task</span>(
-                    <span class="ident">Duration</span>::<span class="ident">from_millis</span>(<span class="ident">STALE_PEER_CHECK_INTERVAL</span>),
-                    <span class="ident">Event</span>::<span class="ident">CheckStalePeer</span>,
-                );
-            }
+    <span class="kw">fn</span> <span class="ident">on_timeout</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
+        <span class="self">self</span>.<span class="ident">handle_pending_applies</span>();
+        <span class="self">self</span>.<span class="ident">clean_stale_tick</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">clean_stale_tick</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">STALE_PEER_CHECK_TICK</span> {
+            <span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">clean_stale_ranges</span>();
+            <span class="self">self</span>.<span class="ident">clean_stale_tick</span> <span class="op">=</span> <span class="number">0</span>;
         }
+    }
+
+    <span class="kw">fn</span> <span class="ident">get_interval</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Duration</span> {
+        <span class="self">self</span>.<span class="ident">clean_stale_check_interval</span>
     }
 }
 
@@ -1916,19 +1842,17 @@
     <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::{<span class="ident">CasualMessage</span>, <span class="ident">SnapKey</span>, <span class="ident">SnapManager</span>};
     <span class="kw">use</span> <span class="ident">engine_test</span>::<span class="ident">ctor</span>::<span class="ident">CFOptions</span>;
     <span class="kw">use</span> <span class="ident">engine_test</span>::<span class="ident">ctor</span>::<span class="ident">ColumnFamilyOptions</span>;
-    <span class="kw">use</span> <span class="ident">engine_test</span>::<span class="ident">kv</span>::<span class="ident">KvTestEngine</span>;
+    <span class="kw">use</span> <span class="ident">engine_test</span>::<span class="ident">kv</span>::{<span class="ident">KvTestEngine</span>, <span class="ident">KvTestSnapshot</span>};
+    <span class="kw">use</span> <span class="ident">engine_traits</span>::<span class="ident">KvEngine</span>;
     <span class="kw">use</span> <span class="ident">engine_traits</span>::{
         <span class="ident">CFNamesExt</span>, <span class="ident">CompactExt</span>, <span class="ident">MiscExt</span>, <span class="ident">Mutable</span>, <span class="ident">Peekable</span>, <span class="ident">SyncMutable</span>, <span class="ident">WriteBatchExt</span>,
     };
-    <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">Engines</span>, <span class="ident">KvEngine</span>};
     <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">CF_DEFAULT</span>, <span class="ident">CF_RAFT</span>};
     <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">raft_serverpb</span>::{<span class="ident">PeerState</span>, <span class="ident">RaftApplyState</span>, <span class="ident">RegionLocalState</span>};
     <span class="kw">use</span> <span class="ident">raft</span>::<span class="ident">eraftpb</span>::<span class="ident">Entry</span>;
     <span class="kw">use</span> <span class="ident">tempfile</span>::<span class="ident">Builder</span>;
-    <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">timer</span>::<span class="ident">Timer</span>;
-    <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">worker</span>::<span class="ident">Worker</span>;
+    <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">worker</span>::{<span class="ident">LazyWorker</span>, <span class="ident">Worker</span>};
 
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">Event</span>;
     <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">PendingDeleteRanges</span>;
     <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">Task</span>;
 
@@ -2019,18 +1943,20 @@
 
         <span class="kw">let</span> <span class="ident">snap_dir</span> <span class="op">=</span> <span class="ident">Builder</span>::<span class="ident">new</span>().<span class="ident">prefix</span>(<span class="string">&quot;snap_dir&quot;</span>).<span class="ident">tempdir</span>().<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">mgr</span> <span class="op">=</span> <span class="ident">SnapManager</span>::<span class="ident">new</span>(<span class="ident">snap_dir</span>.<span class="ident">path</span>().<span class="ident">to_str</span>().<span class="ident">unwrap</span>());
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">worker</span> <span class="op">=</span> <span class="ident">Worker</span>::<span class="ident">new</span>(<span class="string">&quot;region-worker&quot;</span>);
+        <span class="kw">let</span> <span class="ident">bg_worker</span> <span class="op">=</span> <span class="ident">Worker</span>::<span class="ident">new</span>(<span class="string">&quot;region-worker&quot;</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">worker</span>: <span class="ident">LazyWorker</span><span class="op">&lt;</span><span class="ident">Task</span><span class="op">&lt;</span><span class="ident">KvTestSnapshot</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">bg_worker</span>.<span class="ident">lazy_build</span>(<span class="string">&quot;region-worker&quot;</span>);
         <span class="kw">let</span> <span class="ident">sched</span> <span class="op">=</span> <span class="ident">worker</span>.<span class="ident">scheduler</span>();
-        <span class="kw">let</span> <span class="ident">engines</span> <span class="op">=</span> <span class="ident">Engines</span>::<span class="ident">new</span>(<span class="ident">engine</span>.<span class="ident">kv</span>.<span class="ident">clone</span>(), <span class="ident">engine</span>.<span class="ident">raft</span>.<span class="ident">clone</span>());
         <span class="kw">let</span> (<span class="ident">router</span>, <span class="kw">_</span>) <span class="op">=</span> <span class="ident">mpsc</span>::<span class="ident">sync_channel</span>(<span class="number">11</span>);
-        <span class="kw">let</span> <span class="ident">runner</span> <span class="op">=</span> <span class="ident">RegionRunner</span>::<span class="ident">new</span>(
-            <span class="ident">engines</span>,
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">runner</span> <span class="op">=</span> <span class="ident">RegionRunner</span>::<span class="ident">new</span>(
+            <span class="ident">engine</span>.<span class="ident">kv</span>.<span class="ident">clone</span>(),
             <span class="ident">mgr</span>,
             <span class="number">0</span>,
             <span class="bool-val">false</span>,
             <span class="ident">CoprocessorHost</span>::<span class="op">&lt;</span><span class="ident">KvTestEngine</span><span class="op">&gt;</span>::<span class="ident">default</span>(),
             <span class="ident">router</span>,
         );
+        <span class="ident">runner</span>.<span class="ident">clean_stale_check_interval</span> <span class="op">=</span> <span class="ident">Duration</span>::<span class="ident">from_millis</span>(<span class="number">100</span>);
+
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ranges</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[];
         <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="number">10</span> {
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">key</span> <span class="op">=</span> <span class="string">b&quot;k0&quot;</span>.<span class="ident">to_vec</span>();
@@ -2058,9 +1984,7 @@
                 })
                 .<span class="ident">unwrap</span>();
         }
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">timer</span> <span class="op">=</span> <span class="ident">Timer</span>::<span class="ident">new</span>(<span class="number">1</span>);
-        <span class="ident">timer</span>.<span class="ident">add_task</span>(<span class="ident">Duration</span>::<span class="ident">from_millis</span>(<span class="number">100</span>), <span class="ident">Event</span>::<span class="ident">CheckStalePeer</span>);
-        <span class="ident">worker</span>.<span class="ident">start_with_timer</span>(<span class="ident">runner</span>, <span class="ident">timer</span>).<span class="ident">unwrap</span>();
+        <span class="ident">worker</span>.<span class="ident">start_with_timer</span>(<span class="ident">runner</span>);
         <span class="ident">thread</span>::<span class="ident">sleep</span>(<span class="ident">Duration</span>::<span class="ident">from_millis</span>(<span class="number">20</span>));
         <span class="ident">drop</span>(<span class="ident">snap</span>);
         <span class="ident">thread</span>::<span class="ident">sleep</span>(<span class="ident">Duration</span>::<span class="ident">from_millis</span>(<span class="number">200</span>));
@@ -2115,34 +2039,32 @@
             }
         }
 
-        <span class="kw">let</span> <span class="ident">engines</span> <span class="op">=</span> <span class="ident">Engines</span>::<span class="ident">new</span>(<span class="ident">engine</span>.<span class="ident">kv</span>.<span class="ident">clone</span>(), <span class="ident">engine</span>.<span class="ident">raft</span>.<span class="ident">clone</span>());
         <span class="kw">let</span> <span class="ident">snap_dir</span> <span class="op">=</span> <span class="ident">Builder</span>::<span class="ident">new</span>().<span class="ident">prefix</span>(<span class="string">&quot;snap_dir&quot;</span>).<span class="ident">tempdir</span>().<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">mgr</span> <span class="op">=</span> <span class="ident">SnapManager</span>::<span class="ident">new</span>(<span class="ident">snap_dir</span>.<span class="ident">path</span>().<span class="ident">to_str</span>().<span class="ident">unwrap</span>());
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">worker</span> <span class="op">=</span> <span class="ident">Worker</span>::<span class="ident">new</span>(<span class="string">&quot;snap-manager&quot;</span>);
+        <span class="kw">let</span> <span class="ident">bg_worker</span> <span class="op">=</span> <span class="ident">Worker</span>::<span class="ident">new</span>(<span class="string">&quot;snap-manager&quot;</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">worker</span> <span class="op">=</span> <span class="ident">bg_worker</span>.<span class="ident">lazy_build</span>(<span class="string">&quot;snapshot-worker&quot;</span>);
         <span class="kw">let</span> <span class="ident">sched</span> <span class="op">=</span> <span class="ident">worker</span>.<span class="ident">scheduler</span>();
         <span class="kw">let</span> (<span class="ident">router</span>, <span class="ident">receiver</span>) <span class="op">=</span> <span class="ident">mpsc</span>::<span class="ident">sync_channel</span>(<span class="number">1</span>);
         <span class="kw">let</span> <span class="ident">runner</span> <span class="op">=</span> <span class="ident">RegionRunner</span>::<span class="ident">new</span>(
-            <span class="ident">engines</span>.<span class="ident">clone</span>(),
+            <span class="ident">engine</span>.<span class="ident">kv</span>.<span class="ident">clone</span>(),
             <span class="ident">mgr</span>,
             <span class="number">0</span>,
             <span class="bool-val">true</span>,
             <span class="ident">CoprocessorHost</span>::<span class="op">&lt;</span><span class="ident">KvTestEngine</span><span class="op">&gt;</span>::<span class="ident">default</span>(),
             <span class="ident">router</span>,
         );
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">timer</span> <span class="op">=</span> <span class="ident">Timer</span>::<span class="ident">new</span>(<span class="number">1</span>);
-        <span class="ident">timer</span>.<span class="ident">add_task</span>(<span class="ident">Duration</span>::<span class="ident">from_millis</span>(<span class="number">100</span>), <span class="ident">Event</span>::<span class="ident">CheckApply</span>);
-        <span class="ident">worker</span>.<span class="ident">start_with_timer</span>(<span class="ident">runner</span>, <span class="ident">timer</span>).<span class="ident">unwrap</span>();
+        <span class="ident">worker</span>.<span class="ident">start_with_timer</span>(<span class="ident">runner</span>);
 
         <span class="kw">let</span> <span class="ident">gen_and_apply_snap</span> <span class="op">=</span> <span class="op">|</span><span class="ident">id</span>: <span class="ident">u64</span><span class="op">|</span> {
             <span class="comment">// construct snapshot</span>
             <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">mpsc</span>::<span class="ident">sync_channel</span>(<span class="number">1</span>);
-            <span class="kw">let</span> <span class="ident">apply_state</span>: <span class="ident">RaftApplyState</span> <span class="op">=</span> <span class="ident">engines</span>
+            <span class="kw">let</span> <span class="ident">apply_state</span>: <span class="ident">RaftApplyState</span> <span class="op">=</span> <span class="ident">engine</span>
                 .<span class="ident">kv</span>
                 .<span class="ident">get_msg_cf</span>(<span class="ident">CF_RAFT</span>, <span class="kw-2">&amp;</span><span class="ident">keys</span>::<span class="ident">apply_state_key</span>(<span class="ident">id</span>))
                 .<span class="ident">unwrap</span>()
                 .<span class="ident">unwrap</span>();
             <span class="kw">let</span> <span class="ident">idx</span> <span class="op">=</span> <span class="ident">apply_state</span>.<span class="ident">get_applied_index</span>();
-            <span class="kw">let</span> <span class="ident">entry</span> <span class="op">=</span> <span class="ident">engines</span>
+            <span class="kw">let</span> <span class="ident">entry</span> <span class="op">=</span> <span class="ident">engine</span>
                 .<span class="ident">raft</span>
                 .<span class="ident">get_msg</span>::<span class="op">&lt;</span><span class="ident">Entry</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">keys</span>::<span class="ident">raft_log_key</span>(<span class="ident">id</span>, <span class="ident">idx</span>))
                 .<span class="ident">unwrap</span>()
@@ -2150,7 +2072,7 @@
             <span class="ident">sched</span>
                 .<span class="ident">schedule</span>(<span class="ident">Task</span>::<span class="ident">Gen</span> {
                     <span class="ident">region_id</span>: <span class="ident">id</span>,
-                    <span class="ident">kv_snap</span>: <span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">snapshot</span>(),
+                    <span class="ident">kv_snap</span>: <span class="ident">engine</span>.<span class="ident">kv</span>.<span class="ident">snapshot</span>(),
                     <span class="ident">last_applied_index_term</span>: <span class="ident">entry</span>.<span class="ident">get_term</span>(),
                     <span class="ident">last_applied_state</span>: <span class="ident">apply_state</span>,
                     <span class="ident">notifier</span>: <span class="ident">tx</span>,

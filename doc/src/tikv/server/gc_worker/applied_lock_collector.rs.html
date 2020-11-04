@@ -795,19 +795,6 @@
 <span id="792">792</span>
 <span id="793">793</span>
 <span id="794">794</span>
-<span id="795">795</span>
-<span id="796">796</span>
-<span id="797">797</span>
-<span id="798">798</span>
-<span id="799">799</span>
-<span id="800">800</span>
-<span id="801">801</span>
-<span id="802">802</span>
-<span id="803">803</span>
-<span id="804">804</span>
-<span id="805">805</span>
-<span id="806">806</span>
-<span id="807">807</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1191,7 +1178,7 @@
 }
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">AppliedLockCollector</span> {
-    <span class="ident">worker</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">Worker</span><span class="op">&lt;</span><span class="ident">LockCollectorTask</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">worker</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">Worker</span><span class="op">&gt;</span>,
     <span class="ident">scheduler</span>: <span class="ident">Scheduler</span><span class="op">&lt;</span><span class="ident">LockCollectorTask</span><span class="op">&gt;</span>,
 }
 
@@ -1199,30 +1186,20 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">coprocessor_host</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">CoprocessorHost</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">worker</span> <span class="op">=</span> <span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">WorkerBuilder</span>::<span class="ident">new</span>(<span class="string">&quot;lock-collector&quot;</span>).<span class="ident">create</span>());
 
-        <span class="kw">let</span> <span class="ident">scheduler</span> <span class="op">=</span> <span class="ident">worker</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">scheduler</span>();
-
         <span class="kw">let</span> <span class="ident">state</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">LockObserverState</span>::<span class="ident">default</span>());
         <span class="kw">let</span> <span class="ident">runner</span> <span class="op">=</span> <span class="ident">LockCollectorRunner</span>::<span class="ident">new</span>(<span class="ident">Arc</span>::<span class="ident">clone</span>(<span class="kw-2">&amp;</span><span class="ident">state</span>));
+        <span class="kw">let</span> <span class="ident">scheduler</span> <span class="op">=</span> <span class="ident">worker</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">start</span>(<span class="string">&quot;lock-collector&quot;</span>, <span class="ident">runner</span>);
         <span class="kw">let</span> <span class="ident">observer</span> <span class="op">=</span> <span class="ident">LockObserver</span>::<span class="ident">new</span>(<span class="ident">state</span>, <span class="ident">scheduler</span>.<span class="ident">clone</span>());
 
         <span class="ident">observer</span>.<span class="ident">register</span>(<span class="ident">coprocessor_host</span>);
 
         <span class="comment">// Start the worker</span>
-        <span class="ident">worker</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">start</span>(<span class="ident">runner</span>)<span class="question-mark">?</span>;
 
         <span class="prelude-val">Ok</span>(<span class="self">Self</span> { <span class="ident">worker</span>, <span class="ident">scheduler</span> })
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">stop</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">h</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">worker</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">stop</span>() {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">h</span>.<span class="ident">join</span>() {
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(
-                    <span class="string">&quot;failed to join applied_lock_collector handle, err: {:?}&quot;</span>,
-                    <span class="ident">e</span>
-                ));
-            }
-        }
-        <span class="prelude-val">Ok</span>(())
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">stop</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="self">self</span>.<span class="ident">worker</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">stop</span>();
     }
 
     <span class="doccomment">/// Starts collecting applied locks whose `start_ts` &lt;= `max_ts`. Only one `max_ts` is valid</span>
@@ -1259,10 +1236,7 @@
 
 <span class="kw">impl</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">AppliedLockCollector</span> {
     <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
-        <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">stop</span>();
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">r</span> {
-            <span class="macro">error</span><span class="macro">!</span>(<span class="question-mark">?</span><span class="ident">e</span>; <span class="string">&quot;Failed to stop applied_lock_collector&quot;</span>);
-        }
+        <span class="self">self</span>.<span class="ident">stop</span>();
     }
 }
 

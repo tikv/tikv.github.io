@@ -2424,23 +2424,6 @@
 <span id="2421">2421</span>
 <span id="2422">2422</span>
 <span id="2423">2423</span>
-<span id="2424">2424</span>
-<span id="2425">2425</span>
-<span id="2426">2426</span>
-<span id="2427">2427</span>
-<span id="2428">2428</span>
-<span id="2429">2429</span>
-<span id="2430">2430</span>
-<span id="2431">2431</span>
-<span id="2432">2432</span>
-<span id="2433">2433</span>
-<span id="2434">2434</span>
-<span id="2435">2435</span>
-<span id="2436">2436</span>
-<span id="2437">2437</span>
-<span id="2438">2438</span>
-<span id="2439">2439</span>
-<span id="2440">2440</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -3567,12 +3550,7 @@
 
 <span class="kw">struct</span> <span class="ident">Workers</span><span class="op">&lt;</span><span class="ident">EK</span>: <span class="ident">KvEngine</span><span class="op">&gt;</span> {
     <span class="ident">pd_worker</span>: <span class="ident">FutureWorker</span><span class="op">&lt;</span><span class="ident">PdTask</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">consistency_check_worker</span>: <span class="ident">Worker</span><span class="op">&lt;</span><span class="ident">ConsistencyCheckTask</span><span class="op">&lt;</span><span class="ident">EK</span>::<span class="ident">Snapshot</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">split_check_worker</span>: <span class="ident">Worker</span><span class="op">&lt;</span><span class="ident">SplitCheckTask</span><span class="op">&gt;</span>,
-    <span class="comment">// handle Compact, CleanupSST task</span>
-    <span class="ident">cleanup_worker</span>: <span class="ident">Worker</span><span class="op">&lt;</span><span class="ident">CleanupTask</span><span class="op">&gt;</span>,
-    <span class="ident">raftlog_gc_worker</span>: <span class="ident">Worker</span><span class="op">&lt;</span><span class="ident">RaftlogGcTask</span><span class="op">&gt;</span>,
-    <span class="ident">region_worker</span>: <span class="ident">Worker</span><span class="op">&lt;</span><span class="ident">RegionTask</span><span class="op">&lt;</span><span class="ident">EK</span>::<span class="ident">Snapshot</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">background_worker</span>: <span class="ident">Worker</span>,
     <span class="ident">coprocessor_host</span>: <span class="ident">CoprocessorHost</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>,
 }
 
@@ -3606,7 +3584,8 @@
         <span class="ident">store_meta</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">StoreMeta</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="kw-2">mut</span> <span class="ident">coprocessor_host</span>: <span class="ident">CoprocessorHost</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>,
         <span class="ident">importer</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">SSTImporter</span><span class="op">&gt;</span>,
-        <span class="ident">split_check_worker</span>: <span class="ident">Worker</span><span class="op">&lt;</span><span class="ident">SplitCheckTask</span><span class="op">&gt;</span>,
+        <span class="ident">split_check_scheduler</span>: <span class="ident">Scheduler</span><span class="op">&lt;</span><span class="ident">SplitCheckTask</span><span class="op">&gt;</span>,
+        <span class="ident">background_worker</span>: <span class="ident">Worker</span>,
         <span class="ident">auto_split_controller</span>: <span class="ident">AutoSplitController</span>,
         <span class="ident">global_replication_state</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">GlobalReplicationState</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">concurrency_manager</span>: <span class="ident">ConcurrencyManager</span>,
@@ -3620,29 +3599,60 @@
             .<span class="ident">register_admin_observer</span>(<span class="number">100</span>, <span class="ident">BoxAdminObserver</span>::<span class="ident">new</span>(<span class="ident">SplitObserver</span>));
 
         <span class="kw">let</span> <span class="ident">workers</span> <span class="op">=</span> <span class="ident">Workers</span> {
-            <span class="ident">split_check_worker</span>,
-            <span class="ident">region_worker</span>: <span class="ident">Worker</span>::<span class="ident">new</span>(<span class="string">&quot;snapshot-worker&quot;</span>),
             <span class="ident">pd_worker</span>,
-            <span class="ident">consistency_check_worker</span>: <span class="ident">Worker</span>::<span class="ident">new</span>(<span class="string">&quot;consistency-check&quot;</span>),
-            <span class="ident">cleanup_worker</span>: <span class="ident">Worker</span>::<span class="ident">new</span>(<span class="string">&quot;cleanup-worker&quot;</span>),
-            <span class="ident">raftlog_gc_worker</span>: <span class="ident">Worker</span>::<span class="ident">new</span>(<span class="string">&quot;raft-gc-worker&quot;</span>),
+            <span class="ident">background_worker</span>,
             <span class="ident">coprocessor_host</span>: <span class="ident">coprocessor_host</span>.<span class="ident">clone</span>(),
         };
+        <span class="ident">mgr</span>.<span class="ident">init</span>()<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">region_runner</span> <span class="op">=</span> <span class="ident">RegionRunner</span>::<span class="ident">new</span>(
+            <span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">clone</span>(),
+            <span class="ident">mgr</span>.<span class="ident">clone</span>(),
+            <span class="ident">cfg</span>.<span class="ident">value</span>().<span class="ident">snap_apply_batch_size</span>.<span class="number">0</span> <span class="kw">as</span> <span class="ident">usize</span>,
+            <span class="ident">cfg</span>.<span class="ident">value</span>().<span class="ident">use_delete_range</span>,
+            <span class="ident">workers</span>.<span class="ident">coprocessor_host</span>.<span class="ident">clone</span>(),
+            <span class="self">self</span>.<span class="ident">router</span>(),
+        );
+        <span class="kw">let</span> <span class="ident">region_scheduler</span> <span class="op">=</span> <span class="ident">workers</span>
+            .<span class="ident">background_worker</span>
+            .<span class="ident">start_with_timer</span>(<span class="string">&quot;snapshot-worker&quot;</span>, <span class="ident">region_runner</span>);
+
+        <span class="kw">let</span> <span class="ident">raftlog_gc_runner</span> <span class="op">=</span> <span class="ident">RaftlogGcRunner</span>::<span class="ident">new</span>(<span class="self">self</span>.<span class="ident">router</span>(), <span class="ident">engines</span>.<span class="ident">clone</span>());
+        <span class="kw">let</span> <span class="ident">raftlog_gc_scheduler</span> <span class="op">=</span> <span class="ident">workers</span>
+            .<span class="ident">background_worker</span>
+            .<span class="ident">start_with_timer</span>(<span class="string">&quot;raft-gc-worker&quot;</span>, <span class="ident">raftlog_gc_runner</span>);
+
+        <span class="kw">let</span> <span class="ident">compact_runner</span> <span class="op">=</span> <span class="ident">CompactRunner</span>::<span class="ident">new</span>(<span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">clone</span>());
+        <span class="kw">let</span> <span class="ident">cleanup_sst_runner</span> <span class="op">=</span> <span class="ident">CleanupSSTRunner</span>::<span class="ident">new</span>(
+            <span class="ident">meta</span>.<span class="ident">get_id</span>(),
+            <span class="self">self</span>.<span class="ident">router</span>.<span class="ident">clone</span>(),
+            <span class="ident">Arc</span>::<span class="ident">clone</span>(<span class="kw-2">&amp;</span><span class="ident">importer</span>),
+            <span class="ident">Arc</span>::<span class="ident">clone</span>(<span class="kw-2">&amp;</span><span class="ident">pd_client</span>),
+        );
+        <span class="kw">let</span> <span class="ident">cleanup_runner</span> <span class="op">=</span> <span class="ident">CleanupRunner</span>::<span class="ident">new</span>(<span class="ident">compact_runner</span>, <span class="ident">cleanup_sst_runner</span>);
+        <span class="kw">let</span> <span class="ident">cleanup_scheduler</span> <span class="op">=</span> <span class="ident">workers</span>
+            .<span class="ident">background_worker</span>
+            .<span class="ident">start</span>(<span class="string">&quot;cleanup-worker&quot;</span>, <span class="ident">cleanup_runner</span>);
+        <span class="kw">let</span> <span class="ident">consistency_check_runner</span> <span class="op">=</span>
+            <span class="ident">ConsistencyCheckRunner</span>::<span class="op">&lt;</span><span class="ident">EK</span>, <span class="kw">_</span><span class="op">&gt;</span>::<span class="ident">new</span>(<span class="self">self</span>.<span class="ident">router</span>.<span class="ident">clone</span>(), <span class="ident">coprocessor_host</span>.<span class="ident">clone</span>());
+        <span class="kw">let</span> <span class="ident">consistency_check_scheduler</span> <span class="op">=</span> <span class="ident">workers</span>
+            .<span class="ident">background_worker</span>
+            .<span class="ident">start</span>(<span class="string">&quot;consistency-check&quot;</span>, <span class="ident">consistency_check_runner</span>);
+
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">builder</span> <span class="op">=</span> <span class="ident">RaftPollerBuilder</span> {
             <span class="ident">cfg</span>,
             <span class="ident">store</span>: <span class="ident">meta</span>,
             <span class="ident">engines</span>,
             <span class="ident">router</span>: <span class="self">self</span>.<span class="ident">router</span>.<span class="ident">clone</span>(),
-            <span class="ident">split_check_scheduler</span>: <span class="ident">workers</span>.<span class="ident">split_check_worker</span>.<span class="ident">scheduler</span>(),
-            <span class="ident">region_scheduler</span>: <span class="ident">workers</span>.<span class="ident">region_worker</span>.<span class="ident">scheduler</span>(),
+            <span class="ident">split_check_scheduler</span>,
+            <span class="ident">region_scheduler</span>,
             <span class="ident">pd_scheduler</span>: <span class="ident">workers</span>.<span class="ident">pd_worker</span>.<span class="ident">scheduler</span>(),
-            <span class="ident">consistency_check_scheduler</span>: <span class="ident">workers</span>.<span class="ident">consistency_check_worker</span>.<span class="ident">scheduler</span>(),
-            <span class="ident">cleanup_scheduler</span>: <span class="ident">workers</span>.<span class="ident">cleanup_worker</span>.<span class="ident">scheduler</span>(),
-            <span class="ident">raftlog_gc_scheduler</span>: <span class="ident">workers</span>.<span class="ident">raftlog_gc_worker</span>.<span class="ident">scheduler</span>(),
+            <span class="ident">consistency_check_scheduler</span>,
+            <span class="ident">cleanup_scheduler</span>,
+            <span class="ident">raftlog_gc_scheduler</span>,
             <span class="ident">apply_router</span>: <span class="self">self</span>.<span class="ident">apply_router</span>.<span class="ident">clone</span>(),
             <span class="ident">trans</span>,
             <span class="ident">pd_client</span>,
-            <span class="ident">coprocessor_host</span>: <span class="ident">coprocessor_host</span>.<span class="ident">clone</span>(),
+            <span class="ident">coprocessor_host</span>,
             <span class="ident">importer</span>,
             <span class="ident">snap_mgr</span>: <span class="ident">mgr</span>,
             <span class="ident">global_replication_state</span>,
@@ -3659,7 +3669,6 @@
                 <span class="ident">region_peers</span>,
                 <span class="ident">builder</span>,
                 <span class="ident">auto_split_controller</span>,
-                <span class="ident">coprocessor_host</span>,
                 <span class="ident">concurrency_manager</span>,
             )<span class="question-mark">?</span>;
         } <span class="kw">else</span> {
@@ -3668,7 +3677,6 @@
                 <span class="ident">region_peers</span>,
                 <span class="ident">builder</span>,
                 <span class="ident">auto_split_controller</span>,
-                <span class="ident">coprocessor_host</span>,
                 <span class="ident">concurrency_manager</span>,
             )<span class="question-mark">?</span>;
         }
@@ -3681,17 +3689,12 @@
         <span class="ident">region_peers</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SenderFsmPair</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">builder</span>: <span class="ident">RaftPollerBuilder</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">T</span>, <span class="ident">C</span><span class="op">&gt;</span>,
         <span class="ident">auto_split_controller</span>: <span class="ident">AutoSplitController</span>,
-        <span class="ident">coprocessor_host</span>: <span class="ident">CoprocessorHost</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>,
         <span class="ident">concurrency_manager</span>: <span class="ident">ConcurrencyManager</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="ident">builder</span>.<span class="ident">snap_mgr</span>.<span class="ident">init</span>()<span class="question-mark">?</span>;
-
         <span class="kw">let</span> <span class="ident">engines</span> <span class="op">=</span> <span class="ident">builder</span>.<span class="ident">engines</span>.<span class="ident">clone</span>();
-        <span class="kw">let</span> <span class="ident">snap_mgr</span> <span class="op">=</span> <span class="ident">builder</span>.<span class="ident">snap_mgr</span>.<span class="ident">clone</span>();
         <span class="kw">let</span> <span class="ident">cfg</span> <span class="op">=</span> <span class="ident">builder</span>.<span class="ident">cfg</span>.<span class="ident">value</span>().<span class="ident">clone</span>();
         <span class="kw">let</span> <span class="ident">store</span> <span class="op">=</span> <span class="ident">builder</span>.<span class="ident">store</span>.<span class="ident">clone</span>();
         <span class="kw">let</span> <span class="ident">pd_client</span> <span class="op">=</span> <span class="ident">builder</span>.<span class="ident">pd_client</span>.<span class="ident">clone</span>();
-        <span class="kw">let</span> <span class="ident">importer</span> <span class="op">=</span> <span class="ident">builder</span>.<span class="ident">importer</span>.<span class="ident">clone</span>();
 
         <span class="kw">let</span> <span class="ident">apply_poller_builder</span> <span class="op">=</span> <span class="ident">ApplyPollerBuilder</span>::<span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">W</span><span class="op">&gt;</span>::<span class="ident">new</span>(
             <span class="kw-2">&amp;</span><span class="ident">builder</span>,
@@ -3741,33 +3744,6 @@
         <span class="self">self</span>.<span class="ident">apply_system</span>
             .<span class="ident">spawn</span>(<span class="string">&quot;apply&quot;</span>.<span class="ident">to_owned</span>(), <span class="ident">apply_poller_builder</span>);
 
-        <span class="kw">let</span> <span class="ident">region_runner</span> <span class="op">=</span> <span class="ident">RegionRunner</span>::<span class="ident">new</span>(
-            <span class="ident">engines</span>.<span class="ident">clone</span>(),
-            <span class="ident">snap_mgr</span>,
-            <span class="ident">cfg</span>.<span class="ident">snap_apply_batch_size</span>.<span class="number">0</span> <span class="kw">as</span> <span class="ident">usize</span>,
-            <span class="ident">cfg</span>.<span class="ident">use_delete_range</span>,
-            <span class="ident">workers</span>.<span class="ident">coprocessor_host</span>.<span class="ident">clone</span>(),
-            <span class="self">self</span>.<span class="ident">router</span>(),
-        );
-        <span class="kw">let</span> <span class="ident">timer</span> <span class="op">=</span> <span class="ident">region_runner</span>.<span class="ident">new_timer</span>();
-        <span class="macro">box_try</span><span class="macro">!</span>(<span class="ident">workers</span>.<span class="ident">region_worker</span>.<span class="ident">start_with_timer</span>(<span class="ident">region_runner</span>, <span class="ident">timer</span>));
-
-        <span class="kw">let</span> <span class="ident">raftlog_gc_runner</span> <span class="op">=</span> <span class="ident">RaftlogGcRunner</span>::<span class="ident">new</span>(<span class="self">self</span>.<span class="ident">router</span>(), <span class="ident">engines</span>.<span class="ident">clone</span>());
-        <span class="kw">let</span> <span class="ident">timer</span> <span class="op">=</span> <span class="ident">raftlog_gc_runner</span>.<span class="ident">new_timer</span>();
-        <span class="macro">box_try</span><span class="macro">!</span>(<span class="ident">workers</span>
-            .<span class="ident">raftlog_gc_worker</span>
-            .<span class="ident">start_with_timer</span>(<span class="ident">raftlog_gc_runner</span>, <span class="ident">timer</span>));
-
-        <span class="kw">let</span> <span class="ident">compact_runner</span> <span class="op">=</span> <span class="ident">CompactRunner</span>::<span class="ident">new</span>(<span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">clone</span>());
-        <span class="kw">let</span> <span class="ident">cleanup_sst_runner</span> <span class="op">=</span> <span class="ident">CleanupSSTRunner</span>::<span class="ident">new</span>(
-            <span class="ident">store</span>.<span class="ident">get_id</span>(),
-            <span class="self">self</span>.<span class="ident">router</span>.<span class="ident">clone</span>(),
-            <span class="ident">Arc</span>::<span class="ident">clone</span>(<span class="kw-2">&amp;</span><span class="ident">importer</span>),
-            <span class="ident">Arc</span>::<span class="ident">clone</span>(<span class="kw-2">&amp;</span><span class="ident">pd_client</span>),
-        );
-        <span class="kw">let</span> <span class="ident">cleanup_runner</span> <span class="op">=</span> <span class="ident">CleanupRunner</span>::<span class="ident">new</span>(<span class="ident">compact_runner</span>, <span class="ident">cleanup_sst_runner</span>);
-        <span class="macro">box_try</span><span class="macro">!</span>(<span class="ident">workers</span>.<span class="ident">cleanup_worker</span>.<span class="ident">start</span>(<span class="ident">cleanup_runner</span>));
-
         <span class="kw">let</span> <span class="ident">pd_runner</span> <span class="op">=</span> <span class="ident">PdRunner</span>::<span class="ident">new</span>(
             <span class="ident">store</span>.<span class="ident">get_id</span>(),
             <span class="ident">Arc</span>::<span class="ident">clone</span>(<span class="kw-2">&amp;</span><span class="ident">pd_client</span>),
@@ -3779,12 +3755,6 @@
             <span class="ident">concurrency_manager</span>,
         );
         <span class="macro">box_try</span><span class="macro">!</span>(<span class="ident">workers</span>.<span class="ident">pd_worker</span>.<span class="ident">start</span>(<span class="ident">pd_runner</span>));
-
-        <span class="kw">let</span> <span class="ident">consistency_check_runner</span> <span class="op">=</span>
-            <span class="ident">ConsistencyCheckRunner</span>::<span class="op">&lt;</span><span class="ident">EK</span>, <span class="kw">_</span><span class="op">&gt;</span>::<span class="ident">new</span>(<span class="self">self</span>.<span class="ident">router</span>.<span class="ident">clone</span>(), <span class="ident">coprocessor_host</span>);
-        <span class="macro">box_try</span><span class="macro">!</span>(<span class="ident">workers</span>
-            .<span class="ident">consistency_check_worker</span>
-            .<span class="ident">start</span>(<span class="ident">consistency_check_runner</span>));
 
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">sys_util</span>::<span class="ident">thread</span>::<span class="ident">set_priority</span>(<span class="ident">sys_util</span>::<span class="ident">HIGH_PRI</span>) {
             <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;set thread priority for raftstore failed&quot;</span>; <span class="string">&quot;error&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
@@ -3800,12 +3770,7 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">workers</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">workers</span>.<span class="ident">take</span>().<span class="ident">unwrap</span>();
         <span class="comment">// Wait all workers finish.</span>
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">handles</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">thread</span>::<span class="ident">JoinHandle</span><span class="op">&lt;</span>()<span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[];
-        <span class="ident">handles</span>.<span class="ident">push</span>(<span class="ident">workers</span>.<span class="ident">split_check_worker</span>.<span class="ident">stop</span>());
-        <span class="ident">handles</span>.<span class="ident">push</span>(<span class="ident">workers</span>.<span class="ident">region_worker</span>.<span class="ident">stop</span>());
         <span class="ident">handles</span>.<span class="ident">push</span>(<span class="ident">workers</span>.<span class="ident">pd_worker</span>.<span class="ident">stop</span>());
-        <span class="ident">handles</span>.<span class="ident">push</span>(<span class="ident">workers</span>.<span class="ident">consistency_check_worker</span>.<span class="ident">stop</span>());
-        <span class="ident">handles</span>.<span class="ident">push</span>(<span class="ident">workers</span>.<span class="ident">cleanup_worker</span>.<span class="ident">stop</span>());
-        <span class="ident">handles</span>.<span class="ident">push</span>(<span class="ident">workers</span>.<span class="ident">raftlog_gc_worker</span>.<span class="ident">stop</span>());
         <span class="self">self</span>.<span class="ident">apply_system</span>.<span class="ident">shutdown</span>();
         <span class="self">self</span>.<span class="ident">system</span>.<span class="ident">shutdown</span>();
         <span class="kw">for</span> <span class="ident">h</span> <span class="kw">in</span> <span class="ident">handles</span> {
@@ -3814,6 +3779,7 @@
             }
         }
         <span class="ident">workers</span>.<span class="ident">coprocessor_host</span>.<span class="ident">shutdown</span>();
+        <span class="ident">workers</span>.<span class="ident">background_worker</span>.<span class="ident">stop</span>();
     }
 }
 
