@@ -1,1 +1,0 @@
-initSidebarItems({"constant":[["BASE64_ENCODED_CHUNK_LENGTH",""],["BASE64_INPUT_CHUNK_LENGTH",""],["BASE64_LINE_WRAP",""],["BASE64_LINE_WRAP_LENGTH",""],["MAX_BLOB_WIDTH",""]],"enum":[["TrimDirection",""]],"fn":[["encoded_size",""],["line_wrap",""],["strip_whitespace",""],["trim",""],["validate_target_len_for_pad",""]]});

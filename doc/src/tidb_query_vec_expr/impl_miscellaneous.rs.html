@@ -596,6 +596,32 @@
 <span id="593">593</span>
 <span id="594">594</span>
 <span id="595">595</span>
+<span id="596">596</span>
+<span id="597">597</span>
+<span id="598">598</span>
+<span id="599">599</span>
+<span id="600">600</span>
+<span id="601">601</span>
+<span id="602">602</span>
+<span id="603">603</span>
+<span id="604">604</span>
+<span id="605">605</span>
+<span id="606">606</span>
+<span id="607">607</span>
+<span id="608">608</span>
+<span id="609">609</span>
+<span id="610">610</span>
+<span id="611">611</span>
+<span id="612">612</span>
+<span id="613">613</span>
+<span id="614">614</span>
+<span id="615">615</span>
+<span id="616">616</span>
+<span id="617">617</span>
+<span id="618">618</span>
+<span id="619">619</span>
+<span id="620">620</span>
+<span id="621">621</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -608,7 +634,6 @@
 
 <span class="kw">use</span> <span class="ident">tidb_query_common</span>::<span class="prelude-ty">Result</span>;
 <span class="kw">use</span> <span class="ident">tidb_query_datatype</span>::<span class="ident">codec</span>::<span class="ident">data_type</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident">tidb_query_shared_expr</span>::<span class="kw-2">*</span>;
 
 <span class="kw">const</span> <span class="ident">IPV4_LENGTH</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">4</span>;
 <span class="kw">const</span> <span class="ident">IPV6_LENGTH</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">16</span>;
@@ -647,13 +672,40 @@
     }
 }
 
-<span class="attribute">#[<span class="ident">rpn_fn</span>(<span class="ident">nullable</span>)]</span>
+<span class="attribute">#[<span class="ident">rpn_fn</span>]</span>
 <span class="attribute">#[<span class="ident">inline</span>]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">inet_aton</span>(<span class="ident">addr</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">BytesRef</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Int</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-    <span class="prelude-val">Ok</span>(<span class="ident">addr</span>
-        .<span class="ident">as_ref</span>()
-        .<span class="ident">map</span>(<span class="op">|</span><span class="ident">addr</span><span class="op">|</span> <span class="ident">String</span>::<span class="ident">from_utf8_lossy</span>(<span class="ident">addr</span>))
-        .<span class="ident">and_then</span>(<span class="ident">miscellaneous</span>::<span class="ident">inet_aton</span>))
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">inet_aton</span>(<span class="ident">addr</span>: <span class="ident">BytesRef</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Int</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="ident">addr</span> <span class="op">=</span> <span class="ident">String</span>::<span class="ident">from_utf8_lossy</span>(<span class="ident">addr</span>);
+
+    <span class="kw">if</span> <span class="ident">addr</span>.<span class="ident">len</span>() <span class="op">=</span><span class="op">=</span> <span class="number">0</span> <span class="op">|</span><span class="op">|</span> <span class="ident">addr</span>.<span class="ident">ends_with</span>(<span class="string">&#39;.&#39;</span>) {
+        <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>);
+    }
+    <span class="kw">let</span> (<span class="kw-2">mut</span> <span class="ident">byte_result</span>, <span class="kw-2">mut</span> <span class="ident">result</span>, <span class="kw-2">mut</span> <span class="ident">dot_count</span>): (<span class="ident">u64</span>, <span class="ident">u64</span>, <span class="ident">usize</span>) <span class="op">=</span> (<span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>);
+    <span class="kw">for</span> <span class="ident">c</span> <span class="kw">in</span> <span class="ident">addr</span>.<span class="ident">chars</span>() {
+        <span class="kw">if</span> <span class="ident">c</span> <span class="op">&gt;</span><span class="op">=</span> <span class="string">&#39;0&#39;</span> <span class="op">&amp;&amp;</span> <span class="ident">c</span> <span class="op">&lt;</span><span class="op">=</span> <span class="string">&#39;9&#39;</span> {
+            <span class="kw">let</span> <span class="ident">digit</span> <span class="op">=</span> <span class="ident">c</span> <span class="kw">as</span> <span class="ident">u64</span> <span class="op">-</span> <span class="string">&#39;0&#39;</span> <span class="kw">as</span> <span class="ident">u64</span>;
+            <span class="ident">byte_result</span> <span class="op">=</span> <span class="ident">byte_result</span> <span class="op">*</span> <span class="number">10</span> <span class="op">+</span> <span class="ident">digit</span>;
+            <span class="kw">if</span> <span class="ident">byte_result</span> <span class="op">&gt;</span> <span class="number">255</span> {
+                <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>);
+            }
+        } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">c</span> <span class="op">=</span><span class="op">=</span> <span class="string">&#39;.&#39;</span> {
+            <span class="ident">dot_count</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+            <span class="kw">if</span> <span class="ident">dot_count</span> <span class="op">&gt;</span> <span class="number">3</span> {
+                <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>);
+            }
+            <span class="ident">result</span> <span class="op">=</span> (<span class="ident">result</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">8</span>) <span class="op">+</span> <span class="ident">byte_result</span>;
+            <span class="ident">byte_result</span> <span class="op">=</span> <span class="number">0</span>;
+        } <span class="kw">else</span> {
+            <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>);
+        }
+    }
+    <span class="kw">if</span> <span class="ident">dot_count</span> <span class="op">=</span><span class="op">=</span> <span class="number">1</span> {
+        <span class="ident">result</span> <span class="op">&lt;</span><span class="op">&lt;</span><span class="op">=</span> <span class="number">16</span>;
+    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">dot_count</span> <span class="op">=</span><span class="op">=</span> <span class="number">2</span> {
+        <span class="ident">result</span> <span class="op">&lt;</span><span class="op">&lt;</span><span class="op">=</span> <span class="number">8</span>;
+    }
+
+    <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(((<span class="ident">result</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">8</span>) <span class="op">+</span> <span class="ident">byte_result</span>) <span class="kw">as</span> <span class="ident">i64</span>))
 }
 
 <span class="attribute">#[<span class="ident">rpn_fn</span>(<span class="ident">nullable</span>)]</span>
