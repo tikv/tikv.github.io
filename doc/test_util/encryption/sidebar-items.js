@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["create_test_key_file",""],["new_test_key_manager",""]]});
+initSidebarItems({"fn":[["create_test_key_file",""],["new_file_security_config",""],["new_test_file_master_key",""],["new_test_key_manager",""]]});
