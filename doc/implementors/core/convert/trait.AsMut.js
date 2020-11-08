@@ -10,6 +10,6 @@ implementors["nix"] = [{"text":"impl AsMut&lt;timespec&gt; for TimeSpec","synthe
 implementors["ordered_float"] = [{"text":"impl&lt;T:&nbsp;Float&gt; AsMut&lt;T&gt; for OrderedFloat&lt;T&gt;","synthetic":false,"types":[]}];
 implementors["rgb"] = [{"text":"impl&lt;T&gt; AsMut&lt;T&gt; for Gray&lt;T&gt;","synthetic":false,"types":[]},{"text":"impl&lt;T&gt; AsMut&lt;[T]&gt; for RGB&lt;T&gt;","synthetic":false,"types":[]},{"text":"impl&lt;T&gt; AsMut&lt;[T]&gt; for RGBA&lt;T&gt;","synthetic":false,"types":[]},{"text":"impl&lt;T&gt; AsMut&lt;T&gt; for GrayAlpha&lt;T&gt;","synthetic":false,"types":[]}];
 implementors["smallvec"] = [{"text":"impl&lt;A:&nbsp;Array&gt; AsMut&lt;[&lt;A as Array&gt;::Item]&gt; for SmallVec&lt;A&gt;","synthetic":false,"types":[]}];
-implementors["tidb_query_vec_expr"] = [{"text":"impl AsMut&lt;[RpnExpressionNode]&gt; for RpnExpression","synthetic":false,"types":[]}];
+implementors["tidb_query_expr"] = [{"text":"impl AsMut&lt;[RpnExpressionNode]&gt; for RpnExpression","synthetic":false,"types":[]}];
 implementors["tikv_jemalloc_ctl"] = [{"text":"impl&lt;T:&nbsp;MibArg&gt; AsMut&lt;[usize]&gt; for Mib&lt;T&gt;","synthetic":false,"types":[]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
