@@ -1543,6 +1543,65 @@
 <span id="1540">1540</span>
 <span id="1541">1541</span>
 <span id="1542">1542</span>
+<span id="1543">1543</span>
+<span id="1544">1544</span>
+<span id="1545">1545</span>
+<span id="1546">1546</span>
+<span id="1547">1547</span>
+<span id="1548">1548</span>
+<span id="1549">1549</span>
+<span id="1550">1550</span>
+<span id="1551">1551</span>
+<span id="1552">1552</span>
+<span id="1553">1553</span>
+<span id="1554">1554</span>
+<span id="1555">1555</span>
+<span id="1556">1556</span>
+<span id="1557">1557</span>
+<span id="1558">1558</span>
+<span id="1559">1559</span>
+<span id="1560">1560</span>
+<span id="1561">1561</span>
+<span id="1562">1562</span>
+<span id="1563">1563</span>
+<span id="1564">1564</span>
+<span id="1565">1565</span>
+<span id="1566">1566</span>
+<span id="1567">1567</span>
+<span id="1568">1568</span>
+<span id="1569">1569</span>
+<span id="1570">1570</span>
+<span id="1571">1571</span>
+<span id="1572">1572</span>
+<span id="1573">1573</span>
+<span id="1574">1574</span>
+<span id="1575">1575</span>
+<span id="1576">1576</span>
+<span id="1577">1577</span>
+<span id="1578">1578</span>
+<span id="1579">1579</span>
+<span id="1580">1580</span>
+<span id="1581">1581</span>
+<span id="1582">1582</span>
+<span id="1583">1583</span>
+<span id="1584">1584</span>
+<span id="1585">1585</span>
+<span id="1586">1586</span>
+<span id="1587">1587</span>
+<span id="1588">1588</span>
+<span id="1589">1589</span>
+<span id="1590">1590</span>
+<span id="1591">1591</span>
+<span id="1592">1592</span>
+<span id="1593">1593</span>
+<span id="1594">1594</span>
+<span id="1595">1595</span>
+<span id="1596">1596</span>
+<span id="1597">1597</span>
+<span id="1598">1598</span>
+<span id="1599">1599</span>
+<span id="1600">1600</span>
+<span id="1601">1601</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1577,6 +1636,7 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">coprocessor</span>::<span class="ident">tracker</span>::<span class="ident">Tracker</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">coprocessor</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">concurrency_manager</span>::<span class="ident">ConcurrencyManager</span>;
+<span class="kw">use</span> <span class="ident">engine_rocks</span>::<span class="ident">PerfLevel</span>;
 <span class="kw">use</span> <span class="ident">minitrace</span>::<span class="ident">prelude</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">txn_types</span>::<span class="ident">Lock</span>;
 
@@ -1593,6 +1653,9 @@
     <span class="ident">semaphore</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Semaphore</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 
     <span class="ident">concurrency_manager</span>: <span class="ident">ConcurrencyManager</span>,
+
+    <span class="comment">// Perf stats level</span>
+    <span class="ident">perf_level</span>: <span class="ident">PerfLevel</span>,
 
     <span class="doccomment">/// The recursion limit when parsing Coprocessor Protobuf requests.</span>
     <span class="doccomment">///</span>
@@ -1627,6 +1690,7 @@
         <span class="ident">cfg</span>: <span class="kw-2">&amp;</span><span class="ident">Config</span>,
         <span class="ident">read_pool</span>: <span class="ident">ReadPoolHandle</span>,
         <span class="ident">concurrency_manager</span>: <span class="ident">ConcurrencyManager</span>,
+        <span class="ident">perf_level</span>: <span class="ident">PerfLevel</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="comment">// FIXME: When yatp is used, we need to limit coprocessor requests in progress to avoid</span>
         <span class="comment">// using too much memory. However, if there are a number of large requests, small requests</span>
@@ -1641,6 +1705,7 @@
             <span class="ident">read_pool</span>,
             <span class="ident">semaphore</span>,
             <span class="ident">concurrency_manager</span>,
+            <span class="ident">perf_level</span>,
             <span class="ident">recursion_limit</span>: <span class="ident">cfg</span>.<span class="ident">end_point_recursion_limit</span>,
             <span class="ident">batch_row_limit</span>: <span class="ident">cfg</span>.<span class="ident">end_point_batch_row_limit</span>,
             <span class="ident">stream_batch_row_limit</span>: <span class="ident">cfg</span>.<span class="ident">end_point_stream_batch_row_limit</span>,
@@ -1775,6 +1840,7 @@
                     <span class="prelude-val">Some</span>(<span class="ident">is_desc_scan</span>),
                     <span class="ident">start_ts</span>.<span class="ident">into</span>(),
                     <span class="ident">cache_match_version</span>,
+                    <span class="self">self</span>.<span class="ident">perf_level</span>,
                 );
 
                 <span class="self">self</span>.<span class="ident">check_memory_locks</span>(<span class="kw-2">&amp;</span><span class="ident">req_ctx</span>)<span class="question-mark">?</span>;
@@ -1825,6 +1891,7 @@
                     <span class="prelude-val">None</span>,
                     <span class="ident">start_ts</span>.<span class="ident">into</span>(),
                     <span class="ident">cache_match_version</span>,
+                    <span class="self">self</span>.<span class="ident">perf_level</span>,
                 );
 
                 <span class="self">self</span>.<span class="ident">check_memory_locks</span>(<span class="kw-2">&amp;</span><span class="ident">req_ctx</span>)<span class="question-mark">?</span>;
@@ -1862,6 +1929,7 @@
                     <span class="prelude-val">None</span>,
                     <span class="ident">start_ts</span>.<span class="ident">into</span>(),
                     <span class="ident">cache_match_version</span>,
+                    <span class="self">self</span>.<span class="ident">perf_level</span>,
                 );
 
                 <span class="self">self</span>.<span class="ident">check_memory_locks</span>(<span class="kw-2">&amp;</span><span class="ident">req_ctx</span>)<span class="question-mark">?</span>;
@@ -2222,6 +2290,7 @@
     <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">read_pool</span>::<span class="ident">ReadPool</span>;
     <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">kv</span>::<span class="ident">RocksEngine</span>;
     <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">TestEngineBuilder</span>;
+    <span class="kw">use</span> <span class="ident">engine_rocks</span>::<span class="ident">PerfLevel</span>;
     <span class="kw">use</span> <span class="ident">protobuf</span>::<span class="ident">Message</span>;
     <span class="kw">use</span> <span class="ident">txn_types</span>::{<span class="ident">Key</span>, <span class="ident">LockType</span>};
 
@@ -2376,7 +2445,12 @@
             <span class="ident">engine</span>,
         ));
         <span class="kw">let</span> <span class="ident">cm</span> <span class="op">=</span> <span class="ident">ConcurrencyManager</span>::<span class="ident">new</span>(<span class="number">1</span>.<span class="ident">into</span>());
-        <span class="kw">let</span> <span class="ident">cop</span> <span class="op">=</span> <span class="ident">Endpoint</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">Config</span>::<span class="ident">default</span>(), <span class="ident">read_pool</span>.<span class="ident">handle</span>(), <span class="ident">cm</span>);
+        <span class="kw">let</span> <span class="ident">cop</span> <span class="op">=</span> <span class="ident">Endpoint</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>::<span class="ident">new</span>(
+            <span class="kw-2">&amp;</span><span class="ident">Config</span>::<span class="ident">default</span>(),
+            <span class="ident">read_pool</span>.<span class="ident">handle</span>(),
+            <span class="ident">cm</span>,
+            <span class="ident">PerfLevel</span>::<span class="ident">EnableCount</span>,
+        );
 
         <span class="comment">// a normal request</span>
         <span class="kw">let</span> <span class="ident">handler_builder</span> <span class="op">=</span>
@@ -2398,6 +2472,7 @@
             <span class="prelude-val">None</span>,
             <span class="ident">TimeStamp</span>::<span class="ident">max</span>(),
             <span class="prelude-val">None</span>,
+            <span class="ident">PerfLevel</span>::<span class="ident">EnableCount</span>,
         );
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">block_on</span>(<span class="ident">cop</span>.<span class="ident">handle_unary_request</span>(<span class="ident">outdated_req_ctx</span>, <span class="ident">handler_builder</span>)).<span class="ident">is_err</span>());
     }
@@ -2410,7 +2485,12 @@
             <span class="ident">engine</span>,
         ));
         <span class="kw">let</span> <span class="ident">cm</span> <span class="op">=</span> <span class="ident">ConcurrencyManager</span>::<span class="ident">new</span>(<span class="number">1</span>.<span class="ident">into</span>());
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cop</span> <span class="op">=</span> <span class="ident">Endpoint</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">Config</span>::<span class="ident">default</span>(), <span class="ident">read_pool</span>.<span class="ident">handle</span>(), <span class="ident">cm</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cop</span> <span class="op">=</span> <span class="ident">Endpoint</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>::<span class="ident">new</span>(
+            <span class="kw-2">&amp;</span><span class="ident">Config</span>::<span class="ident">default</span>(),
+            <span class="ident">read_pool</span>.<span class="ident">handle</span>(),
+            <span class="ident">cm</span>,
+            <span class="ident">PerfLevel</span>::<span class="ident">EnableCount</span>,
+        );
         <span class="ident">cop</span>.<span class="ident">recursion_limit</span> <span class="op">=</span> <span class="number">100</span>;
 
         <span class="kw">let</span> <span class="ident">req</span> <span class="op">=</span> {
@@ -2444,7 +2524,12 @@
             <span class="ident">engine</span>,
         ));
         <span class="kw">let</span> <span class="ident">cm</span> <span class="op">=</span> <span class="ident">ConcurrencyManager</span>::<span class="ident">new</span>(<span class="number">1</span>.<span class="ident">into</span>());
-        <span class="kw">let</span> <span class="ident">cop</span> <span class="op">=</span> <span class="ident">Endpoint</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">Config</span>::<span class="ident">default</span>(), <span class="ident">read_pool</span>.<span class="ident">handle</span>(), <span class="ident">cm</span>);
+        <span class="kw">let</span> <span class="ident">cop</span> <span class="op">=</span> <span class="ident">Endpoint</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>::<span class="ident">new</span>(
+            <span class="kw-2">&amp;</span><span class="ident">Config</span>::<span class="ident">default</span>(),
+            <span class="ident">read_pool</span>.<span class="ident">handle</span>(),
+            <span class="ident">cm</span>,
+            <span class="ident">PerfLevel</span>::<span class="ident">EnableCount</span>,
+        );
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">coppb</span>::<span class="ident">Request</span>::<span class="ident">default</span>();
         <span class="ident">req</span>.<span class="ident">set_tp</span>(<span class="number">9999</span>);
@@ -2461,7 +2546,12 @@
             <span class="ident">engine</span>,
         ));
         <span class="kw">let</span> <span class="ident">cm</span> <span class="op">=</span> <span class="ident">ConcurrencyManager</span>::<span class="ident">new</span>(<span class="number">1</span>.<span class="ident">into</span>());
-        <span class="kw">let</span> <span class="ident">cop</span> <span class="op">=</span> <span class="ident">Endpoint</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">Config</span>::<span class="ident">default</span>(), <span class="ident">read_pool</span>.<span class="ident">handle</span>(), <span class="ident">cm</span>);
+        <span class="kw">let</span> <span class="ident">cop</span> <span class="op">=</span> <span class="ident">Endpoint</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>::<span class="ident">new</span>(
+            <span class="kw-2">&amp;</span><span class="ident">Config</span>::<span class="ident">default</span>(),
+            <span class="ident">read_pool</span>.<span class="ident">handle</span>(),
+            <span class="ident">cm</span>,
+            <span class="ident">PerfLevel</span>::<span class="ident">EnableCount</span>,
+        );
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">coppb</span>::<span class="ident">Request</span>::<span class="ident">default</span>();
         <span class="ident">req</span>.<span class="ident">set_tp</span>(<span class="ident">REQ_TYPE_DAG</span>);
@@ -2501,7 +2591,12 @@
         );
 
         <span class="kw">let</span> <span class="ident">cm</span> <span class="op">=</span> <span class="ident">ConcurrencyManager</span>::<span class="ident">new</span>(<span class="number">1</span>.<span class="ident">into</span>());
-        <span class="kw">let</span> <span class="ident">cop</span> <span class="op">=</span> <span class="ident">Endpoint</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">Config</span>::<span class="ident">default</span>(), <span class="ident">read_pool</span>.<span class="ident">handle</span>(), <span class="ident">cm</span>);
+        <span class="kw">let</span> <span class="ident">cop</span> <span class="op">=</span> <span class="ident">Endpoint</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>::<span class="ident">new</span>(
+            <span class="kw-2">&amp;</span><span class="ident">Config</span>::<span class="ident">default</span>(),
+            <span class="ident">read_pool</span>.<span class="ident">handle</span>(),
+            <span class="ident">cm</span>,
+            <span class="ident">PerfLevel</span>::<span class="ident">EnableCount</span>,
+        );
 
         <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">mpsc</span>::<span class="ident">channel</span>();
 
@@ -2543,7 +2638,12 @@
             <span class="ident">engine</span>,
         ));
         <span class="kw">let</span> <span class="ident">cm</span> <span class="op">=</span> <span class="ident">ConcurrencyManager</span>::<span class="ident">new</span>(<span class="number">1</span>.<span class="ident">into</span>());
-        <span class="kw">let</span> <span class="ident">cop</span> <span class="op">=</span> <span class="ident">Endpoint</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">Config</span>::<span class="ident">default</span>(), <span class="ident">read_pool</span>.<span class="ident">handle</span>(), <span class="ident">cm</span>);
+        <span class="kw">let</span> <span class="ident">cop</span> <span class="op">=</span> <span class="ident">Endpoint</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>::<span class="ident">new</span>(
+            <span class="kw-2">&amp;</span><span class="ident">Config</span>::<span class="ident">default</span>(),
+            <span class="ident">read_pool</span>.<span class="ident">handle</span>(),
+            <span class="ident">cm</span>,
+            <span class="ident">PerfLevel</span>::<span class="ident">EnableCount</span>,
+        );
 
         <span class="kw">let</span> <span class="ident">handler_builder</span> <span class="op">=</span>
             <span class="ident">Box</span>::<span class="ident">new</span>(<span class="op">|</span><span class="kw">_</span>, <span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="kw">_</span><span class="op">|</span> <span class="prelude-val">Ok</span>(<span class="ident">UnaryFixture</span>::<span class="ident">new</span>(<span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(<span class="string">&quot;foo&quot;</span>))).<span class="ident">into_boxed</span>()));
@@ -2562,7 +2662,12 @@
             <span class="ident">engine</span>,
         ));
         <span class="kw">let</span> <span class="ident">cm</span> <span class="op">=</span> <span class="ident">ConcurrencyManager</span>::<span class="ident">new</span>(<span class="number">1</span>.<span class="ident">into</span>());
-        <span class="kw">let</span> <span class="ident">cop</span> <span class="op">=</span> <span class="ident">Endpoint</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">Config</span>::<span class="ident">default</span>(), <span class="ident">read_pool</span>.<span class="ident">handle</span>(), <span class="ident">cm</span>);
+        <span class="kw">let</span> <span class="ident">cop</span> <span class="op">=</span> <span class="ident">Endpoint</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>::<span class="ident">new</span>(
+            <span class="kw-2">&amp;</span><span class="ident">Config</span>::<span class="ident">default</span>(),
+            <span class="ident">read_pool</span>.<span class="ident">handle</span>(),
+            <span class="ident">cm</span>,
+            <span class="ident">PerfLevel</span>::<span class="ident">EnableCount</span>,
+        );
 
         <span class="comment">// Fail immediately</span>
         <span class="kw">let</span> <span class="ident">handler_builder</span> <span class="op">=</span>
@@ -2609,7 +2714,12 @@
             <span class="ident">engine</span>,
         ));
         <span class="kw">let</span> <span class="ident">cm</span> <span class="op">=</span> <span class="ident">ConcurrencyManager</span>::<span class="ident">new</span>(<span class="number">1</span>.<span class="ident">into</span>());
-        <span class="kw">let</span> <span class="ident">cop</span> <span class="op">=</span> <span class="ident">Endpoint</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">Config</span>::<span class="ident">default</span>(), <span class="ident">read_pool</span>.<span class="ident">handle</span>(), <span class="ident">cm</span>);
+        <span class="kw">let</span> <span class="ident">cop</span> <span class="op">=</span> <span class="ident">Endpoint</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>::<span class="ident">new</span>(
+            <span class="kw-2">&amp;</span><span class="ident">Config</span>::<span class="ident">default</span>(),
+            <span class="ident">read_pool</span>.<span class="ident">handle</span>(),
+            <span class="ident">cm</span>,
+            <span class="ident">PerfLevel</span>::<span class="ident">EnableCount</span>,
+        );
 
         <span class="kw">let</span> <span class="ident">handler_builder</span> <span class="op">=</span> <span class="ident">Box</span>::<span class="ident">new</span>(<span class="op">|</span><span class="kw">_</span>, <span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="kw">_</span><span class="op">|</span> <span class="prelude-val">Ok</span>(<span class="ident">StreamFixture</span>::<span class="ident">new</span>(<span class="macro">vec</span><span class="macro">!</span>[]).<span class="ident">into_boxed</span>()));
         <span class="kw">let</span> <span class="ident">resp_vec</span> <span class="op">=</span> <span class="ident">block_on_stream</span>(
@@ -2631,7 +2741,12 @@
             <span class="ident">engine</span>,
         ));
         <span class="kw">let</span> <span class="ident">cm</span> <span class="op">=</span> <span class="ident">ConcurrencyManager</span>::<span class="ident">new</span>(<span class="number">1</span>.<span class="ident">into</span>());
-        <span class="kw">let</span> <span class="ident">cop</span> <span class="op">=</span> <span class="ident">Endpoint</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">Config</span>::<span class="ident">default</span>(), <span class="ident">read_pool</span>.<span class="ident">handle</span>(), <span class="ident">cm</span>);
+        <span class="kw">let</span> <span class="ident">cop</span> <span class="op">=</span> <span class="ident">Endpoint</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>::<span class="ident">new</span>(
+            <span class="kw-2">&amp;</span><span class="ident">Config</span>::<span class="ident">default</span>(),
+            <span class="ident">read_pool</span>.<span class="ident">handle</span>(),
+            <span class="ident">cm</span>,
+            <span class="ident">PerfLevel</span>::<span class="ident">EnableCount</span>,
+        );
 
         <span class="comment">// handler returns `finished == true` should not be called again.</span>
         <span class="kw">let</span> <span class="ident">counter</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">atomic</span>::<span class="ident">AtomicIsize</span>::<span class="ident">new</span>(<span class="number">0</span>));
@@ -2728,6 +2843,7 @@
             },
             <span class="ident">read_pool</span>.<span class="ident">handle</span>(),
             <span class="ident">cm</span>,
+            <span class="ident">PerfLevel</span>::<span class="ident">EnableCount</span>,
         );
 
         <span class="kw">let</span> <span class="ident">counter</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">atomic</span>::<span class="ident">AtomicIsize</span>::<span class="ident">new</span>(<span class="number">0</span>));
@@ -2787,7 +2903,8 @@
             <span class="ident">ReadableDuration</span>::<span class="ident">millis</span>((<span class="ident">PAYLOAD_SMALL</span> <span class="op">+</span> <span class="ident">PAYLOAD_LARGE</span>) <span class="kw">as</span> <span class="ident">u64</span> <span class="op">*</span> <span class="number">2</span>);
 
         <span class="kw">let</span> <span class="ident">cm</span> <span class="op">=</span> <span class="ident">ConcurrencyManager</span>::<span class="ident">new</span>(<span class="number">1</span>.<span class="ident">into</span>());
-        <span class="kw">let</span> <span class="ident">cop</span> <span class="op">=</span> <span class="ident">Endpoint</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">config</span>, <span class="ident">read_pool</span>.<span class="ident">handle</span>(), <span class="ident">cm</span>);
+        <span class="kw">let</span> <span class="ident">cop</span> <span class="op">=</span>
+            <span class="ident">Endpoint</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">config</span>, <span class="ident">read_pool</span>.<span class="ident">handle</span>(), <span class="ident">cm</span>, <span class="ident">PerfLevel</span>::<span class="ident">EnableCount</span>);
 
         <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">mpsc</span>::<span class="ident">channel</span>();
 
@@ -3068,7 +3185,8 @@
         });
 
         <span class="kw">let</span> <span class="ident">config</span> <span class="op">=</span> <span class="ident">Config</span>::<span class="ident">default</span>();
-        <span class="kw">let</span> <span class="ident">cop</span> <span class="op">=</span> <span class="ident">Endpoint</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">config</span>, <span class="ident">read_pool</span>.<span class="ident">handle</span>(), <span class="ident">cm</span>);
+        <span class="kw">let</span> <span class="ident">cop</span> <span class="op">=</span>
+            <span class="ident">Endpoint</span>::<span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">config</span>, <span class="ident">read_pool</span>.<span class="ident">handle</span>(), <span class="ident">cm</span>, <span class="ident">PerfLevel</span>::<span class="ident">EnableCount</span>);
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">coppb</span>::<span class="ident">Request</span>::<span class="ident">default</span>();
         <span class="ident">req</span>.<span class="ident">mut_context</span>().<span class="ident">set_isolation_level</span>(<span class="ident">IsolationLevel</span>::<span class="ident">Si</span>);
