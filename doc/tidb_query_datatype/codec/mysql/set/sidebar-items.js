@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["Set",""],["SetRef",""]]});
+initSidebarItems({"struct":[["Set","`Set` stores set."],["SetRef",""]]});

@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["ChunkedVecSet","`ChunkedVecSet` stores set in a compact way."]]});
