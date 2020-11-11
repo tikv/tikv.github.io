@@ -508,6 +508,7 @@
 <span id="505">505</span>
 <span id="506">506</span>
 <span id="507">507</span>
+<span id="508">508</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -519,9 +520,7 @@
 
 <span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">compat</span>::<span class="ident">Stream01CompatExt</span>;
 <span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">stream</span>::<span class="ident">StreamExt</span>;
-<span class="kw">use</span> <span class="ident">grpcio</span>::{
-    <span class="ident">ChannelBuilder</span>, <span class="ident">EnvBuilder</span>, <span class="ident">Environment</span>, <span class="ident">ResourceQuota</span>, <span class="ident">Server</span> <span class="kw">as</span> <span class="ident">GrpcServer</span>, <span class="ident">ServerBuilder</span>,
-};
+<span class="kw">use</span> <span class="ident">grpcio</span>::{<span class="ident">ChannelBuilder</span>, <span class="ident">Environment</span>, <span class="ident">ResourceQuota</span>, <span class="ident">Server</span> <span class="kw">as</span> <span class="ident">GrpcServer</span>, <span class="ident">ServerBuilder</span>};
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">tikvpb</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">runtime</span>::{<span class="ident">Builder</span> <span class="kw">as</span> <span class="ident">RuntimeBuilder</span>, <span class="ident">Handle</span> <span class="kw">as</span> <span class="ident">RuntimeHandle</span>, <span class="ident">Runtime</span>};
 <span class="kw">use</span> <span class="ident">tokio_timer</span>::<span class="ident">timer</span>::<span class="ident">Handle</span>;
@@ -591,6 +590,7 @@
         <span class="ident">resolver</span>: <span class="ident">S</span>,
         <span class="ident">snap_mgr</span>: <span class="ident">SnapManager</span>,
         <span class="ident">gc_worker</span>: <span class="ident">GcWorker</span><span class="op">&lt;</span><span class="ident">E</span>, <span class="ident">T</span><span class="op">&gt;</span>,
+        <span class="ident">env</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Environment</span><span class="op">&gt;</span>,
         <span class="ident">yatp_read_pool</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ReadPool</span><span class="op">&gt;</span>,
         <span class="ident">debug_thread_pool</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Runtime</span><span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
@@ -611,12 +611,6 @@
         <span class="kw">let</span> <span class="ident">readpool_normal_thread_load</span> <span class="op">=</span>
             <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">ThreadLoad</span>::<span class="ident">with_threshold</span>(<span class="ident">cfg</span>.<span class="ident">heavy_load_threshold</span>));
 
-        <span class="kw">let</span> <span class="ident">env</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(
-            <span class="ident">EnvBuilder</span>::<span class="ident">new</span>()
-                .<span class="ident">cq_count</span>(<span class="ident">cfg</span>.<span class="ident">grpc_concurrency</span>)
-                .<span class="ident">name_prefix</span>(<span class="macro">thd_name</span><span class="macro">!</span>(<span class="ident">GRPC_THREAD_PREFIX</span>))
-                .<span class="ident">build</span>(),
-        );
         <span class="kw">let</span> <span class="ident">snap_worker</span> <span class="op">=</span> <span class="ident">Worker</span>::<span class="ident">new</span>(<span class="string">&quot;snap-handler&quot;</span>);
         <span class="kw">let</span> <span class="ident">lazy_worker</span> <span class="op">=</span> <span class="ident">snap_worker</span>.<span class="ident">lazy_build</span>(<span class="string">&quot;snap-handler&quot;</span>);
 
@@ -874,6 +868,7 @@
     <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">coprocessor</span>::{<span class="self">self</span>, <span class="ident">readpool_impl</span>};
     <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">server</span>::<span class="ident">TestRaftStoreRouter</span>;
     <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">TestStorageBuilder</span>;
+    <span class="kw">use</span> <span class="ident">grpcio</span>::<span class="ident">EnvBuilder</span>;
     <span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">store</span>::<span class="ident">transport</span>::<span class="ident">Transport</span>;
     <span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">store</span>::<span class="kw-2">*</span>;
 
@@ -932,6 +927,12 @@
         <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">mpsc</span>::<span class="ident">channel</span>();
         <span class="kw">let</span> (<span class="ident">significant_msg_sender</span>, <span class="ident">significant_msg_receiver</span>) <span class="op">=</span> <span class="ident">mpsc</span>::<span class="ident">channel</span>();
         <span class="kw">let</span> <span class="ident">router</span> <span class="op">=</span> <span class="ident">TestRaftStoreRouter</span>::<span class="ident">new</span>(<span class="ident">tx</span>, <span class="ident">significant_msg_sender</span>);
+        <span class="kw">let</span> <span class="ident">env</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(
+            <span class="ident">EnvBuilder</span>::<span class="ident">new</span>()
+                .<span class="ident">cq_count</span>(<span class="number">1</span>)
+                .<span class="ident">name_prefix</span>(<span class="macro">thd_name</span><span class="macro">!</span>(<span class="ident">GRPC_THREAD_PREFIX</span>))
+                .<span class="ident">build</span>(),
+        );
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">gc_worker</span> <span class="op">=</span> <span class="ident">GcWorker</span>::<span class="ident">new</span>(
             <span class="ident">storage</span>.<span class="ident">get_engine</span>(),
@@ -976,6 +977,7 @@
             },
             <span class="ident">SnapManager</span>::<span class="ident">new</span>(<span class="string">&quot;&quot;</span>),
             <span class="ident">gc_worker</span>,
+            <span class="ident">env</span>,
             <span class="prelude-val">None</span>,
             <span class="ident">debug_thread_pool</span>,
         )

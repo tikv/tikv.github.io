@@ -1106,6 +1106,18 @@
 <span id="1103">1103</span>
 <span id="1104">1104</span>
 <span id="1105">1105</span>
+<span id="1106">1106</span>
+<span id="1107">1107</span>
+<span id="1108">1108</span>
+<span id="1109">1109</span>
+<span id="1110">1110</span>
+<span id="1111">1111</span>
+<span id="1112">1112</span>
+<span id="1113">1113</span>
+<span id="1114">1114</span>
+<span id="1115">1115</span>
+<span id="1116">1116</span>
+<span id="1117">1117</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! This module startups all the components of a TiKV server.</span>
 <span class="doccomment">//!</span>
@@ -1134,6 +1146,7 @@
 };
 <span class="kw">use</span> <span class="ident">fs2</span>::<span class="ident">FileExt</span>;
 <span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">executor</span>::<span class="ident">block_on</span>;
+<span class="kw">use</span> <span class="ident">grpcio</span>::{<span class="ident">EnvBuilder</span>, <span class="ident">Environment</span>};
 <span class="kw">use</span> <span class="ident">kvproto</span>::{
     <span class="ident">backup</span>::<span class="ident">create_backup</span>, <span class="ident">cdcpb</span>::<span class="ident">create_change_data</span>, <span class="ident">deadlock</span>::<span class="ident">create_deadlock</span>,
     <span class="ident">debugpb</span>::<span class="ident">create_debug</span>, <span class="ident">diagnosticspb</span>::<span class="ident">create_diagnostics</span>, <span class="ident">import_sstpb</span>::<span class="ident">create_import_sst</span>,
@@ -1168,7 +1181,7 @@
         <span class="ident">resolve</span>,
         <span class="ident">service</span>::{<span class="ident">DebugService</span>, <span class="ident">DiagnosticsService</span>},
         <span class="ident">status_server</span>::<span class="ident">StatusServer</span>,
-        <span class="ident">Node</span>, <span class="ident">RaftKv</span>, <span class="ident">Server</span>, <span class="ident">CPU_CORES_QUOTA_GAUGE</span>, <span class="ident">DEFAULT_CLUSTER_ID</span>,
+        <span class="ident">Node</span>, <span class="ident">RaftKv</span>, <span class="ident">Server</span>, <span class="ident">CPU_CORES_QUOTA_GAUGE</span>, <span class="ident">DEFAULT_CLUSTER_ID</span>, <span class="ident">GRPC_THREAD_PREFIX</span>,
     },
     <span class="ident">storage</span>::{<span class="self">self</span>, <span class="ident">config</span>::<span class="ident">StorageConfigManger</span>, <span class="ident">mvcc</span>::<span class="ident">MvccConsistencyCheckObserver</span>},
 };
@@ -1255,6 +1268,7 @@
     <span class="ident">to_stop</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">Stop</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">lock_files</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">File</span><span class="op">&gt;</span>,
     <span class="ident">concurrency_manager</span>: <span class="ident">ConcurrencyManager</span>,
+    <span class="ident">env</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Environment</span><span class="op">&gt;</span>,
     <span class="ident">background_worker</span>: <span class="ident">Worker</span>,
 }
 
@@ -1281,7 +1295,14 @@
             <span class="ident">SecurityManager</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">config</span>.<span class="ident">security</span>)
                 .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">fatal</span><span class="macro">!</span>(<span class="string">&quot;failed to create security manager: {}&quot;</span>, <span class="ident">e</span>)),
         );
-        <span class="kw">let</span> <span class="ident">pd_client</span> <span class="op">=</span> <span class="self">Self</span>::<span class="ident">connect_to_pd_cluster</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">config</span>, <span class="ident">Arc</span>::<span class="ident">clone</span>(<span class="kw-2">&amp;</span><span class="ident">security_mgr</span>));
+        <span class="kw">let</span> <span class="ident">env</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(
+            <span class="ident">EnvBuilder</span>::<span class="ident">new</span>()
+                .<span class="ident">cq_count</span>(<span class="ident">config</span>.<span class="ident">server</span>.<span class="ident">grpc_concurrency</span>)
+                .<span class="ident">name_prefix</span>(<span class="macro">thd_name</span><span class="macro">!</span>(<span class="ident">GRPC_THREAD_PREFIX</span>))
+                .<span class="ident">build</span>(),
+        );
+        <span class="kw">let</span> <span class="ident">pd_client</span> <span class="op">=</span>
+            <span class="self">Self</span>::<span class="ident">connect_to_pd_cluster</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">config</span>, <span class="ident">env</span>.<span class="ident">clone</span>(), <span class="ident">Arc</span>::<span class="ident">clone</span>(<span class="kw-2">&amp;</span><span class="ident">security_mgr</span>));
 
         <span class="comment">// Initialize and check config</span>
         <span class="kw">let</span> <span class="ident">cfg_controller</span> <span class="op">=</span> <span class="self">Self</span>::<span class="ident">init_config</span>(<span class="ident">config</span>);
@@ -1325,6 +1346,7 @@
             <span class="ident">to_stop</span>: <span class="macro">vec</span><span class="macro">!</span>[],
             <span class="ident">lock_files</span>: <span class="macro">vec</span><span class="macro">!</span>[],
             <span class="ident">concurrency_manager</span>,
+            <span class="ident">env</span>,
             <span class="ident">background_worker</span>,
         }
     }
@@ -1368,10 +1390,11 @@
 
     <span class="kw">fn</span> <span class="ident">connect_to_pd_cluster</span>(
         <span class="ident">config</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">TiKvConfig</span>,
+        <span class="ident">env</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Environment</span><span class="op">&gt;</span>,
         <span class="ident">security_mgr</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">SecurityManager</span><span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">RpcClient</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">pd_client</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(
-            <span class="ident">RpcClient</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">config</span>.<span class="ident">pd</span>, <span class="ident">security_mgr</span>)
+            <span class="ident">RpcClient</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">config</span>.<span class="ident">pd</span>, <span class="prelude-val">Some</span>(<span class="ident">env</span>), <span class="ident">security_mgr</span>)
                 .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">fatal</span><span class="macro">!</span>(<span class="string">&quot;failed to create rpc client: {}&quot;</span>, <span class="ident">e</span>)),
         );
 
@@ -1677,6 +1700,7 @@
             <span class="self">self</span>.<span class="ident">resolver</span>.<span class="ident">clone</span>(),
             <span class="ident">snap_mgr</span>.<span class="ident">clone</span>(),
             <span class="ident">gc_worker</span>.<span class="ident">clone</span>(),
+            <span class="self">self</span>.<span class="ident">env</span>.<span class="ident">clone</span>(),
             <span class="ident">unified_read_pool</span>,
             <span class="ident">debug_thread_pool</span>,
         )

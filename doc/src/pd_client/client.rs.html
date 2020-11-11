@@ -754,6 +754,12 @@
 <span id="751">751</span>
 <span id="752">752</span>
 <span id="753">753</span>
+<span id="754">754</span>
+<span id="755">755</span>
+<span id="756">756</span>
+<span id="757">757</span>
+<span id="758">758</span>
+<span id="759">759</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2017 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -769,7 +775,7 @@
 <span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">sink</span>::<span class="ident">SinkExt</span>;
 <span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">stream</span>::{<span class="ident">StreamExt</span>, <span class="ident">TryStreamExt</span>};
 
-<span class="kw">use</span> <span class="ident">grpcio</span>::{<span class="ident">CallOption</span>, <span class="ident">EnvBuilder</span>, <span class="prelude-ty">Result</span> <span class="kw">as</span> <span class="ident">GrpcResult</span>, <span class="ident">WriteFlags</span>};
+<span class="kw">use</span> <span class="ident">grpcio</span>::{<span class="ident">CallOption</span>, <span class="ident">EnvBuilder</span>, <span class="ident">Environment</span>, <span class="prelude-ty">Result</span> <span class="kw">as</span> <span class="ident">GrpcResult</span>, <span class="ident">WriteFlags</span>};
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">metapb</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">pdpb</span>::{<span class="self">self</span>, <span class="ident">Member</span>};
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">replication_modepb</span>::{<span class="ident">RegionReplicationStatus</span>, <span class="ident">ReplicationStatus</span>};
@@ -793,13 +799,19 @@
 }
 
 <span class="kw">impl</span> <span class="ident">RpcClient</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">cfg</span>: <span class="kw-2">&amp;</span><span class="ident">Config</span>, <span class="ident">security_mgr</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">SecurityManager</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">RpcClient</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">env</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(
-            <span class="ident">EnvBuilder</span>::<span class="ident">new</span>()
-                .<span class="ident">cq_count</span>(<span class="ident">CQ_COUNT</span>)
-                .<span class="ident">name_prefix</span>(<span class="macro">thd_name</span><span class="macro">!</span>(<span class="ident">CLIENT_PREFIX</span>))
-                .<span class="ident">build</span>(),
-        );
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
+        <span class="ident">cfg</span>: <span class="kw-2">&amp;</span><span class="ident">Config</span>,
+        <span class="ident">shared_env</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Environment</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+        <span class="ident">security_mgr</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">SecurityManager</span><span class="op">&gt;</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">RpcClient</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="ident">env</span> <span class="op">=</span> <span class="ident">shared_env</span>.<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="op">|</span> {
+            <span class="ident">Arc</span>::<span class="ident">new</span>(
+                <span class="ident">EnvBuilder</span>::<span class="ident">new</span>()
+                    .<span class="ident">cq_count</span>(<span class="ident">CQ_COUNT</span>)
+                    .<span class="ident">name_prefix</span>(<span class="macro">thd_name</span><span class="macro">!</span>(<span class="ident">CLIENT_PREFIX</span>))
+                    .<span class="ident">build</span>(),
+            )
+        });
 
         <span class="comment">// -1 means the max.</span>
         <span class="kw">let</span> <span class="ident">retries</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">cfg</span>.<span class="ident">retry_max_count</span> {
