@@ -807,6 +807,24 @@
 <span id="804">804</span>
 <span id="805">805</span>
 <span id="806">806</span>
+<span id="807">807</span>
+<span id="808">808</span>
+<span id="809">809</span>
+<span id="810">810</span>
+<span id="811">811</span>
+<span id="812">812</span>
+<span id="813">813</span>
+<span id="814">814</span>
+<span id="815">815</span>
+<span id="816">816</span>
+<span id="817">817</span>
+<span id="818">818</span>
+<span id="819">819</span>
+<span id="820">820</span>
+<span id="821">821</span>
+<span id="822">822</span>
+<span id="823">823</span>
+<span id="824">824</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -818,6 +836,7 @@
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">metapb</span>::<span class="ident">Region</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">pdpb</span>::<span class="ident">CheckPolicy</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">raft_cmdpb</span>::{<span class="ident">ComputeHashRequest</span>, <span class="ident">RaftCmdRequest</span>};
+<span class="kw">use</span> <span class="ident">raft</span>::<span class="ident">eraftpb</span>;
 
 <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">CasualRouter</span>;
@@ -955,6 +974,11 @@
     <span class="ident">RegionChangeObserver</span>,
     <span class="ident">WrappedRegionChangeObserver</span>
 );
+<span class="macro">impl_box_observer</span><span class="macro">!</span>(
+    <span class="ident">BoxReadIndexObserver</span>,
+    <span class="ident">ReadIndexObserver</span>,
+    <span class="ident">WrappedReadIndexObserver</span>
+);
 <span class="macro">impl_box_observer_g</span><span class="macro">!</span>(<span class="ident">BoxCmdObserver</span>, <span class="ident">CmdObserver</span>, <span class="ident">WrappedCmdObserver</span>);
 <span class="macro">impl_box_observer_g</span><span class="macro">!</span>(
     <span class="ident">BoxConsistencyCheckObserver</span>,
@@ -976,6 +1000,7 @@
     <span class="ident">role_observers</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Entry</span><span class="op">&lt;</span><span class="ident">BoxRoleObserver</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">region_change_observers</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Entry</span><span class="op">&lt;</span><span class="ident">BoxRegionChangeObserver</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">cmd_observers</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Entry</span><span class="op">&lt;</span><span class="ident">BoxCmdObserver</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">read_index_observers</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Entry</span><span class="op">&lt;</span><span class="ident">BoxReadIndexObserver</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="comment">// TODO: add endpoint</span>
 }
 
@@ -990,6 +1015,7 @@
             <span class="ident">role_observers</span>: <span class="ident">Default</span>::<span class="ident">default</span>(),
             <span class="ident">region_change_observers</span>: <span class="ident">Default</span>::<span class="ident">default</span>(),
             <span class="ident">cmd_observers</span>: <span class="ident">Default</span>::<span class="ident">default</span>(),
+            <span class="ident">read_index_observers</span>: <span class="ident">Default</span>::<span class="ident">default</span>(),
         }
     }
 }
@@ -1046,6 +1072,10 @@
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">register_cmd_observer</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">priority</span>: <span class="ident">u32</span>, <span class="ident">rlo</span>: <span class="ident">BoxCmdObserver</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>) {
         <span class="macro">push</span><span class="macro">!</span>(<span class="ident">priority</span>, <span class="ident">rlo</span>, <span class="self">self</span>.<span class="ident">cmd_observers</span>);
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">register_read_index_observer</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">priority</span>: <span class="ident">u32</span>, <span class="ident">rio</span>: <span class="ident">BoxReadIndexObserver</span>) {
+        <span class="macro">push</span><span class="macro">!</span>(<span class="ident">priority</span>, <span class="ident">rio</span>, <span class="self">self</span>.<span class="ident">read_index_observers</span>);
     }
 }
 
@@ -1340,6 +1370,12 @@
             .<span class="ident">observer</span>
             .<span class="ident">inner</span>()
             .<span class="ident">on_flush_apply</span>(<span class="ident">engine</span>)
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">on_step_read_index</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">msg</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">eraftpb</span>::<span class="ident">Message</span>) {
+        <span class="kw">for</span> <span class="ident">step_ob</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">registry</span>.<span class="ident">read_index_observers</span> {
+            <span class="ident">step_ob</span>.<span class="ident">observer</span>.<span class="ident">inner</span>().<span class="ident">on_step</span>(<span class="ident">msg</span>);
+        }
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">shutdown</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {

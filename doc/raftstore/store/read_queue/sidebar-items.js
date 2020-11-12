@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["READ_QUEUE_SHRINK_SIZE",""]],"struct":[["ReadIndexQueue",""],["ReadIndexRequest",""]]});
+initSidebarItems({"constant":[["LOCKED_FLAG",""],["READ_QUEUE_SHRINK_SIZE",""],["REQUEST_FLAG",""],["UUID_LEN",""]],"struct":[["ReadIndexContext",""],["ReadIndexQueue",""],["ReadIndexRequest",""]]});
