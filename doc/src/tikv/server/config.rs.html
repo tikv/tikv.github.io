@@ -386,6 +386,14 @@
 <span id="383">383</span>
 <span id="384">384</span>
 <span id="385">385</span>
+<span id="386">386</span>
+<span id="387">387</span>
+<span id="388">388</span>
+<span id="389">389</span>
+<span id="390">390</span>
+<span id="391">391</span>
+<span id="392">392</span>
+<span id="393">393</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -582,7 +590,7 @@
             );
             <span class="self">self</span>.<span class="ident">advertise_addr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">addr</span>.<span class="ident">clone</span>();
         }
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">advertise_addr</span>.<span class="ident">starts_with</span>(<span class="string">&quot;0.0.0.0&quot;</span>) {
+        <span class="kw">if</span> <span class="macro">box_try</span><span class="macro">!</span>(<span class="ident">config</span>::<span class="ident">check_addr</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">advertise_addr</span>)) {
             <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(
                 <span class="string">&quot;invalid advertise-addr: {:?}&quot;</span>,
                 <span class="self">self</span>.<span class="ident">advertise_addr</span>
@@ -592,21 +600,26 @@
             <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(<span class="string">&quot;status-addr can not be empty&quot;</span>));
         }
         <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">status_addr</span>.<span class="ident">is_empty</span>() {
-            <span class="macro">box_try</span><span class="macro">!</span>(<span class="ident">config</span>::<span class="ident">check_addr</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">status_addr</span>));
+            <span class="kw">let</span> <span class="ident">status_addr_unspecified</span> <span class="op">=</span> <span class="macro">box_try</span><span class="macro">!</span>(<span class="ident">config</span>::<span class="ident">check_addr</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">status_addr</span>));
             <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">advertise_status_addr</span>.<span class="ident">is_empty</span>() {
-                <span class="macro">box_try</span><span class="macro">!</span>(<span class="ident">config</span>::<span class="ident">check_addr</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">advertise_status_addr</span>));
-                <span class="kw">if</span> <span class="self">self</span>.<span class="ident">advertise_status_addr</span>.<span class="ident">starts_with</span>(<span class="string">&quot;0.0.0.0&quot;</span>) {
+                <span class="kw">if</span> <span class="macro">box_try</span><span class="macro">!</span>(<span class="ident">config</span>::<span class="ident">check_addr</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">advertise_status_addr</span>)) {
                     <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(
                         <span class="string">&quot;invalid advertise-status-addr: {:?}&quot;</span>,
                         <span class="self">self</span>.<span class="ident">advertise_status_addr</span>
                     ));
                 }
-            } <span class="kw">else</span> {
+            } <span class="kw">else</span> <span class="kw">if</span> <span class="op">!</span><span class="ident">status_addr_unspecified</span> {
                 <span class="macro">info</span><span class="macro">!</span>(
                     <span class="string">&quot;no advertise-status-addr is specified, falling back to status-addr&quot;</span>;
                     <span class="string">&quot;status-addr&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="self">self</span>.<span class="ident">status_addr</span>
                 );
                 <span class="self">self</span>.<span class="ident">advertise_status_addr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">status_addr</span>.<span class="ident">clone</span>();
+            } <span class="kw">else</span> {
+                <span class="macro">info</span><span class="macro">!</span>(
+                    <span class="string">&quot;no advertise-status-addr is specified, and we can&#39;t falling back to \
+                    status-addr because it is invalid as advertise-status-addr&quot;</span>;
+                    <span class="string">&quot;status-addr&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="self">self</span>.<span class="ident">status_addr</span>
+                );
             }
         }
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">advertise_status_addr</span> <span class="op">=</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">advertise_addr</span> {
@@ -736,16 +749,19 @@
 
         <span class="ident">invalid_cfg</span> <span class="op">=</span> <span class="ident">Config</span>::<span class="ident">default</span>();
         <span class="ident">invalid_cfg</span>.<span class="ident">status_addr</span> <span class="op">=</span> <span class="string">&quot;0.0.0.0:1000&quot;</span>.<span class="ident">to_owned</span>();
-        <span class="ident">invalid_cfg</span>.<span class="ident">validate</span>().<span class="ident">unwrap</span>();
+        <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="number">10</span> {
+            <span class="ident">invalid_cfg</span>.<span class="ident">validate</span>().<span class="ident">unwrap</span>();
+        }
+        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">invalid_cfg</span>.<span class="ident">advertise_status_addr</span>.<span class="ident">is_empty</span>());
         <span class="ident">invalid_cfg</span>.<span class="ident">advertise_status_addr</span> <span class="op">=</span> <span class="string">&quot;0.0.0.0:1000&quot;</span>.<span class="ident">to_owned</span>();
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">invalid_cfg</span>.<span class="ident">validate</span>().<span class="ident">is_err</span>());
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">invalid_cfg</span> <span class="op">=</span> <span class="ident">cfg</span>.<span class="ident">clone</span>();
+        <span class="ident">invalid_cfg</span> <span class="op">=</span> <span class="ident">Config</span>::<span class="ident">default</span>();
         <span class="ident">invalid_cfg</span>.<span class="ident">advertise_addr</span> <span class="op">=</span> <span class="string">&quot;127.0.0.1:1000&quot;</span>.<span class="ident">to_owned</span>();
         <span class="ident">invalid_cfg</span>.<span class="ident">advertise_status_addr</span> <span class="op">=</span> <span class="string">&quot;127.0.0.1:1000&quot;</span>.<span class="ident">to_owned</span>();
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">invalid_cfg</span>.<span class="ident">validate</span>().<span class="ident">is_err</span>());
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">invalid_cfg</span> <span class="op">=</span> <span class="ident">cfg</span>.<span class="ident">clone</span>();
+        <span class="ident">invalid_cfg</span> <span class="op">=</span> <span class="ident">Config</span>::<span class="ident">default</span>();
         <span class="ident">invalid_cfg</span>.<span class="ident">grpc_stream_initial_window_size</span> <span class="op">=</span> <span class="ident">ReadableSize</span>(<span class="ident">i32</span>::<span class="ident">MAX</span> <span class="kw">as</span> <span class="ident">u64</span> <span class="op">+</span> <span class="number">1</span>);
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">invalid_cfg</span>.<span class="ident">validate</span>().<span class="ident">is_err</span>());
 
