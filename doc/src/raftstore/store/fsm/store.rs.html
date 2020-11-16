@@ -2410,6 +2410,15 @@
 <span id="2407">2407</span>
 <span id="2408">2408</span>
 <span id="2409">2409</span>
+<span id="2410">2410</span>
+<span id="2411">2411</span>
+<span id="2412">2412</span>
+<span id="2413">2413</span>
+<span id="2414">2414</span>
+<span id="2415">2415</span>
+<span id="2416">2416</span>
+<span id="2417">2417</span>
+<span id="2418">2418</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -3526,6 +3535,14 @@
 <span class="kw">struct</span> <span class="ident">Workers</span><span class="op">&lt;</span><span class="ident">EK</span>: <span class="ident">KvEngine</span><span class="op">&gt;</span> {
     <span class="ident">pd_worker</span>: <span class="ident">FutureWorker</span><span class="op">&lt;</span><span class="ident">PdTask</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">background_worker</span>: <span class="ident">Worker</span>,
+
+    <span class="comment">// Cleanup tasks gets their own workers, instead of reusing background_workers.</span>
+    <span class="comment">// This is because the underlying compact_range call is a blocking operation, which</span>
+    <span class="comment">// can take an extensive amount of time. Also putting the cleanup tasks on</span>
+    <span class="comment">// background_workers pool can create a deadlock when compaction guard is enabled:</span>
+    <span class="comment">// https://github.com/tikv/tikv/issues/9044.</span>
+    <span class="ident">cleanup_worker</span>: <span class="ident">Worker</span>,
+
     <span class="ident">coprocessor_host</span>: <span class="ident">CoprocessorHost</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>,
 }
 
@@ -3576,6 +3593,7 @@
         <span class="kw">let</span> <span class="ident">workers</span> <span class="op">=</span> <span class="ident">Workers</span> {
             <span class="ident">pd_worker</span>,
             <span class="ident">background_worker</span>,
+            <span class="ident">cleanup_worker</span>: <span class="ident">Worker</span>::<span class="ident">new</span>(<span class="string">&quot;cleanup-worker&quot;</span>),
             <span class="ident">coprocessor_host</span>: <span class="ident">coprocessor_host</span>.<span class="ident">clone</span>(),
         };
         <span class="ident">mgr</span>.<span class="ident">init</span>()<span class="question-mark">?</span>;
@@ -3595,7 +3613,6 @@
         <span class="kw">let</span> <span class="ident">raftlog_gc_scheduler</span> <span class="op">=</span> <span class="ident">workers</span>
             .<span class="ident">background_worker</span>
             .<span class="ident">start_with_timer</span>(<span class="string">&quot;raft-gc-worker&quot;</span>, <span class="ident">raftlog_gc_runner</span>);
-
         <span class="kw">let</span> <span class="ident">compact_runner</span> <span class="op">=</span> <span class="ident">CompactRunner</span>::<span class="ident">new</span>(<span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">clone</span>());
         <span class="kw">let</span> <span class="ident">cleanup_sst_runner</span> <span class="op">=</span> <span class="ident">CleanupSSTRunner</span>::<span class="ident">new</span>(
             <span class="ident">meta</span>.<span class="ident">get_id</span>(),
@@ -3605,7 +3622,7 @@
         );
         <span class="kw">let</span> <span class="ident">cleanup_runner</span> <span class="op">=</span> <span class="ident">CleanupRunner</span>::<span class="ident">new</span>(<span class="ident">compact_runner</span>, <span class="ident">cleanup_sst_runner</span>);
         <span class="kw">let</span> <span class="ident">cleanup_scheduler</span> <span class="op">=</span> <span class="ident">workers</span>
-            .<span class="ident">background_worker</span>
+            .<span class="ident">cleanup_worker</span>
             .<span class="ident">start</span>(<span class="string">&quot;cleanup-worker&quot;</span>, <span class="ident">cleanup_runner</span>);
         <span class="kw">let</span> <span class="ident">consistency_check_runner</span> <span class="op">=</span>
             <span class="ident">ConsistencyCheckRunner</span>::<span class="op">&lt;</span><span class="ident">EK</span>, <span class="kw">_</span><span class="op">&gt;</span>::<span class="ident">new</span>(<span class="self">self</span>.<span class="ident">router</span>.<span class="ident">clone</span>(), <span class="ident">coprocessor_host</span>.<span class="ident">clone</span>());
@@ -3756,6 +3773,7 @@
         }
         <span class="ident">workers</span>.<span class="ident">coprocessor_host</span>.<span class="ident">shutdown</span>();
         <span class="ident">workers</span>.<span class="ident">background_worker</span>.<span class="ident">stop</span>();
+        <span class="ident">workers</span>.<span class="ident">cleanup_worker</span>.<span class="ident">stop</span>();
     }
 }
 
