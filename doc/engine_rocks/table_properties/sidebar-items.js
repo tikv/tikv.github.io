@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["RocksTableProperties",""],["RocksTablePropertiesCollection",""],["RocksTablePropertiesCollectionIter",""],["RocksTablePropertiesKey",""],["RocksUserCollectedProperties",""]]});
+initSidebarItems({"struct":[["RocksTableProperties",""],["RocksTablePropertiesCollection",""],["RocksTablePropertiesCollectionIter",""],["RocksTablePropertiesKey",""],["RocksUserCollectedProperties",""],["RocksUserCollectedPropertiesNoRc",""]]});

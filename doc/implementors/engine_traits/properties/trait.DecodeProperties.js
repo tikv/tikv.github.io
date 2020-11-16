@@ -1,4 +1,4 @@
 (function() {var implementors = {};
 implementors["engine_panic"] = [{"text":"impl DecodeProperties for PanicUserCollectedProperties","synthetic":false,"types":[]}];
-implementors["engine_rocks"] = [{"text":"impl DecodeProperties for RocksUserCollectedProperties","synthetic":false,"types":[]},{"text":"impl DecodeProperties for UserProperties","synthetic":false,"types":[]},{"text":"impl&lt;'a&gt; DecodeProperties for UserCollectedPropertiesDecoder&lt;'a&gt;","synthetic":false,"types":[]}];
+implementors["engine_rocks"] = [{"text":"impl DecodeProperties for RocksUserCollectedProperties","synthetic":false,"types":[]},{"text":"impl DecodeProperties for RocksUserCollectedPropertiesNoRc","synthetic":false,"types":[]},{"text":"impl DecodeProperties for UserProperties","synthetic":false,"types":[]},{"text":"impl&lt;'a&gt; DecodeProperties for UserCollectedPropertiesDecoder&lt;'a&gt;","synthetic":false,"types":[]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
