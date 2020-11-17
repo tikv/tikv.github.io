@@ -698,14 +698,27 @@
 <span id="695">695</span>
 <span id="696">696</span>
 <span id="697">697</span>
+<span id="698">698</span>
+<span id="699">699</span>
+<span id="700">700</span>
+<span id="701">701</span>
+<span id="702">702</span>
+<span id="703">703</span>
+<span id="704">704</span>
+<span id="705">705</span>
+<span id="706">706</span>
+<span id="707">707</span>
+<span id="708">708</span>
+<span id="709">709</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">cell</span>::<span class="ident">Cell</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">cmp</span>::<span class="ident">Ordering</span> <span class="kw">as</span> <span class="ident">CmpOrdering</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">ffi</span>::<span class="ident">CString</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::{<span class="ident">AtomicU64</span>, <span class="ident">Ordering</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::{<span class="ident">Arc</span>, <span class="ident">Mutex</span>};
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">thread</span>;
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">time</span>::{<span class="ident">Duration</span>, <span class="ident">Instant</span>};
 
 <span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">GcConfig</span>, <span class="ident">GcWorkerConfigManager</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">mvcc</span>::{<span class="ident">check_need_gc</span>, <span class="ident">GC_DELETE_VERSIONS_HISTOGRAM</span>, <span class="ident">MVCC_VERSIONS_HISTOGRAM</span>};
@@ -719,7 +732,7 @@
 };
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{
     <span class="ident">IterOptions</span>, <span class="ident">Iterable</span>, <span class="ident">Iterator</span>, <span class="ident">MiscExt</span>, <span class="ident">Mutable</span>, <span class="ident">MvccProperties</span>, <span class="ident">SeekKey</span>, <span class="ident">WriteBatchExt</span>,
-    <span class="ident">WriteOptions</span>, <span class="ident">CF_WRITE</span>,
+    <span class="ident">CF_WRITE</span>,
 };
 <span class="kw">use</span> <span class="ident">pd_client</span>::<span class="ident">ClusterVersion</span>;
 <span class="kw">use</span> <span class="ident">txn_types</span>::{<span class="ident">Key</span>, <span class="ident">WriteRef</span>, <span class="ident">WriteType</span>};
@@ -858,17 +871,16 @@
 
     <span class="ident">key_prefix</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
     <span class="ident">remove_older</span>: <span class="ident">bool</span>,
-    <span class="ident">deleting</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 
     <span class="comment">// To handle delete marks.</span>
     <span class="ident">write_iter</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RocksEngineIterator</span><span class="op">&gt;</span>,
     <span class="ident">near_seek_distance</span>: <span class="ident">usize</span>,
 
-    <span class="comment">// For metrics about (versions, deleted_versions) for every MVCC key.</span>
     <span class="ident">versions</span>: <span class="ident">usize</span>,
+    <span class="ident">filtered</span>: <span class="ident">usize</span>,
     <span class="ident">deleted</span>: <span class="ident">usize</span>,
-    <span class="comment">// Total versions and deleted versions in the compaction.</span>
     <span class="ident">total_versions</span>: <span class="ident">usize</span>,
+    <span class="ident">total_filtered</span>: <span class="ident">usize</span>,
     <span class="ident">total_deleted</span>: <span class="ident">usize</span>,
 }
 
@@ -895,46 +907,33 @@
             <span class="ident">write_batch</span>,
             <span class="ident">key_prefix</span>: <span class="macro">vec</span><span class="macro">!</span>[],
             <span class="ident">remove_older</span>: <span class="bool-val">false</span>,
-            <span class="ident">deleting</span>: <span class="prelude-val">None</span>,
             <span class="ident">write_iter</span>,
             <span class="ident">near_seek_distance</span>: <span class="ident">NEAR_SEEK_LIMIT</span>,
             <span class="ident">versions</span>: <span class="number">0</span>,
+            <span class="ident">filtered</span>: <span class="number">0</span>,
             <span class="ident">deleted</span>: <span class="number">0</span>,
             <span class="ident">total_versions</span>: <span class="number">0</span>,
+            <span class="ident">total_filtered</span>: <span class="number">0</span>,
             <span class="ident">total_deleted</span>: <span class="number">0</span>,
         }
     }
 
-    <span class="comment">// Do gc before a delete mark. Must be called before switching `key_prefix`.</span>
-    <span class="kw">fn</span> <span class="ident">handle_deleting</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">deleting</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">deleting</span>.<span class="ident">take</span>() {
-            <span class="prelude-val">Some</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">v</span>,
-            <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span>,
-        };
-
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">valid</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">write_iter_seek_to</span>(<span class="ident">deleting</span>[<span class="number">0</span>].<span class="ident">as_slice</span>());
+    <span class="comment">// Do gc before a delete mark.</span>
+    <span class="kw">fn</span> <span class="ident">handle_delete_mark</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">mark</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">valid</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">write_iter_seek_to</span>(<span class="ident">mark</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">write_iter</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">write_iter</span>.<span class="ident">take</span>().<span class="ident">unwrap</span>();
+        <span class="kw">if</span> <span class="ident">valid</span> <span class="op">&amp;&amp;</span> <span class="ident">write_iter</span>.<span class="ident">key</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">mark</span> {
+            <span class="comment">// The delete mark itself is handled in `filter`.</span>
+            <span class="ident">valid</span> <span class="op">=</span> <span class="ident">write_iter</span>.<span class="ident">next</span>().<span class="ident">unwrap</span>();
+        }
+
         <span class="kw">while</span> <span class="ident">valid</span> {
             <span class="kw">let</span> (<span class="ident">key</span>, <span class="ident">value</span>) <span class="op">=</span> (<span class="ident">write_iter</span>.<span class="ident">key</span>(), <span class="ident">write_iter</span>.<span class="ident">value</span>());
             <span class="kw">if</span> <span class="ident">truncate_ts</span>(<span class="ident">key</span>) <span class="op">!</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">key_prefix</span>.<span class="ident">as_slice</span>() {
                 <span class="kw">break</span>;
             }
-
-            <span class="kw">let</span> (<span class="kw-2">mut</span> <span class="ident">drain_pos</span>, <span class="kw-2">mut</span> <span class="ident">found</span>) <span class="op">=</span> (<span class="number">0</span>, <span class="bool-val">false</span>);
-            <span class="kw">while</span> <span class="ident">drain_pos</span> <span class="op">&lt;</span> <span class="ident">deleting</span>.<span class="ident">len</span>() {
-                <span class="kw">match</span> <span class="ident">write_iter</span>.<span class="ident">key</span>().<span class="ident">cmp</span>(<span class="ident">deleting</span>[<span class="ident">drain_pos</span>].<span class="ident">as_slice</span>()) {
-                    <span class="ident">CmpOrdering</span>::<span class="ident">Equal</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">found</span> <span class="op">=</span> <span class="bool-val">true</span>,
-                    <span class="ident">CmpOrdering</span>::<span class="ident">Less</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">break</span>,
-                    <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> {}
-                }
-                <span class="ident">drain_pos</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
-            }
-            <span class="ident">deleting</span>.<span class="ident">drain</span>(<span class="number">0</span>..<span class="ident">drain_pos</span>);
-            <span class="kw">if</span> <span class="op">!</span><span class="ident">found</span> {
-                <span class="self">self</span>.<span class="ident">handle_filtered_write</span>(<span class="ident">parse_write</span>(<span class="ident">value</span>));
-                <span class="self">self</span>.<span class="ident">delete_write_key</span>(<span class="ident">key</span>);
-            }
-
+            <span class="self">self</span>.<span class="ident">handle_filtered_write</span>(<span class="ident">parse_write</span>(<span class="ident">value</span>));
+            <span class="self">self</span>.<span class="ident">delete_write_key</span>(<span class="ident">key</span>);
             <span class="ident">valid</span> <span class="op">=</span> <span class="ident">write_iter</span>.<span class="ident">next</span>().<span class="ident">unwrap</span>();
         }
         <span class="self">self</span>.<span class="ident">write_iter</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">write_iter</span>);
@@ -978,13 +977,12 @@
     <span class="kw">fn</span> <span class="ident">delete_write_key</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) {
         <span class="self">self</span>.<span class="ident">write_batch</span>.<span class="ident">delete_cf</span>(<span class="ident">CF_WRITE</span>, <span class="ident">key</span>).<span class="ident">unwrap</span>();
         <span class="self">self</span>.<span class="ident">flush_pending_writes_if_need</span>();
+        <span class="self">self</span>.<span class="ident">deleted</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
     }
 
     <span class="kw">fn</span> <span class="ident">flush_pending_writes_if_need</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">write_batch</span>.<span class="ident">count</span>() <span class="op">&gt;</span> <span class="ident">DEFAULT_DELETE_BATCH_COUNT</span> {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">opts</span> <span class="op">=</span> <span class="ident">WriteOptions</span>::<span class="ident">new</span>();
-            <span class="ident">opts</span>.<span class="ident">set_sync</span>(<span class="bool-val">false</span>);
-            <span class="self">self</span>.<span class="ident">engine</span>.<span class="ident">write_opt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">write_batch</span>, <span class="kw-2">&amp;</span><span class="ident">opts</span>).<span class="ident">unwrap</span>();
+            <span class="self">self</span>.<span class="ident">engine</span>.<span class="ident">write</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">write_batch</span>).<span class="ident">unwrap</span>();
             <span class="self">self</span>.<span class="ident">write_batch</span>.<span class="ident">clear</span>();
         }
     }
@@ -995,43 +993,73 @@
             <span class="self">self</span>.<span class="ident">total_versions</span> <span class="op">+</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">versions</span>;
             <span class="self">self</span>.<span class="ident">versions</span> <span class="op">=</span> <span class="number">0</span>;
         }
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">deleted</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
-            <span class="ident">GC_DELETE_VERSIONS_HISTOGRAM</span>.<span class="ident">observe</span>(<span class="self">self</span>.<span class="ident">deleted</span> <span class="kw">as</span> <span class="ident">f64</span>);
-            <span class="self">self</span>.<span class="ident">total_deleted</span> <span class="op">+</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">deleted</span>;
-            <span class="self">self</span>.<span class="ident">deleted</span> <span class="op">=</span> <span class="number">0</span>;
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">filtered</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
+            <span class="ident">GC_DELETE_VERSIONS_HISTOGRAM</span>.<span class="ident">observe</span>(<span class="self">self</span>.<span class="ident">filtered</span> <span class="kw">as</span> <span class="ident">f64</span>);
+            <span class="self">self</span>.<span class="ident">total_filtered</span> <span class="op">+</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">filtered</span>;
+            <span class="self">self</span>.<span class="ident">filtered</span> <span class="op">=</span> <span class="number">0</span>;
         }
+        <span class="self">self</span>.<span class="ident">total_deleted</span> <span class="op">+</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">deleted</span>;
+        <span class="self">self</span>.<span class="ident">deleted</span> <span class="op">=</span> <span class="number">0</span>;
+    }
+}
+
+<span class="kw">struct</span> <span class="ident">CompactionFilterStats</span> {
+    <span class="ident">versions</span>: <span class="ident">Cell</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>, <span class="comment">// Total stale versions meet by compaction filters.</span>
+    <span class="ident">filtered</span>: <span class="ident">Cell</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>, <span class="comment">// Filtered versions by compaction filters.</span>
+    <span class="ident">deleted</span>: <span class="ident">Cell</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>,  <span class="comment">// Deleted versions from RocksDB.</span>
+    <span class="ident">last_report</span>: <span class="ident">Cell</span><span class="op">&lt;</span><span class="ident">Instant</span><span class="op">&gt;</span>,
+}
+<span class="kw">impl</span> <span class="ident">CompactionFilterStats</span> {
+    <span class="kw">fn</span> <span class="ident">report</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">let</span> <span class="ident">versions</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">versions</span>.<span class="ident">replace</span>(<span class="number">0</span>);
+        <span class="kw">let</span> <span class="ident">filtered</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">filtered</span>.<span class="ident">replace</span>(<span class="number">0</span>);
+        <span class="kw">let</span> <span class="ident">deleted</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">deleted</span>.<span class="ident">replace</span>(<span class="number">0</span>);
+        <span class="macro">info</span><span class="macro">!</span>(
+            <span class="string">&quot;Compaction filter in thread {:?} reports&quot;</span>, <span class="ident">thread</span>::<span class="ident">current</span>().<span class="ident">name</span>();
+            <span class="string">&quot;total&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">versions</span>, <span class="string">&quot;filtered&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">filtered</span>, <span class="string">&quot;deleted&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">deleted</span>,
+        );
+        <span class="self">self</span>.<span class="ident">last_report</span>.<span class="ident">set</span>(<span class="ident">Instant</span>::<span class="ident">now</span>());
+    }
+}
+<span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">CompactionFilterStats</span> {
+    <span class="kw">fn</span> <span class="ident">default</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+        <span class="ident">CompactionFilterStats</span> {
+            <span class="ident">versions</span>: <span class="ident">Cell</span>::<span class="ident">new</span>(<span class="number">0</span>),
+            <span class="ident">filtered</span>: <span class="ident">Cell</span>::<span class="ident">new</span>(<span class="number">0</span>),
+            <span class="ident">deleted</span>: <span class="ident">Cell</span>::<span class="ident">new</span>(<span class="number">0</span>),
+            <span class="ident">last_report</span>: <span class="ident">Cell</span>::<span class="ident">new</span>(<span class="ident">Instant</span>::<span class="ident">now</span>()),
+        }
+    }
+}
+<span class="kw">impl</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">CompactionFilterStats</span> {
+    <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
+        <span class="self">self</span>.<span class="ident">report</span>();
     }
 }
 
 <span class="macro">thread_local</span><span class="macro">!</span> {
-    <span class="kw">static</span> <span class="ident">VERSIONS_AND_DELETES</span>: <span class="ident">Cell</span><span class="op">&lt;</span>(<span class="ident">usize</span>, <span class="ident">usize</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Cell</span>::<span class="ident">new</span>((<span class="number">0</span>, <span class="number">0</span>));
+    <span class="kw">static</span> <span class="ident">STATS</span>: <span class="ident">CompactionFilterStats</span> <span class="op">=</span> <span class="ident">CompactionFilterStats</span>::<span class="ident">default</span>();
 }
 
 <span class="kw">impl</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">WriteCompactionFilter</span> {
     <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">handle_deleting</span>();
-
         <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">write_batch</span>.<span class="ident">is_empty</span>() {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">opts</span> <span class="op">=</span> <span class="ident">WriteOptions</span>::<span class="ident">new</span>();
-            <span class="ident">opts</span>.<span class="ident">set_sync</span>(<span class="bool-val">true</span>);
-            <span class="self">self</span>.<span class="ident">engine</span>.<span class="ident">write_opt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">write_batch</span>, <span class="kw-2">&amp;</span><span class="ident">opts</span>).<span class="ident">unwrap</span>();
+            <span class="self">self</span>.<span class="ident">engine</span>.<span class="ident">write</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">write_batch</span>).<span class="ident">unwrap</span>();
             <span class="self">self</span>.<span class="ident">write_batch</span>.<span class="ident">clear</span>();
-        } <span class="kw">else</span> {
-            <span class="self">self</span>.<span class="ident">engine</span>.<span class="ident">sync_wal</span>().<span class="ident">unwrap</span>();
         }
+        <span class="self">self</span>.<span class="ident">engine</span>.<span class="ident">sync_wal</span>().<span class="ident">unwrap</span>();
 
         <span class="self">self</span>.<span class="ident">switch_key_metrics</span>();
-        <span class="ident">VERSIONS_AND_DELETES</span>.<span class="ident">with</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> {
-            <span class="ident">x</span>.<span class="ident">update</span>(<span class="op">|</span>(<span class="kw-2">mut</span> <span class="ident">versions</span>, <span class="kw-2">mut</span> <span class="ident">deletes</span>)<span class="op">|</span> {
-                <span class="ident">versions</span> <span class="op">+</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">total_versions</span>;
-                <span class="ident">deletes</span> <span class="op">+</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">total_deleted</span>;
-                <span class="kw">if</span> <span class="ident">versions</span> <span class="op">&gt;</span><span class="op">=</span> <span class="number">1024</span> <span class="op">*</span> <span class="number">1024</span> {
-                    <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;Compaction filter reports&quot;</span>; <span class="string">&quot;total&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">versions</span>, <span class="string">&quot;gc&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">deletes</span>);
-                    <span class="kw">return</span> (<span class="number">0</span>, <span class="number">0</span>);
-                }
-                (<span class="ident">versions</span>, <span class="ident">deletes</span>)
-            })
-        });
+        <span class="ident">STATS</span>.<span class="ident">with</span>(<span class="op">|</span><span class="ident">stats</span><span class="op">|</span> {
+            <span class="ident">stats</span>.<span class="ident">versions</span>.<span class="ident">update</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span> <span class="op">+</span> <span class="self">self</span>.<span class="ident">total_versions</span>);
+            <span class="ident">stats</span>.<span class="ident">filtered</span>.<span class="ident">update</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span> <span class="op">+</span> <span class="self">self</span>.<span class="ident">total_filtered</span>);
+            <span class="ident">stats</span>.<span class="ident">deleted</span>.<span class="ident">update</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span> <span class="op">+</span> <span class="self">self</span>.<span class="ident">total_deleted</span>);
+            <span class="kw">if</span> <span class="ident">stats</span>.<span class="ident">versions</span>.<span class="ident">get</span>() <span class="op">&gt;</span><span class="op">=</span> <span class="number">1024</span> <span class="op">*</span> <span class="number">1024</span>
+                <span class="op">|</span><span class="op">|</span> <span class="ident">stats</span>.<span class="ident">last_report</span>.<span class="ident">get</span>().<span class="ident">elapsed</span>() <span class="op">&gt;</span><span class="op">=</span> <span class="ident">Duration</span>::<span class="ident">from_secs</span>(<span class="number">60</span>)
+            {
+                <span class="ident">stats</span>.<span class="ident">report</span>();
+            }
+        })
     }
 }
 
@@ -1052,7 +1080,6 @@
 
         <span class="self">self</span>.<span class="ident">versions</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">key_prefix</span> <span class="op">!</span><span class="op">=</span> <span class="ident">key_prefix</span> {
-            <span class="self">self</span>.<span class="ident">handle_deleting</span>();
             <span class="self">self</span>.<span class="ident">key_prefix</span>.<span class="ident">clear</span>();
             <span class="self">self</span>.<span class="ident">key_prefix</span>.<span class="ident">extend_from_slice</span>(<span class="ident">key_prefix</span>);
             <span class="self">self</span>.<span class="ident">remove_older</span> <span class="op">=</span> <span class="bool-val">false</span>;
@@ -1068,17 +1095,14 @@
                 <span class="ident">WriteType</span>::<span class="ident">Delete</span> <span class="op">=</span><span class="op">&gt;</span> {
                     <span class="self">self</span>.<span class="ident">remove_older</span> <span class="op">=</span> <span class="bool-val">true</span>;
                     <span class="ident">filtered</span> <span class="op">=</span> <span class="bool-val">true</span>;
-                    <span class="self">self</span>.<span class="ident">deleting</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">Vec</span>::<span class="ident">with_capacity</span>(<span class="number">16</span>));
+                    <span class="self">self</span>.<span class="ident">handle_delete_mark</span>(<span class="ident">key</span>);
                 }
             }
         }
 
         <span class="kw">if</span> <span class="ident">filtered</span> {
             <span class="self">self</span>.<span class="ident">handle_filtered_write</span>(<span class="ident">write</span>);
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">deleting</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">deleting</span>.<span class="ident">as_mut</span>() {
-                <span class="ident">deleting</span>.<span class="ident">push</span>(<span class="ident">key</span>.<span class="ident">to_vec</span>());
-            }
-            <span class="self">self</span>.<span class="ident">deleted</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+            <span class="self">self</span>.<span class="ident">filtered</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
         }
 
         <span class="ident">filtered</span>
