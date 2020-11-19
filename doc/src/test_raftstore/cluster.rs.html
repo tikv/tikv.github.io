@@ -1403,6 +1403,22 @@
 <span id="1400">1400</span>
 <span id="1401">1401</span>
 <span id="1402">1402</span>
+<span id="1403">1403</span>
+<span id="1404">1404</span>
+<span id="1405">1405</span>
+<span id="1406">1406</span>
+<span id="1407">1407</span>
+<span id="1408">1408</span>
+<span id="1409">1409</span>
+<span id="1410">1410</span>
+<span id="1411">1411</span>
+<span id="1412">1412</span>
+<span id="1413">1413</span>
+<span id="1414">1414</span>
+<span id="1415">1415</span>
+<span id="1416">1416</span>
+<span id="1417">1417</span>
+<span id="1418">1418</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -2675,7 +2691,7 @@
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">try_merge</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">source</span>: <span class="ident">u64</span>, <span class="ident">target</span>: <span class="ident">u64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">RaftCmdResponse</span> {
+    <span class="kw">fn</span> <span class="ident">new_prepare_merge</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">source</span>: <span class="ident">u64</span>, <span class="ident">target</span>: <span class="ident">u64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">RaftCmdRequest</span> {
         <span class="kw">let</span> <span class="ident">region</span> <span class="op">=</span> <span class="ident">block_on</span>(<span class="self">self</span>.<span class="ident">pd_client</span>.<span class="ident">get_region_by_id</span>(<span class="ident">target</span>))
             .<span class="ident">unwrap</span>()
             .<span class="ident">unwrap</span>();
@@ -2683,13 +2699,29 @@
         <span class="kw">let</span> <span class="ident">source_region</span> <span class="op">=</span> <span class="ident">block_on</span>(<span class="self">self</span>.<span class="ident">pd_client</span>.<span class="ident">get_region_by_id</span>(<span class="ident">source</span>))
             .<span class="ident">unwrap</span>()
             .<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">new_admin_request</span>(
+        <span class="ident">new_admin_request</span>(
             <span class="ident">source_region</span>.<span class="ident">get_id</span>(),
             <span class="ident">source_region</span>.<span class="ident">get_region_epoch</span>(),
             <span class="ident">prepare_merge</span>,
-        );
-        <span class="self">self</span>.<span class="ident">call_command_on_leader</span>(<span class="ident">req</span>, <span class="ident">Duration</span>::<span class="ident">from_secs</span>(<span class="number">5</span>))
-            .<span class="ident">unwrap</span>()
+        )
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">merge_region</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">source</span>: <span class="ident">u64</span>, <span class="ident">target</span>: <span class="ident">u64</span>, <span class="ident">cb</span>: <span class="ident">Callback</span><span class="op">&lt;</span><span class="ident">RocksSnapshot</span><span class="op">&gt;</span>) {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">req</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">new_prepare_merge</span>(<span class="ident">source</span>, <span class="ident">target</span>);
+        <span class="kw">let</span> <span class="ident">leader</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">leader_of_region</span>(<span class="ident">source</span>).<span class="ident">unwrap</span>();
+        <span class="ident">req</span>.<span class="ident">mut_header</span>().<span class="ident">set_peer</span>(<span class="ident">leader</span>.<span class="ident">clone</span>());
+        <span class="self">self</span>.<span class="ident">sim</span>
+            .<span class="ident">rl</span>()
+            .<span class="ident">async_command_on_node</span>(<span class="ident">leader</span>.<span class="ident">get_store_id</span>(), <span class="ident">req</span>, <span class="ident">cb</span>)
+            .<span class="ident">unwrap</span>();
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">try_merge</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">source</span>: <span class="ident">u64</span>, <span class="ident">target</span>: <span class="ident">u64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">RaftCmdResponse</span> {
+        <span class="self">self</span>.<span class="ident">call_command_on_leader</span>(
+            <span class="self">self</span>.<span class="ident">new_prepare_merge</span>(<span class="ident">source</span>, <span class="ident">target</span>),
+            <span class="ident">Duration</span>::<span class="ident">from_secs</span>(<span class="number">5</span>),
+        )
+        .<span class="ident">unwrap</span>()
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">must_try_merge</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">source</span>: <span class="ident">u64</span>, <span class="ident">target</span>: <span class="ident">u64</span>) {
