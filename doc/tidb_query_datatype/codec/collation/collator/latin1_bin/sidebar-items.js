@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["CollatorLatin1Bin","Collator for latin1_bin collation with padding behavior (trims right spaces)."]]});
