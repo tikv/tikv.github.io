@@ -332,6 +332,9 @@
 <span id="329">329</span>
 <span id="330">330</span>
 <span id="331">331</span>
+<span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -485,27 +488,32 @@
     <span class="doccomment">/// Get current item&#39;s ExecDetail according to previous collected metrics.</span>
     <span class="doccomment">/// TiDB asks for ExecDetail to be printed in its log.</span>
     <span class="doccomment">/// WARN: TRY BEST NOT TO USE THIS FUNCTION.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_item_exec_details</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">kvrpcpb</span>::<span class="ident">ExecDetails</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_item_exec_details</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> (<span class="ident">kvrpcpb</span>::<span class="ident">ExecDetails</span>, <span class="ident">kvrpcpb</span>::<span class="ident">ExecDetailsV2</span>) {
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="self">self</span>.<span class="ident">current_stage</span>, <span class="ident">TrackerState</span>::<span class="ident">ItemFinished</span>);
         <span class="self">self</span>.<span class="ident">exec_details</span>(<span class="self">self</span>.<span class="ident">item_process_time</span>)
     }
 
     <span class="doccomment">/// Get ExecDetail according to previous collected metrics.</span>
     <span class="doccomment">/// TiDB asks for ExecDetail to be printed in its log.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_exec_details</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">kvrpcpb</span>::<span class="ident">ExecDetails</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_exec_details</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> (<span class="ident">kvrpcpb</span>::<span class="ident">ExecDetails</span>, <span class="ident">kvrpcpb</span>::<span class="ident">ExecDetailsV2</span>) {
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="self">self</span>.<span class="ident">current_stage</span>, <span class="ident">TrackerState</span>::<span class="ident">ItemFinished</span>);
         <span class="self">self</span>.<span class="ident">exec_details</span>(<span class="self">self</span>.<span class="ident">total_process_time</span>)
     }
 
-    <span class="kw">fn</span> <span class="ident">exec_details</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">measure</span>: <span class="ident">Duration</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">kvrpcpb</span>::<span class="ident">ExecDetails</span> {
+    <span class="kw">fn</span> <span class="ident">exec_details</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">measure</span>: <span class="ident">Duration</span>) <span class="op">-</span><span class="op">&gt;</span> (<span class="ident">kvrpcpb</span>::<span class="ident">ExecDetails</span>, <span class="ident">kvrpcpb</span>::<span class="ident">ExecDetailsV2</span>) {
+        <span class="comment">// For compatibility, ExecDetails field is still filled.</span>
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">exec_details</span> <span class="op">=</span> <span class="ident">kvrpcpb</span>::<span class="ident">ExecDetails</span>::<span class="ident">default</span>();
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">handle</span> <span class="op">=</span> <span class="ident">kvrpcpb</span>::<span class="ident">HandleTime</span>::<span class="ident">default</span>();
-        <span class="ident">handle</span>.<span class="ident">set_process_ms</span>((<span class="ident">time</span>::<span class="ident">duration_to_sec</span>(<span class="ident">measure</span>) <span class="op">*</span> <span class="number">1000.0</span>) <span class="kw">as</span> <span class="ident">i64</span>);
-        <span class="ident">handle</span>.<span class="ident">set_wait_ms</span>((<span class="ident">time</span>::<span class="ident">duration_to_sec</span>(<span class="self">self</span>.<span class="ident">wait_time</span>) <span class="op">*</span> <span class="number">1000.0</span>) <span class="kw">as</span> <span class="ident">i64</span>);
-        <span class="ident">exec_details</span>.<span class="ident">set_handle_time</span>(<span class="ident">handle</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">td</span> <span class="op">=</span> <span class="ident">kvrpcpb</span>::<span class="ident">TimeDetail</span>::<span class="ident">default</span>();
+        <span class="ident">td</span>.<span class="ident">set_process_wall_time_ms</span>(<span class="ident">time</span>::<span class="ident">duration_to_ms</span>(<span class="ident">measure</span>) <span class="kw">as</span> <span class="ident">i64</span>);
+        <span class="ident">td</span>.<span class="ident">set_wait_wall_time_ms</span>(<span class="ident">time</span>::<span class="ident">duration_to_ms</span>(<span class="self">self</span>.<span class="ident">wait_time</span>) <span class="kw">as</span> <span class="ident">i64</span>);
+        <span class="ident">exec_details</span>.<span class="ident">set_time_detail</span>(<span class="ident">td</span>.<span class="ident">clone</span>());
 
         <span class="kw">let</span> <span class="ident">detail</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">total_storage_stats</span>.<span class="ident">scan_detail</span>();
+        <span class="ident">exec_details</span>.<span class="ident">set_scan_detail</span>(<span class="ident">detail</span>);
+
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">exec_details_v2</span> <span class="op">=</span> <span class="ident">kvrpcpb</span>::<span class="ident">ExecDetailsV2</span>::<span class="ident">default</span>();
+        <span class="ident">exec_details_v2</span>.<span class="ident">set_time_detail</span>(<span class="ident">td</span>);
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">detail_v2</span> <span class="op">=</span> <span class="ident">ScanDetailV2</span>::<span class="ident">default</span>();
         <span class="ident">detail_v2</span>.<span class="ident">set_processed_versions</span>(<span class="self">self</span>.<span class="ident">total_storage_stats</span>.<span class="ident">write</span>.<span class="ident">processed_keys</span> <span class="kw">as</span> <span class="ident">u64</span>);
@@ -521,11 +529,9 @@
         );
         <span class="ident">detail_v2</span>.<span class="ident">set_rocksdb_block_read_count</span>(<span class="self">self</span>.<span class="ident">total_perf_stats</span>.<span class="number">0</span>.<span class="ident">block_read_count</span> <span class="kw">as</span> <span class="ident">u64</span>);
         <span class="ident">detail_v2</span>.<span class="ident">set_rocksdb_block_read_byte</span>(<span class="self">self</span>.<span class="ident">total_perf_stats</span>.<span class="number">0</span>.<span class="ident">block_read_byte</span> <span class="kw">as</span> <span class="ident">u64</span>);
+        <span class="ident">exec_details_v2</span>.<span class="ident">set_scan_detail_v2</span>(<span class="ident">detail_v2</span>);
 
-        <span class="ident">exec_details</span>.<span class="ident">set_use_scan_detail_v2</span>(<span class="bool-val">true</span>);
-        <span class="ident">exec_details</span>.<span class="ident">set_scan_detail</span>(<span class="ident">detail</span>);
-        <span class="ident">exec_details</span>.<span class="ident">set_scan_detail_v2</span>(<span class="ident">detail_v2</span>);
-        <span class="ident">exec_details</span>
+        (<span class="ident">exec_details</span>, <span class="ident">exec_details_v2</span>)
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">on_finish_all_items</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
