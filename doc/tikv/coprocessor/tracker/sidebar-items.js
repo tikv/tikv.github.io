@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["SLOW_QUERY_LOWER_BOUND",""]],"enum":[["TrackerState",""]],"struct":[["Tracker","Track coprocessor requests to update statistics and provide slow logs."]]});
+initSidebarItems({"enum":[["TrackerState",""]],"struct":[["Tracker","Track coprocessor requests to update statistics and provide slow logs."]]});

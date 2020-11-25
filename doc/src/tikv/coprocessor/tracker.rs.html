@@ -333,8 +333,6 @@
 <span id="330">330</span>
 <span id="331">331</span>
 <span id="332">332</span>
-<span id="333">333</span>
-<span id="334">334</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -349,9 +347,6 @@
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">metrics</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">coprocessor</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">Statistics</span>;
-
-<span class="comment">// If handle time is larger than the lower bound, the query is considered as slow query.</span>
-<span class="kw">const</span> <span class="ident">SLOW_QUERY_LOWER_BOUND</span>: <span class="ident">f64</span> <span class="op">=</span> <span class="number">1.0</span>; <span class="comment">// 1 second.</span>
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">PartialEq</span>)]</span>
 <span class="kw">enum</span> <span class="ident">TrackerState</span> {
@@ -397,6 +392,7 @@
     <span class="ident">total_process_time</span>: <span class="ident">Duration</span>,
     <span class="ident">total_storage_stats</span>: <span class="ident">Statistics</span>,
     <span class="ident">total_perf_stats</span>: <span class="ident">PerfStatisticsDelta</span>, <span class="comment">// Accumulated perf statistics</span>
+    <span class="ident">slow_log_threshold</span>: <span class="ident">Duration</span>,
 
     <span class="comment">// Request info, used to print slow log.</span>
     <span class="kw">pub</span> <span class="ident">req_ctx</span>: <span class="ident">ReqContext</span>,
@@ -406,7 +402,7 @@
     <span class="doccomment">/// Initialize the tracker. Normally it is called outside future pool&#39;s factory context,</span>
     <span class="doccomment">/// because the future pool might be full and we need to wait it. This kind of wait time</span>
     <span class="doccomment">/// has to be recorded.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">req_ctx</span>: <span class="ident">ReqContext</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Tracker</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">req_ctx</span>: <span class="ident">ReqContext</span>, <span class="ident">slow_log_threshold</span>: <span class="ident">Duration</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Tracker</span> {
         <span class="kw">let</span> <span class="ident">now</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now_coarse</span>();
         <span class="ident">Tracker</span> {
             <span class="ident">request_begin_at</span>: <span class="ident">now</span>,
@@ -421,7 +417,7 @@
             <span class="ident">total_process_time</span>: <span class="ident">Duration</span>::<span class="ident">default</span>(),
             <span class="ident">total_storage_stats</span>: <span class="ident">Statistics</span>::<span class="ident">default</span>(),
             <span class="ident">total_perf_stats</span>: <span class="ident">PerfStatisticsDelta</span>::<span class="ident">default</span>(),
-
+            <span class="ident">slow_log_threshold</span>,
             <span class="ident">req_ctx</span>,
         }
     }
@@ -551,7 +547,7 @@
 
         <span class="kw">let</span> <span class="ident">total_storage_stats</span> <span class="op">=</span> <span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">take</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">total_storage_stats</span>);
 
-        <span class="kw">if</span> <span class="ident">time</span>::<span class="ident">duration_to_sec</span>(<span class="self">self</span>.<span class="ident">req_lifetime</span>) <span class="op">&gt;</span> <span class="ident">SLOW_QUERY_LOWER_BOUND</span> {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">req_lifetime</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">slow_log_threshold</span> {
             <span class="kw">let</span> <span class="ident">first_range</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">req_ctx</span>.<span class="ident">ranges</span>.<span class="ident">first</span>();
             <span class="kw">let</span> <span class="ident">some_table_id</span> <span class="op">=</span> <span class="ident">first_range</span>.<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">range</span><span class="op">|</span> {
                 <span class="ident">tidb_query_datatype</span>::<span class="ident">codec</span>::<span class="ident">table</span>::<span class="ident">decode_table_id</span>(<span class="ident">range</span>.<span class="ident">get_start</span>())

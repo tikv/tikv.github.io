@@ -1649,6 +1649,9 @@
 <span id="1646">1646</span>
 <span id="1647">1647</span>
 <span id="1648">1648</span>
+<span id="1649">1649</span>
+<span id="1650">1650</span>
+<span id="1651">1651</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1716,6 +1719,8 @@
     <span class="doccomment">/// The soft time limit of handling Coprocessor requests.</span>
     <span class="ident">max_handle_duration</span>: <span class="ident">Duration</span>,
 
+    <span class="ident">slow_log_threshold</span>: <span class="ident">Duration</span>,
+
     <span class="ident">_phantom</span>: <span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>,
 }
 
@@ -1758,6 +1763,7 @@
             <span class="ident">stream_batch_row_limit</span>: <span class="ident">cfg</span>.<span class="ident">end_point_stream_batch_row_limit</span>,
             <span class="ident">stream_channel_size</span>: <span class="ident">cfg</span>.<span class="ident">end_point_stream_channel_size</span>,
             <span class="ident">max_handle_duration</span>: <span class="ident">cfg</span>.<span class="ident">end_point_request_max_handle_duration</span>.<span class="number">0</span>,
+            <span class="ident">slow_log_threshold</span>: <span class="ident">cfg</span>.<span class="ident">end_point_slow_log_threshold</span>.<span class="number">0</span>,
             <span class="ident">_phantom</span>: <span class="ident">Default</span>::<span class="ident">default</span>(),
         }
     }
@@ -2111,7 +2117,7 @@
         <span class="kw">let</span> <span class="ident">priority</span> <span class="op">=</span> <span class="ident">req_ctx</span>.<span class="ident">context</span>.<span class="ident">get_priority</span>();
         <span class="kw">let</span> <span class="ident">task_id</span> <span class="op">=</span> <span class="ident">req_ctx</span>.<span class="ident">build_task_id</span>();
         <span class="comment">// box the tracker so that moving it is cheap.</span>
-        <span class="kw">let</span> <span class="ident">tracker</span> <span class="op">=</span> <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">Tracker</span>::<span class="ident">new</span>(<span class="ident">req_ctx</span>));
+        <span class="kw">let</span> <span class="ident">tracker</span> <span class="op">=</span> <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">Tracker</span>::<span class="ident">new</span>(<span class="ident">req_ctx</span>, <span class="self">self</span>.<span class="ident">slow_log_threshold</span>));
 
         <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="self">self</span>
             .<span class="ident">read_pool</span>
@@ -2245,7 +2251,7 @@
         <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">mpsc</span>::<span class="ident">channel</span>::<span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">coppb</span>::<span class="ident">Response</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">stream_channel_size</span>);
         <span class="kw">let</span> <span class="ident">priority</span> <span class="op">=</span> <span class="ident">req_ctx</span>.<span class="ident">context</span>.<span class="ident">get_priority</span>();
         <span class="kw">let</span> <span class="ident">task_id</span> <span class="op">=</span> <span class="ident">req_ctx</span>.<span class="ident">build_task_id</span>();
-        <span class="kw">let</span> <span class="ident">tracker</span> <span class="op">=</span> <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">Tracker</span>::<span class="ident">new</span>(<span class="ident">req_ctx</span>));
+        <span class="kw">let</span> <span class="ident">tracker</span> <span class="op">=</span> <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">Tracker</span>::<span class="ident">new</span>(<span class="ident">req_ctx</span>, <span class="self">self</span>.<span class="ident">slow_log_threshold</span>));
 
         <span class="self">self</span>.<span class="ident">read_pool</span>
             .<span class="ident">spawn</span>(
