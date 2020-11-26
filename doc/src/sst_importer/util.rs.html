@@ -241,6 +241,11 @@
 <span id="238">238</span>
 <span id="239">239</span>
 <span id="240">240</span>
+<span id="241">241</span>
+<span id="242">242</span>
+<span id="243">243</span>
+<span id="244">244</span>
+<span id="245">245</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -277,10 +282,12 @@
     <span class="kw">let</span> <span class="ident">clone</span> <span class="op">=</span> <span class="ident">clone</span>.<span class="ident">as_ref</span>().<span class="ident">to_str</span>().<span class="ident">unwrap</span>();
 
     <span class="kw">if</span> <span class="ident">Path</span>::<span class="ident">new</span>(<span class="ident">clone</span>).<span class="ident">exists</span>() {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">key_manager</span>) <span class="op">=</span> <span class="ident">encryption_key_manager</span> {
-            <span class="ident">key_manager</span>.<span class="ident">delete_file</span>(<span class="ident">clone</span>)<span class="question-mark">?</span>;
-        }
         <span class="ident">fs</span>::<span class="ident">remove_file</span>(<span class="ident">clone</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;remove {}: {:?}&quot;</span>, <span class="ident">clone</span>, <span class="ident">e</span>))<span class="question-mark">?</span>;
+    }
+    <span class="comment">// always try to remove the file from key manager because the clean up in rocksdb is not atomic,</span>
+    <span class="comment">// thus the file may be deleted but key in key manager is not.</span>
+    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">key_manager</span>) <span class="op">=</span> <span class="ident">encryption_key_manager</span> {
+        <span class="ident">key_manager</span>.<span class="ident">delete_file</span>(<span class="ident">clone</span>)<span class="question-mark">?</span>;
     }
 
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">unix</span>)]</span>
@@ -294,11 +301,14 @@
         <span class="comment">// RocksDB must not have this file, we can make a hard link.</span>
         <span class="ident">fs</span>::<span class="ident">hard_link</span>(<span class="ident">path</span>, <span class="ident">clone</span>)
             .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;link from {} to {}: {:?}&quot;</span>, <span class="ident">path</span>, <span class="ident">clone</span>, <span class="ident">e</span>))<span class="question-mark">?</span>;
+        <span class="ident">File</span>::<span class="ident">open</span>(<span class="ident">clone</span>)<span class="question-mark">?</span>.<span class="ident">sync_all</span>()<span class="question-mark">?</span>;
     } <span class="kw">else</span> {
         <span class="comment">// RocksDB may have this file, we should make a copy.</span>
         <span class="ident">copy_and_sync</span>(<span class="ident">path</span>, <span class="ident">clone</span>)
             .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;copy from {} to {}: {:?}&quot;</span>, <span class="ident">path</span>, <span class="ident">clone</span>, <span class="ident">e</span>))<span class="question-mark">?</span>;
     }
+    <span class="comment">// sync clone dir</span>
+    <span class="ident">File</span>::<span class="ident">open</span>(<span class="ident">Path</span>::<span class="ident">new</span>(<span class="ident">clone</span>).<span class="ident">parent</span>().<span class="ident">unwrap</span>())<span class="question-mark">?</span>.<span class="ident">sync_all</span>()<span class="question-mark">?</span>;
     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">key_manager</span>) <span class="op">=</span> <span class="ident">encryption_key_manager</span> {
         <span class="ident">key_manager</span>.<span class="ident">link_file</span>(<span class="ident">path</span>, <span class="ident">clone</span>)<span class="question-mark">?</span>;
     }
