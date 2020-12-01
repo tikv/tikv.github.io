@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["AggrFnDefinitionParserSum","The parser for SUM aggregate function."],["AggrFnStateSum","The state of the SUM aggregate function."],["AggrFnSum","The SUM aggregate function."]]});
+initSidebarItems({"struct":[["AggrFnDefinitionParserSum","The parser for SUM aggregate function."],["AggrFnStateSum","The state of the SUM aggregate function."],["AggrFnStateSumForEnum",""],["AggrFnSum","The SUM aggregate function."],["AggrFnSumForEnum",""]]});
