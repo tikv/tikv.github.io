@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["get_io_rate_limiter",""],["set_io_rate_limiter",""]],"struct":[["IORateLimiter","No-op limiter An instance of `IORateLimiter` should be safely shared between threads."],["IO_RATE_LIMITER",""]]});

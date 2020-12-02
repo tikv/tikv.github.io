@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["File","A wrapper around `std::fs::File` with capability to track and regulate IO flow."],["OpenOptions",""]]});
