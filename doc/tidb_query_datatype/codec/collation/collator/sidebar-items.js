@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["TRIM_PADDING_SPACE",""]],"mod":[["binary",""],["latin1_bin",""],["utf8mb4_binary",""],["utf8mb4_general_ci",""],["utf8mb4_unicode_ci",""]]});
+initSidebarItems({"constant":[["PADDING_SPACE",""]],"mod":[["binary",""],["latin1_bin",""],["utf8mb4_binary",""],["utf8mb4_general_ci",""],["utf8mb4_unicode_ci",""]]});

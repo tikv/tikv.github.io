@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["map_long_rune",""],["unicode_ci_convert",""]],"static":[["LONG_RUNE",""],["UNICODE_CI_TABLE",""]],"struct":[["CollatorUtf8Mb4UnicodeCi","Collator for `utf8mb4_unicode_ci` collation with padding behavior (trims right spaces)."]]});
+initSidebarItems({"fn":[["map_long_rune",""]],"static":[["LONG_RUNE",""],["UNICODE_CI_TABLE",""]],"struct":[["CollatorUtf8Mb4UnicodeCi","Collator for `utf8mb4_unicode_ci` collation with padding behavior (trims right spaces)."]]});

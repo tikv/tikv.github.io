@@ -686,9 +686,6 @@
 <span id="683">683</span>
 <span id="684">684</span>
 <span id="685">685</span>
-<span id="686">686</span>
-<span id="687">687</span>
-<span id="688">688</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -700,41 +697,51 @@
 
 <span class="kw">impl</span> <span class="ident">Collator</span> <span class="kw">for</span> <span class="ident">CollatorUtf8Mb4UnicodeCi</span> {
     <span class="kw">type</span> <span class="ident">Charset</span> <span class="op">=</span> <span class="ident">CharsetUtf8mb4</span>;
+    <span class="kw">type</span> <span class="ident">Weight</span> <span class="op">=</span> <span class="ident">u128</span>;
+
+    <span class="kw">const</span> <span class="ident">IS_CASE_INSENSITIVE</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="bool-val">true</span>;
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">validate</span>(<span class="ident">bstr</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="ident">str</span>::<span class="ident">from_utf8</span>(<span class="ident">bstr</span>)<span class="question-mark">?</span>;
-        <span class="prelude-val">Ok</span>(())
+    <span class="kw">fn</span> <span class="ident">char_weight</span>(<span class="ident">ch</span>: <span class="ident">char</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span>::<span class="ident">Weight</span> {
+        <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="ident">ch</span> <span class="kw">as</span> <span class="ident">usize</span>;
+        <span class="kw">if</span> <span class="ident">r</span> <span class="op">&gt;</span> <span class="number">0xFFFF</span> {
+            <span class="kw">return</span> <span class="number">0xFFFD</span>;
+        }
+
+        <span class="kw">let</span> <span class="ident">u</span> <span class="op">=</span> <span class="ident">UNICODE_CI_TABLE</span>[<span class="ident">r</span>];
+        <span class="kw">if</span> <span class="ident">u</span> <span class="op">=</span><span class="op">=</span> <span class="ident">LONG_RUNE</span> {
+            <span class="kw">return</span> <span class="ident">map_long_rune</span>(<span class="ident">r</span>);
+        }
+
+        <span class="ident">u</span> <span class="kw">as</span> <span class="ident">u128</span>
     }
 
+    <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">fn</span> <span class="ident">write_sort_key</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">BufferWriter</span><span class="op">&gt;</span>(<span class="ident">writer</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">W</span>, <span class="ident">bstr</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">s</span> <span class="op">=</span> <span class="ident">str</span>::<span class="ident">from_utf8</span>(<span class="ident">bstr</span>)<span class="question-mark">?</span>.<span class="ident">trim_end_matches</span>(<span class="ident">TRIM_PADDING_SPACE</span>);
+        <span class="kw">let</span> <span class="ident">s</span> <span class="op">=</span> <span class="ident">str</span>::<span class="ident">from_utf8</span>(<span class="ident">bstr</span>)<span class="question-mark">?</span>.<span class="ident">trim_end_matches</span>(<span class="ident">PADDING_SPACE</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">n</span> <span class="op">=</span> <span class="number">0</span>;
         <span class="kw">for</span> <span class="ident">ch</span> <span class="kw">in</span> <span class="ident">s</span>.<span class="ident">chars</span>() {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">convert</span> <span class="op">=</span> <span class="ident">unicode_ci_convert</span>(<span class="ident">ch</span>);
-            <span class="kw">while</span> <span class="ident">convert</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
-                <span class="ident">writer</span>.<span class="ident">write_u16_be</span>((<span class="ident">convert</span> <span class="op">&amp;</span> <span class="number">0xFFFF</span>) <span class="kw">as</span> <span class="ident">u16</span>)<span class="question-mark">?</span>;
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">weight</span> <span class="op">=</span> <span class="self">Self</span>::<span class="ident">char_weight</span>(<span class="ident">ch</span>);
+            <span class="kw">while</span> <span class="ident">weight</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
+                <span class="ident">writer</span>.<span class="ident">write_u16_be</span>((<span class="ident">weight</span> <span class="op">&amp;</span> <span class="number">0xFFFF</span>) <span class="kw">as</span> <span class="ident">u16</span>)<span class="question-mark">?</span>;
                 <span class="ident">n</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
-                <span class="ident">convert</span> <span class="op">&gt;</span><span class="op">&gt;</span><span class="op">=</span> <span class="number">16</span>
+                <span class="ident">weight</span> <span class="op">&gt;</span><span class="op">&gt;</span><span class="op">=</span> <span class="number">16</span>
             }
         }
         <span class="prelude-val">Ok</span>(<span class="ident">n</span> <span class="op">*</span> <span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">size_of</span>::<span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>())
     }
 
+    <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">fn</span> <span class="ident">sort_compare</span>(<span class="ident">a</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">b</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Ordering</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ca</span> <span class="op">=</span> <span class="ident">str</span>::<span class="ident">from_utf8</span>(<span class="ident">a</span>)<span class="question-mark">?</span>
-            .<span class="ident">trim_end_matches</span>(<span class="ident">TRIM_PADDING_SPACE</span>)
-            .<span class="ident">chars</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cb</span> <span class="op">=</span> <span class="ident">str</span>::<span class="ident">from_utf8</span>(<span class="ident">b</span>)<span class="question-mark">?</span>
-            .<span class="ident">trim_end_matches</span>(<span class="ident">TRIM_PADDING_SPACE</span>)
-            .<span class="ident">chars</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ca</span> <span class="op">=</span> <span class="ident">str</span>::<span class="ident">from_utf8</span>(<span class="ident">a</span>)<span class="question-mark">?</span>.<span class="ident">trim_end_matches</span>(<span class="ident">PADDING_SPACE</span>).<span class="ident">chars</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cb</span> <span class="op">=</span> <span class="ident">str</span>::<span class="ident">from_utf8</span>(<span class="ident">b</span>)<span class="question-mark">?</span>.<span class="ident">trim_end_matches</span>(<span class="ident">PADDING_SPACE</span>).<span class="ident">chars</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">an</span> <span class="op">=</span> <span class="number">0</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">bn</span> <span class="op">=</span> <span class="number">0</span>;
 
         <span class="kw">loop</span> {
             <span class="kw">if</span> <span class="ident">an</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
                 <span class="kw">for</span> <span class="ident">ach</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ca</span> {
-                    <span class="ident">an</span> <span class="op">=</span> <span class="ident">unicode_ci_convert</span>(<span class="ident">ach</span>);
+                    <span class="ident">an</span> <span class="op">=</span> <span class="self">Self</span>::<span class="ident">char_weight</span>(<span class="ident">ach</span>);
                     <span class="kw">if</span> <span class="ident">an</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
                         <span class="kw">break</span>;
                     }
@@ -743,7 +750,7 @@
 
             <span class="kw">if</span> <span class="ident">bn</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
                 <span class="kw">for</span> <span class="ident">bch</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">cb</span> {
-                    <span class="ident">bn</span> <span class="op">=</span> <span class="ident">unicode_ci_convert</span>(<span class="ident">bch</span>);
+                    <span class="ident">bn</span> <span class="op">=</span> <span class="self">Self</span>::<span class="ident">char_weight</span>(<span class="ident">bch</span>);
                     <span class="kw">if</span> <span class="ident">bn</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
                         <span class="kw">break</span>;
                     }
@@ -771,36 +778,52 @@
         }
     }
 
+    <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">fn</span> <span class="ident">sort_hash</span><span class="op">&lt;</span><span class="ident">H</span>: <span class="ident">Hasher</span><span class="op">&gt;</span>(<span class="ident">state</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">H</span>, <span class="ident">bstr</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">s</span> <span class="op">=</span> <span class="ident">str</span>::<span class="ident">from_utf8</span>(<span class="ident">bstr</span>)<span class="question-mark">?</span>.<span class="ident">trim_end_matches</span>(<span class="ident">TRIM_PADDING_SPACE</span>);
+        <span class="kw">let</span> <span class="ident">s</span> <span class="op">=</span> <span class="ident">str</span>::<span class="ident">from_utf8</span>(<span class="ident">bstr</span>)<span class="question-mark">?</span>.<span class="ident">trim_end_matches</span>(<span class="ident">PADDING_SPACE</span>);
         <span class="kw">for</span> <span class="ident">ch</span> <span class="kw">in</span> <span class="ident">s</span>.<span class="ident">chars</span>() {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">convert</span> <span class="op">=</span> <span class="ident">unicode_ci_convert</span>(<span class="ident">ch</span>);
-            <span class="kw">while</span> <span class="ident">convert</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
-                (<span class="ident">convert</span> <span class="op">&amp;</span> <span class="number">0xFFFF</span>).<span class="ident">hash</span>(<span class="ident">state</span>);
-                <span class="ident">convert</span> <span class="op">&gt;</span><span class="op">&gt;</span><span class="op">=</span> <span class="number">16</span>;
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">weight</span> <span class="op">=</span> <span class="self">Self</span>::<span class="ident">char_weight</span>(<span class="ident">ch</span>);
+            <span class="kw">while</span> <span class="ident">weight</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
+                (<span class="ident">weight</span> <span class="op">&amp;</span> <span class="number">0xFFFF</span>).<span class="ident">hash</span>(<span class="ident">state</span>);
+                <span class="ident">weight</span> <span class="op">&gt;</span><span class="op">&gt;</span><span class="op">=</span> <span class="number">16</span>;
             }
         }
         <span class="prelude-val">Ok</span>(())
     }
 }
 
-<span class="attribute">#[<span class="ident">inline</span>]</span>
-<span class="kw">fn</span> <span class="ident">unicode_ci_convert</span>(<span class="ident">c</span>: <span class="ident">char</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u128</span> {
-    <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="ident">c</span> <span class="kw">as</span> <span class="ident">usize</span>;
-    <span class="kw">if</span> <span class="ident">r</span> <span class="op">&gt;</span> <span class="number">0xFFFF</span> {
-        <span class="kw">return</span> <span class="number">0xFFFD</span>;
-    }
-
-    <span class="kw">let</span> <span class="ident">u</span> <span class="op">=</span> <span class="ident">UNICODE_CI_TABLE</span>[<span class="ident">r</span>];
-    <span class="kw">if</span> <span class="ident">u</span> <span class="op">=</span><span class="op">=</span> <span class="ident">LONG_RUNE</span> {
-        <span class="kw">return</span> <span class="ident">map_long_rune</span>(<span class="ident">r</span>);
-    }
-
-    <span class="ident">u</span> <span class="kw">as</span> <span class="ident">u128</span>
-}
-
 <span class="comment">// Created from https://www.unicode.org/Public/UCA/4.0.0/allkeys-4.0.0.txt</span>
+
 <span class="kw">static</span> <span class="ident">LONG_RUNE</span>: <span class="ident">u64</span> <span class="op">=</span> <span class="number">0xFFFD</span>;
+
+<span class="attribute">#[<span class="ident">inline</span>]</span>
+<span class="kw">fn</span> <span class="ident">map_long_rune</span>(<span class="ident">r</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u128</span> {
+    <span class="kw">match</span> <span class="ident">r</span> {
+        <span class="number">0x321D</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x000002891E031DC21D6E1DC61D6D0288</span>,
+        <span class="number">0x321E</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x0000000002891DCB1D741DC61D6D0288</span>,
+        <span class="number">0x327C</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x0000000000001DC61D621E0F1DBE1D70</span>,
+        <span class="number">0x3307</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x0000000000001E650E0B1E591E5E1E55</span>,
+        <span class="number">0x3315</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x0000000000001E721E781E591E7C1E58</span>,
+        <span class="number">0x3316</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x000000001E7A1E650E0B1E731E7C1E58</span>,
+        <span class="number">0x3317</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x0000000000001E651E631E7D1E7C1E58</span>,
+        <span class="number">0x3319</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x0000000000001E811E651E721E781E59</span>,
+        <span class="number">0x331A</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x0000000000001E7C1E531E5F1E7A1E59</span>,
+        <span class="number">0x3320</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x0000000000001E720E0B1E621E811E5C</span>,
+        <span class="number">0x332B</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x0000000000001E651E811E5F0E0B1E6B</span>,
+        <span class="number">0x332E</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x0000000000001E7A1E651E5E1E521E6C</span>,
+        <span class="number">0x3332</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x0000000000001E651E631E781E521E6D</span>,
+        <span class="number">0x3334</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x0000000000001E7A1E551E5D1E631E6D</span>,
+        <span class="number">0x3336</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x0000000000001E7A0E0B1E611E591E6E</span>,
+        <span class="number">0x3347</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x0000000000001E811E771E5D1E811E70</span>,
+        <span class="number">0x334A</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x0000000000001E7A0E0B1E6B1E791E71</span>,
+        <span class="number">0x3356</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x0000000000001E811E5A1E651E811E7B</span>,
+        <span class="number">0x337F</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0xF93EFB40CF1AFB40DF0FFB40E82AFB40</span>,
+        <span class="number">0x33AE</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x0000000000000FEA04370E6D0E330FC0</span>,
+        <span class="number">0x33AF</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x000000000E2B0FEA04370E6D0E330FC0</span>,
+        <span class="number">0xFDFB</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x13B713AB135013AB135E020913AB135E</span>,
+        <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0xFFFD</span>,
+    }
+}
 
 <span class="attribute">#[<span class="ident">rustfmt</span>::<span class="ident">skip</span>]</span>
 <span class="kw">static</span> <span class="ident">UNICODE_CI_TABLE</span>: [<span class="ident">u64</span>; <span class="number">0x10000</span>] <span class="op">=</span> [
@@ -1349,34 +1372,5 @@
     <span class="number">0xFEFDFBC1</span>,<span class="number">0xFEFEFBC1</span>,<span class="number">0</span>,<span class="number">0xFF00FBC1</span>,<span class="number">0x251</span>,<span class="number">0x27E</span>,<span class="number">0x2D2</span>,<span class="number">0xE0F</span>,<span class="number">0x2D3</span>,<span class="number">0x2CF</span>,<span class="number">0x277</span>,<span class="number">0x288</span>,<span class="number">0x289</span>,<span class="number">0x2C8</span>,<span class="number">0x428</span>,<span class="number">0x22F</span>,<span class="number">0x221</span>,<span class="number">0x25D</span>,<span class="number">0x2CC</span>,<span class="number">0xE29</span>,<span class="number">0xE2A</span>,<span class="number">0xE2B</span>,<span class="number">0xE2C</span>,<span class="number">0xE2D</span>,<span class="number">0xE2E</span>,<span class="number">0xE2F</span>,<span class="number">0xE30</span>,<span class="number">0xE31</span>,<span class="number">0xE32</span>,<span class="number">0x23D</span>,<span class="number">0x23A</span>,<span class="number">0x42C</span>,<span class="number">0x42D</span>,<span class="number">0x42E</span>,<span class="number">0x255</span>,<span class="number">0x2C7</span>,<span class="number">0xE33</span>,<span class="number">0xE4A</span>,<span class="number">0xE60</span>,<span class="number">0xE6D</span>,<span class="number">0xE8B</span>,<span class="number">0xEB9</span>,<span class="number">0xEC1</span>,<span class="number">0xEE1</span>,<span class="number">0xEFB</span>,<span class="number">0xF10</span>,<span class="number">0xF21</span>,<span class="number">0xF2E</span>,<span class="number">0xF5B</span>,<span class="number">0xF64</span>,<span class="number">0xF82</span>,<span class="number">0xFA7</span>,<span class="number">0xFB4</span>,<span class="number">0xFC0</span>,<span class="number">0xFEA</span>,<span class="number">0x1002</span>,<span class="number">0x101F</span>,<span class="number">0x1044</span>,<span class="number">0x1051</span>,<span class="number">0x105A</span>,<span class="number">0x105E</span>,<span class="number">0x106A</span>,<span class="number">0x28A</span>,<span class="number">0x2CE</span>,<span class="number">0x28B</span>,<span class="number">0x20F</span>,<span class="number">0x21B</span>,<span class="number">0x20C</span>,<span class="number">0xE33</span>,<span class="number">0xE4A</span>,<span class="number">0xE60</span>,<span class="number">0xE6D</span>,<span class="number">0xE8B</span>,<span class="number">0xEB9</span>,<span class="number">0xEC1</span>,<span class="number">0xEE1</span>,<span class="number">0xEFB</span>,<span class="number">0xF10</span>,<span class="number">0xF21</span>,<span class="number">0xF2E</span>,<span class="number">0xF5B</span>,<span class="number">0xF64</span>,<span class="number">0xF82</span>,<span class="number">0xFA7</span>,<span class="number">0xFB4</span>,<span class="number">0xFC0</span>,<span class="number">0xFEA</span>,<span class="number">0x1002</span>,<span class="number">0x101F</span>,<span class="number">0x1044</span>,<span class="number">0x1051</span>,<span class="number">0x105A</span>,<span class="number">0x105E</span>,<span class="number">0x106A</span>,<span class="number">0x28C</span>,<span class="number">0x430</span>,<span class="number">0x28D</span>,<span class="number">0x433</span>,<span class="number">0x29A</span>,<span class="number">0x29B</span>,<span class="number">0x266</span>,<span class="number">0x2B2</span>,<span class="number">0x2B3</span>,<span class="number">0x237</span>,<span class="number">0x22E</span>,<span class="number">0x1E80</span>,<span class="number">0x1E52</span>,<span class="number">0x1E53</span>,<span class="number">0x1E54</span>,<span class="number">0x1E55</span>,<span class="number">0x1E56</span>,<span class="number">0x1E75</span>,<span class="number">0x1E76</span>,<span class="number">0x1E77</span>,<span class="number">0x1E63</span>,<span class="number">0xE0B</span>,<span class="number">0x1E52</span>,<span class="number">0x1E53</span>,<span class="number">0x1E54</span>,<span class="number">0x1E55</span>,<span class="number">0x1E56</span>,<span class="number">0x1E57</span>,<span class="number">0x1E58</span>,<span class="number">0x1E59</span>,<span class="number">0x1E5A</span>,<span class="number">0x1E5B</span>,<span class="number">0x1E5C</span>,<span class="number">0x1E5D</span>,<span class="number">0x1E5E</span>,<span class="number">0x1E5F</span>,<span class="number">0x1E60</span>,<span class="number">0x1E61</span>,<span class="number">0x1E62</span>,<span class="number">0x1E63</span>,<span class="number">0x1E64</span>,<span class="number">0x1E65</span>,<span class="number">0x1E66</span>,<span class="number">0x1E67</span>,<span class="number">0x1E68</span>,<span class="number">0x1E69</span>,<span class="number">0x1E6A</span>,<span class="number">0x1E6B</span>,<span class="number">0x1E6C</span>,<span class="number">0x1E6D</span>,<span class="number">0x1E6E</span>,<span class="number">0x1E6F</span>,<span class="number">0x1E70</span>,<span class="number">0x1E71</span>,<span class="number">0x1E72</span>,<span class="number">0x1E73</span>,<span class="number">0x1E74</span>,<span class="number">0x1E75</span>,<span class="number">0x1E76</span>,<span class="number">0x1E77</span>,<span class="number">0x1E78</span>,<span class="number">0x1E79</span>,<span class="number">0x1E7A</span>,<span class="number">0x1E7B</span>,<span class="number">0x1E7C</span>,<span class="number">0x1E7D</span>,<span class="number">0x1E81</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0x1DBD</span>,<span class="number">0x1D62</span>,<span class="number">0x1D63</span>,<span class="number">0x1E02</span>,<span class="number">0x1D64</span>,<span class="number">0x1E04</span>,<span class="number">0x1E05</span>,<span class="number">0x1D65</span>,<span class="number">0x1D66</span>,<span class="number">0x1D67</span>,<span class="number">0x1E08</span>,<span class="number">0x1E09</span>,<span class="number">0x1E0A</span>,<span class="number">0x1E0B</span>,<span class="number">0x1E0C</span>,<span class="number">0x1E0D</span>,<span class="number">0x1D7C</span>,<span class="number">0x1D68</span>,<span class="number">0x1D69</span>,<span class="number">0x1D6A</span>,<span class="number">0x1D83</span>,<span class="number">0x1D6B</span>,<span class="number">0x1D6C</span>,<span class="number">0x1D6D</span>,<span class="number">0x1D6E</span>,<span class="number">0x1D6F</span>,<span class="number">0x1D70</span>,<span class="number">0x1D71</span>,<span class="comment">/* FEFD */</span>
     <span class="number">0x1D72</span>,<span class="number">0x1D73</span>,<span class="number">0x1D74</span>,<span class="number">0xFFBFFBC1</span>,<span class="number">0xFFC0FBC1</span>,<span class="number">0xFFC1FBC1</span>,<span class="number">0x1DBE</span>,<span class="number">0x1DBF</span>,<span class="number">0x1DC0</span>,<span class="number">0x1DC1</span>,<span class="number">0x1DC2</span>,<span class="number">0x1DC3</span>,<span class="number">0xFFC8FBC1</span>,<span class="number">0xFFC9FBC1</span>,<span class="number">0x1DC4</span>,<span class="number">0x1DC5</span>,<span class="number">0x1DC6</span>,<span class="number">0x1DC7</span>,<span class="number">0x1DC8</span>,<span class="number">0x1DC9</span>,<span class="number">0xFFD0FBC1</span>,<span class="number">0xFFD1FBC1</span>,<span class="number">0x1DCA</span>,<span class="number">0x1DCB</span>,<span class="number">0x1DCC</span>,<span class="number">0x1DCD</span>,<span class="number">0x1DCE</span>,<span class="number">0x1DCF</span>,<span class="number">0xFFD8FBC1</span>,<span class="number">0xFFD9FBC1</span>,<span class="number">0x1DD0</span>,<span class="number">0x1DD1</span>,<span class="number">0x1DD2</span>,<span class="number">0xFFDDFBC1</span>,<span class="number">0xFFDEFBC1</span>,<span class="number">0xFFDFFBC1</span>,<span class="number">0xE0E</span>,<span class="number">0xE10</span>,<span class="number">0x42F</span>,<span class="number">0x210</span>,<span class="number">0x431</span>,<span class="number">0xE11</span>,<span class="number">0xE20</span>,<span class="number">0xFFE7FBC1</span>,<span class="number">0x5FE</span>,<span class="number">0x3AE</span>,<span class="number">0x3B0</span>,<span class="number">0x3AF</span>,<span class="number">0x3B1</span>,<span class="number">0x69C</span>,<span class="number">0x6C7</span>,<span class="number">0xFFEFFBC1</span>,<span class="number">0xFFF0FBC1</span>,<span class="number">0xFFF1FBC1</span>,<span class="number">0xFFF2FBC1</span>,<span class="number">0xFFF3FBC1</span>,<span class="number">0xFFF4FBC1</span>,<span class="number">0xFFF5FBC1</span>,<span class="number">0xFFF6FBC1</span>,<span class="number">0xFFF7FBC1</span>,<span class="number">0xFFF8FBC1</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0xDC5</span>,<span class="number">0xDC6</span>,<span class="number">0xFFFEFBC1</span>,<span class="number">0xFFFFFBC1</span>,
 ];
-
-<span class="attribute">#[<span class="ident">inline</span>]</span>
-<span class="kw">fn</span> <span class="ident">map_long_rune</span>(<span class="ident">r</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u128</span> {
-    <span class="kw">match</span> <span class="ident">r</span> {
-        <span class="number">0x321D</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x000002891E031DC21D6E1DC61D6D0288</span>,
-        <span class="number">0x321E</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x0000000002891DCB1D741DC61D6D0288</span>,
-        <span class="number">0x327C</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x0000000000001DC61D621E0F1DBE1D70</span>,
-        <span class="number">0x3307</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x0000000000001E650E0B1E591E5E1E55</span>,
-        <span class="number">0x3315</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x0000000000001E721E781E591E7C1E58</span>,
-        <span class="number">0x3316</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x000000001E7A1E650E0B1E731E7C1E58</span>,
-        <span class="number">0x3317</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x0000000000001E651E631E7D1E7C1E58</span>,
-        <span class="number">0x3319</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x0000000000001E811E651E721E781E59</span>,
-        <span class="number">0x331A</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x0000000000001E7C1E531E5F1E7A1E59</span>,
-        <span class="number">0x3320</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x0000000000001E720E0B1E621E811E5C</span>,
-        <span class="number">0x332B</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x0000000000001E651E811E5F0E0B1E6B</span>,
-        <span class="number">0x332E</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x0000000000001E7A1E651E5E1E521E6C</span>,
-        <span class="number">0x3332</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x0000000000001E651E631E781E521E6D</span>,
-        <span class="number">0x3334</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x0000000000001E7A1E551E5D1E631E6D</span>,
-        <span class="number">0x3336</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x0000000000001E7A0E0B1E611E591E6E</span>,
-        <span class="number">0x3347</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x0000000000001E811E771E5D1E811E70</span>,
-        <span class="number">0x334A</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x0000000000001E7A0E0B1E6B1E791E71</span>,
-        <span class="number">0x3356</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x0000000000001E811E5A1E651E811E7B</span>,
-        <span class="number">0x337F</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0xF93EFB40CF1AFB40DF0FFB40E82AFB40</span>,
-        <span class="number">0x33AE</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x0000000000000FEA04370E6D0E330FC0</span>,
-        <span class="number">0x33AF</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x000000000E2B0FEA04370E6D0E330FC0</span>,
-        <span class="number">0xFDFB</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0x13B713AB135013AB135E020913AB135E</span>,
-        <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0xFFFD</span>,
-    }
-}
 </pre></div>
 </section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../../../../";window.currentCrate = "tidb_query_datatype";</script><script src="../../../../../main.js"></script><script src="../../../../../source-script.js"></script><script src="../../../../../source-files.js"></script><script defer src="../../../../../search-index.js"></script></body></html>
