@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["gc",""]],"mod":[["tests",""]]});
+initSidebarItems({"enum":[["State",""]],"fn":[["gc",""]],"mod":[["tests",""]],"struct":[["Gc","Iterates over the versions of `key`, see the `run` method."]]});
