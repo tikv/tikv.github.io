@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["try_prewrite_check_not_exists",""],["try_prewrite_insert",""]]});
+initSidebarItems({"fn":[["optimistic_txn_props",""],["try_pessimistic_prewrite_check_not_exists",""],["try_prewrite_check_not_exists",""],["try_prewrite_insert",""]]});

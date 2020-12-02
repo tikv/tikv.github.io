@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["prewrite",""]],"mod":[["tests",""]]});
+initSidebarItems({"enum":[["CommitKind",""],["LockStatus",""],["TransactionKind",""]],"fn":[["amend_pessimistic_lock",""],["async_commit_timestamps",""],["prewrite","Prewrite a single mutation by creating and storing a lock and value."]],"mod":[["tests",""]],"struct":[["PrewriteMutation","A single mutation to be prewritten."],["TransactionProperties",""]]});

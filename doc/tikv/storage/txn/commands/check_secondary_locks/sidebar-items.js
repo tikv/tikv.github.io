@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["CheckSecondaryLocks","Check secondary locks of an async commit transaction."]]});
+initSidebarItems({"enum":[["SecondaryLockStatus",""]],"struct":[["CheckSecondaryLocks","Check secondary locks of an async commit transaction."]]});

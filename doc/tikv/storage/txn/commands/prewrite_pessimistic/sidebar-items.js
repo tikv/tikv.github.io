@@ -1,1 +1,0 @@
-initSidebarItems({"struct":[["PrewritePessimistic","The prewrite phase of a transaction using pessimistic locking. The first phase of 2PC."]]});
