@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["Substitution",""]],"macro":[["match_template",""]],"struct":[["MatchArmIdentFolder",""],["MatchTemplate",""],["ReplaceIdentFolder",""]]});
+initSidebarItems({"enum":[["Substitution",""]],"fn":[["replace_in_token_stream",""]],"macro":[["match_template","This crate provides a macro that can be used to append a match expression with multiple arms, where the tokens in the first arm, as a template, can be subsitituted and the template arm will be expanded into multiple arms."]],"struct":[["MatchTemplate",""]]});

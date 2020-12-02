@@ -261,96 +261,69 @@
 <span id="258">258</span>
 <span id="259">259</span>
 <span id="260">260</span>
-<span id="261">261</span>
-<span id="262">262</span>
-<span id="263">263</span>
-<span id="264">264</span>
-<span id="265">265</span>
-<span id="266">266</span>
-<span id="267">267</span>
-<span id="268">268</span>
-<span id="269">269</span>
-<span id="270">270</span>
-<span id="271">271</span>
-<span id="272">272</span>
-<span id="273">273</span>
-<span id="274">274</span>
-<span id="275">275</span>
-<span id="276">276</span>
-<span id="277">277</span>
-<span id="278">278</span>
-<span id="279">279</span>
-<span id="280">280</span>
-<span id="281">281</span>
-<span id="282">282</span>
-<span id="283">283</span>
-<span id="284">284</span>
-<span id="285">285</span>
-<span id="286">286</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.</span>
-
-<span class="doccomment">//! This crate provides a macro that can be used to append a match expression with multiple</span>
-<span class="doccomment">//! arms, where the tokens in the first arm, as a template, can be subsitituted and the template</span>
-<span class="doccomment">//! arm will be expanded into multiple arms.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! For example, the following code</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ```ignore</span>
-<span class="doccomment">//! match_template! {</span>
-<span class="doccomment">//!     T = [Int, Real, Double],</span>
-<span class="doccomment">//!     match Foo {</span>
-<span class="doccomment">//!         EvalType::T =&gt; { panic!(&quot;{}&quot;, EvalType::T); },</span>
-<span class="doccomment">//!         EvalType::Other =&gt; unreachable!(),</span>
-<span class="doccomment">//!     }</span>
-<span class="doccomment">//! }</span>
-<span class="doccomment">//! ```</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! generates</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ```ignore</span>
-<span class="doccomment">//! match Foo {</span>
-<span class="doccomment">//!     EvalType::Int =&gt; { panic!(&quot;{}&quot;, EvalType::Int); },</span>
-<span class="doccomment">//!     EvalType::Real =&gt; { panic!(&quot;{}&quot;, EvalType::Real); },</span>
-<span class="doccomment">//!     EvalType::Double =&gt; { panic!(&quot;{}&quot;, EvalType::Double); },</span>
-<span class="doccomment">//!     EvalType::Other =&gt; unreachable!(),</span>
-<span class="doccomment">//! }</span>
-<span class="doccomment">//! ```</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! In addition, substitution can vary on two sides of the arms.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! For example,</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ```ignore</span>
-<span class="doccomment">//! match_template! {</span>
-<span class="doccomment">//!     T = [Foo, Bar =&gt; Baz],</span>
-<span class="doccomment">//!     match Foo {</span>
-<span class="doccomment">//!         EvalType::T =&gt; { panic!(&quot;{}&quot;, EvalType::T); },</span>
-<span class="doccomment">//!     }</span>
-<span class="doccomment">//! }</span>
-<span class="doccomment">//! ```</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! generates</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! ```ignore</span>
-<span class="doccomment">//! match Foo {</span>
-<span class="doccomment">//!     EvalType::Foo =&gt; { panic!(&quot;{}&quot;, EvalType::Foo); },</span>
-<span class="doccomment">//!     EvalType::Bar =&gt; { panic!(&quot;{}&quot;, EvalType::Baz); },</span>
-<span class="doccomment">//! }</span>
-<span class="doccomment">//! ```</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Wildcard match arm is also supported (but there will be no substitution).</span>
 
 <span class="attribute">#[<span class="ident">macro_use</span>]</span>
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">quote</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">proc_macro</span>;
 
-<span class="kw">use</span> <span class="ident">proc_macro2</span>::{<span class="ident">TokenStream</span>, <span class="ident">TokenTree</span>};
-<span class="kw">use</span> <span class="ident">syn</span>::<span class="ident">fold</span>::<span class="ident">Fold</span>;
+<span class="kw">use</span> <span class="ident">proc_macro2</span>::{<span class="ident">Group</span>, <span class="ident">TokenStream</span>, <span class="ident">TokenTree</span>};
+<span class="kw">use</span> <span class="ident">quote</span>::<span class="ident">ToTokens</span>;
 <span class="kw">use</span> <span class="ident">syn</span>::<span class="ident">parse</span>::{<span class="ident">Parse</span>, <span class="ident">ParseStream</span>, <span class="prelude-ty">Result</span>};
 <span class="kw">use</span> <span class="ident">syn</span>::<span class="ident">punctuated</span>::<span class="ident">Punctuated</span>;
 <span class="kw">use</span> <span class="ident">syn</span>::<span class="kw-2">*</span>;
 
+<span class="doccomment">/// This crate provides a macro that can be used to append a match expression with multiple</span>
+<span class="doccomment">/// arms, where the tokens in the first arm, as a template, can be subsitituted and the template</span>
+<span class="doccomment">/// arm will be expanded into multiple arms.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// For example, the following code</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// ```ignore</span>
+<span class="doccomment">/// match_template! {</span>
+<span class="doccomment">///     T = [Int, Real, Double],</span>
+<span class="doccomment">///     match Foo {</span>
+<span class="doccomment">///         EvalType::T =&gt; { panic!(&quot;{}&quot;, EvalType::T); },</span>
+<span class="doccomment">///         EvalType::Other =&gt; unreachable!(),</span>
+<span class="doccomment">///     }</span>
+<span class="doccomment">/// }</span>
+<span class="doccomment">/// ```</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// generates</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// ```ignore</span>
+<span class="doccomment">/// match Foo {</span>
+<span class="doccomment">///     EvalType::Int =&gt; { panic!(&quot;{}&quot;, EvalType::Int); },</span>
+<span class="doccomment">///     EvalType::Real =&gt; { panic!(&quot;{}&quot;, EvalType::Real); },</span>
+<span class="doccomment">///     EvalType::Double =&gt; { panic!(&quot;{}&quot;, EvalType::Double); },</span>
+<span class="doccomment">///     EvalType::Other =&gt; unreachable!(),</span>
+<span class="doccomment">/// }</span>
+<span class="doccomment">/// ```</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// In addition, substitution can vary on two sides of the arms.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// For example,</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// ```ignore</span>
+<span class="doccomment">/// match_template! {</span>
+<span class="doccomment">///     T = [Foo, Bar =&gt; Baz],</span>
+<span class="doccomment">///     match Foo {</span>
+<span class="doccomment">///         EvalType::T =&gt; { panic!(&quot;{}&quot;, EvalType::T); },</span>
+<span class="doccomment">///     }</span>
+<span class="doccomment">/// }</span>
+<span class="doccomment">/// ```</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// generates</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// ```ignore</span>
+<span class="doccomment">/// match Foo {</span>
+<span class="doccomment">///     EvalType::Foo =&gt; { panic!(&quot;{}&quot;, EvalType::Foo); },</span>
+<span class="doccomment">///     EvalType::Bar =&gt; { panic!(&quot;{}&quot;, EvalType::Baz); },</span>
+<span class="doccomment">/// }</span>
+<span class="doccomment">/// ```</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Wildcard match arm is also supported (but there will be no substitution).</span>
 <span class="attribute">#[<span class="ident">proc_macro</span>]</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">match_template</span>(<span class="ident">input</span>: <span class="ident">proc_macro</span>::<span class="ident">TokenStream</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">proc_macro</span>::<span class="ident">TokenStream</span> {
     <span class="kw">let</span> <span class="ident">mt</span> <span class="op">=</span> <span class="macro">parse_macro_input</span><span class="macro">!</span>(<span class="ident">input</span> <span class="kw">as</span> <span class="ident">MatchTemplate</span>);
@@ -400,19 +373,18 @@
             <span class="ident">remaining_arms</span>,
         } <span class="op">=</span> <span class="self">self</span>;
         <span class="kw">let</span> <span class="ident">match_arms</span> <span class="op">=</span> <span class="ident">substitutes</span>.<span class="ident">into_iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">substitute</span><span class="op">|</span> {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">folder</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">substitute</span> {
-                <span class="ident">Substitution</span>::<span class="ident">Identical</span>(<span class="ident">ident</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">MatchArmIdentFolder</span> {
-                    <span class="ident">template_ident</span>: <span class="ident">template_ident</span>.<span class="ident">clone</span>(),
-                    <span class="ident">left_ident</span>: <span class="ident">ident</span>.<span class="ident">clone</span>(),
-                    <span class="ident">right_ident</span>: <span class="ident">ident</span>,
-                },
-                <span class="ident">Substitution</span>::<span class="ident">Map</span>(<span class="ident">left_ident</span>, <span class="ident">right_ident</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">MatchArmIdentFolder</span> {
-                    <span class="ident">template_ident</span>: <span class="ident">template_ident</span>.<span class="ident">clone</span>(),
-                    <span class="ident">left_ident</span>,
-                    <span class="ident">right_ident</span>,
-                },
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">arm</span> <span class="op">=</span> <span class="ident">template_arm</span>.<span class="ident">clone</span>();
+            <span class="kw">let</span> (<span class="ident">left_tokens</span>, <span class="ident">right_tokens</span>) <span class="op">=</span> <span class="kw">match</span> <span class="ident">substitute</span> {
+                <span class="ident">Substitution</span>::<span class="ident">Identical</span>(<span class="ident">ident</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                    (<span class="ident">ident</span>.<span class="ident">clone</span>().<span class="ident">into_token_stream</span>(), <span class="ident">ident</span>.<span class="ident">into_token_stream</span>())
+                }
+                <span class="ident">Substitution</span>::<span class="ident">Map</span>(<span class="ident">left_ident</span>, <span class="ident">right_tokens</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                    (<span class="ident">left_ident</span>.<span class="ident">into_token_stream</span>(), <span class="ident">right_tokens</span>)
+                }
             };
-            <span class="ident">folder</span>.<span class="ident">fold_arm</span>(<span class="ident">template_arm</span>.<span class="ident">clone</span>())
+            <span class="ident">arm</span>.<span class="ident">pat</span> <span class="op">=</span> <span class="ident">replace_in_token_stream</span>(<span class="ident">arm</span>.<span class="ident">pat</span>, <span class="kw-2">&amp;</span><span class="ident">template_ident</span>, <span class="kw-2">&amp;</span><span class="ident">left_tokens</span>);
+            <span class="ident">arm</span>.<span class="ident">body</span> <span class="op">=</span> <span class="ident">replace_in_token_stream</span>(<span class="ident">arm</span>.<span class="ident">body</span>, <span class="kw-2">&amp;</span><span class="ident">template_ident</span>, <span class="kw-2">&amp;</span><span class="ident">right_tokens</span>);
+            <span class="ident">arm</span>
         });
         <span class="macro">quote</span><span class="macro">!</span> {
             <span class="kw">match</span> #<span class="ident">match_exp</span> {
@@ -423,78 +395,53 @@
     }
 }
 
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
 <span class="kw">enum</span> <span class="ident">Substitution</span> {
     <span class="ident">Identical</span>(<span class="ident">Ident</span>),
-    <span class="ident">Map</span>(<span class="ident">Ident</span>, <span class="ident">Ident</span>),
+    <span class="ident">Map</span>(<span class="ident">Ident</span>, <span class="ident">TokenStream</span>),
 }
 
 <span class="kw">impl</span> <span class="ident">Parse</span> <span class="kw">for</span> <span class="ident">Substitution</span> {
     <span class="kw">fn</span> <span class="ident">parse</span>(<span class="ident">input</span>: <span class="ident">ParseStream</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">first_ident</span> <span class="op">=</span> <span class="ident">input</span>.<span class="ident">parse</span>()<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">left_ident</span> <span class="op">=</span> <span class="ident">input</span>.<span class="ident">parse</span>()<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">fat_arrow</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="macro">Token</span><span class="macro">!</span>[<span class="op">=</span><span class="op">&gt;</span>]<span class="op">&gt;</span> <span class="op">=</span> <span class="ident">input</span>.<span class="ident">parse</span>()<span class="question-mark">?</span>;
         <span class="kw">if</span> <span class="ident">fat_arrow</span>.<span class="ident">is_some</span>() {
-            <span class="kw">let</span> <span class="ident">second_ident</span> <span class="op">=</span> <span class="ident">input</span>.<span class="ident">parse</span>()<span class="question-mark">?</span>;
-            <span class="prelude-val">Ok</span>(<span class="ident">Substitution</span>::<span class="ident">Map</span>(<span class="ident">first_ident</span>, <span class="ident">second_ident</span>))
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">right_tokens</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">TokenTree</span><span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[];
+            <span class="kw">while</span> <span class="op">!</span><span class="ident">input</span>.<span class="ident">peek</span>(<span class="macro">Token</span><span class="macro">!</span>[,]) <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="ident">input</span>.<span class="ident">is_empty</span>() {
+                <span class="ident">right_tokens</span>.<span class="ident">push</span>(<span class="ident">input</span>.<span class="ident">parse</span>()<span class="question-mark">?</span>);
+            }
+            <span class="prelude-val">Ok</span>(<span class="ident">Substitution</span>::<span class="ident">Map</span>(
+                <span class="ident">left_ident</span>,
+                <span class="ident">right_tokens</span>.<span class="ident">into_iter</span>().<span class="ident">collect</span>(),
+            ))
         } <span class="kw">else</span> {
-            <span class="prelude-val">Ok</span>(<span class="ident">Substitution</span>::<span class="ident">Identical</span>(<span class="ident">first_ident</span>))
+            <span class="prelude-val">Ok</span>(<span class="ident">Substitution</span>::<span class="ident">Identical</span>(<span class="ident">left_ident</span>))
         }
     }
 }
 
-<span class="kw">struct</span> <span class="ident">MatchArmIdentFolder</span> {
-    <span class="ident">template_ident</span>: <span class="ident">Ident</span>,
-    <span class="ident">left_ident</span>: <span class="ident">Ident</span>,
-    <span class="ident">right_ident</span>: <span class="ident">Ident</span>,
-}
+<span class="kw">fn</span> <span class="ident">replace_in_token_stream</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">ToTokens</span> <span class="op">+</span> <span class="ident">Parse</span><span class="op">&gt;</span>(
+    <span class="ident">input</span>: <span class="ident">T</span>,
+    <span class="ident">from_ident</span>: <span class="kw-2">&amp;</span><span class="ident">Ident</span>,
+    <span class="ident">to_tokens</span>: <span class="kw-2">&amp;</span><span class="ident">TokenStream</span>,
+) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">T</span> {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tokens</span> <span class="op">=</span> <span class="ident">TokenStream</span>::<span class="ident">new</span>();
+    <span class="ident">input</span>.<span class="ident">to_tokens</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">tokens</span>);
 
-<span class="kw">impl</span> <span class="ident">Fold</span> <span class="kw">for</span> <span class="ident">MatchArmIdentFolder</span> {
-    <span class="kw">fn</span> <span class="ident">fold_pat</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">i</span>: <span class="ident">Pat</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Pat</span> {
-        <span class="ident">ReplaceIdentFolder</span> {
-            <span class="ident">from_ident</span>: <span class="self">self</span>.<span class="ident">template_ident</span>.<span class="ident">clone</span>(),
-            <span class="ident">to_ident</span>: <span class="self">self</span>.<span class="ident">left_ident</span>.<span class="ident">clone</span>(),
-        }
-        .<span class="ident">fold_pat</span>(<span class="ident">i</span>)
-    }
+    <span class="kw">let</span> <span class="ident">tokens</span>: <span class="ident">TokenStream</span> <span class="op">=</span> <span class="ident">tokens</span>
+        .<span class="ident">into_iter</span>()
+        .<span class="ident">flat_map</span>(<span class="op">|</span><span class="ident">token</span><span class="op">|</span> <span class="kw">match</span> <span class="ident">token</span> {
+            <span class="ident">TokenTree</span>::<span class="ident">Ident</span>(<span class="ident">ident</span>) <span class="kw">if</span> <span class="ident">ident</span> <span class="op">=</span><span class="op">=</span> <span class="kw-2">*</span><span class="ident">from_ident</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">to_tokens</span>.<span class="ident">clone</span>(),
+            <span class="ident">TokenTree</span>::<span class="ident">Group</span>(<span class="ident">group</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Group</span>::<span class="ident">new</span>(
+                <span class="ident">group</span>.<span class="ident">delimiter</span>(),
+                <span class="ident">replace_in_token_stream</span>(<span class="ident">group</span>.<span class="ident">stream</span>(), <span class="ident">from_ident</span>, <span class="ident">to_tokens</span>),
+            )
+            .<span class="ident">into_token_stream</span>(),
+            <span class="ident">other</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">other</span>.<span class="ident">into</span>(),
+        })
+        .<span class="ident">collect</span>();
 
-    <span class="kw">fn</span> <span class="ident">fold_expr</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">i</span>: <span class="ident">Expr</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Expr</span> {
-        <span class="ident">ReplaceIdentFolder</span> {
-            <span class="ident">from_ident</span>: <span class="self">self</span>.<span class="ident">template_ident</span>.<span class="ident">clone</span>(),
-            <span class="ident">to_ident</span>: <span class="self">self</span>.<span class="ident">right_ident</span>.<span class="ident">clone</span>(),
-        }
-        .<span class="ident">fold_expr</span>(<span class="ident">i</span>)
-    }
-}
-
-<span class="kw">struct</span> <span class="ident">ReplaceIdentFolder</span> {
-    <span class="ident">from_ident</span>: <span class="ident">Ident</span>,
-    <span class="ident">to_ident</span>: <span class="ident">Ident</span>,
-}
-
-<span class="kw">impl</span> <span class="ident">Fold</span> <span class="kw">for</span> <span class="ident">ReplaceIdentFolder</span> {
-    <span class="kw">fn</span> <span class="ident">fold_macro</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">i</span>: <span class="ident">Macro</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Macro</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">m</span> <span class="op">=</span> <span class="ident">syn</span>::<span class="ident">fold</span>::<span class="ident">fold_macro</span>(<span class="self">self</span>, <span class="ident">i</span>);
-        <span class="ident">m</span>.<span class="ident">tokens</span> <span class="op">=</span> <span class="ident">m</span>
-            .<span class="ident">tokens</span>
-            .<span class="ident">into_iter</span>()
-            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">tt</span><span class="op">|</span> {
-                <span class="kw">if</span> <span class="kw">let</span> <span class="ident">TokenTree</span>::<span class="ident">Ident</span>(<span class="ident">i</span>) <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">tt</span> {
-                    <span class="kw">if</span> <span class="ident">i</span> <span class="op">=</span><span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">from_ident</span> {
-                        <span class="kw">return</span> <span class="ident">TokenTree</span>::<span class="ident">Ident</span>(<span class="self">self</span>.<span class="ident">to_ident</span>.<span class="ident">clone</span>());
-                    }
-                }
-                <span class="ident">tt</span>
-            })
-            .<span class="ident">collect</span>();
-        <span class="ident">m</span>
-    }
-
-    <span class="kw">fn</span> <span class="ident">fold_ident</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">i</span>: <span class="ident">Ident</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Ident</span> {
-        <span class="kw">if</span> <span class="ident">i</span> <span class="op">=</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">from_ident</span> {
-            <span class="self">self</span>.<span class="ident">to_ident</span>.<span class="ident">clone</span>()
-        } <span class="kw">else</span> {
-            <span class="ident">i</span>
-        }
-    }
+    <span class="ident">syn</span>::<span class="ident">parse2</span>(<span class="ident">tokens</span>).<span class="ident">unwrap</span>()
 }
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
@@ -553,7 +500,7 @@
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_map</span>() {
         <span class="kw">let</span> <span class="ident">input</span> <span class="op">=</span> <span class="string">r#&quot;
-            TT = [Foo, Bar =&gt; Baz],
+            TT = [Foo, Bar =&gt; Baz, Bark =&gt; &lt;&amp;&#39;static Whooh&gt;()],
             match v {
                 VectorValue::TT =&gt; EvalType::TT,
                 EvalType::Other =&gt; unreachable!(),
@@ -564,6 +511,7 @@
             match v {
                 VectorValue::Foo =&gt; EvalType::Foo,
                 VectorValue::Bar =&gt; EvalType::Baz,
+                VectorValue::Bark =&gt; EvalType:: &lt; &amp; &#39;static Whooh&gt;(),
                 EvalType::Other =&gt; unreachable!(),
             }
         &quot;#</span>;
