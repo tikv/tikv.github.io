@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["build_read_pool",""],["build_read_pool_for_test",""]],"struct":[["FuturePoolTicker",""]]});
+initSidebarItems({"fn":[["build_read_pool","Build respective thread pools to handle read commands of different priority levels."],["build_read_pool_for_test","Build a thread pool that has default tick behavior for testing."]],"struct":[["FuturePoolTicker",""]]});
