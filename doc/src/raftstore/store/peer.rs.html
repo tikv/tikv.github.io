@@ -3881,6 +3881,58 @@
 <span id="3878">3878</span>
 <span id="3879">3879</span>
 <span id="3880">3880</span>
+<span id="3881">3881</span>
+<span id="3882">3882</span>
+<span id="3883">3883</span>
+<span id="3884">3884</span>
+<span id="3885">3885</span>
+<span id="3886">3886</span>
+<span id="3887">3887</span>
+<span id="3888">3888</span>
+<span id="3889">3889</span>
+<span id="3890">3890</span>
+<span id="3891">3891</span>
+<span id="3892">3892</span>
+<span id="3893">3893</span>
+<span id="3894">3894</span>
+<span id="3895">3895</span>
+<span id="3896">3896</span>
+<span id="3897">3897</span>
+<span id="3898">3898</span>
+<span id="3899">3899</span>
+<span id="3900">3900</span>
+<span id="3901">3901</span>
+<span id="3902">3902</span>
+<span id="3903">3903</span>
+<span id="3904">3904</span>
+<span id="3905">3905</span>
+<span id="3906">3906</span>
+<span id="3907">3907</span>
+<span id="3908">3908</span>
+<span id="3909">3909</span>
+<span id="3910">3910</span>
+<span id="3911">3911</span>
+<span id="3912">3912</span>
+<span id="3913">3913</span>
+<span id="3914">3914</span>
+<span id="3915">3915</span>
+<span id="3916">3916</span>
+<span id="3917">3917</span>
+<span id="3918">3918</span>
+<span id="3919">3919</span>
+<span id="3920">3920</span>
+<span id="3921">3921</span>
+<span id="3922">3922</span>
+<span id="3923">3923</span>
+<span id="3924">3924</span>
+<span id="3925">3925</span>
+<span id="3926">3926</span>
+<span id="3927">3927</span>
+<span id="3928">3928</span>
+<span id="3929">3929</span>
+<span id="3930">3930</span>
+<span id="3931">3931</span>
+<span id="3932">3932</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -3922,9 +3974,10 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">fsm</span>::<span class="ident">apply</span>::<span class="ident">CatchUpLogs</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">fsm</span>::<span class="ident">store</span>::<span class="ident">PollContext</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">fsm</span>::{<span class="ident">apply</span>, <span class="ident">Apply</span>, <span class="ident">ApplyMetrics</span>, <span class="ident">ApplyTask</span>, <span class="ident">GroupState</span>, <span class="ident">Proposal</span>};
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">worker</span>::{<span class="ident">ReadDelegate</span>, <span class="ident">ReadExecutor</span>, <span class="ident">ReadProgress</span>, <span class="ident">RegionTask</span>};
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">worker</span>::{<span class="ident">HeartbeatTask</span>, <span class="ident">ReadDelegate</span>, <span class="ident">ReadExecutor</span>, <span class="ident">ReadProgress</span>, <span class="ident">RegionTask</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::{
     <span class="ident">Callback</span>, <span class="ident">Config</span>, <span class="ident">GlobalReplicationState</span>, <span class="ident">PdTask</span>, <span class="ident">ReadIndexContext</span>, <span class="ident">ReadResponse</span>,
+    <span class="ident">SplitCheckTask</span>,
 };
 <span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">Error</span>, <span class="prelude-ty">Result</span>};
 <span class="kw">use</span> <span class="ident">pd_client</span>::<span class="ident">INVALID_ID</span>;
@@ -4354,6 +4407,11 @@
 
     <span class="doccomment">/// Check whether this proposal can be proposed based on its epoch</span>
     <span class="ident">cmd_epoch_checker</span>: <span class="ident">CmdEpochChecker</span><span class="op">&lt;</span><span class="ident">EK</span>::<span class="ident">Snapshot</span><span class="op">&gt;</span>,
+
+    <span class="doccomment">/// The number of pending pd heartbeat tasks. Pd heartbeat task may be blocked by</span>
+    <span class="doccomment">/// reading rocksdb. To avoid unnecessary io operations, we always let the later</span>
+    <span class="doccomment">/// task run when there are more than 1 pending tasks.</span>
+    <span class="kw">pub</span> <span class="ident">pending_pd_heartbeat_tasks</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicU64</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span> <span class="ident">Peer</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>
@@ -4446,6 +4504,7 @@
             <span class="ident">txn_extra_op</span>: <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">AtomicCell</span>::<span class="ident">new</span>(<span class="ident">TxnExtraOp</span>::<span class="ident">Noop</span>)),
             <span class="ident">max_ts_sync_status</span>: <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">AtomicU64</span>::<span class="ident">new</span>(<span class="number">0</span>)),
             <span class="ident">cmd_epoch_checker</span>: <span class="ident">Default</span>::<span class="ident">default</span>(),
+            <span class="ident">pending_pd_heartbeat_tasks</span>: <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">AtomicU64</span>::<span class="ident">new</span>(<span class="number">0</span>)),
         };
 
         <span class="comment">// If this region has only one peer and I am the one, campaign directly.</span>
@@ -6977,8 +7036,13 @@
         <span class="prelude-val">Some</span>(<span class="ident">status</span>)
     }
 
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_region_size_or_keys_none</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+        <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;region_size_or_keys_none&quot;</span>, <span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="bool-val">true</span>);
+        <span class="self">self</span>.<span class="ident">approximate_size</span>.<span class="ident">is_none</span>() <span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">approximate_keys</span>.<span class="ident">is_none</span>()
+    }
+
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">heartbeat_pd</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="ident">PollContext</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">T</span><span class="op">&gt;</span>) {
-        <span class="kw">let</span> <span class="ident">task</span> <span class="op">=</span> <span class="ident">PdTask</span>::<span class="ident">Heartbeat</span> {
+        <span class="kw">let</span> <span class="ident">task</span> <span class="op">=</span> <span class="ident">PdTask</span>::<span class="ident">Heartbeat</span>(<span class="ident">HeartbeatTask</span> {
             <span class="ident">term</span>: <span class="self">self</span>.<span class="ident">term</span>(),
             <span class="ident">region</span>: <span class="self">self</span>.<span class="ident">region</span>().<span class="ident">clone</span>(),
             <span class="ident">peer</span>: <span class="self">self</span>.<span class="ident">peer</span>.<span class="ident">clone</span>(),
@@ -6986,17 +7050,57 @@
             <span class="ident">pending_peers</span>: <span class="self">self</span>.<span class="ident">collect_pending_peers</span>(<span class="ident">ctx</span>),
             <span class="ident">written_bytes</span>: <span class="self">self</span>.<span class="ident">peer_stat</span>.<span class="ident">written_bytes</span>,
             <span class="ident">written_keys</span>: <span class="self">self</span>.<span class="ident">peer_stat</span>.<span class="ident">written_keys</span>,
-            <span class="ident">approximate_size</span>: <span class="self">self</span>.<span class="ident">approximate_size</span>,
-            <span class="ident">approximate_keys</span>: <span class="self">self</span>.<span class="ident">approximate_keys</span>,
+            <span class="ident">approximate_size</span>: <span class="self">self</span>.<span class="ident">approximate_size</span>.<span class="ident">unwrap_or_default</span>(),
+            <span class="ident">approximate_keys</span>: <span class="self">self</span>.<span class="ident">approximate_keys</span>.<span class="ident">unwrap_or_default</span>(),
             <span class="ident">replication_status</span>: <span class="self">self</span>.<span class="ident">region_replication_status</span>(),
+        });
+        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">is_region_size_or_keys_none</span>() {
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">ctx</span>.<span class="ident">pd_scheduler</span>.<span class="ident">schedule</span>(<span class="ident">task</span>) {
+                <span class="macro">error</span><span class="macro">!</span>(
+                    <span class="string">&quot;failed to notify pd&quot;</span>;
+                    <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">region_id</span>,
+                    <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">peer</span>.<span class="ident">get_id</span>(),
+                    <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>,
+                );
+            }
+            <span class="kw">return</span>;
+        }
+
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">pending_pd_heartbeat_tasks</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>) <span class="op">&gt;</span> <span class="number">2</span> {
+            <span class="kw">return</span>;
+        }
+        <span class="kw">let</span> <span class="ident">region_id</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">region_id</span>;
+        <span class="kw">let</span> <span class="ident">peer_id</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">peer</span>.<span class="ident">get_id</span>();
+        <span class="kw">let</span> <span class="ident">scheduler</span> <span class="op">=</span> <span class="ident">ctx</span>.<span class="ident">pd_scheduler</span>.<span class="ident">clone</span>();
+        <span class="kw">let</span> <span class="ident">split_check_task</span> <span class="op">=</span> <span class="ident">SplitCheckTask</span>::<span class="ident">GetRegionApproximateSizeAndKeys</span> {
+            <span class="ident">region</span>: <span class="self">self</span>.<span class="ident">region</span>().<span class="ident">clone</span>(),
+            <span class="ident">pending_tasks</span>: <span class="self">self</span>.<span class="ident">pending_pd_heartbeat_tasks</span>.<span class="ident">clone</span>(),
+            <span class="ident">cb</span>: <span class="ident">Box</span>::<span class="ident">new</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">size</span>: <span class="ident">u64</span>, <span class="ident">keys</span>: <span class="ident">u64</span><span class="op">|</span> {
+                <span class="kw">if</span> <span class="kw">let</span> <span class="ident">PdTask</span>::<span class="ident">Heartbeat</span>(<span class="kw-2">mut</span> <span class="ident">h</span>) <span class="op">=</span> <span class="ident">task</span> {
+                    <span class="ident">h</span>.<span class="ident">approximate_size</span> <span class="op">=</span> <span class="ident">size</span>;
+                    <span class="ident">h</span>.<span class="ident">approximate_keys</span> <span class="op">=</span> <span class="ident">keys</span>;
+                    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">scheduler</span>.<span class="ident">schedule</span>(<span class="ident">PdTask</span>::<span class="ident">Heartbeat</span>(<span class="ident">h</span>)) {
+                        <span class="macro">error</span><span class="macro">!</span>(
+                            <span class="string">&quot;failed to notify pd&quot;</span>;
+                            <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>,
+                            <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">peer_id</span>,
+                            <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>,
+                        );
+                    }
+                }
+            }),
         };
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">ctx</span>.<span class="ident">pd_scheduler</span>.<span class="ident">schedule</span>(<span class="ident">task</span>) {
+        <span class="self">self</span>.<span class="ident">pending_pd_heartbeat_tasks</span>
+            .<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">ctx</span>.<span class="ident">split_check_scheduler</span>.<span class="ident">schedule</span>(<span class="ident">split_check_task</span>) {
             <span class="macro">error</span><span class="macro">!</span>(
                 <span class="string">&quot;failed to notify pd&quot;</span>;
-                <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">region_id</span>,
-                <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">peer</span>.<span class="ident">get_id</span>(),
+                <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>,
+                <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">peer_id</span>,
                 <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>,
             );
+            <span class="self">self</span>.<span class="ident">pending_pd_heartbeat_tasks</span>
+                .<span class="ident">fetch_sub</span>(<span class="number">1</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
         }
     }
 
