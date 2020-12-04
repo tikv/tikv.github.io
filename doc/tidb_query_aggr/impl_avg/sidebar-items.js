@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["AggrFnAvg","The AVG aggregate function."],["AggrFnDefinitionParserAvg","The parser for AVG aggregate function."],["AggrFnStateAvg","The state of the AVG aggregate function."]]});
+initSidebarItems({"struct":[["AggrFnAvg","The AVG aggregate function."],["AggrFnAvgForEnum",""],["AggrFnAvgForSet",""],["AggrFnDefinitionParserAvg","The parser for AVG aggregate function."],["AggrFnStateAvg","The state of the AVG aggregate function."],["AggrFnStateAvgForEnum",""],["AggrFnStateAvgForSet",""]]});
