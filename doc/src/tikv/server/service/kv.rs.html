@@ -1853,6 +1853,33 @@
 <span id="1850">1850</span>
 <span id="1851">1851</span>
 <span id="1852">1852</span>
+<span id="1853">1853</span>
+<span id="1854">1854</span>
+<span id="1855">1855</span>
+<span id="1856">1856</span>
+<span id="1857">1857</span>
+<span id="1858">1858</span>
+<span id="1859">1859</span>
+<span id="1860">1860</span>
+<span id="1861">1861</span>
+<span id="1862">1862</span>
+<span id="1863">1863</span>
+<span id="1864">1864</span>
+<span id="1865">1865</span>
+<span id="1866">1866</span>
+<span id="1867">1867</span>
+<span id="1868">1868</span>
+<span id="1869">1869</span>
+<span id="1870">1870</span>
+<span id="1871">1871</span>
+<span id="1872">1872</span>
+<span id="1873">1873</span>
+<span id="1874">1874</span>
+<span id="1875">1875</span>
+<span id="1876">1876</span>
+<span id="1877">1877</span>
+<span id="1878">1878</span>
+<span id="1879">1879</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2017 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1893,7 +1920,7 @@
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">raft_serverpb</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">tikvpb</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">router</span>::<span class="ident">RaftStoreRouter</span>;
-<span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">store</span>::{<span class="ident">Callback</span>, <span class="ident">CasualMessage</span>};
+<span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">store</span>::{<span class="ident">Callback</span>, <span class="ident">CasualMessage</span>, <span class="ident">StoreMsg</span>};
 <span class="kw">use</span> <span class="ident">raftstore</span>::{<span class="ident">DiscardReason</span>, <span class="ident">Error</span> <span class="kw">as</span> <span class="ident">RaftStoreError</span>};
 <span class="kw">use</span> <span class="ident">security</span>::{<span class="ident">check_common_name</span>, <span class="ident">SecurityManager</span>};
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">future</span>::{<span class="ident">paired_future_callback</span>, <span class="ident">poll_future_notify</span>};
@@ -2873,6 +2900,33 @@
         <span class="ident">_sink</span>: <span class="ident">ServerStreamingSink</span><span class="op">&lt;</span><span class="ident">MppDataPacket</span><span class="op">&gt;</span>,
     ) {
         <span class="macro">unimplemented</span><span class="macro">!</span>()
+    }
+
+    <span class="kw">fn</span> <span class="ident">check_leader</span>(
+        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
+        <span class="ident">ctx</span>: <span class="ident">RpcContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>,
+        <span class="kw-2">mut</span> <span class="ident">request</span>: <span class="ident">CheckLeaderRequest</span>,
+        <span class="ident">sink</span>: <span class="ident">UnarySink</span><span class="op">&lt;</span><span class="ident">CheckLeaderResponse</span><span class="op">&gt;</span>,
+    ) {
+        <span class="kw">let</span> <span class="ident">ts</span> <span class="op">=</span> <span class="ident">request</span>.<span class="ident">get_ts</span>();
+        <span class="kw">let</span> <span class="ident">leaders</span> <span class="op">=</span> <span class="ident">request</span>.<span class="ident">take_regions</span>().<span class="ident">into</span>();
+        <span class="kw">let</span> (<span class="ident">cb</span>, <span class="ident">resp</span>) <span class="op">=</span> <span class="ident">paired_future_callback</span>();
+        <span class="kw">let</span> <span class="ident">ch</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">ch</span>.<span class="ident">clone</span>();
+        <span class="kw">let</span> <span class="ident">task</span> <span class="op">=</span> <span class="ident">async</span> <span class="kw">move</span> {
+            <span class="ident">ch</span>.<span class="ident">send_store_msg</span>(<span class="ident">StoreMsg</span>::<span class="ident">CheckLeader</span> { <span class="ident">leaders</span>, <span class="ident">cb</span> })<span class="question-mark">?</span>;
+            <span class="kw">let</span> <span class="ident">regions</span> <span class="op">=</span> <span class="ident">resp</span>.<span class="ident">await</span><span class="question-mark">?</span>;
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">CheckLeaderResponse</span>::<span class="ident">default</span>();
+            <span class="ident">resp</span>.<span class="ident">set_ts</span>(<span class="ident">ts</span>);
+            <span class="ident">resp</span>.<span class="ident">set_regions</span>(<span class="ident">regions</span>);
+            <span class="ident">sink</span>.<span class="ident">success</span>(<span class="ident">resp</span>).<span class="ident">await</span><span class="question-mark">?</span>;
+            <span class="ident">ServerResult</span>::<span class="prelude-val">Ok</span>(())
+        }
+        .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
+            <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;cdc call CheckLeader failed&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
+        })
+        .<span class="ident">map</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> ());
+
+        <span class="ident">ctx</span>.<span class="ident">spawn</span>(<span class="ident">task</span>);
     }
 }
 
