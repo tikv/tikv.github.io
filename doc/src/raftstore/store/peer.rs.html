@@ -3948,6 +3948,17 @@
 <span id="3945">3945</span>
 <span id="3946">3946</span>
 <span id="3947">3947</span>
+<span id="3948">3948</span>
+<span id="3949">3949</span>
+<span id="3950">3950</span>
+<span id="3951">3951</span>
+<span id="3952">3952</span>
+<span id="3953">3953</span>
+<span id="3954">3954</span>
+<span id="3955">3955</span>
+<span id="3956">3956</span>
+<span id="3957">3957</span>
+<span id="3958">3958</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -3975,10 +3986,10 @@
     <span class="ident">DrAutoSyncState</span>, <span class="ident">RegionReplicationState</span>, <span class="ident">RegionReplicationStatus</span>, <span class="ident">ReplicationMode</span>,
 };
 <span class="kw">use</span> <span class="ident">protobuf</span>::<span class="ident">Message</span>;
-<span class="kw">use</span> <span class="ident">raft</span>::<span class="ident">eraftpb</span>::{<span class="self">self</span>, <span class="ident">ConfChangeType</span>, <span class="ident">EntryType</span>, <span class="ident">MessageType</span>};
+<span class="kw">use</span> <span class="ident">raft</span>::<span class="ident">eraftpb</span>::{<span class="self">self</span>, <span class="ident">ConfChangeType</span>, <span class="ident">Entry</span>, <span class="ident">EntryType</span>, <span class="ident">MessageType</span>};
 <span class="kw">use</span> <span class="ident">raft</span>::{
-    <span class="self">self</span>, <span class="ident">Changer</span>, <span class="ident">ProgressState</span>, <span class="ident">ProgressTracker</span>, <span class="ident">RawNode</span>, <span class="ident">Ready</span>, <span class="ident">SnapshotStatus</span>, <span class="ident">StateRole</span>,
-    <span class="ident">INVALID_INDEX</span>, <span class="ident">NO_LIMIT</span>,
+    <span class="self">self</span>, <span class="ident">Changer</span>, <span class="ident">LightReady</span>, <span class="ident">ProgressState</span>, <span class="ident">ProgressTracker</span>, <span class="ident">RawNode</span>, <span class="ident">Ready</span>, <span class="ident">SnapshotStatus</span>,
+    <span class="ident">StateRole</span>, <span class="ident">INVALID_INDEX</span>, <span class="ident">NO_LIMIT</span>,
 };
 <span class="kw">use</span> <span class="ident">raft_proto</span>::<span class="ident">ConfChangeI</span>;
 <span class="kw">use</span> <span class="ident">smallvec</span>::<span class="ident">SmallVec</span>;
@@ -4066,6 +4077,7 @@
                 <span class="ident">propos</span>.<span class="ident">push</span>(<span class="ident">p</span>);
             }
         }
+        <span class="self">self</span>.<span class="ident">gc</span>();
         <span class="ident">propos</span>
     }
 
@@ -4333,8 +4345,6 @@
     <span class="doccomment">/// 1. when merging, its data in storeMeta will be removed early by the target peer.</span>
     <span class="doccomment">/// 2. all read requests must be rejected.</span>
     <span class="kw">pub</span> <span class="ident">pending_remove</span>: <span class="ident">bool</span>,
-    <span class="doccomment">/// If a snapshot is being applied asynchronously, messages should not be sent.</span>
-    <span class="ident">pending_messages</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">eraftpb</span>::<span class="ident">Message</span><span class="op">&gt;</span>,
 
     <span class="doccomment">/// Record the instants of peers being added into the configuration.</span>
     <span class="doccomment">/// Remove them after they are not pending any more.</span>
@@ -4382,9 +4392,9 @@
     <span class="doccomment">/// of peers is greater than the majority of all peers.</span>
     <span class="doccomment">/// There are more details in the annotation above</span>
     <span class="doccomment">/// `test_node_merge_write_data_to_source_region_after_merging`</span>
-    <span class="doccomment">/// The peers who want to rollback merge</span>
+    <span class="doccomment">/// The peers who want to rollback merge.</span>
     <span class="kw">pub</span> <span class="ident">want_rollback_merge_peers</span>: <span class="ident">HashSet</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// source region is catching up logs for merge</span>
+    <span class="doccomment">/// Source region is catching up logs for merge.</span>
     <span class="kw">pub</span> <span class="ident">catch_up_logs</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">CatchUpLogs</span><span class="op">&gt;</span>,
 
     <span class="doccomment">/// Write Statistics for PD to schedule hot spot.</span>
@@ -4420,8 +4430,11 @@
     <span class="doccomment">/// marking the lowest bit.</span>
     <span class="kw">pub</span> <span class="ident">max_ts_sync_status</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicU64</span><span class="op">&gt;</span>,
 
-    <span class="doccomment">/// Check whether this proposal can be proposed based on its epoch</span>
+    <span class="doccomment">/// Check whether this proposal can be proposed based on its epoch.</span>
     <span class="ident">cmd_epoch_checker</span>: <span class="ident">CmdEpochChecker</span><span class="op">&lt;</span><span class="ident">EK</span>::<span class="ident">Snapshot</span><span class="op">&gt;</span>,
+
+    <span class="doccomment">/// The number of the last unpersisted ready.</span>
+    <span class="ident">last_unpersisted_number</span>: <span class="ident">u64</span>,
 
     <span class="doccomment">/// The number of pending pd heartbeat tasks. Pd heartbeat task may be blocked by</span>
     <span class="doccomment">/// reading rocksdb. To avoid unnecessary io operations, we always let the later</span>
@@ -4506,7 +4519,6 @@
             },
             <span class="ident">raft_log_size_hint</span>: <span class="number">0</span>,
             <span class="ident">leader_lease</span>: <span class="ident">Lease</span>::<span class="ident">new</span>(<span class="ident">cfg</span>.<span class="ident">raft_store_max_leader_lease</span>()),
-            <span class="ident">pending_messages</span>: <span class="macro">vec</span><span class="macro">!</span>[],
             <span class="ident">peer_stat</span>: <span class="ident">PeerStat</span>::<span class="ident">default</span>(),
             <span class="ident">catch_up_logs</span>: <span class="prelude-val">None</span>,
             <span class="ident">bcast_wake_up_time</span>: <span class="prelude-val">None</span>,
@@ -4519,6 +4531,7 @@
             <span class="ident">txn_extra_op</span>: <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">AtomicCell</span>::<span class="ident">new</span>(<span class="ident">TxnExtraOp</span>::<span class="ident">Noop</span>)),
             <span class="ident">max_ts_sync_status</span>: <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">AtomicU64</span>::<span class="ident">new</span>(<span class="number">0</span>)),
             <span class="ident">cmd_epoch_checker</span>: <span class="ident">Default</span>::<span class="ident">default</span>(),
+            <span class="ident">last_unpersisted_number</span>: <span class="number">0</span>,
             <span class="ident">pending_pd_heartbeat_tasks</span>: <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">AtomicU64</span>::<span class="ident">new</span>(<span class="number">0</span>)),
         };
 
@@ -4610,12 +4623,11 @@
         }
     }
 
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">maybe_append_merge_entries</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">merge</span>: <span class="kw-2">&amp;</span><span class="ident">CommitMergeRequest</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">entries</span> <span class="op">=</span> <span class="ident">merge</span>.<span class="ident">get_entries</span>();
         <span class="kw">if</span> <span class="ident">entries</span>.<span class="ident">is_empty</span>() {
             <span class="comment">// Though the entries is empty, it is possible that one source peer has caught up the logs</span>
-            <span class="comment">// but commit index is not updated. If Other source peers are already destroyed, so the raft</span>
+            <span class="comment">// but commit index is not updated. If other source peers are already destroyed, so the raft</span>
             <span class="comment">// group will not make any progress, namely the source peer can not get the latest commit index anymore.</span>
             <span class="comment">// Here update the commit index to let source apply rest uncommitted entries.</span>
             <span class="kw">return</span> <span class="kw">if</span> <span class="ident">merge</span>.<span class="ident">get_commit</span>() <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">raft</span>.<span class="ident">raft_log</span>.<span class="ident">committed</span> {
@@ -4904,16 +4916,18 @@
     }
 
     <span class="kw">fn</span> <span class="ident">add_ready_metric</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ready</span>: <span class="kw-2">&amp;</span><span class="ident">Ready</span>, <span class="ident">metrics</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">RaftReadyMetrics</span>) {
-        <span class="ident">metrics</span>.<span class="ident">message</span> <span class="op">+</span><span class="op">=</span> <span class="ident">ready</span>.<span class="ident">messages</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">u64</span>;
-        <span class="ident">metrics</span>.<span class="ident">commit</span> <span class="op">+</span><span class="op">=</span> <span class="ident">ready</span>
-            .<span class="ident">committed_entries</span>
-            .<span class="ident">as_ref</span>()
-            .<span class="ident">map_or</span>(<span class="number">0</span>, <span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="ident">v</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">u64</span>);
+        <span class="ident">metrics</span>.<span class="ident">message</span> <span class="op">+</span><span class="op">=</span> <span class="ident">ready</span>.<span class="ident">messages</span>().<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">u64</span>;
+        <span class="ident">metrics</span>.<span class="ident">commit</span> <span class="op">+</span><span class="op">=</span> <span class="ident">ready</span>.<span class="ident">committed_entries</span>().<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">u64</span>;
         <span class="ident">metrics</span>.<span class="ident">append</span> <span class="op">+</span><span class="op">=</span> <span class="ident">ready</span>.<span class="ident">entries</span>().<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">u64</span>;
 
         <span class="kw">if</span> <span class="op">!</span><span class="ident">ready</span>.<span class="ident">snapshot</span>().<span class="ident">is_empty</span>() {
             <span class="ident">metrics</span>.<span class="ident">snapshot</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
         }
+    }
+
+    <span class="kw">fn</span> <span class="ident">add_light_ready_metric</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">light_ready</span>: <span class="kw-2">&amp;</span><span class="ident">LightReady</span>, <span class="ident">metrics</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">RaftReadyMetrics</span>) {
+        <span class="ident">metrics</span>.<span class="ident">message</span> <span class="op">+</span><span class="op">=</span> <span class="ident">light_ready</span>.<span class="ident">messages</span>().<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">u64</span>;
+        <span class="ident">metrics</span>.<span class="ident">commit</span> <span class="op">+</span><span class="op">=</span> <span class="ident">light_ready</span>.<span class="ident">committed_entries</span>().<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">u64</span>;
     }
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
@@ -4992,9 +5006,7 @@
 
             <span class="comment">// Here we hold up MsgReadIndex. If current peer has valid lease, then we could handle the</span>
             <span class="comment">// request directly, rather than send a heartbeat to check quorum.</span>
-            <span class="kw">let</span> <span class="ident">committed</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">raft</span>.<span class="ident">raft_log</span>.<span class="ident">committed</span>;
-            <span class="kw">let</span> <span class="ident">expected_term</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">raft</span>.<span class="ident">raft_log</span>.<span class="ident">term</span>(<span class="ident">committed</span>).<span class="ident">unwrap_or</span>(<span class="number">0</span>);
-            <span class="kw">if</span> <span class="ident">expected_term</span> <span class="op">=</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">raft</span>.<span class="ident">term</span> {
+            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">raft</span>.<span class="ident">commit_to_current_term</span>() {
                 <span class="comment">// If the leader hasn&#39;t committed any entries in its term, it can&#39;t response read only</span>
                 <span class="comment">// requests. Please also take a look at raft-rs.</span>
                 <span class="kw">let</span> <span class="ident">state</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">inspect_lease</span>();
@@ -5003,17 +5015,18 @@
                     <span class="ident">resp</span>.<span class="ident">set_msg_type</span>(<span class="ident">MessageType</span>::<span class="ident">MsgReadIndexResp</span>);
                     <span class="ident">resp</span>.<span class="ident">term</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">term</span>();
                     <span class="ident">resp</span>.<span class="ident">to</span> <span class="op">=</span> <span class="ident">m</span>.<span class="ident">from</span>;
-                    <span class="ident">resp</span>.<span class="ident">index</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_store</span>().<span class="ident">committed_index</span>();
+                    <span class="comment">// Must use the commit index of `PeerStorage` instead of the commit index</span>
+                    <span class="comment">// in raft-rs which may be greater than the former one.</span>
+                    <span class="comment">// For more details, see the annotations above `on_leader_commit_idx_changed`.</span>
+                    <span class="ident">resp</span>.<span class="ident">index</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_store</span>().<span class="ident">commit_index</span>();
                     <span class="ident">resp</span>.<span class="ident">set_entries</span>(<span class="ident">m</span>.<span class="ident">take_entries</span>());
 
-                    <span class="self">self</span>.<span class="ident">pending_messages</span>.<span class="ident">push</span>(<span class="ident">resp</span>);
+                    <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">raft</span>.<span class="ident">msgs</span>.<span class="ident">push</span>(<span class="ident">resp</span>);
                     <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
                 }
                 <span class="self">self</span>.<span class="ident">should_wake_up</span> <span class="op">=</span> <span class="ident">state</span> <span class="op">=</span><span class="op">=</span> <span class="ident">LeaseState</span>::<span class="ident">Expired</span>;
             }
-        }
-
-        <span class="kw">if</span> <span class="ident">msg_type</span> <span class="op">=</span><span class="op">=</span> <span class="ident">MessageType</span>::<span class="ident">MsgTransferLeader</span> {
+        } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">msg_type</span> <span class="op">=</span><span class="op">=</span> <span class="ident">MessageType</span>::<span class="ident">MsgTransferLeader</span> {
             <span class="self">self</span>.<span class="ident">execute_transfer_leader</span>(<span class="ident">ctx</span>, <span class="kw-2">&amp;</span><span class="ident">m</span>);
             <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
         }
@@ -5248,6 +5261,62 @@
         }
     }
 
+    <span class="doccomment">/// Correctness depends on the order between calling this function and notifying other peers</span>
+    <span class="doccomment">/// the new commit index.</span>
+    <span class="doccomment">/// It is due to the interaction between lease and split/merge.(details are decribed below)</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Note that in addition to the hearbeat/append msg, the read index response also can notify</span>
+    <span class="doccomment">/// other peers the new commit index. There are three place where TiKV handles read index resquest.</span>
+    <span class="doccomment">/// The first place is in raft-rs, so it&#39;s like hearbeat/append msg, call this function and</span>
+    <span class="doccomment">/// then send the response. The second place is in `Step`, we should use the commit index</span>
+    <span class="doccomment">/// of `PeerStorage` which is the greatest commit index that can be observed outside.</span>
+    <span class="doccomment">/// The third place is in `read_index`, handle it like the second one.</span>
+    <span class="kw">fn</span> <span class="ident">on_leader_commit_idx_changed</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">pre_commit_index</span>: <span class="ident">u64</span>, <span class="ident">commit_index</span>: <span class="ident">u64</span>) {
+        <span class="kw">if</span> <span class="ident">commit_index</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">pre_commit_index</span> <span class="op">|</span><span class="op">|</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">is_leader</span>() {
+            <span class="kw">return</span>;
+        }
+
+        <span class="comment">// The admin cmds in `CmdEpochChecker` are proposed by the current leader so we can</span>
+        <span class="comment">// use it to get the split/prepare-merge cmds which was committed just now.</span>
+
+        <span class="comment">// BatchSplit and Split cmd are mutually exclusive because they both change epoch&#39;s</span>
+        <span class="comment">// version so only one of them can be proposed and the other one will be rejected</span>
+        <span class="comment">// by `CmdEpochChecker`.</span>
+        <span class="kw">let</span> <span class="ident">last_split_idx</span> <span class="op">=</span> <span class="self">self</span>
+            .<span class="ident">cmd_epoch_checker</span>
+            .<span class="ident">last_cmd_index</span>(<span class="ident">AdminCmdType</span>::<span class="ident">BatchSplit</span>)
+            .<span class="ident">or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">cmd_epoch_checker</span>.<span class="ident">last_cmd_index</span>(<span class="ident">AdminCmdType</span>::<span class="ident">Split</span>));
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">idx</span>) <span class="op">=</span> <span class="ident">last_split_idx</span> {
+            <span class="kw">if</span> <span class="ident">idx</span> <span class="op">&gt;</span> <span class="ident">pre_commit_index</span> <span class="op">&amp;&amp;</span> <span class="ident">idx</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">commit_index</span> {
+                <span class="comment">// We don&#39;t need to suspect its lease because peers of new region that</span>
+                <span class="comment">// in other store do not start election before theirs election timeout</span>
+                <span class="comment">// which is longer than the max leader lease.</span>
+                <span class="comment">// It&#39;s safe to read local within its current lease, however, it&#39;s not</span>
+                <span class="comment">// safe to renew its lease.</span>
+                <span class="self">self</span>.<span class="ident">last_committed_split_idx</span> <span class="op">=</span> <span class="ident">idx</span>;
+            }
+        } <span class="kw">else</span> {
+            <span class="comment">// BatchSplit/Split and PrepareMerge cmd are mutually exclusive too.</span>
+            <span class="comment">// So if there is no Split cmd, we should check PrepareMerge cmd.</span>
+            <span class="kw">let</span> <span class="ident">last_prepare_merge_idx</span> <span class="op">=</span> <span class="self">self</span>
+                .<span class="ident">cmd_epoch_checker</span>
+                .<span class="ident">last_cmd_index</span>(<span class="ident">AdminCmdType</span>::<span class="ident">PrepareMerge</span>);
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">idx</span>) <span class="op">=</span> <span class="ident">last_prepare_merge_idx</span> {
+                <span class="kw">if</span> <span class="ident">idx</span> <span class="op">&gt;</span> <span class="ident">pre_commit_index</span> <span class="op">&amp;&amp;</span> <span class="ident">idx</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">commit_index</span> {
+                    <span class="comment">// We committed prepare merge, to prevent unsafe read index,</span>
+                    <span class="comment">// we must record its index.</span>
+                    <span class="self">self</span>.<span class="ident">last_committed_prepare_merge_idx</span> <span class="op">=</span> <span class="ident">idx</span>;
+                    <span class="comment">// After prepare_merge is committed and the leader broadcasts commit</span>
+                    <span class="comment">// index to followers, the leader can not know when the target region</span>
+                    <span class="comment">// merges majority of this region, also it can not know when the target</span>
+                    <span class="comment">// region writes new values.</span>
+                    <span class="comment">// To prevent unsafe local read, we suspect its leader lease.</span>
+                    <span class="self">self</span>.<span class="ident">leader_lease</span>.<span class="ident">suspect</span>(<span class="ident">monotonic_raw_now</span>());
+                }
+            }
+        }
+    }
+
     <span class="kw">fn</span> <span class="ident">on_leader_changed</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
         <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">PollContext</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">T</span><span class="op">&gt;</span>,
@@ -5266,9 +5335,9 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">ready_to_handle_pending_snap</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
         <span class="comment">// If apply worker is still working, written apply state may be overwritten</span>
         <span class="comment">// by apply worker. So we have to wait here.</span>
-        <span class="comment">// Please note that committed_index can&#39;t be used here. When applying a snapshot,</span>
+        <span class="comment">// Please note that commit_index can&#39;t be used here. When applying a snapshot,</span>
         <span class="comment">// a stale heartbeat can make the leader think follower has already applied</span>
-        <span class="comment">// the snapshot, and send remaining log entries, which may increase committed_index.</span>
+        <span class="comment">// the snapshot, and send remaining log entries, which may increase commit_index.</span>
         <span class="comment">// TODO: add more test</span>
         <span class="self">self</span>.<span class="ident">last_applying_idx</span> <span class="op">=</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">get_store</span>().<span class="ident">applied_index</span>()
             <span class="comment">// Requesting snapshots also triggers apply workers to write</span>
@@ -5302,6 +5371,9 @@
         <span class="comment">// could get a newer value, and after that, the leader may read a stale value,</span>
         <span class="comment">// which violates linearizability.</span>
         <span class="self">self</span>.<span class="ident">get_store</span>().<span class="ident">applied_index</span>() <span class="op">&gt;</span><span class="op">=</span> <span class="ident">read_index</span>
+            <span class="comment">// If it is in pending merge state(i.e. applied PrepareMerge), the data may be stale.</span>
+            <span class="comment">// TODO: Add a test to cover this case</span>
+            <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">pending_merge_state</span>.<span class="ident">is_none</span>()
             <span class="comment">// a peer which is applying snapshot will clean up its data and ingest a snapshot file,</span>
             <span class="comment">// during between the two operations a replica read could read empty data.</span>
             <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">is_applying_snapshot</span>()
@@ -5357,23 +5429,6 @@
         <span class="bool-val">false</span>
     }
 
-    <span class="doccomment">/// Whether a log can be applied before writing raft batch.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// If TiKV crashes, it&#39;s possible apply index &gt; commit index. If logs are still</span>
-    <span class="doccomment">/// available in other nodes, it&#39;s possible to be recovered. But for singleton, logs are</span>
-    <span class="doccomment">/// only available on single node, logs are gone forever.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Note we can&#39;t just check singleton. Because conf change takes effect on apply, so even</span>
-    <span class="doccomment">/// there are two nodes, previous logs can still be committed by leader alone. Those logs</span>
-    <span class="doccomment">/// can&#39;t be applied early. After introducing joint consensus, the node number can be</span>
-    <span class="doccomment">/// undetermined. So here check whether log is persisted on disk instead.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Only apply existing logs has another benefit that we don&#39;t need to deal with snapshots</span>
-    <span class="doccomment">/// that are older than apply index as apply index &lt;= last index &lt;= index of snapshot.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">can_early_apply</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">term</span>: <span class="ident">u64</span>, <span class="ident">index</span>: <span class="ident">u64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">get_store</span>().<span class="ident">last_index</span>() <span class="op">&gt;</span><span class="op">=</span> <span class="ident">index</span> <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">get_store</span>().<span class="ident">last_term</span>() <span class="op">&gt;</span><span class="op">=</span> <span class="ident">term</span>
-    }
-
     <span class="doccomment">/// Checks if leader needs to keep sending logs for follower.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// In DrAutoSync mode, if leader goes to sleep before the region is sync,</span>
@@ -5393,9 +5448,17 @@
         }
         <span class="kw">match</span> <span class="self">self</span>.<span class="ident">mut_store</span>().<span class="ident">check_applying_snap</span>() {
             <span class="ident">CheckApplyingSnapStatus</span>::<span class="ident">Applying</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="comment">// If we continue to handle all the messages, it may cause too many messages because</span>
-                <span class="comment">// leader will send all the remaining messages to this follower, which can lead</span>
-                <span class="comment">// to full message queue under high load.</span>
+                <span class="comment">// If this peer is applying snapshot, we should not get a new ready.</span>
+                <span class="comment">// There are two reasons in my opinion:</span>
+                <span class="comment">//   1. If we handle a new ready and persist the data(e.g. entries),</span>
+                <span class="comment">//      we can not tell raft-rs that this ready has been persisted because</span>
+                <span class="comment">//      the ready need to be persisted one by one from raft-rs&#39;s view.</span>
+                <span class="comment">//   2. When this peer is applying snapshot, the response msg should not</span>
+                <span class="comment">//      be sent to leader, thus the leader will not send new entries to</span>
+                <span class="comment">//      this peer. Although it&#39;s possible a new leader may send a AppendEntries</span>
+                <span class="comment">//      msg to this peer, this possibility is very low. In most cases, there</span>
+                <span class="comment">//      is no msg need to be handled.</span>
+                <span class="comment">// So we choose to not get a new ready which makes the logic more clear.</span>
                 <span class="macro">debug</span><span class="macro">!</span>(
                     <span class="string">&quot;still applying snapshot, skip further handling&quot;</span>;
                     <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">region_id</span>,
@@ -5405,16 +5468,13 @@
             }
             <span class="ident">CheckApplyingSnapStatus</span>::<span class="ident">Success</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="self">self</span>.<span class="ident">post_pending_read_index_on_replica</span>(<span class="ident">ctx</span>);
+                <span class="comment">// If there is a snapshot, it must belongs to the last ready.</span>
+                <span class="self">self</span>.<span class="ident">raft_group</span>
+                    .<span class="ident">on_persist_ready</span>(<span class="self">self</span>.<span class="ident">last_unpersisted_number</span>);
             }
             <span class="ident">CheckApplyingSnapStatus</span>::<span class="ident">Idle</span> <span class="op">=</span><span class="op">&gt;</span> {}
         }
 
-        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">pending_messages</span>.<span class="ident">is_empty</span>() {
-            <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;raft_before_follower_send&quot;</span>);
-            <span class="kw">let</span> <span class="ident">messages</span> <span class="op">=</span> <span class="ident">mem</span>::<span class="ident">replace</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">pending_messages</span>, <span class="macro">vec</span><span class="macro">!</span>[]);
-            <span class="ident">ctx</span>.<span class="ident">need_flush_trans</span> <span class="op">=</span> <span class="bool-val">true</span>;
-            <span class="self">self</span>.<span class="ident">send</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>.<span class="ident">trans</span>, <span class="ident">messages</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>.<span class="ident">raft_metrics</span>.<span class="ident">message</span>);
-        }
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">destroy_regions</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[];
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">has_pending_snapshot</span>() {
             <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">ready_to_handle_pending_snap</span>() {
@@ -5452,10 +5512,7 @@
             }
         }
 
-        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>
-            .<span class="ident">raft_group</span>
-            .<span class="ident">has_ready_since</span>(<span class="prelude-val">Some</span>(<span class="self">self</span>.<span class="ident">last_applying_idx</span>))
-        {
+        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">has_ready</span>() {
             <span class="comment">// Generating snapshot task won&#39;t set ready for raft group.</span>
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">gen_task</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">mut_store</span>().<span class="ident">take_gen_snap_task</span>() {
                 <span class="self">self</span>.<span class="ident">pending_request_snapshot_count</span>
@@ -5466,14 +5523,11 @@
             <span class="kw">return</span> <span class="prelude-val">None</span>;
         }
 
-        <span class="kw">let</span> <span class="ident">before_handle_raft_ready_1003</span> <span class="op">=</span> <span class="op">|</span><span class="op">|</span> {
-            <span class="macro">fail_point</span><span class="macro">!</span>(
-                <span class="string">&quot;before_handle_raft_ready_1003&quot;</span>,
-                <span class="self">self</span>.<span class="ident">peer</span>.<span class="ident">get_id</span>() <span class="op">=</span><span class="op">=</span> <span class="number">1003</span> <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">is_leader</span>(),
-                <span class="op">|</span><span class="kw">_</span><span class="op">|</span> {}
-            );
-        };
-        <span class="ident">before_handle_raft_ready_1003</span>();
+        <span class="macro">fail_point</span><span class="macro">!</span>(
+            <span class="string">&quot;before_handle_raft_ready_1003&quot;</span>,
+            <span class="self">self</span>.<span class="ident">peer</span>.<span class="ident">get_id</span>() <span class="op">=</span><span class="op">=</span> <span class="number">1003</span> <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">is_leader</span>(),
+            <span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="prelude-val">None</span>
+        );
 
         <span class="macro">fail_point</span><span class="macro">!</span>(
             <span class="string">&quot;before_handle_snapshot_ready_3&quot;</span>,
@@ -5487,73 +5541,51 @@
             <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">peer</span>.<span class="ident">get_id</span>(),
         );
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ready</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">ready_since</span>(<span class="self">self</span>.<span class="ident">last_applying_idx</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ready</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">ready</span>();
 
-        <span class="self">self</span>.<span class="ident">on_role_changed</span>(<span class="ident">ctx</span>, <span class="kw-2">&amp;</span><span class="ident">ready</span>);
+        <span class="self">self</span>.<span class="ident">last_unpersisted_number</span> <span class="op">=</span> <span class="ident">ready</span>.<span class="ident">number</span>();
+
+        <span class="kw">if</span> <span class="op">!</span><span class="ident">ready</span>.<span class="ident">must_sync</span>() {
+            <span class="comment">// If this ready need not to sync, the term, vote must not be changed,</span>
+            <span class="comment">// entries and snapshot must be empty.</span>
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">hs</span>) <span class="op">=</span> <span class="ident">ready</span>.<span class="ident">hs</span>() {
+                <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">hs</span>.<span class="ident">get_term</span>(), <span class="self">self</span>.<span class="ident">get_store</span>().<span class="ident">hard_state</span>().<span class="ident">get_term</span>());
+                <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">hs</span>.<span class="ident">get_vote</span>(), <span class="self">self</span>.<span class="ident">get_store</span>().<span class="ident">hard_state</span>().<span class="ident">get_vote</span>());
+            }
+            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">ready</span>.<span class="ident">entries</span>().<span class="ident">is_empty</span>());
+            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">ready</span>.<span class="ident">snapshot</span>().<span class="ident">is_empty</span>());
+        }
 
         <span class="self">self</span>.<span class="ident">add_ready_metric</span>(<span class="kw-2">&amp;</span><span class="ident">ready</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>.<span class="ident">raft_metrics</span>.<span class="ident">ready</span>);
 
-        <span class="kw">if</span> <span class="op">!</span><span class="ident">ready</span>.<span class="ident">committed_entries</span>.<span class="ident">as_ref</span>().<span class="ident">map_or</span>(<span class="bool-val">true</span>, <span class="ident">Vec</span>::<span class="ident">is_empty</span>) {
-            <span class="comment">// We must renew current_time because this value may be created a long time ago.</span>
-            <span class="comment">// If we do not renew it, this time may be smaller than propose_time of a command,</span>
-            <span class="comment">// which was proposed in another thread while this thread receives its AppendEntriesResponse</span>
-            <span class="comment">// and is ready to calculate its commit-log-duration.</span>
-            <span class="ident">ctx</span>.<span class="ident">current_time</span>.<span class="ident">replace</span>(<span class="ident">monotonic_raw_now</span>());
+        <span class="self">self</span>.<span class="ident">on_role_changed</span>(<span class="ident">ctx</span>, <span class="kw-2">&amp;</span><span class="ident">ready</span>);
+
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">hs</span>) <span class="op">=</span> <span class="ident">ready</span>.<span class="ident">hs</span>() {
+            <span class="kw">let</span> <span class="ident">pre_commit_index</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_store</span>().<span class="ident">commit_index</span>();
+            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">hs</span>.<span class="ident">get_commit</span>() <span class="op">&gt;</span><span class="op">=</span> <span class="ident">pre_commit_index</span>);
+            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">is_leader</span>() {
+                <span class="self">self</span>.<span class="ident">on_leader_commit_idx_changed</span>(<span class="ident">pre_commit_index</span>, <span class="ident">hs</span>.<span class="ident">get_commit</span>());
+            }
         }
 
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">is_leader</span>() {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">hs</span>) <span class="op">=</span> <span class="ident">ready</span>.<span class="ident">hs</span>() {
-                <span class="kw">let</span> <span class="ident">pre_commit_index</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_store</span>().<span class="ident">committed_index</span>();
-                <span class="kw">if</span> <span class="ident">hs</span>.<span class="ident">get_commit</span>() <span class="op">&gt;</span> <span class="ident">pre_commit_index</span> {
-                    <span class="comment">// The admin cmds in `CmdEpochChecker` are proposed by the current leader so we can</span>
-                    <span class="comment">// use it to get the split/prepare-merge cmds which was committed just now.</span>
-
-                    <span class="comment">// BatchSplit and Split cmd are mutually exclusive because they both change epoch&#39;s</span>
-                    <span class="comment">// version so only one of them can be proposed and the other one will be rejected</span>
-                    <span class="comment">// by `CmdEpochChecker`.</span>
-                    <span class="kw">let</span> <span class="ident">last_split_idx</span> <span class="op">=</span> <span class="self">self</span>
-                        .<span class="ident">cmd_epoch_checker</span>
-                        .<span class="ident">last_cmd_index</span>(<span class="ident">AdminCmdType</span>::<span class="ident">BatchSplit</span>)
-                        .<span class="ident">or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">cmd_epoch_checker</span>.<span class="ident">last_cmd_index</span>(<span class="ident">AdminCmdType</span>::<span class="ident">Split</span>));
-                    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">idx</span>) <span class="op">=</span> <span class="ident">last_split_idx</span> {
-                        <span class="kw">if</span> <span class="ident">idx</span> <span class="op">&gt;</span> <span class="ident">pre_commit_index</span> <span class="op">&amp;&amp;</span> <span class="ident">idx</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">hs</span>.<span class="ident">get_commit</span>() {
-                            <span class="comment">// We don&#39;t need to suspect its lease because peers of new region that</span>
-                            <span class="comment">// in other store do not start election before theirs election timeout</span>
-                            <span class="comment">// which is longer than the max leader lease.</span>
-                            <span class="comment">// It&#39;s safe to read local within its current lease, however, it&#39;s not</span>
-                            <span class="comment">// safe to renew its lease.</span>
-                            <span class="self">self</span>.<span class="ident">last_committed_split_idx</span> <span class="op">=</span> <span class="ident">idx</span>;
-                        }
-                    }
-                    <span class="kw">let</span> <span class="ident">last_prepare_merge_idx</span> <span class="op">=</span> <span class="self">self</span>
-                        .<span class="ident">cmd_epoch_checker</span>
-                        .<span class="ident">last_cmd_index</span>(<span class="ident">AdminCmdType</span>::<span class="ident">PrepareMerge</span>);
-                    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">idx</span>) <span class="op">=</span> <span class="ident">last_prepare_merge_idx</span> {
-                        <span class="kw">if</span> <span class="ident">idx</span> <span class="op">&gt;</span> <span class="ident">pre_commit_index</span> <span class="op">&amp;&amp;</span> <span class="ident">idx</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">hs</span>.<span class="ident">get_commit</span>() {
-                            <span class="comment">// We committed prepare merge, to prevent unsafe read index,</span>
-                            <span class="comment">// we must record its index.</span>
-                            <span class="self">self</span>.<span class="ident">last_committed_prepare_merge_idx</span> <span class="op">=</span> <span class="ident">idx</span>;
-                            <span class="comment">// After prepare_merge is committed and the leader broadcasts commit</span>
-                            <span class="comment">// index to followers, the leader can not know when the target region</span>
-                            <span class="comment">// merges majority of this region, also it can not know when the target</span>
-                            <span class="comment">// region writes new values.</span>
-                            <span class="comment">// To prevent unsafe local read, we suspect its leader lease.</span>
-                            <span class="self">self</span>.<span class="ident">leader_lease</span>.<span class="ident">suspect</span>(<span class="ident">monotonic_raw_now</span>());
-                        }
-                    }
-                }
+        <span class="kw">if</span> <span class="op">!</span><span class="ident">ready</span>.<span class="ident">messages</span>().<span class="ident">is_empty</span>() {
+            <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">is_leader</span>() {
+                <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;raft_before_follower_send&quot;</span>);
             }
-            <span class="comment">// The leader can write to disk and replicate to the followers concurrently</span>
-            <span class="comment">// For more details, check raft thesis 10.2.1.</span>
-            <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;raft_before_leader_send&quot;</span>);
-            <span class="kw">let</span> <span class="ident">msgs</span> <span class="op">=</span> <span class="ident">ready</span>.<span class="ident">messages</span>.<span class="ident">drain</span>(..);
-            <span class="ident">ctx</span>.<span class="ident">need_flush_trans</span> <span class="op">=</span> <span class="bool-val">true</span>;
-            <span class="self">self</span>.<span class="ident">send</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>.<span class="ident">trans</span>, <span class="ident">msgs</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>.<span class="ident">raft_metrics</span>.<span class="ident">message</span>);
+            <span class="kw">for</span> <span class="ident">vec_msg</span> <span class="kw">in</span> <span class="ident">ready</span>.<span class="ident">take_messages</span>() {
+                <span class="self">self</span>.<span class="ident">send</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>.<span class="ident">trans</span>, <span class="ident">vec_msg</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>.<span class="ident">raft_metrics</span>.<span class="ident">message</span>);
+            }
+        }
+
+        <span class="self">self</span>.<span class="ident">apply_reads</span>(<span class="ident">ctx</span>, <span class="kw-2">&amp;</span><span class="ident">ready</span>);
+
+        <span class="kw">if</span> <span class="op">!</span><span class="ident">ready</span>.<span class="ident">committed_entries</span>().<span class="ident">is_empty</span>() {
+            <span class="self">self</span>.<span class="ident">handle_raft_committed_entries</span>(<span class="ident">ctx</span>, <span class="ident">ready</span>.<span class="ident">take_committed_entries</span>());
         }
 
         <span class="kw">let</span> <span class="ident">invoke_ctx</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>
             .<span class="ident">mut_store</span>()
-            .<span class="ident">handle_raft_ready</span>(<span class="ident">ctx</span>, <span class="kw-2">&amp;</span><span class="ident">ready</span>, <span class="ident">destroy_regions</span>)
+            .<span class="ident">handle_raft_ready</span>(<span class="ident">ctx</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ready</span>, <span class="ident">destroy_regions</span>)
         {
             <span class="prelude-val">Ok</span>(<span class="ident">r</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">r</span>,
             <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
@@ -5569,7 +5601,6 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">post_raft_ready_append</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Transport</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
         <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">PollContext</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">T</span><span class="op">&gt;</span>,
-        <span class="ident">ready</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Ready</span>,
         <span class="ident">invoke_ctx</span>: <span class="ident">InvokeContext</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ApplySnapResult</span><span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="ident">invoke_ctx</span>.<span class="ident">has_snapshot</span>() {
@@ -5599,20 +5630,6 @@
             };
         }
 
-        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">is_leader</span>() {
-            <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;raft_before_follower_send&quot;</span>);
-            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">is_applying_snapshot</span>() {
-                <span class="self">self</span>.<span class="ident">pending_messages</span> <span class="op">=</span> <span class="ident">mem</span>::<span class="ident">replace</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ready</span>.<span class="ident">messages</span>, <span class="macro">vec</span><span class="macro">!</span>[]);
-            } <span class="kw">else</span> {
-                <span class="self">self</span>.<span class="ident">send</span>(
-                    <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>.<span class="ident">trans</span>,
-                    <span class="ident">ready</span>.<span class="ident">messages</span>.<span class="ident">drain</span>(..),
-                    <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>.<span class="ident">raft_metrics</span>.<span class="ident">message</span>,
-                );
-                <span class="ident">ctx</span>.<span class="ident">need_flush_trans</span> <span class="op">=</span> <span class="bool-val">true</span>;
-            }
-        }
-
         <span class="kw">if</span> <span class="ident">apply_snap_result</span>.<span class="ident">is_some</span>() {
             <span class="self">self</span>.<span class="ident">activate</span>(<span class="ident">ctx</span>);
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">meta</span> <span class="op">=</span> <span class="ident">ctx</span>.<span class="ident">store_meta</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
@@ -5623,133 +5640,141 @@
         <span class="ident">apply_snap_result</span>
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_raft_ready_apply</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_raft_committed_entries</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
         <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">PollContext</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">T</span><span class="op">&gt;</span>,
-        <span class="ident">ready</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Ready</span>,
-        <span class="ident">invoke_ctx</span>: <span class="kw-2">&amp;</span><span class="ident">InvokeContext</span>,
+        <span class="ident">committed_entries</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Entry</span><span class="op">&gt;</span>,
     ) {
-        <span class="comment">// Call `handle_raft_committed_entries` directly here may lead to inconsistency.</span>
-        <span class="comment">// In some cases, there will be some pending committed entries when applying a</span>
-        <span class="comment">// snapshot. If we call `handle_raft_committed_entries` directly, these updates</span>
-        <span class="comment">// will be written to disk. Because we apply snapshot asynchronously, so these</span>
-        <span class="comment">// updates will soon be removed. But the soft state of raft is still be updated</span>
-        <span class="comment">// in memory. Hence when handle ready next time, these updates won&#39;t be included</span>
-        <span class="comment">// in `ready.committed_entries` again, which will lead to inconsistency.</span>
-        <span class="kw">if</span> <span class="ident">ready</span>.<span class="ident">snapshot</span>().<span class="ident">is_empty</span>() {
-            <span class="macro">debug_assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">invoke_ctx</span>.<span class="ident">has_snapshot</span>() <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">get_store</span>().<span class="ident">is_applying_snapshot</span>());
-            <span class="kw">let</span> <span class="ident">committed_entries</span> <span class="op">=</span> <span class="ident">ready</span>.<span class="ident">committed_entries</span>.<span class="ident">take</span>().<span class="ident">unwrap</span>();
-            <span class="comment">// leader needs to update lease and last committed split index.</span>
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">lease_to_be_updated</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">is_leader</span>();
-            <span class="kw">for</span> <span class="ident">entry</span> <span class="kw">in</span> <span class="ident">committed_entries</span>.<span class="ident">iter</span>().<span class="ident">rev</span>() {
-                <span class="comment">// raft meta is very small, can be ignored.</span>
-                <span class="self">self</span>.<span class="ident">raft_log_size_hint</span> <span class="op">+</span><span class="op">=</span> <span class="ident">entry</span>.<span class="ident">get_data</span>().<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">u64</span>;
-                <span class="kw">if</span> <span class="ident">lease_to_be_updated</span> {
-                    <span class="kw">let</span> <span class="ident">propose_time</span> <span class="op">=</span> <span class="self">self</span>
-                        .<span class="ident">proposals</span>
-                        .<span class="ident">find_propose_time</span>((<span class="ident">entry</span>.<span class="ident">get_term</span>(), <span class="ident">entry</span>.<span class="ident">get_index</span>()));
-                    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">propose_time</span>) <span class="op">=</span> <span class="ident">propose_time</span> {
-                        <span class="ident">ctx</span>.<span class="ident">raft_metrics</span>.<span class="ident">commit_log</span>.<span class="ident">observe</span>(<span class="ident">duration_to_sec</span>(
-                            (<span class="ident">ctx</span>.<span class="ident">current_time</span>.<span class="ident">unwrap</span>() <span class="op">-</span> <span class="ident">propose_time</span>).<span class="ident">to_std</span>().<span class="ident">unwrap</span>(),
-                        ));
-                        <span class="self">self</span>.<span class="ident">maybe_renew_leader_lease</span>(<span class="ident">propose_time</span>, <span class="ident">ctx</span>, <span class="prelude-val">None</span>);
-                        <span class="ident">lease_to_be_updated</span> <span class="op">=</span> <span class="bool-val">false</span>;
-                    }
-                }
-
-                <span class="macro">fail_point</span><span class="macro">!</span>(
-                    <span class="string">&quot;leader_commit_prepare_merge&quot;</span>,
-                    {
-                        <span class="kw">let</span> <span class="ident">ctx</span> <span class="op">=</span> <span class="ident">ProposalContext</span>::<span class="ident">from_bytes</span>(<span class="kw-2">&amp;</span><span class="ident">entry</span>.<span class="ident">context</span>);
-                        <span class="self">self</span>.<span class="ident">is_leader</span>()
-                            <span class="op">&amp;&amp;</span> <span class="ident">entry</span>.<span class="ident">term</span> <span class="op">=</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">term</span>()
-                            <span class="op">&amp;&amp;</span> <span class="ident">ctx</span>.<span class="ident">contains</span>(<span class="ident">ProposalContext</span>::<span class="ident">PREPARE_MERGE</span>)
-                    },
-                    <span class="op">|</span><span class="kw">_</span><span class="op">|</span> {}
-                );
-
-                <span class="macro">fail_point</span><span class="macro">!</span>(
-                    <span class="string">&quot;before_send_rollback_merge_1003&quot;</span>,
-                    <span class="kw">if</span> <span class="self">self</span>.<span class="ident">peer_id</span>() <span class="op">!</span><span class="op">=</span> <span class="number">1003</span> {
-                        <span class="bool-val">false</span>
-                    } <span class="kw">else</span> {
-                        <span class="kw">let</span> <span class="ident">index</span> <span class="op">=</span> <span class="ident">entry</span>.<span class="ident">get_index</span>();
-                        <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="ident">entry</span>.<span class="ident">get_data</span>();
-                        <span class="kw">if</span> <span class="ident">data</span>.<span class="ident">is_empty</span>() <span class="op">|</span><span class="op">|</span> <span class="ident">entry</span>.<span class="ident">get_entry_type</span>() <span class="op">!</span><span class="op">=</span> <span class="ident">EntryType</span>::<span class="ident">EntryNormal</span> {
-                            <span class="bool-val">false</span>
-                        } <span class="kw">else</span> {
-                            <span class="kw">let</span> <span class="ident">cmd</span>: <span class="ident">RaftCmdRequest</span> <span class="op">=</span> <span class="ident">util</span>::<span class="ident">parse_data_at</span>(<span class="ident">data</span>, <span class="ident">index</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">tag</span>);
-                            <span class="ident">cmd</span>.<span class="ident">has_admin_request</span>()
-                                <span class="op">&amp;&amp;</span> <span class="ident">cmd</span>.<span class="ident">get_admin_request</span>().<span class="ident">get_cmd_type</span>()
-                                    <span class="op">=</span><span class="op">=</span> <span class="ident">AdminCmdType</span>::<span class="ident">RollbackMerge</span>
-                        }
-                    },
-                    <span class="op">|</span><span class="kw">_</span><span class="op">|</span> {}
-                );
-            }
-            <span class="kw">if</span> <span class="op">!</span><span class="ident">committed_entries</span>.<span class="ident">is_empty</span>() {
-                <span class="self">self</span>.<span class="ident">last_applying_idx</span> <span class="op">=</span> <span class="ident">committed_entries</span>.<span class="ident">last</span>().<span class="ident">unwrap</span>().<span class="ident">get_index</span>();
-                <span class="kw">if</span> <span class="self">self</span>.<span class="ident">last_applying_idx</span> <span class="op">&gt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">last_urgent_proposal_idx</span> {
-                    <span class="comment">// Urgent requests are flushed, make it lazy again.</span>
-                    <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">skip_bcast_commit</span>(<span class="bool-val">true</span>);
-                    <span class="self">self</span>.<span class="ident">last_urgent_proposal_idx</span> <span class="op">=</span> <span class="ident">u64</span>::<span class="ident">MAX</span>;
-                }
-                <span class="kw">let</span> <span class="ident">committed_index</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">raft</span>.<span class="ident">raft_log</span>.<span class="ident">committed</span>;
-                <span class="kw">let</span> <span class="ident">term</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">raft</span>.<span class="ident">raft_log</span>.<span class="ident">term</span>(<span class="ident">committed_index</span>).<span class="ident">unwrap</span>();
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cbs</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">proposals</span>.<span class="ident">take</span>(<span class="ident">committed_index</span>, <span class="ident">term</span>);
-                <span class="ident">cbs</span>.<span class="ident">iter_mut</span>().<span class="ident">for_each</span>(<span class="op">|</span><span class="ident">p</span><span class="op">|</span> {
-                    <span class="kw">if</span> <span class="ident">p</span>.<span class="ident">must_pass_epoch_check</span> {
-                        <span class="comment">// In this case the apply can be guaranteed to be successful. Invoke the</span>
-                        <span class="comment">// on_committed callback if necessary.</span>
-                        <span class="ident">p</span>.<span class="ident">cb</span>.<span class="ident">invoke_committed</span>();
-                    }
-                });
-                <span class="kw">let</span> <span class="ident">apply</span> <span class="op">=</span> <span class="ident">Apply</span>::<span class="ident">new</span>(
-                    <span class="self">self</span>.<span class="ident">peer_id</span>(),
-                    <span class="self">self</span>.<span class="ident">region_id</span>,
-                    <span class="self">self</span>.<span class="ident">term</span>(),
-                    <span class="ident">committed_entries</span>,
-                    <span class="self">self</span>.<span class="ident">get_store</span>().<span class="ident">committed_index</span>(),
-                    <span class="ident">committed_index</span>,
-                    <span class="ident">term</span>,
-                    <span class="ident">cbs</span>,
-                );
-                <span class="ident">ctx</span>.<span class="ident">apply_router</span>
-                    .<span class="ident">schedule_task</span>(<span class="self">self</span>.<span class="ident">region_id</span>, <span class="ident">ApplyTask</span>::<span class="ident">apply</span>(<span class="ident">apply</span>));
-            }
-            <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;after_send_to_apply_1003&quot;</span>, <span class="self">self</span>.<span class="ident">peer_id</span>() <span class="op">=</span><span class="op">=</span> <span class="number">1003</span>, <span class="op">|</span><span class="kw">_</span><span class="op">|</span> {});
-            <span class="comment">// Check whether there is a pending generate snapshot task, the task</span>
-            <span class="comment">// needs to be sent to the apply system.</span>
-            <span class="comment">// Always sending snapshot task behind apply task, so it gets latest</span>
-            <span class="comment">// snapshot.</span>
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">gen_task</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">mut_store</span>().<span class="ident">take_gen_snap_task</span>() {
-                <span class="self">self</span>.<span class="ident">pending_request_snapshot_count</span>
-                    .<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
-                <span class="ident">ctx</span>.<span class="ident">apply_router</span>
-                    .<span class="ident">schedule_task</span>(<span class="self">self</span>.<span class="ident">region_id</span>, <span class="ident">ApplyTask</span>::<span class="ident">Snapshot</span>(<span class="ident">gen_task</span>));
-            }
+        <span class="macro">assert</span><span class="macro">!</span>(
+            <span class="op">!</span><span class="self">self</span>.<span class="ident">is_applying_snapshot</span>(),
+            <span class="string">&quot;{} is applying snapshot when it is ready to handle committed entries&quot;</span>,
+            <span class="self">self</span>.<span class="ident">tag</span>
+        );
+        <span class="kw">if</span> <span class="op">!</span><span class="ident">committed_entries</span>.<span class="ident">is_empty</span>() {
+            <span class="comment">// We must renew current_time because this value may be created a long time ago.</span>
+            <span class="comment">// If we do not renew it, this time may be smaller than propose_time of a command,</span>
+            <span class="comment">// which was proposed in another thread while this thread receives its AppendEntriesResponse</span>
+            <span class="comment">// and is ready to calculate its commit-log-duration.</span>
+            <span class="ident">ctx</span>.<span class="ident">current_time</span>.<span class="ident">replace</span>(<span class="ident">monotonic_raw_now</span>());
         }
+        <span class="comment">// Leader needs to update lease.</span>
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">lease_to_be_updated</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">is_leader</span>();
+        <span class="kw">for</span> <span class="ident">entry</span> <span class="kw">in</span> <span class="ident">committed_entries</span>.<span class="ident">iter</span>().<span class="ident">rev</span>() {
+            <span class="comment">// raft meta is very small, can be ignored.</span>
+            <span class="self">self</span>.<span class="ident">raft_log_size_hint</span> <span class="op">+</span><span class="op">=</span> <span class="ident">entry</span>.<span class="ident">get_data</span>().<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">u64</span>;
+            <span class="kw">if</span> <span class="ident">lease_to_be_updated</span> {
+                <span class="kw">let</span> <span class="ident">propose_time</span> <span class="op">=</span> <span class="self">self</span>
+                    .<span class="ident">proposals</span>
+                    .<span class="ident">find_propose_time</span>((<span class="ident">entry</span>.<span class="ident">get_term</span>(), <span class="ident">entry</span>.<span class="ident">get_index</span>()));
+                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">propose_time</span>) <span class="op">=</span> <span class="ident">propose_time</span> {
+                    <span class="ident">ctx</span>.<span class="ident">raft_metrics</span>.<span class="ident">commit_log</span>.<span class="ident">observe</span>(<span class="ident">duration_to_sec</span>(
+                        (<span class="ident">ctx</span>.<span class="ident">current_time</span>.<span class="ident">unwrap</span>() <span class="op">-</span> <span class="ident">propose_time</span>).<span class="ident">to_std</span>().<span class="ident">unwrap</span>(),
+                    ));
+                    <span class="self">self</span>.<span class="ident">maybe_renew_leader_lease</span>(<span class="ident">propose_time</span>, <span class="ident">ctx</span>, <span class="prelude-val">None</span>);
+                    <span class="ident">lease_to_be_updated</span> <span class="op">=</span> <span class="bool-val">false</span>;
+                }
+            }
 
-        <span class="self">self</span>.<span class="ident">apply_reads</span>(<span class="ident">ctx</span>, <span class="ident">ready</span>);
+            <span class="macro">fail_point</span><span class="macro">!</span>(
+                <span class="string">&quot;leader_commit_prepare_merge&quot;</span>,
+                {
+                    <span class="kw">let</span> <span class="ident">ctx</span> <span class="op">=</span> <span class="ident">ProposalContext</span>::<span class="ident">from_bytes</span>(<span class="kw-2">&amp;</span><span class="ident">entry</span>.<span class="ident">context</span>);
+                    <span class="self">self</span>.<span class="ident">is_leader</span>()
+                        <span class="op">&amp;&amp;</span> <span class="ident">entry</span>.<span class="ident">term</span> <span class="op">=</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">term</span>()
+                        <span class="op">&amp;&amp;</span> <span class="ident">ctx</span>.<span class="ident">contains</span>(<span class="ident">ProposalContext</span>::<span class="ident">PREPARE_MERGE</span>)
+                },
+                <span class="op">|</span><span class="kw">_</span><span class="op">|</span> {}
+            );
+        }
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">last_entry</span>) <span class="op">=</span> <span class="ident">committed_entries</span>.<span class="ident">last</span>() {
+            <span class="self">self</span>.<span class="ident">last_applying_idx</span> <span class="op">=</span> <span class="ident">last_entry</span>.<span class="ident">get_index</span>();
+            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">last_applying_idx</span> <span class="op">&gt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">last_urgent_proposal_idx</span> {
+                <span class="comment">// Urgent requests are flushed, make it lazy again.</span>
+                <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">skip_bcast_commit</span>(<span class="bool-val">true</span>);
+                <span class="self">self</span>.<span class="ident">last_urgent_proposal_idx</span> <span class="op">=</span> <span class="ident">u64</span>::<span class="ident">MAX</span>;
+            }
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cbs</span> <span class="op">=</span> <span class="self">self</span>
+                .<span class="ident">proposals</span>
+                .<span class="ident">take</span>(<span class="ident">last_entry</span>.<span class="ident">get_index</span>(), <span class="ident">last_entry</span>.<span class="ident">get_term</span>());
+            <span class="ident">cbs</span>.<span class="ident">iter_mut</span>().<span class="ident">for_each</span>(<span class="op">|</span><span class="ident">p</span><span class="op">|</span> {
+                <span class="kw">if</span> <span class="ident">p</span>.<span class="ident">must_pass_epoch_check</span> {
+                    <span class="comment">// In this case the apply can be guaranteed to be successful. Invoke the</span>
+                    <span class="comment">// on_committed callback if necessary.</span>
+                    <span class="ident">p</span>.<span class="ident">cb</span>.<span class="ident">invoke_committed</span>();
+                }
+            });
+            <span class="kw">let</span> <span class="ident">apply</span> <span class="op">=</span> <span class="ident">Apply</span>::<span class="ident">new</span>(
+                <span class="self">self</span>.<span class="ident">peer_id</span>(),
+                <span class="self">self</span>.<span class="ident">region_id</span>,
+                <span class="self">self</span>.<span class="ident">term</span>(),
+                <span class="ident">committed_entries</span>,
+                <span class="ident">cbs</span>,
+            );
+            <span class="ident">ctx</span>.<span class="ident">apply_router</span>
+                .<span class="ident">schedule_task</span>(<span class="self">self</span>.<span class="ident">region_id</span>, <span class="ident">ApplyTask</span>::<span class="ident">apply</span>(<span class="ident">apply</span>));
+        }
+        <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;after_send_to_apply_1003&quot;</span>, <span class="self">self</span>.<span class="ident">peer_id</span>() <span class="op">=</span><span class="op">=</span> <span class="number">1003</span>, <span class="op">|</span><span class="kw">_</span><span class="op">|</span> {});
+        <span class="comment">// Check whether there is a pending generate snapshot task, the task</span>
+        <span class="comment">// needs to be sent to the apply system.</span>
+        <span class="comment">// Always sending snapshot task behind apply task, so it gets latest</span>
+        <span class="comment">// snapshot.</span>
+        <span class="comment">// TODO: maybe we should move this code to other place to make the logic more clear.</span>
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">gen_task</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">mut_store</span>().<span class="ident">take_gen_snap_task</span>() {
+            <span class="self">self</span>.<span class="ident">pending_request_snapshot_count</span>
+                .<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
+            <span class="ident">ctx</span>.<span class="ident">apply_router</span>
+                .<span class="ident">schedule_task</span>(<span class="self">self</span>.<span class="ident">region_id</span>, <span class="ident">ApplyTask</span>::<span class="ident">Snapshot</span>(<span class="ident">gen_task</span>));
+        }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_raft_ready_advance</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">ready</span>: <span class="ident">Ready</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_raft_ready_advance</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Transport</span><span class="op">&gt;</span>(
+        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
+        <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">PollContext</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">T</span><span class="op">&gt;</span>,
+        <span class="ident">ready</span>: <span class="ident">Ready</span>,
+    ) {
+        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">ready</span>.<span class="ident">number</span>(), <span class="self">self</span>.<span class="ident">last_unpersisted_number</span>);
         <span class="kw">if</span> <span class="op">!</span><span class="ident">ready</span>.<span class="ident">snapshot</span>().<span class="ident">is_empty</span>() {
             <span class="comment">// Snapshot&#39;s metadata has been applied.</span>
             <span class="self">self</span>.<span class="ident">last_applying_idx</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_store</span>().<span class="ident">truncated_index</span>();
-            <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">advance_append</span>(<span class="ident">ready</span>);
+            <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">advance_append_async</span>(<span class="ident">ready</span>);
             <span class="comment">// Because we only handle raft ready when not applying snapshot, so following</span>
             <span class="comment">// line won&#39;t be called twice for the same snapshot.</span>
-            <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">advance_apply</span>(<span class="self">self</span>.<span class="ident">last_applying_idx</span>);
+            <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">advance_apply_to</span>(<span class="self">self</span>.<span class="ident">last_applying_idx</span>);
             <span class="self">self</span>.<span class="ident">cmd_epoch_checker</span>.<span class="ident">advance_apply</span>(
                 <span class="self">self</span>.<span class="ident">last_applying_idx</span>,
                 <span class="self">self</span>.<span class="ident">term</span>(),
                 <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">store</span>().<span class="ident">region</span>(),
             );
-        } <span class="kw">else</span> {
-            <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">advance_append</span>(<span class="ident">ready</span>);
+            <span class="kw">return</span>;
         }
-        <span class="self">self</span>.<span class="ident">proposals</span>.<span class="ident">gc</span>();
+
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">light_rd</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">advance_append</span>(<span class="ident">ready</span>);
+
+        <span class="self">self</span>.<span class="ident">add_light_ready_metric</span>(<span class="kw-2">&amp;</span><span class="ident">light_rd</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>.<span class="ident">raft_metrics</span>.<span class="ident">ready</span>);
+
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">commit_index</span>) <span class="op">=</span> <span class="ident">light_rd</span>.<span class="ident">commit_index</span>() {
+            <span class="kw">let</span> <span class="ident">pre_commit_index</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_store</span>().<span class="ident">commit_index</span>();
+            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">commit_index</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">pre_commit_index</span>);
+            <span class="comment">// No need to persist the commit index but the one in memory</span>
+            <span class="comment">// (i.e. commit of hardstate in PeerStorage) should be updated.</span>
+            <span class="self">self</span>.<span class="ident">mut_store</span>().<span class="ident">set_commit_index</span>(<span class="ident">commit_index</span>);
+            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">is_leader</span>() {
+                <span class="self">self</span>.<span class="ident">on_leader_commit_idx_changed</span>(<span class="ident">pre_commit_index</span>, <span class="ident">commit_index</span>);
+            }
+        }
+
+        <span class="kw">if</span> <span class="op">!</span><span class="ident">light_rd</span>.<span class="ident">messages</span>().<span class="ident">is_empty</span>() {
+            <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">is_leader</span>() {
+                <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;raft_before_follower_send&quot;</span>);
+            }
+            <span class="kw">for</span> <span class="ident">vec_msg</span> <span class="kw">in</span> <span class="ident">light_rd</span>.<span class="ident">take_messages</span>() {
+                <span class="self">self</span>.<span class="ident">send</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>.<span class="ident">trans</span>, <span class="ident">vec_msg</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>.<span class="ident">raft_metrics</span>.<span class="ident">message</span>);
+            }
+        }
+
+        <span class="kw">if</span> <span class="op">!</span><span class="ident">light_rd</span>.<span class="ident">committed_entries</span>().<span class="ident">is_empty</span>() {
+            <span class="self">self</span>.<span class="ident">handle_raft_committed_entries</span>(<span class="ident">ctx</span>, <span class="ident">light_rd</span>.<span class="ident">take_committed_entries</span>());
+        }
     }
 
     <span class="kw">fn</span> <span class="ident">response_read</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(
@@ -5884,7 +5909,7 @@
         }
 
         <span class="self">self</span>.<span class="ident">raft_group</span>
-            .<span class="ident">advance_apply</span>(<span class="ident">apply_state</span>.<span class="ident">get_applied_index</span>());
+            .<span class="ident">advance_apply_to</span>(<span class="ident">apply_state</span>.<span class="ident">get_applied_index</span>());
 
         <span class="self">self</span>.<span class="ident">cmd_epoch_checker</span>.<span class="ident">advance_apply</span>(
             <span class="ident">apply_state</span>.<span class="ident">get_applied_index</span>(),
@@ -6316,7 +6341,7 @@
         <span class="ident">cb</span>: <span class="ident">Callback</span><span class="op">&lt;</span><span class="ident">EK</span>::<span class="ident">Snapshot</span><span class="op">&gt;</span>,
     ) {
         <span class="ident">ctx</span>.<span class="ident">raft_metrics</span>.<span class="ident">propose</span>.<span class="ident">local_read</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
-        <span class="ident">cb</span>.<span class="ident">invoke_read</span>(<span class="self">self</span>.<span class="ident">handle_read</span>(<span class="ident">ctx</span>, <span class="ident">req</span>, <span class="bool-val">false</span>, <span class="prelude-val">Some</span>(<span class="self">self</span>.<span class="ident">get_store</span>().<span class="ident">committed_index</span>())))
+        <span class="ident">cb</span>.<span class="ident">invoke_read</span>(<span class="self">self</span>.<span class="ident">handle_read</span>(<span class="ident">ctx</span>, <span class="ident">req</span>, <span class="bool-val">false</span>, <span class="prelude-val">Some</span>(<span class="self">self</span>.<span class="ident">get_store</span>().<span class="ident">commit_index</span>())))
     }
 
     <span class="kw">fn</span> <span class="ident">pre_read_index</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
@@ -6413,11 +6438,14 @@
                 <span class="comment">// before or after the previous read index, and the lease can be renewed when get</span>
                 <span class="comment">// heartbeat responses.</span>
                 <span class="ident">LeaseState</span>::<span class="ident">Valid</span> <span class="op">|</span> <span class="ident">LeaseState</span>::<span class="ident">Expired</span> <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="kw">let</span> <span class="ident">committed_index</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_store</span>().<span class="ident">committed_index</span>();
+                    <span class="comment">// Must use the commit index of `PeerStorage` instead of the commit index</span>
+                    <span class="comment">// in raft-rs which may be greater than the former one.</span>
+                    <span class="comment">// For more details, see the annotations above `on_leader_commit_idx_changed`.</span>
+                    <span class="kw">let</span> <span class="ident">commit_index</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_store</span>().<span class="ident">commit_index</span>();
                     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">read</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">pending_reads</span>.<span class="ident">back_mut</span>() {
                         <span class="kw">let</span> <span class="ident">max_lease</span> <span class="op">=</span> <span class="ident">poll_ctx</span>.<span class="ident">cfg</span>.<span class="ident">raft_store_max_leader_lease</span>();
                         <span class="kw">if</span> <span class="ident">read</span>.<span class="ident">renew_lease_time</span> <span class="op">+</span> <span class="ident">max_lease</span> <span class="op">&gt;</span> <span class="ident">renew_lease_time</span> {
-                            <span class="ident">read</span>.<span class="ident">push_command</span>(<span class="ident">req</span>, <span class="ident">cb</span>, <span class="ident">committed_index</span>);
+                            <span class="ident">read</span>.<span class="ident">push_command</span>(<span class="ident">req</span>, <span class="ident">cb</span>, <span class="ident">commit_index</span>);
                             <span class="kw">return</span> <span class="bool-val">false</span>;
                         }
                     }
@@ -7236,8 +7264,6 @@
                 <span class="string">&quot;target_peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">peer</span>.<span class="ident">get_id</span>(),
                 <span class="string">&quot;target_store_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">peer</span>.<span class="ident">get_store_id</span>(),
             );
-        } <span class="kw">else</span> {
-            <span class="ident">ctx</span>.<span class="ident">need_flush_trans</span> <span class="op">=</span> <span class="bool-val">true</span>;
         }
     }
 
@@ -7268,8 +7294,6 @@
                     <span class="string">&quot;target_peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">peer</span>.<span class="ident">get_id</span>(),
                     <span class="string">&quot;target_store_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">peer</span>.<span class="ident">get_store_id</span>(),
                 );
-            } <span class="kw">else</span> {
-                <span class="ident">ctx</span>.<span class="ident">need_flush_trans</span> <span class="op">=</span> <span class="bool-val">true</span>;
             }
         }
     }
@@ -7318,8 +7342,6 @@
                 <span class="string">&quot;target_peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">to_peer</span>.<span class="ident">get_id</span>(),
                 <span class="string">&quot;target_store_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">to_peer</span>.<span class="ident">get_store_id</span>(),
             );
-        } <span class="kw">else</span> {
-            <span class="ident">ctx</span>.<span class="ident">need_flush_trans</span> <span class="op">=</span> <span class="bool-val">true</span>;
         }
     }
 
@@ -7538,7 +7560,7 @@
     <span class="kw">fn</span> <span class="ident">region</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">metapb</span>::<span class="ident">Region</span>;
     <span class="kw">fn</span> <span class="ident">apply_state</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">RaftApplyState</span>;
     <span class="kw">fn</span> <span class="ident">raft_status</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">raft</span>::<span class="ident">Status</span>;
-    <span class="kw">fn</span> <span class="ident">raft_committed_index</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u64</span>;
+    <span class="kw">fn</span> <span class="ident">raft_commit_index</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u64</span>;
     <span class="kw">fn</span> <span class="ident">raft_request_snapshot</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">index</span>: <span class="ident">u64</span>);
     <span class="kw">fn</span> <span class="ident">pending_merge_state</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">MergeState</span><span class="op">&gt;</span>;
 }
@@ -7556,8 +7578,8 @@
     <span class="kw">fn</span> <span class="ident">raft_status</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">raft</span>::<span class="ident">Status</span> {
         <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">status</span>()
     }
-    <span class="kw">fn</span> <span class="ident">raft_committed_index</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u64</span> {
-        <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">store</span>().<span class="ident">committed_index</span>()
+    <span class="kw">fn</span> <span class="ident">raft_commit_index</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u64</span> {
+        <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">store</span>().<span class="ident">commit_index</span>()
     }
     <span class="kw">fn</span> <span class="ident">raft_request_snapshot</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">index</span>: <span class="ident">u64</span>) {
         <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">request_snapshot</span>(<span class="ident">index</span>).<span class="ident">unwrap</span>();

@@ -4133,34 +4133,6 @@
 <span id="4130">4130</span>
 <span id="4131">4131</span>
 <span id="4132">4132</span>
-<span id="4133">4133</span>
-<span id="4134">4134</span>
-<span id="4135">4135</span>
-<span id="4136">4136</span>
-<span id="4137">4137</span>
-<span id="4138">4138</span>
-<span id="4139">4139</span>
-<span id="4140">4140</span>
-<span id="4141">4141</span>
-<span id="4142">4142</span>
-<span id="4143">4143</span>
-<span id="4144">4144</span>
-<span id="4145">4145</span>
-<span id="4146">4146</span>
-<span id="4147">4147</span>
-<span id="4148">4148</span>
-<span id="4149">4149</span>
-<span id="4150">4150</span>
-<span id="4151">4151</span>
-<span id="4152">4152</span>
-<span id="4153">4153</span>
-<span id="4154">4154</span>
-<span id="4155">4155</span>
-<span id="4156">4156</span>
-<span id="4157">4157</span>
-<span id="4158">4158</span>
-<span id="4159">4159</span>
-<span id="4160">4160</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -4267,7 +4239,6 @@
     <span class="ident">group_state</span>: <span class="ident">GroupState</span>,
     <span class="ident">stopped</span>: <span class="ident">bool</span>,
     <span class="ident">has_ready</span>: <span class="ident">bool</span>,
-    <span class="ident">early_apply</span>: <span class="ident">bool</span>,
     <span class="ident">mailbox</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">BasicMailbox</span><span class="op">&lt;</span><span class="ident">PeerFsm</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="kw">pub</span> <span class="ident">receiver</span>: <span class="ident">Receiver</span><span class="op">&lt;</span><span class="ident">PeerMsg</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="doccomment">/// when snapshot is generating or sending, skip split check at most REGION_SPLIT_SKIT_MAX_COUNT times.</span>
@@ -4352,7 +4323,6 @@
         <span class="prelude-val">Ok</span>((
             <span class="ident">tx</span>,
             <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">PeerFsm</span> {
-                <span class="ident">early_apply</span>: <span class="ident">cfg</span>.<span class="ident">early_apply</span>,
                 <span class="ident">peer</span>: <span class="ident">Peer</span>::<span class="ident">new</span>(<span class="ident">store_id</span>, <span class="ident">cfg</span>, <span class="ident">sched</span>, <span class="ident">engines</span>, <span class="ident">region</span>, <span class="ident">meta_peer</span>)<span class="question-mark">?</span>,
                 <span class="ident">tick_registry</span>: <span class="ident">PeerTicks</span>::<span class="ident">empty</span>(),
                 <span class="ident">missing_ticks</span>: <span class="number">0</span>,
@@ -4395,7 +4365,6 @@
         <span class="prelude-val">Ok</span>((
             <span class="ident">tx</span>,
             <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">PeerFsm</span> {
-                <span class="ident">early_apply</span>: <span class="ident">cfg</span>.<span class="ident">early_apply</span>,
                 <span class="ident">peer</span>: <span class="ident">Peer</span>::<span class="ident">new</span>(<span class="ident">store_id</span>, <span class="ident">cfg</span>, <span class="ident">sched</span>, <span class="ident">engines</span>, <span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="ident">peer</span>)<span class="question-mark">?</span>,
                 <span class="ident">tick_registry</span>: <span class="ident">PeerTicks</span>::<span class="ident">empty</span>(),
                 <span class="ident">missing_ticks</span>: <span class="number">0</span>,
@@ -4823,8 +4792,13 @@
         <span class="self">self</span>.<span class="ident">register_check_peer_stale_state_tick</span>();
         <span class="self">self</span>.<span class="ident">on_check_merge</span>();
         <span class="comment">// Apply committed entries more quickly.</span>
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">raft_group</span>.<span class="ident">store</span>().<span class="ident">committed_index</span>()
+        <span class="comment">// Or if it&#39;s a leader. This implicitly means it&#39;s a singleton</span>
+        <span class="comment">// because it becomes leader in `Peer::new` when it&#39;s a</span>
+        <span class="comment">// singleton. It has a no-op entry that need to be persisted,</span>
+        <span class="comment">// committed, and then it should apply it.</span>
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">raft_group</span>.<span class="ident">store</span>().<span class="ident">commit_index</span>()
             <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">raft_group</span>.<span class="ident">store</span>().<span class="ident">applied_index</span>()
+            <span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">is_leader</span>()
         {
             <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">has_ready</span> <span class="op">=</span> <span class="bool-val">true</span>;
         }
@@ -5064,62 +5038,32 @@
         <span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">pending_count</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
         <span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">has_ready</span> <span class="op">=</span> <span class="bool-val">true</span>;
         <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">handle_raft_ready_append</span>(<span class="self">self</span>.<span class="ident">ctx</span>);
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">mut</span> <span class="ident">r</span>) <span class="op">=</span> <span class="ident">res</span> {
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">r</span>) <span class="op">=</span> <span class="ident">res</span> {
             <span class="self">self</span>.<span class="ident">on_role_changed</span>(<span class="kw-2">&amp;</span><span class="ident">r</span>.<span class="number">0</span>);
-            <span class="kw">if</span> <span class="op">!</span><span class="ident">r</span>.<span class="number">0</span>.<span class="ident">entries</span>().<span class="ident">is_empty</span>() {
+            <span class="kw">if</span> <span class="ident">r</span>.<span class="number">1</span>.<span class="ident">has_new_entries</span> {
                 <span class="self">self</span>.<span class="ident">register_raft_gc_log_tick</span>();
                 <span class="self">self</span>.<span class="ident">register_split_region_check_tick</span>();
-            }
-            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">cfg</span>.<span class="ident">early_apply</span> {
-                <span class="self">self</span>.<span class="ident">handle_raft_ready_apply</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">r</span>.<span class="number">0</span>, <span class="kw-2">&amp;</span><span class="ident">r</span>.<span class="number">1</span>);
             }
             <span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">ready_res</span>.<span class="ident">push</span>(<span class="ident">r</span>);
         }
     }
 
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_raft_ready_apply</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">ready</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Ready</span>, <span class="ident">invoke_ctx</span>: <span class="kw-2">&amp;</span><span class="ident">InvokeContext</span>) {
-        <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">early_apply</span> <span class="op">=</span> <span class="ident">ready</span>
-            .<span class="ident">committed_entries</span>
-            .<span class="ident">as_ref</span>()
-            .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">e</span>.<span class="ident">last</span>())
-            .<span class="ident">map_or</span>(<span class="bool-val">false</span>, <span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
-                <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">can_early_apply</span>(<span class="ident">e</span>.<span class="ident">get_term</span>(), <span class="ident">e</span>.<span class="ident">get_index</span>())
-            });
-        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">early_apply</span> {
-            <span class="kw">return</span>;
-        }
-        <span class="self">self</span>.<span class="ident">fsm</span>
-            .<span class="ident">peer</span>
-            .<span class="ident">handle_raft_ready_apply</span>(<span class="self">self</span>.<span class="ident">ctx</span>, <span class="ident">ready</span>, <span class="ident">invoke_ctx</span>);
-    }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">post_raft_ready_append</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="kw-2">mut</span> <span class="ident">ready</span>: <span class="ident">Ready</span>, <span class="ident">invoke_ctx</span>: <span class="ident">InvokeContext</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">post_raft_ready_append</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">ready</span>: <span class="ident">Ready</span>, <span class="ident">invoke_ctx</span>: <span class="ident">InvokeContext</span>) {
         <span class="kw">let</span> <span class="ident">is_merging</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">pending_merge_state</span>.<span class="ident">is_some</span>();
-        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">early_apply</span> {
-            <span class="self">self</span>.<span class="ident">fsm</span>
-                .<span class="ident">peer</span>
-                .<span class="ident">handle_raft_ready_apply</span>(<span class="self">self</span>.<span class="ident">ctx</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ready</span>, <span class="kw-2">&amp;</span><span class="ident">invoke_ctx</span>);
-        }
-        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="self">self</span>
-            .<span class="ident">fsm</span>
-            .<span class="ident">peer</span>
-            .<span class="ident">post_raft_ready_append</span>(<span class="self">self</span>.<span class="ident">ctx</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ready</span>, <span class="ident">invoke_ctx</span>);
-        <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">handle_raft_ready_advance</span>(<span class="ident">ready</span>);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">has_snapshot</span> <span class="op">=</span> <span class="bool-val">false</span>;
+        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">post_raft_ready_append</span>(<span class="self">self</span>.<span class="ident">ctx</span>, <span class="ident">invoke_ctx</span>);
+        <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">handle_raft_ready_advance</span>(<span class="self">self</span>.<span class="ident">ctx</span>, <span class="ident">ready</span>);
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">apply_res</span>) <span class="op">=</span> <span class="ident">res</span> {
             <span class="self">self</span>.<span class="ident">on_ready_apply_snapshot</span>(<span class="ident">apply_res</span>);
-            <span class="ident">has_snapshot</span> <span class="op">=</span> <span class="bool-val">true</span>;
+            <span class="kw">if</span> <span class="ident">is_merging</span> {
+                <span class="comment">// After applying a snapshot, merge is rollbacked implicitly.</span>
+                <span class="self">self</span>.<span class="ident">on_ready_rollback_merge</span>(<span class="number">0</span>, <span class="prelude-val">None</span>);
+            }
             <span class="self">self</span>.<span class="ident">register_raft_base_tick</span>();
         }
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">leader_unreachable</span> {
             <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">group_state</span> <span class="op">=</span> <span class="ident">GroupState</span>::<span class="ident">Chaos</span>;
             <span class="self">self</span>.<span class="ident">register_raft_base_tick</span>();
             <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">leader_unreachable</span> <span class="op">=</span> <span class="bool-val">false</span>;
-        }
-        <span class="kw">if</span> <span class="ident">is_merging</span> <span class="op">&amp;&amp;</span> <span class="ident">has_snapshot</span> {
-            <span class="comment">// After applying a snapshot, merge is rollbacked implicitly.</span>
-            <span class="self">self</span>.<span class="ident">on_ready_rollback_merge</span>(<span class="number">0</span>, <span class="prelude-val">None</span>);
         }
     }
 
@@ -5916,7 +5860,7 @@
             };
             <span class="comment">// Use `unwrap` is ok because the StoreMeta lock is held and these source peers still</span>
             <span class="comment">// exist in regions and region_ranges map.</span>
-            <span class="comment">// It depends on the implementation of `destroy_peer`</span>
+            <span class="comment">// It depends on the implementation of `destroy_peer`.</span>
             <span class="self">self</span>.<span class="ident">ctx</span>
                 .<span class="ident">router</span>
                 .<span class="ident">force_send</span>(

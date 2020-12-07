@@ -2614,6 +2614,17 @@
 <span id="2611">2611</span>
 <span id="2612">2612</span>
 <span id="2613">2613</span>
+<span id="2614">2614</span>
+<span id="2615">2615</span>
+<span id="2616">2616</span>
+<span id="2617">2617</span>
+<span id="2618">2618</span>
+<span id="2619">2619</span>
+<span id="2620">2620</span>
+<span id="2621">2621</span>
+<span id="2622">2622</span>
+<span id="2623">2623</span>
+<span id="2624">2624</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -2963,6 +2974,8 @@
     <span class="doccomment">/// Changed RaftApplyState is stored into `apply_state`.</span>
     <span class="kw">pub</span> <span class="ident">apply_state</span>: <span class="ident">RaftApplyState</span>,
     <span class="ident">last_term</span>: <span class="ident">u64</span>,
+    <span class="doccomment">/// If the ready has new entries.</span>
+    <span class="kw">pub</span> <span class="ident">has_new_entries</span>: <span class="ident">bool</span>,
     <span class="doccomment">/// The old region is stored here if there is a snapshot.</span>
     <span class="kw">pub</span> <span class="ident">snap_region</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Region</span><span class="op">&gt;</span>,
     <span class="doccomment">/// The regions whose range are overlapped with this region</span>
@@ -2976,6 +2989,7 @@
             <span class="ident">raft_state</span>: <span class="ident">store</span>.<span class="ident">raft_state</span>.<span class="ident">clone</span>(),
             <span class="ident">apply_state</span>: <span class="ident">store</span>.<span class="ident">apply_state</span>.<span class="ident">clone</span>(),
             <span class="ident">last_term</span>: <span class="ident">store</span>.<span class="ident">last_term</span>,
+            <span class="ident">has_new_entries</span>: <span class="bool-val">false</span>,
             <span class="ident">snap_region</span>: <span class="prelude-val">None</span>,
             <span class="ident">destroyed_regions</span>: <span class="macro">vec</span><span class="macro">!</span>[],
         }
@@ -3124,53 +3138,6 @@
     )
 }
 
-<span class="kw">fn</span> <span class="ident">validate_states</span><span class="op">&lt;</span><span class="ident">EK</span>: <span class="ident">KvEngine</span>, <span class="ident">ER</span>: <span class="ident">RaftEngine</span><span class="op">&gt;</span>(
-    <span class="ident">region_id</span>: <span class="ident">u64</span>,
-    <span class="ident">engines</span>: <span class="kw-2">&amp;</span><span class="ident">Engines</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>,
-    <span class="ident">raft_state</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">RaftLocalState</span>,
-    <span class="ident">apply_state</span>: <span class="kw-2">&amp;</span><span class="ident">RaftApplyState</span>,
-) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">last_index</span> <span class="op">=</span> <span class="ident">raft_state</span>.<span class="ident">get_last_index</span>();
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">commit_index</span> <span class="op">=</span> <span class="ident">raft_state</span>.<span class="ident">get_hard_state</span>().<span class="ident">get_commit</span>();
-    <span class="kw">let</span> <span class="ident">apply_index</span> <span class="op">=</span> <span class="ident">apply_state</span>.<span class="ident">get_applied_index</span>();
-
-    <span class="kw">if</span> <span class="ident">commit_index</span> <span class="op">&lt;</span> <span class="ident">apply_state</span>.<span class="ident">get_last_commit_index</span>() {
-        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(
-            <span class="string">&quot;raft state {:?} not match apply state {:?} and can&#39;t be recovered.&quot;</span>,
-            <span class="ident">raft_state</span>,
-            <span class="ident">apply_state</span>
-        ));
-    }
-    <span class="kw">let</span> <span class="ident">recorded_commit_index</span> <span class="op">=</span> <span class="ident">apply_state</span>.<span class="ident">get_commit_index</span>();
-    <span class="kw">if</span> <span class="ident">commit_index</span> <span class="op">&lt;</span> <span class="ident">recorded_commit_index</span> {
-        <span class="kw">let</span> <span class="ident">entry</span> <span class="op">=</span> <span class="ident">engines</span>.<span class="ident">raft</span>.<span class="ident">get_entry</span>(<span class="ident">region_id</span>, <span class="ident">recorded_commit_index</span>)<span class="question-mark">?</span>;
-        <span class="kw">if</span> <span class="ident">entry</span>.<span class="ident">map_or</span>(<span class="bool-val">true</span>, <span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">e</span>.<span class="ident">get_term</span>() <span class="op">!</span><span class="op">=</span> <span class="ident">apply_state</span>.<span class="ident">get_commit_term</span>()) {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(
-                <span class="string">&quot;log at recorded commit index [{}] {} doesn&#39;t exist, may lose data&quot;</span>,
-                <span class="ident">apply_state</span>.<span class="ident">get_commit_term</span>(),
-                <span class="ident">recorded_commit_index</span>
-            ));
-        }
-        <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;updating commit index&quot;</span>; <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>, <span class="string">&quot;old&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">commit_index</span>, <span class="string">&quot;new&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">recorded_commit_index</span>);
-        <span class="ident">commit_index</span> <span class="op">=</span> <span class="ident">recorded_commit_index</span>;
-    }
-
-    <span class="kw">if</span> <span class="ident">commit_index</span> <span class="op">&gt;</span> <span class="ident">last_index</span> <span class="op">|</span><span class="op">|</span> <span class="ident">apply_index</span> <span class="op">&gt;</span> <span class="ident">commit_index</span> {
-        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(
-            <span class="string">&quot;raft state {:?} not match apply state {:?} and can&#39;t be recovered,&quot;</span>,
-            <span class="ident">raft_state</span>,
-            <span class="ident">apply_state</span>
-        ));
-    }
-
-    <span class="ident">raft_state</span>.<span class="ident">mut_hard_state</span>().<span class="ident">set_commit</span>(<span class="ident">commit_index</span>);
-    <span class="kw">if</span> <span class="ident">raft_state</span>.<span class="ident">get_hard_state</span>().<span class="ident">get_term</span>() <span class="op">&lt;</span> <span class="ident">apply_state</span>.<span class="ident">get_commit_term</span>() {
-        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(<span class="string">&quot;raft state {:?} corrupted&quot;</span>, <span class="ident">raft_state</span>));
-    }
-
-    <span class="prelude-val">Ok</span>(())
-}
-
 <span class="kw">fn</span> <span class="ident">init_last_term</span><span class="op">&lt;</span><span class="ident">EK</span>: <span class="ident">KvEngine</span>, <span class="ident">ER</span>: <span class="ident">RaftEngine</span><span class="op">&gt;</span>(
     <span class="ident">engines</span>: <span class="kw-2">&amp;</span><span class="ident">Engines</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>,
     <span class="ident">region</span>: <span class="kw-2">&amp;</span><span class="ident">Region</span>,
@@ -3196,6 +3163,64 @@
         )),
         <span class="prelude-val">Some</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="ident">e</span>.<span class="ident">get_term</span>()),
     }
+}
+
+<span class="kw">fn</span> <span class="ident">validate_states</span><span class="op">&lt;</span><span class="ident">EK</span>: <span class="ident">KvEngine</span>, <span class="ident">ER</span>: <span class="ident">RaftEngine</span><span class="op">&gt;</span>(
+    <span class="ident">region_id</span>: <span class="ident">u64</span>,
+    <span class="ident">engines</span>: <span class="kw-2">&amp;</span><span class="ident">Engines</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>,
+    <span class="ident">raft_state</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">RaftLocalState</span>,
+    <span class="ident">apply_state</span>: <span class="kw-2">&amp;</span><span class="ident">RaftApplyState</span>,
+) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="ident">last_index</span> <span class="op">=</span> <span class="ident">raft_state</span>.<span class="ident">get_last_index</span>();
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">commit_index</span> <span class="op">=</span> <span class="ident">raft_state</span>.<span class="ident">get_hard_state</span>().<span class="ident">get_commit</span>();
+    <span class="kw">let</span> <span class="ident">recorded_commit_index</span> <span class="op">=</span> <span class="ident">apply_state</span>.<span class="ident">get_commit_index</span>();
+    <span class="kw">let</span> <span class="ident">state_str</span> <span class="op">=</span> <span class="op">|</span><span class="op">|</span> <span class="op">-</span><span class="op">&gt;</span> <span class="ident">String</span> {
+        <span class="macro">format</span><span class="macro">!</span>(
+            <span class="string">&quot;region {}, raft state {:?}, apply state {:?}&quot;</span>,
+            <span class="ident">region_id</span>, <span class="ident">raft_state</span>, <span class="ident">apply_state</span>
+        )
+    };
+    <span class="comment">// The commit index of raft state may be less than the recorded commit index.</span>
+    <span class="comment">// If so, forward the commit index.</span>
+    <span class="kw">if</span> <span class="ident">commit_index</span> <span class="op">&lt;</span> <span class="ident">recorded_commit_index</span> {
+        <span class="kw">let</span> <span class="ident">entry</span> <span class="op">=</span> <span class="ident">engines</span>.<span class="ident">raft</span>.<span class="ident">get_entry</span>(<span class="ident">region_id</span>, <span class="ident">recorded_commit_index</span>)<span class="question-mark">?</span>;
+        <span class="kw">if</span> <span class="ident">entry</span>.<span class="ident">map_or</span>(<span class="bool-val">true</span>, <span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">e</span>.<span class="ident">get_term</span>() <span class="op">!</span><span class="op">=</span> <span class="ident">apply_state</span>.<span class="ident">get_commit_term</span>()) {
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(
+                <span class="string">&quot;log at recorded commit index [{}] {} doesn&#39;t exist, may lose data, {}&quot;</span>,
+                <span class="ident">apply_state</span>.<span class="ident">get_commit_term</span>(),
+                <span class="ident">recorded_commit_index</span>,
+                <span class="ident">state_str</span>()
+            ));
+        }
+        <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;updating commit index&quot;</span>; <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>, <span class="string">&quot;old&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">commit_index</span>, <span class="string">&quot;new&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">recorded_commit_index</span>);
+        <span class="ident">commit_index</span> <span class="op">=</span> <span class="ident">recorded_commit_index</span>;
+    }
+    <span class="comment">// Invariant: applied index &lt;= max(commit index, recorded commit index)</span>
+    <span class="kw">if</span> <span class="ident">apply_state</span>.<span class="ident">get_applied_index</span>() <span class="op">&gt;</span> <span class="ident">commit_index</span> {
+        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(
+            <span class="string">&quot;applied index &gt; max(commit index, recorded commit index), {}&quot;</span>,
+            <span class="ident">state_str</span>()
+        ));
+    }
+    <span class="comment">// Invariant: max(commit index, recorded commit index) &lt;= last index</span>
+    <span class="kw">if</span> <span class="ident">commit_index</span> <span class="op">&gt;</span> <span class="ident">last_index</span> {
+        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(
+            <span class="string">&quot;max(commit index, recorded commit index) &gt; last index, {}&quot;</span>,
+            <span class="ident">state_str</span>()
+        ));
+    }
+    <span class="comment">// Since the entries must be persisted before applying, the term of raft state should also</span>
+    <span class="comment">// be persisted. So it should be greater than the commit term of apply state.</span>
+    <span class="kw">if</span> <span class="ident">raft_state</span>.<span class="ident">get_hard_state</span>().<span class="ident">get_term</span>() <span class="op">&lt;</span> <span class="ident">apply_state</span>.<span class="ident">get_commit_term</span>() {
+        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(
+            <span class="string">&quot;term of raft state &lt; commit term of apply state, {}&quot;</span>,
+            <span class="ident">state_str</span>()
+        ));
+    }
+
+    <span class="ident">raft_state</span>.<span class="ident">mut_hard_state</span>().<span class="ident">set_commit</span>(<span class="ident">commit_index</span>);
+
+    <span class="prelude-val">Ok</span>(())
 }
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">PeerStorage</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>
@@ -3452,8 +3477,19 @@
     }
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">committed_index</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u64</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">commit_index</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u64</span> {
         <span class="self">self</span>.<span class="ident">raft_state</span>.<span class="ident">get_hard_state</span>().<span class="ident">get_commit</span>()
+    }
+
+    <span class="attribute">#[<span class="ident">inline</span>]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_commit_index</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">commit</span>: <span class="ident">u64</span>) {
+        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">commit</span> <span class="op">&gt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">commit_index</span>());
+        <span class="self">self</span>.<span class="ident">raft_state</span>.<span class="ident">mut_hard_state</span>().<span class="ident">set_commit</span>(<span class="ident">commit</span>);
+    }
+
+    <span class="attribute">#[<span class="ident">inline</span>]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">hard_state</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">HardState</span> {
+        <span class="self">self</span>.<span class="ident">raft_state</span>.<span class="ident">get_hard_state</span>()
     }
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
@@ -3585,7 +3621,7 @@
         <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">mpsc</span>::<span class="ident">sync_channel</span>(<span class="number">1</span>);
         <span class="kw-2">*</span><span class="ident">snap_state</span> <span class="op">=</span> <span class="ident">SnapState</span>::<span class="ident">Generating</span>(<span class="ident">rx</span>);
 
-        <span class="kw">let</span> <span class="ident">task</span> <span class="op">=</span> <span class="ident">GenSnapTask</span>::<span class="ident">new</span>(<span class="self">self</span>.<span class="ident">region</span>.<span class="ident">get_id</span>(), <span class="self">self</span>.<span class="ident">committed_index</span>(), <span class="ident">tx</span>);
+        <span class="kw">let</span> <span class="ident">task</span> <span class="op">=</span> <span class="ident">GenSnapTask</span>::<span class="ident">new</span>(<span class="self">self</span>.<span class="ident">region</span>.<span class="ident">get_id</span>(), <span class="ident">tx</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">gen_snap_task</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">gen_snap_task</span>.<span class="ident">borrow_mut</span>();
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">gen_snap_task</span>.<span class="ident">is_none</span>());
         <span class="kw-2">*</span><span class="ident">gen_snap_task</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">task</span>);
@@ -3601,10 +3637,12 @@
     <span class="comment">// Append the given entries to the raft log using previous last index or self.last_index.</span>
     <span class="comment">// Return the new last index for later update. After we commit in engine, we can set last_index</span>
     <span class="comment">// to the return one.</span>
+    <span class="comment">// WARNING: If this function returns error, the caller must panic otherwise the entry cache may</span>
+    <span class="comment">// be wrong and break correctness.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">append</span><span class="op">&lt;</span><span class="ident">H</span>: <span class="ident">HandleRaftReadyContext</span><span class="op">&lt;</span><span class="ident">EK</span>::<span class="ident">WriteBatch</span>, <span class="ident">ER</span>::<span class="ident">LogBatch</span><span class="op">&gt;</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
         <span class="ident">invoke_ctx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">InvokeContext</span>,
-        <span class="ident">entries</span>: <span class="kw-2">&amp;</span>[<span class="ident">Entry</span>],
+        <span class="ident">entries</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Entry</span><span class="op">&gt;</span>,
         <span class="ident">ready_ctx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">H</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">region_id</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_region_id</span>();
@@ -3619,24 +3657,21 @@
             <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">prev_last_index</span>);
         }
 
+        <span class="ident">invoke_ctx</span>.<span class="ident">has_new_entries</span> <span class="op">=</span> <span class="bool-val">true</span>;
+
         <span class="kw">let</span> (<span class="ident">last_index</span>, <span class="ident">last_term</span>) <span class="op">=</span> {
             <span class="kw">let</span> <span class="ident">e</span> <span class="op">=</span> <span class="ident">entries</span>.<span class="ident">last</span>().<span class="ident">unwrap</span>();
             (<span class="ident">e</span>.<span class="ident">get_index</span>(), <span class="ident">e</span>.<span class="ident">get_term</span>())
         };
 
-        <span class="kw">for</span> <span class="ident">entry</span> <span class="kw">in</span> <span class="ident">entries</span> {
-            <span class="kw">if</span> <span class="op">!</span><span class="ident">ready_ctx</span>.<span class="ident">sync_log</span>() {
-                <span class="ident">ready_ctx</span>.<span class="ident">set_sync_log</span>(<span class="ident">get_sync_log_from_entry</span>(<span class="ident">entry</span>));
-            }
-        }
-
-        <span class="comment">// TODO: save a copy here.</span>
-        <span class="ident">ready_ctx</span>.<span class="ident">raft_wb_mut</span>().<span class="ident">append_slice</span>(<span class="ident">region_id</span>, <span class="ident">entries</span>)<span class="question-mark">?</span>;
-
+        <span class="comment">// WARNING: This code is correct based on the assumption that</span>
+        <span class="comment">// if this function returns error, the TiKV will panic soon,</span>
+        <span class="comment">// otherwise, the entry cache may be wrong and break correctness.</span>
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">cache</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">cache</span> {
-            <span class="comment">// TODO: if the writebatch is failed to commit, the cache will be wrong.</span>
-            <span class="ident">cache</span>.<span class="ident">append</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">tag</span>, <span class="ident">entries</span>);
+            <span class="ident">cache</span>.<span class="ident">append</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">tag</span>, <span class="kw-2">&amp;</span><span class="ident">entries</span>);
         }
+
+        <span class="ident">ready_ctx</span>.<span class="ident">raft_wb_mut</span>().<span class="ident">append</span>(<span class="ident">region_id</span>, <span class="ident">entries</span>)<span class="question-mark">?</span>;
 
         <span class="comment">// Delete any previously appended log entries which never committed.</span>
         <span class="comment">// TODO: Wrap it as an engine::Error.</span>
@@ -3762,8 +3797,6 @@
             <span class="string">&quot;region&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">region</span>,
             <span class="string">&quot;state&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">ctx</span>.<span class="ident">apply_state</span>,
         );
-
-        <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;before_apply_snap_update_region&quot;</span>, <span class="op">|</span><span class="kw">_</span><span class="op">|</span> { <span class="prelude-val">Ok</span>(()) });
 
         <span class="ident">ctx</span>.<span class="ident">snap_region</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">region</span>);
         <span class="prelude-val">Ok</span>(())
@@ -3954,12 +3987,11 @@
     <span class="doccomment">/// This function only write data to `ready_ctx`&#39;s `WriteBatch`. It&#39;s caller&#39;s duty to write</span>
     <span class="doccomment">/// it explicitly to disk. If it&#39;s flushed to disk successfully, `post_ready` should be called</span>
     <span class="doccomment">/// to update the memory states properly.</span>
-    <span class="comment">// Using `&amp;Ready` here to make sure `Ready` struct is not modified in this function. This is</span>
-    <span class="comment">// a requirement to advance the ready object properly later.</span>
+    <span class="doccomment">/// WARNING: If this function returns error, the caller must panic(details in `append` function).</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_raft_ready</span><span class="op">&lt;</span><span class="ident">H</span>: <span class="ident">HandleRaftReadyContext</span><span class="op">&lt;</span><span class="ident">EK</span>::<span class="ident">WriteBatch</span>, <span class="ident">ER</span>::<span class="ident">LogBatch</span><span class="op">&gt;</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
         <span class="ident">ready_ctx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">H</span>,
-        <span class="ident">ready</span>: <span class="kw-2">&amp;</span><span class="ident">Ready</span>,
+        <span class="ident">ready</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Ready</span>,
         <span class="ident">destroy_regions</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">metapb</span>::<span class="ident">Region</span><span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">InvokeContext</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ctx</span> <span class="op">=</span> <span class="ident">InvokeContext</span>::<span class="ident">new</span>(<span class="self">self</span>);
@@ -3976,12 +4008,8 @@
             <span class="ident">last_index</span>(<span class="kw-2">&amp;</span><span class="ident">ctx</span>.<span class="ident">raft_state</span>)
         };
 
-        <span class="kw">if</span> <span class="ident">ready</span>.<span class="ident">must_sync</span>() {
-            <span class="ident">ready_ctx</span>.<span class="ident">set_sync_log</span>(<span class="bool-val">true</span>);
-        }
-
         <span class="kw">if</span> <span class="op">!</span><span class="ident">ready</span>.<span class="ident">entries</span>().<span class="ident">is_empty</span>() {
-            <span class="self">self</span>.<span class="ident">append</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>, <span class="ident">ready</span>.<span class="ident">entries</span>(), <span class="ident">ready_ctx</span>)<span class="question-mark">?</span>;
+            <span class="self">self</span>.<span class="ident">append</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>, <span class="ident">ready</span>.<span class="ident">take_entries</span>(), <span class="ident">ready_ctx</span>)<span class="question-mark">?</span>;
         }
 
         <span class="comment">// Last index is 0 means the peer is created from raft message</span>
@@ -3992,7 +4020,7 @@
             }
         }
 
-        <span class="comment">// Save raft state if it has changed or peer has applied a snapshot.</span>
+        <span class="comment">// Save raft state if it has changed or there is a snapshot.</span>
         <span class="kw">if</span> <span class="ident">ctx</span>.<span class="ident">raft_state</span> <span class="op">!</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">raft_state</span> <span class="op">|</span><span class="op">|</span> <span class="ident">snapshot_index</span> <span class="op">&gt;</span> <span class="number">0</span> {
             <span class="ident">ctx</span>.<span class="ident">save_raft_state_to</span>(<span class="ident">ready_ctx</span>.<span class="ident">raft_wb_mut</span>())<span class="question-mark">?</span>;
             <span class="kw">if</span> <span class="ident">snapshot_index</span> <span class="op">&gt;</span> <span class="number">0</span> {
@@ -4066,6 +4094,7 @@
     }
 }
 
+<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
 <span class="kw">fn</span> <span class="ident">get_sync_log_from_entry</span>(<span class="ident">entry</span>: <span class="kw-2">&amp;</span><span class="ident">Entry</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
     <span class="kw">if</span> <span class="ident">entry</span>.<span class="ident">get_sync_log</span>() {
         <span class="kw">return</span> <span class="bool-val">true</span>;
@@ -4331,7 +4360,9 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">kv_wb</span> <span class="op">=</span> <span class="ident">store</span>.<span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">write_batch</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ctx</span> <span class="op">=</span> <span class="ident">InvokeContext</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">store</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ready_ctx</span> <span class="op">=</span> <span class="ident">ReadyContext</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">store</span>);
-        <span class="ident">store</span>.<span class="ident">append</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>, <span class="kw-2">&amp;</span><span class="ident">ents</span>[<span class="number">1</span>..], <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ready_ctx</span>).<span class="ident">unwrap</span>();
+        <span class="ident">store</span>
+            .<span class="ident">append</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>, <span class="ident">ents</span>[<span class="number">1</span>..].<span class="ident">to_vec</span>(), <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ready_ctx</span>)
+            .<span class="ident">unwrap</span>();
         <span class="ident">ctx</span>.<span class="ident">apply_state</span>
             .<span class="ident">mut_truncated_state</span>()
             .<span class="ident">set_index</span>(<span class="ident">ents</span>[<span class="number">0</span>].<span class="ident">get_index</span>());
@@ -4351,7 +4382,9 @@
     <span class="kw">fn</span> <span class="ident">append_ents</span>(<span class="ident">store</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">PeerStorage</span><span class="op">&lt;</span><span class="ident">KvTestEngine</span>, <span class="ident">RaftTestEngine</span><span class="op">&gt;</span>, <span class="ident">ents</span>: <span class="kw-2">&amp;</span>[<span class="ident">Entry</span>]) {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ctx</span> <span class="op">=</span> <span class="ident">InvokeContext</span>::<span class="ident">new</span>(<span class="ident">store</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ready_ctx</span> <span class="op">=</span> <span class="ident">ReadyContext</span>::<span class="ident">new</span>(<span class="ident">store</span>);
-        <span class="ident">store</span>.<span class="ident">append</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>, <span class="ident">ents</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ready_ctx</span>).<span class="ident">unwrap</span>();
+        <span class="ident">store</span>
+            .<span class="ident">append</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>, <span class="ident">ents</span>.<span class="ident">to_vec</span>(), <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ready_ctx</span>)
+            .<span class="ident">unwrap</span>();
         <span class="ident">ctx</span>.<span class="ident">save_raft_state_to</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ready_ctx</span>.<span class="ident">raft_wb</span>).<span class="ident">unwrap</span>();
         <span class="ident">store</span>.<span class="ident">engines</span>.<span class="ident">raft</span>.<span class="ident">write</span>(<span class="kw-2">&amp;</span><span class="ident">ready_ctx</span>.<span class="ident">raft_wb</span>).<span class="ident">unwrap</span>();
         <span class="ident">store</span>.<span class="ident">raft_state</span> <span class="op">=</span> <span class="ident">ctx</span>.<span class="ident">raft_state</span>;
@@ -4659,7 +4692,7 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ready_ctx</span> <span class="op">=</span> <span class="ident">ReadyContext</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">s</span>);
         <span class="ident">s</span>.<span class="ident">append</span>(
             <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>,
-            <span class="kw-2">&amp;</span>[<span class="ident">new_entry</span>(<span class="number">6</span>, <span class="number">5</span>), <span class="ident">new_entry</span>(<span class="number">7</span>, <span class="number">5</span>)],
+            [<span class="ident">new_entry</span>(<span class="number">6</span>, <span class="number">5</span>), <span class="ident">new_entry</span>(<span class="number">7</span>, <span class="number">5</span>)].<span class="ident">to_vec</span>(),
             <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ready_ctx</span>,
         )
         .<span class="ident">unwrap</span>();
@@ -5214,17 +5247,6 @@
             .<span class="ident">put_msg</span>(<span class="kw-2">&amp;</span><span class="ident">log_key</span>, <span class="kw-2">&amp;</span><span class="ident">new_entry</span>(<span class="number">13</span>, <span class="ident">RAFT_INIT_LOG_TERM</span>))
             .<span class="ident">unwrap</span>();
         <span class="ident">engines</span>.<span class="ident">raft</span>.<span class="ident">put_msg</span>(<span class="kw-2">&amp;</span><span class="ident">raft_state_key</span>, <span class="kw-2">&amp;</span><span class="ident">raft_state</span>).<span class="ident">unwrap</span>();
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">build_storage</span>().<span class="ident">is_err</span>());
-
-        <span class="comment">// last_commit_index &gt; commit_index is invalid.</span>
-        <span class="ident">raft_state</span>.<span class="ident">set_last_index</span>(<span class="number">20</span>);
-        <span class="ident">raft_state</span>.<span class="ident">mut_hard_state</span>().<span class="ident">set_commit</span>(<span class="number">12</span>);
-        <span class="ident">engines</span>.<span class="ident">raft</span>.<span class="ident">put_msg</span>(<span class="kw-2">&amp;</span><span class="ident">raft_state_key</span>, <span class="kw-2">&amp;</span><span class="ident">raft_state</span>).<span class="ident">unwrap</span>();
-        <span class="ident">apply_state</span>.<span class="ident">set_last_commit_index</span>(<span class="number">13</span>);
-        <span class="ident">engines</span>
-            .<span class="ident">kv</span>
-            .<span class="ident">put_msg_cf</span>(<span class="ident">CF_RAFT</span>, <span class="kw-2">&amp;</span><span class="ident">apply_state_key</span>, <span class="kw-2">&amp;</span><span class="ident">apply_state</span>)
-            .<span class="ident">unwrap</span>();
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">build_storage</span>().<span class="ident">is_err</span>());
     }
 }

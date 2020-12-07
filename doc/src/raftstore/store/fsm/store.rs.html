@@ -2450,12 +2450,6 @@
 <span id="2447">2447</span>
 <span id="2448">2448</span>
 <span id="2449">2449</span>
-<span id="2450">2450</span>
-<span id="2451">2451</span>
-<span id="2452">2452</span>
-<span id="2453">2453</span>
-<span id="2454">2454</span>
-<span id="2455">2455</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -2792,7 +2786,6 @@
     <span class="kw">pub</span> <span class="ident">sync_log</span>: <span class="ident">bool</span>,
     <span class="kw">pub</span> <span class="ident">has_ready</span>: <span class="ident">bool</span>,
     <span class="kw">pub</span> <span class="ident">ready_res</span>: <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">Ready</span>, <span class="ident">InvokeContext</span>)<span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">need_flush_trans</span>: <span class="ident">bool</span>,
     <span class="kw">pub</span> <span class="ident">current_time</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Timespec</span><span class="op">&gt;</span>,
     <span class="kw">pub</span> <span class="ident">perf_context_statistics</span>: <span class="ident">PerfContextStatistics</span>,
     <span class="kw">pub</span> <span class="ident">tick_batch</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">PeerTickBatch</span><span class="op">&gt;</span>,
@@ -2937,7 +2930,6 @@
                 <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>,
             );
         }
-        <span class="self">self</span>.<span class="ident">need_flush_trans</span> <span class="op">=</span> <span class="bool-val">true</span>;
     }
 }
 
@@ -3089,11 +3081,10 @@
         <span class="comment">// Only enable the fail point when the store id is equal to 3, which is</span>
         <span class="comment">// the id of slow store in tests.</span>
         <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;on_raft_ready&quot;</span>, <span class="self">self</span>.<span class="ident">poll_ctx</span>.<span class="ident">store_id</span>() <span class="op">=</span><span class="op">=</span> <span class="number">3</span>, <span class="op">|</span><span class="kw">_</span><span class="op">|</span> {});
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">poll_ctx</span>.<span class="ident">need_flush_trans</span>
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">poll_ctx</span>.<span class="ident">trans</span>.<span class="ident">need_flush</span>()
             <span class="op">&amp;&amp;</span> (<span class="op">!</span><span class="self">self</span>.<span class="ident">poll_ctx</span>.<span class="ident">kv_wb</span>.<span class="ident">is_empty</span>() <span class="op">|</span><span class="op">|</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">poll_ctx</span>.<span class="ident">raft_wb</span>.<span class="ident">is_empty</span>())
         {
             <span class="self">self</span>.<span class="ident">poll_ctx</span>.<span class="ident">trans</span>.<span class="ident">flush</span>();
-            <span class="self">self</span>.<span class="ident">poll_ctx</span>.<span class="ident">need_flush_trans</span> <span class="op">=</span> <span class="bool-val">false</span>;
         }
         <span class="kw">let</span> <span class="ident">ready_cnt</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">poll_ctx</span>.<span class="ident">ready_res</span>.<span class="ident">len</span>();
         <span class="self">self</span>.<span class="ident">poll_ctx</span>.<span class="ident">raft_metrics</span>.<span class="ident">ready</span>.<span class="ident">has_ready_region</span> <span class="op">+</span><span class="op">=</span> <span class="ident">ready_cnt</span> <span class="kw">as</span> <span class="ident">u64</span>;
@@ -3116,13 +3107,13 @@
             }
         }
         <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;raft_between_save&quot;</span>);
+
         <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">poll_ctx</span>.<span class="ident">raft_wb</span>.<span class="ident">is_empty</span>() {
             <span class="macro">fail_point</span><span class="macro">!</span>(
                 <span class="string">&quot;raft_before_save_on_store_1&quot;</span>,
                 <span class="self">self</span>.<span class="ident">poll_ctx</span>.<span class="ident">store_id</span>() <span class="op">=</span><span class="op">=</span> <span class="number">1</span>,
                 <span class="op">|</span><span class="kw">_</span><span class="op">|</span> {}
             );
-
             <span class="self">self</span>.<span class="ident">poll_ctx</span>
                 .<span class="ident">engines</span>
                 .<span class="ident">raft</span>
@@ -3320,9 +3311,8 @@
     }
 
     <span class="kw">fn</span> <span class="ident">pause</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">poll_ctx</span>.<span class="ident">need_flush_trans</span> {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">poll_ctx</span>.<span class="ident">trans</span>.<span class="ident">need_flush</span>() {
             <span class="self">self</span>.<span class="ident">poll_ctx</span>.<span class="ident">trans</span>.<span class="ident">flush</span>();
-            <span class="self">self</span>.<span class="ident">poll_ctx</span>.<span class="ident">need_flush_trans</span> <span class="op">=</span> <span class="bool-val">false</span>;
         }
     }
 }
@@ -3553,7 +3543,6 @@
             <span class="ident">sync_log</span>: <span class="bool-val">false</span>,
             <span class="ident">has_ready</span>: <span class="bool-val">false</span>,
             <span class="ident">ready_res</span>: <span class="ident">Vec</span>::<span class="ident">new</span>(),
-            <span class="ident">need_flush_trans</span>: <span class="bool-val">false</span>,
             <span class="ident">current_time</span>: <span class="prelude-val">None</span>,
             <span class="ident">perf_context_statistics</span>: <span class="ident">PerfContextStatistics</span>::<span class="ident">new</span>(<span class="self">self</span>.<span class="ident">cfg</span>.<span class="ident">value</span>().<span class="ident">perf_level</span>),
             <span class="ident">tick_batch</span>: <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">PeerTickBatch</span>::<span class="ident">default</span>(); <span class="number">256</span>],
@@ -3949,7 +3938,6 @@
                         <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>,
                     );
                 }
-                <span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">need_flush_trans</span> <span class="op">=</span> <span class="bool-val">true</span>;
             }
 
             <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">CheckMsgStatus</span>::<span class="ident">DropMsg</span>);

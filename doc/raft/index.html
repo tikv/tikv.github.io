@@ -1,7 +1,7 @@
 <!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `raft` crate."><meta name="keywords" content="rust, rustlang, rust-lang, raft"><title>raft - Rust</title><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../ayu.css" disabled ><script src="../storage.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../favicon.svg">
 <link rel="alternate icon" type="image/png" href="../favicon-16x16.png">
 <link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../down-arrow.svg");}</style></head><body class="rustdoc mod"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../raft/index.html'><div class='logo-container rust-logo'><img src='../rust-logo.png' alt='logo'></div></a><p class="location">Crate raft</p><div class="block version"><p>Version 0.6.0-alpha</p></div><div class="sidebar-elems"><a id="all-types" href="all.html"><p>See all raft's items</p></a><div class="block items"><ul><li><a href="#reexports">Re-exports</a></li><li><a href="#modules">Modules</a></li><li><a href="#structs">Structs</a></li><li><a href="#enums">Enums</a></li><li><a href="#constants">Constants</a></li><li><a href="#functions">Functions</a></li><li><a href="#types">Type Definitions</a></li></ul></div><p class="location"></p><script>window.sidebarCurrent = {name: "raft", ty: "mod", relpath: "../"};</script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><span class="help-button">?</span>
-                <a id="settings-menu" href="../settings.html"><img src="../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class="fqn"><span class="out-of-band"><span id="render-detail"><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span><a class="srclink" href="../src/raft/lib.rs.html#17-570" title="goto source code">[src]</a></span><span class="in-band">Crate <a class="mod" href="">raft</a></span></h1><div class="docblock"><h2 id="creating-a-raft-node" class="section-header"><a href="#creating-a-raft-node">Creating a Raft node</a></h2>
+                <a id="settings-menu" href="../settings.html"><img src="../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class="fqn"><span class="out-of-band"><span id="render-detail"><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span><a class="srclink" href="../src/raft/lib.rs.html#17-576" title="goto source code">[src]</a></span><span class="in-band">Crate <a class="mod" href="">raft</a></span></h1><div class="docblock"><h2 id="creating-a-raft-node" class="section-header"><a href="#creating-a-raft-node">Creating a Raft node</a></h2>
 <p>You can use <a href="raw_node/struct.RawNode.html#method.new"><code>RawNode::new</code></a> to create the Raft node. To
 create the Raft node, you need to provide a <a href="storage/trait.Storage.html"><code>Storage</code></a> component, and
 a <a href="struct.Config.html"><code>Config</code></a> to the <a href="raw_node/struct.RawNode.html#method.new"><code>RawNode::new</code></a>
@@ -137,6 +137,18 @@ state:</p>
 by one:</p>
 <ol>
 <li>
+<p>Check whether <code>messages</code> is empty or not. If not, it means that the node will send messages to
+other nodes:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">let</span> <span class="ident">msgs</span> <span class="op">=</span> <span class="ident">ready</span>.<span class="ident">take_messages</span>();
+<span class="kw">for</span> <span class="ident">vec_msg</span> <span class="kw">in</span> <span class="ident">msgs</span> {
+    <span class="kw">for</span> <span class="ident">_msg</span> <span class="kw">in</span> <span class="ident">vec_msg</span> {
+        <span class="comment">// Send messages to other peers.</span>
+    }
+}</pre></div>
+</li>
+<li>
 <p>Check whether <code>snapshot</code> is empty or not. If not empty, it means that the Raft node has received
 a Raft snapshot from the leader and we must apply the snapshot:</p>
 
@@ -151,8 +163,32 @@ a Raft snapshot from the leader and we must apply the snapshot:</p>
 </pre></div>
 </li>
 <li>
+<p>Check whether <code>committed_entires</code> is empty or not. If not, it means that there are some newly
+committed log entries which you must apply to the state machine. Of course, after applying, you
+need to update the applied index and resume <code>apply</code> later:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">_last_apply_index</span> <span class="op">=</span> <span class="number">0</span>;
+<span class="kw">for</span> <span class="ident">entry</span> <span class="kw">in</span> <span class="ident">ready</span>.<span class="ident">take_committed_entries</span>() {
+    <span class="comment">// Mostly, you need to save the last apply index to resume applying</span>
+    <span class="comment">// after restart. Here we just ignore this because we use a Memory storage.</span>
+    <span class="ident">_last_apply_index</span> <span class="op">=</span> <span class="ident">entry</span>.<span class="ident">index</span>;
+
+    <span class="kw">if</span> <span class="ident">entry</span>.<span class="ident">data</span>.<span class="ident">is_empty</span>() {
+        <span class="comment">// Emtpy entry, when the peer becomes Leader it will send an empty entry.</span>
+        <span class="kw">continue</span>;
+    }
+
+    <span class="kw">match</span> <span class="ident">entry</span>.<span class="ident">get_entry_type</span>() {
+        <span class="ident">EntryType</span>::<span class="ident">EntryNormal</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">handle_normal</span>(<span class="ident">entry</span>),
+        <span class="ident">EntryType</span>::<span class="ident">EntryConfChange</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">handle_conf_change</span>(<span class="ident">entry</span>),
+        <span class="ident">EntryType</span>::<span class="ident">EntryConfChangeV2</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">unimplemented</span><span class="macro">!</span>(),
+    }
+}</pre></div>
+</li>
+<li>
 <p>Check whether <code>entries</code> is empty or not. If not empty, it means that there are newly added
-entries but has not been committed yet, we must append the entries to the Raft log:</p>
+entries but have not been committed yet, we must append the entries to the Raft log:</p>
 
 <div class="example-wrap"><pre class="rust rust-example-rendered">
 <span class="kw">if</span> <span class="op">!</span><span class="ident">ready</span>.<span class="ident">entries</span>().<span class="ident">is_empty</span>() {
@@ -173,52 +209,16 @@ We must persist the changed <code>HardState</code>:</p>
 }</pre></div>
 </li>
 <li>
-<p>Check whether <code>messages</code> is empty or not. If not, it means that the node will send messages to
-other nodes. There has been an optimization for sending messages: if the node is a leader, this can
-be done together with step 1 in parallel; if the node is not a leader, it needs to reply the
-messages to the leader after appending the Raft entries:</p>
+<p>Call <code>advance</code> to notify that the previous work is completed. Get the return value <code>LightReady</code>
+and handle its <code>messages</code> and <code>committed_entries</code> like step 1 and step 3 does. Then call <code>advance_apply</code>
+to advance the applied index inside.</p>
 
 <div class="example-wrap"><pre class="rust rust-example-rendered">
-<span class="kw">if</span> <span class="op">!</span><span class="ident">is_leader</span> {
-    <span class="comment">// If not leader, the follower needs to reply the messages to</span>
-    <span class="comment">// the leader after appending Raft entries.</span>
-    <span class="kw">let</span> <span class="ident">msgs</span> <span class="op">=</span> <span class="ident">ready</span>.<span class="ident">messages</span>.<span class="ident">drain</span>(..);
-    <span class="kw">for</span> <span class="ident">_msg</span> <span class="kw">in</span> <span class="ident">msgs</span> {
-        <span class="comment">// Send messages to other peers.</span>
-    }
-}</pre></div>
-</li>
-<li>
-<p>Check whether <code>committed_entires</code> is empty or not. If not, it means that there are some newly
-committed log entries which you must apply to the state machine. Of course, after applying, you
-need to update the applied index and resume <code>apply</code> later:</p>
-
-<div class="example-wrap"><pre class="rust rust-example-rendered">
-<span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">committed_entries</span>) <span class="op">=</span> <span class="ident">ready</span>.<span class="ident">committed_entries</span>.<span class="ident">take</span>() {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">_last_apply_index</span> <span class="op">=</span> <span class="number">0</span>;
-    <span class="kw">for</span> <span class="ident">entry</span> <span class="kw">in</span> <span class="ident">committed_entries</span> {
-        <span class="comment">// Mostly, you need to save the last apply index to resume applying</span>
-        <span class="comment">// after restart. Here we just ignore this because we use a Memory storage.</span>
-        <span class="ident">_last_apply_index</span> <span class="op">=</span> <span class="ident">entry</span>.<span class="ident">index</span>;
-
-        <span class="kw">if</span> <span class="ident">entry</span>.<span class="ident">data</span>.<span class="ident">is_empty</span>() {
-            <span class="comment">// Emtpy entry, when the peer becomes Leader it will send an empty entry.</span>
-            <span class="kw">continue</span>;
-        }
-
-        <span class="kw">match</span> <span class="ident">entry</span>.<span class="ident">get_entry_type</span>() {
-            <span class="ident">EntryType</span>::<span class="ident">EntryNormal</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">handle_normal</span>(<span class="ident">entry</span>),
-            <span class="ident">EntryType</span>::<span class="ident">EntryConfChange</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">handle_conf_change</span>(<span class="ident">entry</span>),
-            <span class="ident">EntryType</span>::<span class="ident">EntryConfChangeV2</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">unimplemented</span><span class="macro">!</span>(),
-        }
-    }
-}</pre></div>
-</li>
-<li>
-<p>Call <code>advance</code> to prepare for the next <code>Ready</code> state.</p>
-
-<div class="example-wrap"><pre class="rust rust-example-rendered">
-<span class="ident">node</span>.<span class="ident">advance</span>(<span class="ident">ready</span>);</pre></div>
+<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">light_rd</span> <span class="op">=</span> <span class="ident">node</span>.<span class="ident">advance</span>(<span class="ident">ready</span>);
+<span class="comment">// Like step 1 and 5, you can use functions to make them behave the same.</span>
+<span class="ident">handle_messages</span>(<span class="ident">light_rd</span>.<span class="ident">take_messages</span>());
+<span class="ident">handle_committed_entries</span>(<span class="ident">light_rd</span>.<span class="ident">take_committed_entries</span>());
+<span class="ident">node</span>.<span class="ident">advance_apply</span>();</pre></div>
 </li>
 </ol>
 <p>For more information, check out an <a href="examples/single_mem_node/main.rs#L113-L179">example</a>.</p>
@@ -272,7 +272,7 @@ active), it is very important to wait until the entire peer group has exited the
 before taking old, removed peers offline.</p>
 </blockquote>
 </div><h2 id="reexports" class="section-header"><a href="#reexports">Re-exports</a></h2>
-<table><tr><td><code>pub use self::raft_log::<a class="constant" href="../raft/util/constant.NO_LIMIT.html" title="constant raft::util::NO_LIMIT">NO_LIMIT</a>;</code></td></tr><tr><td><code>pub use self::raw_node::<a class="fn" href="../raft/raw_node/fn.is_empty_snap.html" title="fn raft::raw_node::is_empty_snap">is_empty_snap</a>;</code></td></tr><tr><td><code>pub use self::raw_node::<a class="struct" href="../raft/raw_node/struct.Peer.html" title="struct raft::raw_node::Peer">Peer</a>;</code></td></tr><tr><td><code>pub use self::raw_node::<a class="struct" href="../raft/raw_node/struct.RawNode.html" title="struct raft::raw_node::RawNode">RawNode</a>;</code></td></tr><tr><td><code>pub use self::raw_node::<a class="struct" href="../raft/raw_node/struct.Ready.html" title="struct raft::raw_node::Ready">Ready</a>;</code></td></tr><tr><td><code>pub use self::raw_node::<a class="enum" href="../raft/raw_node/enum.SnapshotStatus.html" title="enum raft::raw_node::SnapshotStatus">SnapshotStatus</a>;</code></td></tr><tr><td><code>pub use self::storage::<a class="struct" href="../raft/storage/struct.RaftState.html" title="struct raft::storage::RaftState">RaftState</a>;</code></td></tr><tr><td><code>pub use self::storage::<a class="trait" href="../raft/storage/trait.Storage.html" title="trait raft::storage::Storage">Storage</a>;</code></td></tr><tr><td><code>pub use self::util::<a class="fn" href="../raft/util/fn.majority.html" title="fn raft::util::majority">majority</a>;</code></td></tr></table><h2 id="modules" class="section-header"><a href="#modules">Modules</a></h2>
+<table><tr><td><code>pub use self::raft_log::<a class="constant" href="../raft/util/constant.NO_LIMIT.html" title="constant raft::util::NO_LIMIT">NO_LIMIT</a>;</code></td></tr><tr><td><code>pub use self::raw_node::<a class="fn" href="../raft/raw_node/fn.is_empty_snap.html" title="fn raft::raw_node::is_empty_snap">is_empty_snap</a>;</code></td></tr><tr><td><code>pub use self::raw_node::<a class="struct" href="../raft/raw_node/struct.LightReady.html" title="struct raft::raw_node::LightReady">LightReady</a>;</code></td></tr><tr><td><code>pub use self::raw_node::<a class="struct" href="../raft/raw_node/struct.Peer.html" title="struct raft::raw_node::Peer">Peer</a>;</code></td></tr><tr><td><code>pub use self::raw_node::<a class="struct" href="../raft/raw_node/struct.RawNode.html" title="struct raft::raw_node::RawNode">RawNode</a>;</code></td></tr><tr><td><code>pub use self::raw_node::<a class="struct" href="../raft/raw_node/struct.Ready.html" title="struct raft::raw_node::Ready">Ready</a>;</code></td></tr><tr><td><code>pub use self::raw_node::<a class="enum" href="../raft/raw_node/enum.SnapshotStatus.html" title="enum raft::raw_node::SnapshotStatus">SnapshotStatus</a>;</code></td></tr><tr><td><code>pub use self::storage::<a class="struct" href="../raft/storage/struct.RaftState.html" title="struct raft::storage::RaftState">RaftState</a>;</code></td></tr><tr><td><code>pub use self::storage::<a class="trait" href="../raft/storage/trait.Storage.html" title="trait raft::storage::Storage">Storage</a>;</code></td></tr><tr><td><code>pub use self::util::<a class="fn" href="../raft/util/fn.majority.html" title="fn raft::util::majority">majority</a>;</code></td></tr></table><h2 id="modules" class="section-header"><a href="#modules">Modules</a></h2>
 <table><tr class="module-item"><td><a class="mod" href="eraftpb/index.html" title="raft::eraftpb mod">eraftpb</a></td><td class="docblock-short"><p>Generated file from <code>eraftpb.proto</code></p>
 </td></tr><tr class="module-item"><td><a class="mod" href="prelude/index.html" title="raft::prelude mod">prelude</a></td><td class="docblock-short"><p>A &quot;prelude&quot; for crates using the <code>raft</code> crate.</p>
 </td></tr><tr class="module-item"><td><a class="mod" href="raw_node/index.html" title="raft::raw_node mod">raw_node</a></td><td class="docblock-short"><p>The raw node of the raft module.</p>
