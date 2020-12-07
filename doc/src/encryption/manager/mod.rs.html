@@ -1058,6 +1058,35 @@
 <span id="1055">1055</span>
 <span id="1056">1056</span>
 <span id="1057">1057</span>
+<span id="1058">1058</span>
+<span id="1059">1059</span>
+<span id="1060">1060</span>
+<span id="1061">1061</span>
+<span id="1062">1062</span>
+<span id="1063">1063</span>
+<span id="1064">1064</span>
+<span id="1065">1065</span>
+<span id="1066">1066</span>
+<span id="1067">1067</span>
+<span id="1068">1068</span>
+<span id="1069">1069</span>
+<span id="1070">1070</span>
+<span id="1071">1071</span>
+<span id="1072">1072</span>
+<span id="1073">1073</span>
+<span id="1074">1074</span>
+<span id="1075">1075</span>
+<span id="1076">1076</span>
+<span id="1077">1077</span>
+<span id="1078">1078</span>
+<span id="1079">1079</span>
+<span id="1080">1080</span>
+<span id="1081">1081</span>
+<span id="1082">1082</span>
+<span id="1083">1083</span>
+<span id="1084">1084</span>
+<span id="1085">1085</span>
+<span id="1086">1086</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1076,8 +1105,8 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">config</span>::{<span class="ident">EncryptionConfig</span>, <span class="ident">MasterKeyConfig</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">crypter</span>::{<span class="self">self</span>, <span class="ident">compat</span>, <span class="ident">Iv</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">encrypted_file</span>::<span class="ident">EncryptedFile</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">file_dict_file</span>::<span class="ident">FileDictionaryFile</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">io</span>::<span class="ident">EncrypterWriter</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">log_file</span>::<span class="ident">LogFile</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">master_key</span>::{<span class="ident">create_backend</span>, <span class="ident">Backend</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">metrics</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">Error</span>, <span class="prelude-ty">Result</span>};
@@ -1089,7 +1118,7 @@
 <span class="kw">struct</span> <span class="ident">Dicts</span> {
     <span class="comment">// Maps data file paths to key id and metadata. This file is stored as plaintext.</span>
     <span class="ident">file_dict</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">FileDictionary</span><span class="op">&gt;</span>,
-    <span class="ident">log_file</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">LogFile</span><span class="op">&gt;</span>,
+    <span class="ident">file_dict_file</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">FileDictionaryFile</span><span class="op">&gt;</span>,
     <span class="comment">// Maps data key id to data keys, together with metadata. Also stores the data</span>
     <span class="comment">// key id used to encrypt the encryption file dictionary. The content is encrypted</span>
     <span class="comment">// using master key.</span>
@@ -1103,13 +1132,19 @@
 }
 
 <span class="kw">impl</span> <span class="ident">Dicts</span> {
-    <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">path</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">rotation_period</span>: <span class="ident">Duration</span>, <span class="ident">file_rewrite_threshold</span>: <span class="ident">u64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Dicts</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">new</span>(
+        <span class="ident">path</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
+        <span class="ident">rotation_period</span>: <span class="ident">Duration</span>,
+        <span class="ident">enable_file_dictionary_log</span>: <span class="ident">bool</span>,
+        <span class="ident">file_dictionary_rewrite_threshold</span>: <span class="ident">u64</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Dicts</span><span class="op">&gt;</span> {
         <span class="prelude-val">Ok</span>(<span class="ident">Dicts</span> {
             <span class="ident">file_dict</span>: <span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">FileDictionary</span>::<span class="ident">default</span>()),
-            <span class="ident">log_file</span>: <span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">LogFile</span>::<span class="ident">new</span>(
+            <span class="ident">file_dict_file</span>: <span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">FileDictionaryFile</span>::<span class="ident">new</span>(
                 <span class="ident">Path</span>::<span class="ident">new</span>(<span class="ident">path</span>).<span class="ident">to_owned</span>(),
                 <span class="ident">FILE_DICT_NAME</span>,
-                <span class="ident">file_rewrite_threshold</span>,
+                <span class="ident">enable_file_dictionary_log</span>,
+                <span class="ident">file_dictionary_rewrite_threshold</span>,
             )<span class="question-mark">?</span>),
             <span class="ident">key_dict</span>: <span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">KeyDictionary</span> {
                 <span class="ident">current_key_id</span>: <span class="number">0</span>,
@@ -1125,19 +1160,26 @@
         <span class="ident">path</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
         <span class="ident">rotation_period</span>: <span class="ident">Duration</span>,
         <span class="ident">master_key</span>: <span class="kw-2">&amp;</span><span class="ident">dyn</span> <span class="ident">Backend</span>,
-        <span class="ident">file_rewrite_threshold</span>: <span class="ident">u64</span>,
+        <span class="ident">enable_file_dictionary_log</span>: <span class="ident">bool</span>,
+        <span class="ident">file_dictionary_rewrite_threshold</span>: <span class="ident">u64</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Dicts</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">base</span> <span class="op">=</span> <span class="ident">Path</span>::<span class="ident">new</span>(<span class="ident">path</span>);
 
         <span class="comment">// File dict is saved in plaintext.</span>
-        <span class="kw">let</span> <span class="ident">log_content</span> <span class="op">=</span> <span class="ident">LogFile</span>::<span class="ident">open</span>(<span class="ident">base</span>, <span class="ident">FILE_DICT_NAME</span>, <span class="ident">file_rewrite_threshold</span>, <span class="bool-val">false</span>);
+        <span class="kw">let</span> <span class="ident">log_content</span> <span class="op">=</span> <span class="ident">FileDictionaryFile</span>::<span class="ident">open</span>(
+            <span class="ident">base</span>,
+            <span class="ident">FILE_DICT_NAME</span>,
+            <span class="ident">enable_file_dictionary_log</span>,
+            <span class="ident">file_dictionary_rewrite_threshold</span>,
+            <span class="bool-val">false</span>,
+        );
 
         <span class="kw">let</span> <span class="ident">key_file</span> <span class="op">=</span> <span class="ident">EncryptedFile</span>::<span class="ident">new</span>(<span class="ident">base</span>, <span class="ident">KEY_DICT_NAME</span>);
         <span class="kw">let</span> <span class="ident">key_bytes</span> <span class="op">=</span> <span class="ident">key_file</span>.<span class="ident">read</span>(<span class="ident">master_key</span>);
 
         <span class="kw">match</span> (<span class="ident">log_content</span>, <span class="ident">key_bytes</span>) {
             <span class="comment">// Both files are found.</span>
-            (<span class="prelude-val">Ok</span>((<span class="ident">log_file</span>, <span class="ident">file_dict</span>)), <span class="prelude-val">Ok</span>(<span class="ident">key_bytes</span>)) <span class="op">=</span><span class="op">&gt;</span> {
+            (<span class="prelude-val">Ok</span>((<span class="ident">file_dict_file</span>, <span class="ident">file_dict</span>)), <span class="prelude-val">Ok</span>(<span class="ident">key_bytes</span>)) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;encryption: found both of key dictionary and file dictionary.&quot;</span>);
                 <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">key_dict</span> <span class="op">=</span> <span class="ident">KeyDictionary</span>::<span class="ident">default</span>();
                 <span class="ident">key_dict</span>.<span class="ident">merge_from_bytes</span>(<span class="kw-2">&amp;</span><span class="ident">key_bytes</span>)<span class="question-mark">?</span>;
@@ -1148,7 +1190,7 @@
 
                 <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">Dicts</span> {
                     <span class="ident">file_dict</span>: <span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">file_dict</span>),
-                    <span class="ident">log_file</span>: <span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">log_file</span>),
+                    <span class="ident">file_dict_file</span>: <span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">file_dict_file</span>),
                     <span class="ident">key_dict</span>: <span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">key_dict</span>),
                     <span class="ident">current_key_id</span>,
                     <span class="ident">rotation_period</span>,
@@ -1164,13 +1206,13 @@
                 <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
             }
             <span class="comment">// ...else, return either error.</span>
-            (<span class="ident">log_file</span>, <span class="ident">key_bytes</span>) <span class="op">=</span><span class="op">&gt;</span> {
+            (<span class="ident">file_dict_file</span>, <span class="ident">key_bytes</span>) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">key_err</span>) <span class="op">=</span> <span class="ident">key_bytes</span> {
                     <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;encryption: failed to load key dictionary.&quot;</span>);
                     <span class="prelude-val">Err</span>(<span class="ident">key_err</span>)
                 } <span class="kw">else</span> {
                     <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;encryption: failed to load file dictionary.&quot;</span>);
-                    <span class="prelude-val">Err</span>(<span class="ident">log_file</span>.<span class="ident">unwrap_err</span>())
+                    <span class="prelude-val">Err</span>(<span class="ident">file_dict_file</span>.<span class="ident">unwrap_err</span>())
                 }
             }
         }
@@ -1232,7 +1274,7 @@
     }
 
     <span class="kw">fn</span> <span class="ident">new_file</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">fname</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">method</span>: <span class="ident">EncryptionMethod</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">FileInfo</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">log_file</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">log_file</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">file_dict_file</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">file_dict_file</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">iv</span> <span class="op">=</span> <span class="ident">Iv</span>::<span class="ident">new_ctr</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">file</span> <span class="op">=</span> <span class="ident">FileInfo</span>::<span class="ident">default</span>();
         <span class="ident">file</span>.<span class="ident">iv</span> <span class="op">=</span> <span class="ident">iv</span>.<span class="ident">as_slice</span>().<span class="ident">to_vec</span>();
@@ -1244,7 +1286,7 @@
             <span class="ident">file_dict</span>.<span class="ident">files</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="kw">_</span>
         };
 
-        <span class="ident">log_file</span>.<span class="ident">insert</span>(<span class="ident">fname</span>, <span class="kw-2">&amp;</span><span class="ident">file</span>)<span class="question-mark">?</span>;
+        <span class="ident">file_dict_file</span>.<span class="ident">insert</span>(<span class="ident">fname</span>, <span class="kw-2">&amp;</span><span class="ident">file</span>)<span class="question-mark">?</span>;
         <span class="ident">ENCRYPTION_FILE_NUM_GAUGE</span>.<span class="ident">set</span>(<span class="ident">file_num</span>);
 
         <span class="kw">if</span> <span class="ident">method</span> <span class="op">!</span><span class="op">=</span> <span class="ident">EncryptionMethod</span>::<span class="ident">Plaintext</span> {
@@ -1259,7 +1301,7 @@
     }
 
     <span class="kw">fn</span> <span class="ident">delete_file</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">fname</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">log_file</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">log_file</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">file_dict_file</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">file_dict_file</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
         <span class="kw">let</span> (<span class="ident">file</span>, <span class="ident">file_num</span>) <span class="op">=</span> {
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">file_dict</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">file_dict</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
 
@@ -1276,7 +1318,7 @@
             }
         };
 
-        <span class="ident">log_file</span>.<span class="ident">remove</span>(<span class="ident">fname</span>)<span class="question-mark">?</span>;
+        <span class="ident">file_dict_file</span>.<span class="ident">remove</span>(<span class="ident">fname</span>)<span class="question-mark">?</span>;
         <span class="ident">ENCRYPTION_FILE_NUM_GAUGE</span>.<span class="ident">set</span>(<span class="ident">file_num</span>);
         <span class="kw">if</span> <span class="ident">file</span>.<span class="ident">method</span> <span class="op">!</span><span class="op">=</span> <span class="ident">compat</span>(<span class="ident">EncryptionMethod</span>::<span class="ident">Plaintext</span>) {
             <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;delete encrypted file&quot;</span>; <span class="string">&quot;fname&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fname</span>);
@@ -1287,7 +1329,7 @@
     }
 
     <span class="kw">fn</span> <span class="ident">link_file</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">src_fname</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">dst_fname</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">log_file</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">log_file</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">file_dict_file</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">file_dict_file</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
         <span class="kw">let</span> (<span class="ident">method</span>, <span class="ident">file</span>, <span class="ident">file_num</span>) <span class="op">=</span> {
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">file_dict</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">file_dict</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
             <span class="kw">let</span> <span class="ident">file</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">file_dict</span>.<span class="ident">files</span>.<span class="ident">get</span>(<span class="ident">src_fname</span>) {
@@ -1309,7 +1351,7 @@
             <span class="kw">let</span> <span class="ident">file_num</span> <span class="op">=</span> <span class="ident">file_dict</span>.<span class="ident">files</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="kw">_</span>;
             (<span class="ident">method</span>, <span class="ident">file</span>, <span class="ident">file_num</span>)
         };
-        <span class="ident">log_file</span>.<span class="ident">insert</span>(<span class="ident">dst_fname</span>, <span class="kw-2">&amp;</span><span class="ident">file</span>)<span class="question-mark">?</span>;
+        <span class="ident">file_dict_file</span>.<span class="ident">insert</span>(<span class="ident">dst_fname</span>, <span class="kw-2">&amp;</span><span class="ident">file</span>)<span class="question-mark">?</span>;
         <span class="ident">ENCRYPTION_FILE_NUM_GAUGE</span>.<span class="ident">set</span>(<span class="ident">file_num</span>);
 
         <span class="kw">if</span> <span class="ident">method</span> <span class="op">!</span><span class="op">=</span> <span class="ident">compat</span>(<span class="ident">EncryptionMethod</span>::<span class="ident">Plaintext</span>) {
@@ -1321,7 +1363,7 @@
     }
 
     <span class="kw">fn</span> <span class="ident">rename_file</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">src_fname</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">dst_fname</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">log_file</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">log_file</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">file_dict_file</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">file_dict_file</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
         <span class="kw">let</span> (<span class="ident">method</span>, <span class="ident">file</span>, <span class="ident">file_num</span>) <span class="op">=</span> {
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">file_dict</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">file_dict</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
             <span class="kw">let</span> <span class="ident">file</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">file_dict</span>.<span class="ident">files</span>.<span class="ident">remove</span>(<span class="ident">src_fname</span>) {
@@ -1337,7 +1379,7 @@
             <span class="kw">let</span> <span class="ident">file_num</span> <span class="op">=</span> <span class="ident">file_dict</span>.<span class="ident">files</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="kw">_</span>;
             (<span class="ident">method</span>, <span class="ident">file</span>, <span class="ident">file_num</span>)
         };
-        <span class="ident">log_file</span>.<span class="ident">replace</span>(<span class="ident">src_fname</span>, <span class="ident">dst_fname</span>, <span class="ident">file</span>)<span class="question-mark">?</span>;
+        <span class="ident">file_dict_file</span>.<span class="ident">replace</span>(<span class="ident">src_fname</span>, <span class="ident">dst_fname</span>, <span class="ident">file</span>)<span class="question-mark">?</span>;
 
         <span class="ident">ENCRYPTION_FILE_NUM_GAUGE</span>.<span class="ident">set</span>(<span class="ident">file_num</span>);
 
@@ -1462,7 +1504,8 @@
             <span class="kw-2">&amp;</span><span class="ident">config</span>.<span class="ident">previous_master_key</span>,
             <span class="ident">config</span>.<span class="ident">data_encryption_method</span>,
             <span class="ident">config</span>.<span class="ident">data_key_rotation_period</span>.<span class="ident">into</span>(),
-            <span class="ident">config</span>.<span class="ident">file_rewrite_threshold</span>,
+            <span class="ident">config</span>.<span class="ident">enable_file_dictionary_log</span>,
+            <span class="ident">config</span>.<span class="ident">file_dictionary_rewrite_threshold</span>,
             <span class="ident">dict_path</span>,
         )
     }
@@ -1472,7 +1515,8 @@
         <span class="ident">previous_master_key_config</span>: <span class="kw-2">&amp;</span><span class="ident">MasterKeyConfig</span>,
         <span class="ident">method</span>: <span class="ident">EncryptionMethod</span>,
         <span class="ident">rotation_period</span>: <span class="ident">Duration</span>,
-        <span class="ident">file_rewrite_threshold</span>: <span class="ident">u64</span>,
+        <span class="ident">enable_file_dictionary_log</span>: <span class="ident">bool</span>,
+        <span class="ident">file_dictionary_rewrite_threshold</span>: <span class="ident">u64</span>,
         <span class="ident">dict_path</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">DataKeyManager</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">master_key</span> <span class="op">=</span> <span class="ident">create_backend</span>(<span class="ident">master_key_config</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
@@ -1489,7 +1533,8 @@
                 <span class="ident">dict_path</span>,
                 <span class="ident">rotation_period</span>,
                 <span class="ident">master_key</span>.<span class="ident">as_ref</span>(),
-                <span class="ident">file_rewrite_threshold</span>,
+                <span class="ident">enable_file_dictionary_log</span>,
+                <span class="ident">file_dictionary_rewrite_threshold</span>,
             ),
             <span class="ident">method</span>,
         ) {
@@ -1501,7 +1546,12 @@
             <span class="comment">// Encryption is being enabled.</span>
             (<span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>), <span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;encryption is being enabled. method = {:?}&quot;</span>, <span class="ident">method</span>);
-                <span class="ident">Dicts</span>::<span class="ident">new</span>(<span class="ident">dict_path</span>, <span class="ident">rotation_period</span>, <span class="ident">file_rewrite_threshold</span>)<span class="question-mark">?</span>
+                <span class="ident">Dicts</span>::<span class="ident">new</span>(
+                    <span class="ident">dict_path</span>,
+                    <span class="ident">rotation_period</span>,
+                    <span class="ident">enable_file_dictionary_log</span>,
+                    <span class="ident">file_dictionary_rewrite_threshold</span>,
+                )<span class="question-mark">?</span>
             }
             <span class="comment">// Encryption was enabled and master key didn&#39;t change.</span>
             (<span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">dicts</span>)), <span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> {
@@ -1522,7 +1572,8 @@
                     <span class="ident">dict_path</span>,
                     <span class="ident">rotation_period</span>,
                     <span class="ident">previous_master_key</span>.<span class="ident">as_ref</span>(),
-                    <span class="ident">file_rewrite_threshold</span>,
+                    <span class="ident">enable_file_dictionary_log</span>,
+                    <span class="ident">file_dictionary_rewrite_threshold</span>,
                 )
                 .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
                     <span class="kw">if</span> <span class="kw">let</span> <span class="ident">Error</span>::<span class="ident">WrongMasterKey</span>(<span class="ident">e_previous</span>) <span class="op">=</span> <span class="ident">e</span> {
@@ -1612,7 +1663,13 @@
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">dump_file_dict</span>(<span class="ident">dict_path</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">file_path</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">str</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="kw">let</span> (<span class="kw">_</span>, <span class="ident">file_dict</span>) <span class="op">=</span> <span class="ident">LogFile</span>::<span class="ident">open</span>(<span class="ident">dict_path</span>, <span class="ident">FILE_DICT_NAME</span>, <span class="number">1</span>, <span class="bool-val">true</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> (<span class="kw">_</span>, <span class="ident">file_dict</span>) <span class="op">=</span> <span class="ident">FileDictionaryFile</span>::<span class="ident">open</span>(
+            <span class="ident">dict_path</span>,
+            <span class="ident">FILE_DICT_NAME</span>,
+            <span class="bool-val">true</span>, <span class="comment">/*enable_file_dictionary_log*/</span>
+            <span class="number">1</span>,
+            <span class="bool-val">true</span>, <span class="comment">/*skip_rewrite*/</span>
+        )<span class="question-mark">?</span>;
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">file_path</span>) <span class="op">=</span> <span class="ident">file_path</span> {
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">info</span>) <span class="op">=</span> <span class="ident">file_dict</span>.<span class="ident">files</span>.<span class="ident">get</span>(<span class="ident">file_path</span>) {
                 <span class="macro">println</span><span class="macro">!</span>(<span class="string">&quot;{}: {:?}&quot;</span>, <span class="ident">file_path</span>, <span class="ident">info</span>);
@@ -1725,6 +1782,7 @@
             <span class="kw-2">&amp;</span><span class="ident">previous_master_key</span>,
             <span class="ident">method</span>.<span class="ident">unwrap_or</span>(<span class="ident">EncryptionMethod</span>::<span class="ident">Aes256Ctr</span>),
             <span class="ident">Duration</span>::<span class="ident">from_secs</span>(<span class="number">60</span>),
+            <span class="bool-val">true</span>, <span class="comment">/*enable_file_dictionary_log*/</span>
             <span class="number">2</span>,
             <span class="ident">tmp</span>.<span class="ident">path</span>().<span class="ident">as_os_str</span>().<span class="ident">to_str</span>().<span class="ident">unwrap</span>(),
         );
