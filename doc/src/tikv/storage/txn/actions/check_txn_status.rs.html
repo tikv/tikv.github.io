@@ -120,6 +120,15 @@
 <span id="117">117</span>
 <span id="118">118</span>
 <span id="119">119</span>
+<span id="120">120</span>
+<span id="121">121</span>
+<span id="122">122</span>
+<span id="123">123</span>
+<span id="124">124</span>
+<span id="125">125</span>
+<span id="126">126</span>
+<span id="127">127</span>
+<span id="128">128</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -140,11 +149,20 @@
     <span class="kw-2">mut</span> <span class="ident">lock</span>: <span class="ident">Lock</span>,
     <span class="ident">current_ts</span>: <span class="ident">TimeStamp</span>,
     <span class="ident">caller_start_ts</span>: <span class="ident">TimeStamp</span>,
+    <span class="ident">force_sync_commit</span>: <span class="ident">bool</span>,
 ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">TxnStatus</span>, <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ReleasedLock</span><span class="op">&gt;</span>)<span class="op">&gt;</span> {
     <span class="comment">// Never rollback or push forward min_commit_ts in check_txn_status if it&#39;s using async commit.</span>
     <span class="comment">// Rollback of async-commit locks are done during ResolveLock.</span>
     <span class="kw">if</span> <span class="ident">lock</span>.<span class="ident">use_async_commit</span> {
-        <span class="kw">return</span> <span class="prelude-val">Ok</span>((<span class="ident">TxnStatus</span>::<span class="ident">uncommitted</span>(<span class="ident">lock</span>, <span class="bool-val">false</span>), <span class="prelude-val">None</span>));
+        <span class="kw">if</span> <span class="ident">force_sync_commit</span> {
+            <span class="macro">info</span><span class="macro">!</span>(
+                <span class="string">&quot;fallback is set, check_txn_status treats it as a non-async-commit txn&quot;</span>;
+                <span class="string">&quot;start_ts&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">txn</span>.<span class="ident">start_ts</span>,
+                <span class="string">&quot;primary_key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">primary_key</span>,
+            );
+        } <span class="kw">else</span> {
+            <span class="kw">return</span> <span class="prelude-val">Ok</span>((<span class="ident">TxnStatus</span>::<span class="ident">uncommitted</span>(<span class="ident">lock</span>, <span class="bool-val">false</span>), <span class="prelude-val">None</span>));
+        }
     }
 
     <span class="kw">let</span> <span class="ident">is_pessimistic_txn</span> <span class="op">=</span> <span class="op">!</span><span class="ident">lock</span>.<span class="ident">for_update_ts</span>.<span class="ident">is_zero</span>();
