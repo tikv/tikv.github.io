@@ -739,7 +739,6 @@
 <span id="736">736</span>
 <span id="737">737</span>
 <span id="738">738</span>
-<span id="739">739</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -756,7 +755,6 @@
 };
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">txn</span>::<span class="prelude-ty">Result</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::{<span class="ident">ProcessResult</span>, <span class="ident">Snapshot</span>, <span class="ident">TxnStatus</span>};
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">mem</span>;
 
 <span class="macro">command</span><span class="macro">!</span> {
     <span class="doccomment">/// Check the status of a transaction. This is usually invoked by a transaction that meets</span>
@@ -799,9 +797,9 @@
     <span class="doccomment">/// in the primary lock.</span>
     <span class="doccomment">/// When transaction T1 meets T2&#39;s lock, it may invoke this on T2&#39;s primary key. In this</span>
     <span class="doccomment">/// situation, `self.start_ts` is T2&#39;s `start_ts`, `caller_start_ts` is T1&#39;s `start_ts`, and</span>
-    <span class="doccomment">/// the `current_ts` is literally the timestamp when this function is invoked. It may not be</span>
+    <span class="doccomment">/// the `current_ts` is literally the timestamp when this function is invoked; it may not be</span>
     <span class="doccomment">/// accurate.</span>
-    <span class="kw">fn</span> <span class="ident">process_write</span>(<span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">snapshot</span>: <span class="ident">S</span>, <span class="ident">context</span>: <span class="ident">WriteContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="ident">L</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">WriteResult</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">process_write</span>(<span class="self">self</span>, <span class="ident">snapshot</span>: <span class="ident">S</span>, <span class="ident">context</span>: <span class="ident">WriteContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="ident">L</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">WriteResult</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_max_ts</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">lock_ts</span>;
         <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">current_ts</span>.<span class="ident">is_max</span>() <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">current_ts</span> <span class="op">&gt;</span> <span class="ident">new_max_ts</span> {
             <span class="ident">new_max_ts</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">current_ts</span>;
@@ -818,8 +816,6 @@
             <span class="ident">context</span>.<span class="ident">concurrency_manager</span>,
         );
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">released_locks</span> <span class="op">=</span> <span class="ident">ReleasedLocks</span>::<span class="ident">new</span>(<span class="self">self</span>.<span class="ident">lock_ts</span>, <span class="ident">TimeStamp</span>::<span class="ident">zero</span>());
-        <span class="kw">let</span> <span class="ident">ctx</span> <span class="op">=</span> <span class="ident">mem</span>::<span class="ident">take</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">ctx</span>);
         <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;check_txn_status&quot;</span>, <span class="op">|</span><span class="ident">err</span><span class="op">|</span> <span class="prelude-val">Err</span>(
             <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">mvcc</span>::<span class="ident">Error</span>::<span class="ident">from</span>(<span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">mvcc</span>::<span class="ident">txn</span>::<span class="ident">make_txn_error</span>(
                 <span class="ident">err</span>,
@@ -829,26 +825,28 @@
             .<span class="ident">into</span>()
         ));
 
-        <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">txn</span>.<span class="ident">reader</span>.<span class="ident">load_lock</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">primary_key</span>)<span class="question-mark">?</span> {
+        <span class="kw">let</span> (<span class="ident">txn_status</span>, <span class="ident">released</span>) <span class="op">=</span> <span class="kw">match</span> <span class="ident">txn</span>.<span class="ident">reader</span>.<span class="ident">load_lock</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">primary_key</span>)<span class="question-mark">?</span> {
             <span class="prelude-val">Some</span>(<span class="ident">lock</span>) <span class="kw">if</span> <span class="ident">lock</span>.<span class="ident">ts</span> <span class="op">=</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">lock_ts</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">check_txn_status_lock_exists</span>(
                 <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">txn</span>,
                 <span class="self">self</span>.<span class="ident">primary_key</span>,
                 <span class="ident">lock</span>,
                 <span class="self">self</span>.<span class="ident">current_ts</span>,
                 <span class="self">self</span>.<span class="ident">caller_start_ts</span>,
-            ),
+            )<span class="question-mark">?</span>,
             <span class="comment">// The rollback must be protected, see more on</span>
             <span class="comment">// [issue #7364](https://github.com/tikv/tikv/issues/7364)</span>
-            <span class="ident">l</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">check_txn_status_missing_lock</span>(
-                <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">txn</span>,
-                <span class="self">self</span>.<span class="ident">primary_key</span>,
-                <span class="ident">l</span>,
-                <span class="ident">MissingLockAction</span>::<span class="ident">rollback</span>(<span class="self">self</span>.<span class="ident">rollback_if_not_exist</span>),
-            )
-            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> (<span class="ident">s</span>, <span class="prelude-val">None</span>)),
+            <span class="ident">l</span> <span class="op">=</span><span class="op">&gt;</span> (
+                <span class="ident">check_txn_status_missing_lock</span>(
+                    <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">txn</span>,
+                    <span class="self">self</span>.<span class="ident">primary_key</span>,
+                    <span class="ident">l</span>,
+                    <span class="ident">MissingLockAction</span>::<span class="ident">rollback</span>(<span class="self">self</span>.<span class="ident">rollback_if_not_exist</span>),
+                )<span class="question-mark">?</span>,
+                <span class="prelude-val">None</span>,
+            ),
         };
-        <span class="kw">let</span> (<span class="ident">txn_status</span>, <span class="ident">released</span>) <span class="op">=</span> <span class="ident">result</span><span class="question-mark">?</span>;
 
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">released_locks</span> <span class="op">=</span> <span class="ident">ReleasedLocks</span>::<span class="ident">new</span>(<span class="self">self</span>.<span class="ident">lock_ts</span>, <span class="ident">TimeStamp</span>::<span class="ident">zero</span>());
         <span class="ident">released_locks</span>.<span class="ident">push</span>(<span class="ident">released</span>);
         <span class="comment">// The lock is released here only when the `check_txn_status` returns `TtlExpire`.</span>
         <span class="kw">if</span> <span class="kw">let</span> <span class="ident">TxnStatus</span>::<span class="ident">TtlExpire</span> <span class="op">=</span> <span class="ident">txn_status</span> {
@@ -859,7 +857,7 @@
         <span class="kw">let</span> <span class="ident">pr</span> <span class="op">=</span> <span class="ident">ProcessResult</span>::<span class="ident">TxnStatus</span> { <span class="ident">txn_status</span> };
         <span class="kw">let</span> <span class="ident">write_data</span> <span class="op">=</span> <span class="ident">WriteData</span>::<span class="ident">from_modifies</span>(<span class="ident">txn</span>.<span class="ident">into_modifies</span>());
         <span class="prelude-val">Ok</span>(<span class="ident">WriteResult</span> {
-            <span class="ident">ctx</span>,
+            <span class="ident">ctx</span>: <span class="self">self</span>.<span class="ident">ctx</span>,
             <span class="ident">to_be_write</span>: <span class="ident">write_data</span>,
             <span class="ident">rows</span>: <span class="number">1</span>,
             <span class="ident">pr</span>,
