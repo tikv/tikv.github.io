@@ -2,6 +2,7 @@
 implementors["chrono"] = [{"text":"impl FromStr for NaiveDate","synthetic":false,"types":[]},{"text":"impl FromStr for NaiveTime","synthetic":false,"types":[]},{"text":"impl FromStr for NaiveDateTime","synthetic":false,"types":[]},{"text":"impl FromStr for DateTime&lt;Utc&gt;","synthetic":false,"types":[]},{"text":"impl FromStr for DateTime&lt;Local&gt;","synthetic":false,"types":[]},{"text":"impl FromStr for DateTime&lt;FixedOffset&gt;","synthetic":false,"types":[]},{"text":"impl FromStr for Weekday","synthetic":false,"types":[]}];
 implementors["chrono_tz"] = [{"text":"impl FromStr for Tz","synthetic":false,"types":[]}];
 implementors["clap"] = [{"text":"impl FromStr for AppSettings","synthetic":false,"types":[]},{"text":"impl FromStr for ArgSettings","synthetic":false,"types":[]},{"text":"impl FromStr for Shell","synthetic":false,"types":[]}];
+implementors["debugid"] = [{"text":"impl FromStr for DebugId","synthetic":false,"types":[]},{"text":"impl FromStr for CodeId","synthetic":false,"types":[]}];
 implementors["engine_rocks"] = [{"text":"impl FromStr for BlobRunMode","synthetic":false,"types":[]}];
 implementors["fuzz"] = [{"text":"impl FromStr for Fuzzer","synthetic":false,"types":[]}];
 implementors["http"] = [{"text":"impl FromStr for HeaderName","synthetic":false,"types":[]},{"text":"impl FromStr for HeaderValue","synthetic":false,"types":[]},{"text":"impl FromStr for Method","synthetic":false,"types":[]},{"text":"impl FromStr for StatusCode","synthetic":false,"types":[]},{"text":"impl FromStr for Authority","synthetic":false,"types":[]},{"text":"impl FromStr for PathAndQuery","synthetic":false,"types":[]},{"text":"impl FromStr for Scheme","synthetic":false,"types":[]},{"text":"impl FromStr for Uri","synthetic":false,"types":[]}];
@@ -26,6 +27,7 @@ implementors["semver"] = [{"text":"impl FromStr for Version","synthetic":false,"
 implementors["semver_parser"] = [{"text":"impl FromStr for Op","synthetic":false,"types":[]}];
 implementors["serde_json"] = [{"text":"impl FromStr for Number","synthetic":false,"types":[]},{"text":"impl FromStr for Value","synthetic":false,"types":[]}];
 implementors["slog"] = [{"text":"impl FromStr for Level","synthetic":false,"types":[]},{"text":"impl FromStr for FilterLevel","synthetic":false,"types":[]}];
+implementors["symbolic_common"] = [{"text":"impl FromStr for Arch","synthetic":false,"types":[]},{"text":"impl FromStr for Language","synthetic":false,"types":[]}];
 implementors["tidb_query_datatype"] = [{"text":"impl FromStr for Decimal","synthetic":false,"types":[]},{"text":"impl FromStr for Json","synthetic":false,"types":[]}];
 implementors["tikv_util"] = [{"text":"impl FromStr for ReadableSize","synthetic":false,"types":[]},{"text":"impl FromStr for ReadableDuration","synthetic":false,"types":[]}];
 implementors["toml"] = [{"text":"impl FromStr for Value","synthetic":false,"types":[]}];

@@ -20,6 +20,7 @@ implementors["iovec"] = [{"text":"impl DerefMut for IoVec","synthetic":false,"ty
 implementors["libflate"] = [{"text":"impl&lt;T:&nbsp;Complete&gt; DerefMut for AutoFinish&lt;T&gt;","synthetic":false,"types":[]},{"text":"impl&lt;T:&nbsp;Complete&gt; DerefMut for AutoFinishUnchecked&lt;T&gt;","synthetic":false,"types":[]}];
 implementors["lock_api"] = [{"text":"impl&lt;'a, R:&nbsp;RawMutex + 'a, T:&nbsp;?Sized + 'a&gt; DerefMut for MutexGuard&lt;'a, R, T&gt;","synthetic":false,"types":[]},{"text":"impl&lt;'a, R:&nbsp;RawMutex + 'a, T:&nbsp;?Sized + 'a&gt; DerefMut for MappedMutexGuard&lt;'a, R, T&gt;","synthetic":false,"types":[]},{"text":"impl&lt;'a, R:&nbsp;RawRwLock + 'a, T:&nbsp;?Sized + 'a&gt; DerefMut for RwLockWriteGuard&lt;'a, R, T&gt;","synthetic":false,"types":[]},{"text":"impl&lt;'a, R:&nbsp;RawRwLock + 'a, T:&nbsp;?Sized + 'a&gt; DerefMut for MappedRwLockWriteGuard&lt;'a, R, T&gt;","synthetic":false,"types":[]}];
 implementors["md5"] = [{"text":"impl DerefMut for Digest","synthetic":false,"types":[]}];
+implementors["memmap"] = [{"text":"impl DerefMut for MmapMut","synthetic":false,"types":[]}];
 implementors["mio"] = [{"text":"impl DerefMut for UnixReady","synthetic":false,"types":[]}];
 implementors["nodrop"] = [{"text":"impl&lt;T&gt; DerefMut for NoDrop&lt;T&gt;","synthetic":false,"types":[]}];
 implementors["once_cell"] = [{"text":"impl&lt;T, F:&nbsp;FnOnce() -&gt; T&gt; DerefMut for Lazy&lt;T, F&gt;","synthetic":false,"types":[]},{"text":"impl&lt;T, F:&nbsp;FnOnce() -&gt; T&gt; DerefMut for Lazy&lt;T, F&gt;","synthetic":false,"types":[]}];

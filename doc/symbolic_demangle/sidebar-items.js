@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["demangle","Demangles an identifier and falls back to the original symbol."]],"struct":[["DemangleOptions","Options for `Demangle::demangle`."]],"trait":[["Demangle","An extension trait on `Name` for demangling names."]]});
