@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["AnalyzeContext",""],["SampleBuilder",""],["SampleCollector","`SampleCollector` will collect Samples and calculate the count, ndv and total size of an attribute."]]});
+initSidebarItems({"constant":[["ANALYZE_VERSION_V1",""],["ANALYZE_VERSION_V2",""]],"struct":[["AnalyzeContext",""],["SampleBuilder",""],["SampleCollector","`SampleCollector` will collect Samples and calculate the count, ndv and total size of an attribute."]]});
