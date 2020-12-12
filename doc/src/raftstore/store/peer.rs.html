@@ -3959,6 +3959,8 @@
 <span id="3956">3956</span>
 <span id="3957">3957</span>
 <span id="3958">3958</span>
+<span id="3959">3959</span>
+<span id="3960">3960</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -5003,22 +5005,24 @@
         <span class="kw">let</span> <span class="ident">msg_type</span> <span class="op">=</span> <span class="ident">m</span>.<span class="ident">get_msg_type</span>();
         <span class="kw">if</span> <span class="ident">msg_type</span> <span class="op">=</span><span class="op">=</span> <span class="ident">MessageType</span>::<span class="ident">MsgReadIndex</span> {
             <span class="ident">ctx</span>.<span class="ident">coprocessor_host</span>.<span class="ident">on_step_read_index</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">m</span>);
-
-            <span class="comment">// Here we hold up MsgReadIndex. If current peer has valid lease, then we could handle the</span>
-            <span class="comment">// request directly, rather than send a heartbeat to check quorum.</span>
-            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">raft</span>.<span class="ident">commit_to_current_term</span>() {
-                <span class="comment">// If the leader hasn&#39;t committed any entries in its term, it can&#39;t response read only</span>
-                <span class="comment">// requests. Please also take a look at raft-rs.</span>
+            <span class="comment">// Must use the commit index of `PeerStorage` instead of the commit index</span>
+            <span class="comment">// in raft-rs which may be greater than the former one.</span>
+            <span class="comment">// For more details, see the annotations above `on_leader_commit_idx_changed`.</span>
+            <span class="kw">let</span> <span class="ident">index</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_store</span>().<span class="ident">commit_index</span>();
+            <span class="comment">// Check if the log term of this index is equal to current term, if so,</span>
+            <span class="comment">// this index can be used to reply the read index request if the leader holds</span>
+            <span class="comment">// the lease. Please also take a look at raft-rs.</span>
+            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">get_store</span>().<span class="ident">term</span>(<span class="ident">index</span>).<span class="ident">unwrap</span>() <span class="op">=</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">term</span>() {
                 <span class="kw">let</span> <span class="ident">state</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">inspect_lease</span>();
                 <span class="kw">if</span> <span class="kw">let</span> <span class="ident">LeaseState</span>::<span class="ident">Valid</span> <span class="op">=</span> <span class="ident">state</span> {
+                    <span class="comment">// If current peer has valid lease, then we could handle the</span>
+                    <span class="comment">// request directly, rather than send a heartbeat to check quorum.</span>
                     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">eraftpb</span>::<span class="ident">Message</span>::<span class="ident">default</span>();
                     <span class="ident">resp</span>.<span class="ident">set_msg_type</span>(<span class="ident">MessageType</span>::<span class="ident">MsgReadIndexResp</span>);
                     <span class="ident">resp</span>.<span class="ident">term</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">term</span>();
                     <span class="ident">resp</span>.<span class="ident">to</span> <span class="op">=</span> <span class="ident">m</span>.<span class="ident">from</span>;
-                    <span class="comment">// Must use the commit index of `PeerStorage` instead of the commit index</span>
-                    <span class="comment">// in raft-rs which may be greater than the former one.</span>
-                    <span class="comment">// For more details, see the annotations above `on_leader_commit_idx_changed`.</span>
-                    <span class="ident">resp</span>.<span class="ident">index</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_store</span>().<span class="ident">commit_index</span>();
+
+                    <span class="ident">resp</span>.<span class="ident">index</span> <span class="op">=</span> <span class="ident">index</span>;
                     <span class="ident">resp</span>.<span class="ident">set_entries</span>(<span class="ident">m</span>.<span class="ident">take_entries</span>());
 
                     <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">raft</span>.<span class="ident">msgs</span>.<span class="ident">push</span>(<span class="ident">resp</span>);
