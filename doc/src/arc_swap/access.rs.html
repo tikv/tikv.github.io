@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `/rust/registry/src/github.com-1ecc6299db9ec823/arc-swap-0.4.4/src/access.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>access.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `/rust/registry/src/github.com-1ecc6299db9ec823/arc-swap-0.4.8/src/access.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>access.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
 <link rel="alternate icon" type="image/png" href="../../favicon-16x16.png">
 <link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../arc_swap/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><span class="help-button">?</span>
                 <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
@@ -429,24 +429,9 @@
 <span id="426">426</span>
 <span id="427">427</span>
 <span id="428">428</span>
-<span id="429">429</span>
-<span id="430">430</span>
-<span id="431">431</span>
-<span id="432">432</span>
-<span id="433">433</span>
-<span id="434">434</span>
-<span id="435">435</span>
-<span id="436">436</span>
-<span id="437">437</span>
-<span id="438">438</span>
-<span id="439">439</span>
-<span id="440">440</span>
-<span id="441">441</span>
-<span id="442">442</span>
-<span id="443">443</span>
-<span id="444">444</span>
-<span id="445">445</span>
 </pre><div class="example-wrap"><pre class="rust ">
+<span class="attribute">#![<span class="ident">deny</span>(<span class="ident">unsafe_code</span>)]</span>
+
 <span class="doccomment">//! Abstracting over accessing parts of stored value.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! Sometimes, there&#39;s a big globalish data structure (like a configuration for the whole program).</span>
@@ -665,39 +650,20 @@
 <span class="doccomment">/// This is the guard type for [`Map`]. It is accessible and nameable, but is not expected to be</span>
 <span class="doccomment">/// generally used directly.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MapGuard</span><span class="op">&lt;</span><span class="ident">G</span>, <span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="ident">_guard</span>: <span class="ident">G</span>,
-    <span class="ident">value</span>: <span class="kw-2">*</span><span class="kw">const</span> <span class="ident">T</span>,
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MapGuard</span><span class="op">&lt;</span><span class="ident">G</span>, <span class="ident">F</span>, <span class="ident">T</span>, <span class="ident">R</span><span class="op">&gt;</span> {
+    <span class="ident">guard</span>: <span class="ident">G</span>,
+    <span class="ident">projection</span>: <span class="ident">F</span>,
+    <span class="ident">_t</span>: <span class="ident">PhantomData</span><span class="op">&lt;</span><span class="kw">fn</span>(<span class="kw-2">&amp;</span><span class="ident">T</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">R</span><span class="op">&gt;</span>,
 }
 
-<span class="comment">// Why these are safe:</span>
-<span class="comment">// * The *const T is actually used just as a &amp;const T with &#39;self lifetime (which can&#39;t be done in</span>
-<span class="comment">//   Rust). So if the reference is Send/Sync, so is the raw pointer.</span>
-<span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">G</span>, <span class="ident">T</span><span class="op">&gt;</span> <span class="ident">Send</span> <span class="kw">for</span> <span class="ident">MapGuard</span><span class="op">&lt;</span><span class="ident">G</span>, <span class="ident">T</span><span class="op">&gt;</span>
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">G</span>, <span class="ident">F</span>, <span class="ident">T</span>, <span class="ident">R</span><span class="op">&gt;</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">MapGuard</span><span class="op">&lt;</span><span class="ident">G</span>, <span class="ident">F</span>, <span class="ident">T</span>, <span class="ident">R</span><span class="op">&gt;</span>
 <span class="kw">where</span>
-    <span class="ident">G</span>: <span class="ident">Send</span>,
-    <span class="kw">for</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">T</span>: <span class="ident">Send</span>,
+    <span class="ident">G</span>: <span class="ident">Deref</span><span class="op">&lt;</span><span class="ident">Target</span> <span class="op">=</span> <span class="ident">T</span><span class="op">&gt;</span>,
+    <span class="ident">F</span>: <span class="ident">Fn</span>(<span class="kw-2">&amp;</span><span class="ident">T</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">R</span>,
 {
-}
-
-<span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">G</span>, <span class="ident">T</span><span class="op">&gt;</span> <span class="ident">Sync</span> <span class="kw">for</span> <span class="ident">MapGuard</span><span class="op">&lt;</span><span class="ident">G</span>, <span class="ident">T</span><span class="op">&gt;</span>
-<span class="kw">where</span>
-    <span class="ident">G</span>: <span class="ident">Sync</span>,
-    <span class="kw">for</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">T</span>: <span class="ident">Sync</span>,
-{
-}
-
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">G</span>, <span class="ident">T</span><span class="op">&gt;</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">MapGuard</span><span class="op">&lt;</span><span class="ident">G</span>, <span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">T</span>;
-    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">T</span> {
-        <span class="comment">// Why this is safe:</span>
-        <span class="comment">// * The pointer is originally converted from a reference. It&#39;s not null, it&#39;s aligned,</span>
-        <span class="comment">//   it&#39;s the right type, etc.</span>
-        <span class="comment">// * The pointee couldn&#39;t have gone away ‒ the guard keeps the original reference alive, so</span>
-        <span class="comment">//   must the new one still be alive too. Moving the guard is fine, we assume the RefCnt is</span>
-        <span class="comment">//   Pin (because it&#39;s Arc or Rc or something like that ‒ when that one moves, the data it</span>
-        <span class="comment">//   points to stay at the same place).</span>
-        <span class="kw">unsafe</span> { <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="self">self</span>.<span class="ident">value</span> }
+    <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">R</span>;
+    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">R</span> {
+        (<span class="self">self</span>.<span class="ident">projection</span>)(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">guard</span>)
     }
 }
 
@@ -726,7 +692,7 @@
     <span class="doccomment">///   *cheap* (like only taking reference).</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;</span>(<span class="ident">access</span>: <span class="ident">A</span>, <span class="ident">projection</span>: <span class="ident">F</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span>
     <span class="kw">where</span>
-        <span class="ident">F</span>: <span class="ident">Fn</span>(<span class="kw-2">&amp;</span><span class="ident">T</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">R</span>,
+        <span class="ident">F</span>: <span class="ident">Fn</span>(<span class="kw-2">&amp;</span><span class="ident">T</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">R</span> <span class="op">+</span> <span class="ident">Clone</span>,
     {
         <span class="ident">Map</span> {
             <span class="ident">access</span>,
@@ -736,18 +702,18 @@
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">A</span>, <span class="ident">T</span>, <span class="ident">F</span>, <span class="ident">R</span><span class="op">&gt;</span> <span class="ident">Access</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Map</span><span class="op">&lt;</span><span class="ident">A</span>, <span class="ident">T</span>, <span class="ident">F</span><span class="op">&gt;</span>
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">A</span>, <span class="ident">F</span>, <span class="ident">T</span>, <span class="ident">R</span><span class="op">&gt;</span> <span class="ident">Access</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Map</span><span class="op">&lt;</span><span class="ident">A</span>, <span class="ident">T</span>, <span class="ident">F</span><span class="op">&gt;</span>
 <span class="kw">where</span>
     <span class="ident">A</span>: <span class="ident">Access</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
-    <span class="ident">F</span>: <span class="ident">Fn</span>(<span class="kw-2">&amp;</span><span class="ident">T</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">R</span>,
+    <span class="ident">F</span>: <span class="ident">Fn</span>(<span class="kw-2">&amp;</span><span class="ident">T</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">R</span> <span class="op">+</span> <span class="ident">Clone</span>,
 {
-    <span class="kw">type</span> <span class="ident">Guard</span> <span class="op">=</span> <span class="ident">MapGuard</span><span class="op">&lt;</span><span class="ident">A</span>::<span class="ident">Guard</span>, <span class="ident">R</span><span class="op">&gt;</span>;
+    <span class="kw">type</span> <span class="ident">Guard</span> <span class="op">=</span> <span class="ident">MapGuard</span><span class="op">&lt;</span><span class="ident">A</span>::<span class="ident">Guard</span>, <span class="ident">F</span>, <span class="ident">T</span>, <span class="ident">R</span><span class="op">&gt;</span>;
     <span class="kw">fn</span> <span class="ident">load</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span>::<span class="ident">Guard</span> {
         <span class="kw">let</span> <span class="ident">guard</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">access</span>.<span class="ident">load</span>();
-        <span class="kw">let</span> <span class="ident">value</span>: <span class="kw-2">*</span><span class="kw">const</span> <span class="kw">_</span> <span class="op">=</span> (<span class="self">self</span>.<span class="ident">projection</span>)(<span class="kw-2">&amp;</span><span class="ident">guard</span>);
         <span class="ident">MapGuard</span> {
-            <span class="ident">_guard</span>: <span class="ident">guard</span>,
-            <span class="ident">value</span>,
+            <span class="ident">guard</span>,
+            <span class="ident">projection</span>: <span class="self">self</span>.<span class="ident">projection</span>.<span class="ident">clone</span>(),
+            <span class="ident">_t</span>: <span class="ident">PhantomData</span>,
         }
     }
 }
