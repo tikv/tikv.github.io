@@ -333,6 +333,33 @@
 <span id="330">330</span>
 <span id="331">331</span>
 <span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
+<span id="336">336</span>
+<span id="337">337</span>
+<span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+<span id="341">341</span>
+<span id="342">342</span>
+<span id="343">343</span>
+<span id="344">344</span>
+<span id="345">345</span>
+<span id="346">346</span>
+<span id="347">347</span>
+<span id="348">348</span>
+<span id="349">349</span>
+<span id="350">350</span>
+<span id="351">351</span>
+<span id="352">352</span>
+<span id="353">353</span>
+<span id="354">354</span>
+<span id="355">355</span>
+<span id="356">356</span>
+<span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -363,10 +390,10 @@
     <span class="ident">AllItemsBegan</span>,
 
     <span class="doccomment">/// The tracker is notified that a single item just began.</span>
-    <span class="ident">ItemBegan</span>,
+    <span class="ident">ItemBegan</span>(<span class="ident">Instant</span>),
 
     <span class="doccomment">/// The tracker is notified that a single item just finished.</span>
-    <span class="ident">ItemFinished</span>,
+    <span class="ident">ItemFinished</span>(<span class="ident">Instant</span>),
 
     <span class="doccomment">/// The tracker is notified that all items just finished.</span>
     <span class="ident">AllItemFinished</span>,
@@ -379,7 +406,6 @@
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Tracker</span> {
     <span class="ident">request_begin_at</span>: <span class="ident">Instant</span>,
-    <span class="ident">item_begin_at</span>: <span class="ident">Instant</span>,
 
     <span class="comment">// Intermediate results</span>
     <span class="ident">current_stage</span>: <span class="ident">TrackerState</span>,
@@ -388,6 +414,14 @@
     <span class="ident">snapshot_wait_time</span>: <span class="ident">Duration</span>, <span class="comment">// Wait time spent on waiting for a snapshot</span>
     <span class="ident">handler_build_time</span>: <span class="ident">Duration</span>, <span class="comment">// Time spent on building the handler (not included in total wait time)</span>
     <span class="ident">req_lifetime</span>: <span class="ident">Duration</span>,
+
+    <span class="comment">// Suspend time between processing two items</span>
+    <span class="comment">//</span>
+    <span class="comment">// In a cooperative environment, a cop task may suspend itself at finishing an item,</span>
+    <span class="comment">// and be resumed by the runtime later. That will raise a considerable suspend time.</span>
+    <span class="ident">item_suspend_time</span>: <span class="ident">Duration</span>,
+    <span class="ident">total_suspend_time</span>: <span class="ident">Duration</span>,
+
     <span class="ident">item_process_time</span>: <span class="ident">Duration</span>,
     <span class="ident">total_process_time</span>: <span class="ident">Duration</span>,
     <span class="ident">total_storage_stats</span>: <span class="ident">Statistics</span>,
@@ -406,7 +440,6 @@
         <span class="kw">let</span> <span class="ident">now</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now_coarse</span>();
         <span class="ident">Tracker</span> {
             <span class="ident">request_begin_at</span>: <span class="ident">now</span>,
-            <span class="ident">item_begin_at</span>: <span class="ident">now</span>,
             <span class="ident">current_stage</span>: <span class="ident">TrackerState</span>::<span class="ident">Initialized</span>,
             <span class="ident">wait_time</span>: <span class="ident">Duration</span>::<span class="ident">default</span>(),
             <span class="ident">schedule_wait_time</span>: <span class="ident">Duration</span>::<span class="ident">default</span>(),
@@ -414,6 +447,8 @@
             <span class="ident">handler_build_time</span>: <span class="ident">Duration</span>::<span class="ident">default</span>(),
             <span class="ident">req_lifetime</span>: <span class="ident">Duration</span>::<span class="ident">default</span>(),
             <span class="ident">item_process_time</span>: <span class="ident">Duration</span>::<span class="ident">default</span>(),
+            <span class="ident">item_suspend_time</span>: <span class="ident">Duration</span>::<span class="ident">default</span>(),
+            <span class="ident">total_suspend_time</span>: <span class="ident">Duration</span>::<span class="ident">default</span>(),
             <span class="ident">total_process_time</span>: <span class="ident">Duration</span>::<span class="ident">default</span>(),
             <span class="ident">total_storage_stats</span>: <span class="ident">Statistics</span>::<span class="ident">default</span>(),
             <span class="ident">total_perf_stats</span>: <span class="ident">PerfStatisticsDelta</span>::<span class="ident">default</span>(),
@@ -451,13 +486,18 @@
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">on_begin_item</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
-        <span class="macro">assert</span><span class="macro">!</span>(
-            <span class="self">self</span>.<span class="ident">current_stage</span> <span class="op">=</span><span class="op">=</span> <span class="ident">TrackerState</span>::<span class="ident">AllItemsBegan</span>
-                <span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">current_stage</span> <span class="op">=</span><span class="op">=</span> <span class="ident">TrackerState</span>::<span class="ident">ItemFinished</span>
-        );
+        <span class="kw">let</span> <span class="ident">now</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now_coarse</span>();
+        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">current_stage</span> {
+            <span class="ident">TrackerState</span>::<span class="ident">AllItemsBegan</span> <span class="op">=</span><span class="op">&gt;</span> {}
+            <span class="ident">TrackerState</span>::<span class="ident">ItemFinished</span>(<span class="ident">at</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="self">self</span>.<span class="ident">item_suspend_time</span> <span class="op">=</span> <span class="ident">now</span> <span class="op">-</span> <span class="ident">at</span>;
+                <span class="self">self</span>.<span class="ident">total_suspend_time</span> <span class="op">+</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">item_suspend_time</span>;
+            }
+            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">unreachable</span><span class="macro">!</span>(),
+        }
+
         <span class="ident">set_perf_level</span>(<span class="self">self</span>.<span class="ident">req_ctx</span>.<span class="ident">perf_level</span>);
-        <span class="self">self</span>.<span class="ident">item_begin_at</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now_coarse</span>();
-        <span class="self">self</span>.<span class="ident">current_stage</span> <span class="op">=</span> <span class="ident">TrackerState</span>::<span class="ident">ItemBegan</span>;
+        <span class="self">self</span>.<span class="ident">current_stage</span> <span class="op">=</span> <span class="ident">TrackerState</span>::<span class="ident">ItemBegan</span>(<span class="ident">now</span>);
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">on_finish_item</span>(
@@ -465,16 +505,19 @@
         <span class="ident">some_storage_stats</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Statistics</span><span class="op">&gt;</span>,
         <span class="ident">perf_statistics</span>: <span class="ident">PerfStatisticsDelta</span>,
     ) {
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="self">self</span>.<span class="ident">current_stage</span>, <span class="ident">TrackerState</span>::<span class="ident">ItemBegan</span>);
-        <span class="self">self</span>.<span class="ident">item_process_time</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now_coarse</span>() <span class="op">-</span> <span class="self">self</span>.<span class="ident">item_begin_at</span>;
-        <span class="self">self</span>.<span class="ident">total_process_time</span> <span class="op">+</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">item_process_time</span>;
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">storage_stats</span>) <span class="op">=</span> <span class="ident">some_storage_stats</span> {
-            <span class="self">self</span>.<span class="ident">total_storage_stats</span>.<span class="ident">add</span>(<span class="kw-2">&amp;</span><span class="ident">storage_stats</span>);
+        <span class="kw">if</span> <span class="kw">let</span> <span class="ident">TrackerState</span>::<span class="ident">ItemBegan</span>(<span class="ident">at</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">current_stage</span> {
+            <span class="kw">let</span> <span class="ident">now</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now_coarse</span>();
+            <span class="self">self</span>.<span class="ident">item_process_time</span> <span class="op">=</span> <span class="ident">now</span> <span class="op">-</span> <span class="ident">at</span>;
+            <span class="self">self</span>.<span class="ident">total_process_time</span> <span class="op">+</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">item_process_time</span>;
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">storage_stats</span>) <span class="op">=</span> <span class="ident">some_storage_stats</span> {
+                <span class="self">self</span>.<span class="ident">total_storage_stats</span>.<span class="ident">add</span>(<span class="kw-2">&amp;</span><span class="ident">storage_stats</span>);
+            }
+            <span class="comment">// Record delta perf statistics</span>
+            <span class="self">self</span>.<span class="ident">total_perf_stats</span> <span class="op">+</span><span class="op">=</span> <span class="ident">perf_statistics</span>;
+            <span class="self">self</span>.<span class="ident">current_stage</span> <span class="op">=</span> <span class="ident">TrackerState</span>::<span class="ident">ItemFinished</span>(<span class="ident">now</span>);
+        } <span class="kw">else</span> {
+            <span class="macro">unreachable</span><span class="macro">!</span>()
         }
-        <span class="comment">// Record delta perf statistics</span>
-        <span class="self">self</span>.<span class="ident">total_perf_stats</span> <span class="op">+</span><span class="op">=</span> <span class="ident">perf_statistics</span>;
-        <span class="self">self</span>.<span class="ident">current_stage</span> <span class="op">=</span> <span class="ident">TrackerState</span>::<span class="ident">ItemFinished</span>;
-        <span class="comment">// TODO: Need to record time between Finish -&gt; Begin Next?</span>
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">collect_storage_statistics</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">storage_stats</span>: <span class="ident">Statistics</span>) {
@@ -485,15 +528,22 @@
     <span class="doccomment">/// TiDB asks for ExecDetail to be printed in its log.</span>
     <span class="doccomment">/// WARN: TRY BEST NOT TO USE THIS FUNCTION.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_item_exec_details</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> (<span class="ident">kvrpcpb</span>::<span class="ident">ExecDetails</span>, <span class="ident">kvrpcpb</span>::<span class="ident">ExecDetailsV2</span>) {
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="self">self</span>.<span class="ident">current_stage</span>, <span class="ident">TrackerState</span>::<span class="ident">ItemFinished</span>);
-        <span class="self">self</span>.<span class="ident">exec_details</span>(<span class="self">self</span>.<span class="ident">item_process_time</span>)
+        <span class="kw">if</span> <span class="kw">let</span> <span class="ident">TrackerState</span>::<span class="ident">ItemFinished</span>(<span class="kw">_</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">current_stage</span> {
+            <span class="self">self</span>.<span class="ident">exec_details</span>(<span class="self">self</span>.<span class="ident">item_process_time</span>)
+        } <span class="kw">else</span> {
+            <span class="macro">unreachable</span><span class="macro">!</span>()
+        }
     }
 
     <span class="doccomment">/// Get ExecDetail according to previous collected metrics.</span>
     <span class="doccomment">/// TiDB asks for ExecDetail to be printed in its log.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_exec_details</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> (<span class="ident">kvrpcpb</span>::<span class="ident">ExecDetails</span>, <span class="ident">kvrpcpb</span>::<span class="ident">ExecDetailsV2</span>) {
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="self">self</span>.<span class="ident">current_stage</span>, <span class="ident">TrackerState</span>::<span class="ident">ItemFinished</span>);
-        <span class="self">self</span>.<span class="ident">exec_details</span>(<span class="self">self</span>.<span class="ident">total_process_time</span>)
+        <span class="kw">if</span> <span class="kw">let</span> <span class="ident">TrackerState</span>::<span class="ident">ItemFinished</span>(<span class="kw">_</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">current_stage</span> {
+            <span class="comment">// TODO: Separate process time and suspend time</span>
+            <span class="self">self</span>.<span class="ident">exec_details</span>(<span class="self">self</span>.<span class="ident">total_process_time</span> <span class="op">+</span> <span class="self">self</span>.<span class="ident">total_suspend_time</span>)
+        } <span class="kw">else</span> {
+            <span class="macro">unreachable</span><span class="macro">!</span>()
+        }
     }
 
     <span class="kw">fn</span> <span class="ident">exec_details</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">measure</span>: <span class="ident">Duration</span>) <span class="op">-</span><span class="op">&gt;</span> (<span class="ident">kvrpcpb</span>::<span class="ident">ExecDetails</span>, <span class="ident">kvrpcpb</span>::<span class="ident">ExecDetailsV2</span>) {
@@ -531,10 +581,12 @@
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">on_finish_all_items</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
-        <span class="macro">assert</span><span class="macro">!</span>(
-            <span class="self">self</span>.<span class="ident">current_stage</span> <span class="op">=</span><span class="op">=</span> <span class="ident">TrackerState</span>::<span class="ident">AllItemsBegan</span>
-                <span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">current_stage</span> <span class="op">=</span><span class="op">=</span> <span class="ident">TrackerState</span>::<span class="ident">ItemFinished</span>
-        );
+        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">current_stage</span> {
+            <span class="ident">TrackerState</span>::<span class="ident">AllItemsBegan</span> <span class="op">=</span><span class="op">&gt;</span> {}
+            <span class="ident">TrackerState</span>::<span class="ident">ItemFinished</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> {}
+            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">unreachable</span><span class="macro">!</span>(),
+        }
+
         <span class="self">self</span>.<span class="ident">req_lifetime</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now_coarse</span>() <span class="op">-</span> <span class="self">self</span>.<span class="ident">request_begin_at</span>;
         <span class="self">self</span>.<span class="ident">current_stage</span> <span class="op">=</span> <span class="ident">TrackerState</span>::<span class="ident">AllItemFinished</span>;
         <span class="self">self</span>.<span class="ident">track</span>();
@@ -563,6 +615,7 @@
                 <span class="string">&quot;wait_time.snapshot&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="self">self</span>.<span class="ident">snapshot_wait_time</span>,
                 <span class="string">&quot;handler_build_time&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="self">self</span>.<span class="ident">handler_build_time</span>,
                 <span class="string">&quot;total_process_time&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="self">self</span>.<span class="ident">total_process_time</span>,
+                <span class="string">&quot;total_suspend_time&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="self">self</span>.<span class="ident">total_suspend_time</span>,
                 <span class="string">&quot;txn_start_ts&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">req_ctx</span>.<span class="ident">txn_start_ts</span>,
                 <span class="string">&quot;table_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">some_table_id</span>,
                 <span class="string">&quot;tag&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">req_ctx</span>.<span class="ident">tag</span>.<span class="ident">get_str</span>(),
@@ -656,12 +709,13 @@
         <span class="kw">if</span> <span class="kw">let</span> <span class="ident">TrackerState</span>::<span class="ident">SnapshotRetrieved</span>(<span class="kw">_</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">current_stage</span> {
             <span class="self">self</span>.<span class="ident">on_begin_all_items</span>();
         }
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">current_stage</span> <span class="op">=</span><span class="op">=</span> <span class="ident">TrackerState</span>::<span class="ident">ItemBegan</span> {
+        <span class="kw">if</span> <span class="kw">let</span> <span class="ident">TrackerState</span>::<span class="ident">ItemBegan</span>(<span class="kw">_</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">current_stage</span> {
             <span class="self">self</span>.<span class="ident">on_finish_item</span>(<span class="prelude-val">None</span>, <span class="ident">PerfStatisticsDelta</span>::<span class="ident">default</span>());
         }
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">current_stage</span> <span class="op">=</span><span class="op">=</span> <span class="ident">TrackerState</span>::<span class="ident">AllItemsBegan</span>
-            <span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">current_stage</span> <span class="op">=</span><span class="op">=</span> <span class="ident">TrackerState</span>::<span class="ident">ItemFinished</span>
-        {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">current_stage</span> <span class="op">=</span><span class="op">=</span> <span class="ident">TrackerState</span>::<span class="ident">AllItemsBegan</span> {
+            <span class="self">self</span>.<span class="ident">on_finish_all_items</span>();
+        }
+        <span class="kw">if</span> <span class="kw">let</span> <span class="ident">TrackerState</span>::<span class="ident">ItemFinished</span>(<span class="kw">_</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">current_stage</span> {
             <span class="self">self</span>.<span class="ident">on_finish_all_items</span>();
         }
     }
