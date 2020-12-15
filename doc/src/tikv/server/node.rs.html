@@ -429,13 +429,6 @@
 <span id="426">426</span>
 <span id="427">427</span>
 <span id="428">428</span>
-<span id="429">429</span>
-<span id="430">430</span>
-<span id="431">431</span>
-<span id="432">432</span>
-<span id="433">433</span>
-<span id="434">434</span>
-<span id="435">435</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -465,7 +458,7 @@
 <span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">store</span>::{<span class="self">self</span>, <span class="ident">initial_region</span>, <span class="ident">Config</span> <span class="kw">as</span> <span class="ident">StoreConfig</span>, <span class="ident">SnapManager</span>, <span class="ident">Transport</span>};
 <span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">store</span>::{<span class="ident">GlobalReplicationState</span>, <span class="ident">PdTask</span>, <span class="ident">SplitCheckTask</span>};
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">config</span>::<span class="ident">VersionTrack</span>;
-<span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">worker</span>::{<span class="ident">Builder</span> <span class="kw">as</span> <span class="ident">WorkerBuilder</span>, <span class="ident">FutureWorker</span>, <span class="ident">Scheduler</span>, <span class="ident">Worker</span>};
+<span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">worker</span>::{<span class="ident">FutureWorker</span>, <span class="ident">Scheduler</span>, <span class="ident">Worker</span>};
 
 <span class="kw">const</span> <span class="ident">MAX_CHECK_CLUSTER_BOOTSTRAPPED_RETRY_COUNT</span>: <span class="ident">u64</span> <span class="op">=</span> <span class="number">60</span>;
 <span class="kw">const</span> <span class="ident">CHECK_CLUSTER_BOOTSTRAPPED_RETRY_SECONDS</span>: <span class="ident">u64</span> <span class="op">=</span> <span class="number">3</span>;
@@ -505,7 +498,7 @@
 
     <span class="ident">pd_client</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>,
     <span class="ident">state</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">GlobalReplicationState</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">bg_worker</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Worker</span><span class="op">&gt;</span>,
+    <span class="ident">bg_worker</span>: <span class="ident">Worker</span>,
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">C</span>, <span class="ident">ER</span><span class="op">&gt;</span> <span class="ident">Node</span><span class="op">&lt;</span><span class="ident">C</span>, <span class="ident">ER</span><span class="op">&gt;</span>
@@ -520,7 +513,7 @@
         <span class="ident">store_cfg</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">VersionTrack</span><span class="op">&lt;</span><span class="ident">StoreConfig</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">pd_client</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>,
         <span class="ident">state</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">GlobalReplicationState</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-        <span class="ident">bg_worker</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Worker</span><span class="op">&gt;</span>,
+        <span class="ident">bg_worker</span>: <span class="ident">Worker</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Node</span><span class="op">&lt;</span><span class="ident">C</span>, <span class="ident">ER</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">store</span> <span class="op">=</span> <span class="ident">metapb</span>::<span class="ident">Store</span>::<span class="ident">default</span>();
         <span class="ident">store</span>.<span class="ident">set_id</span>(<span class="ident">INVALID_ID</span>);
@@ -832,12 +825,7 @@
         <span class="kw">let</span> <span class="ident">cfg</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">store_cfg</span>.<span class="ident">clone</span>();
         <span class="kw">let</span> <span class="ident">pd_client</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">pd_client</span>);
         <span class="kw">let</span> <span class="ident">store</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">store</span>.<span class="ident">clone</span>();
-        <span class="kw">let</span> <span class="ident">background_worker</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">worker</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">bg_worker</span>.<span class="ident">as_ref</span>() {
-            <span class="ident">worker</span>.<span class="ident">clone</span>()
-        } <span class="kw">else</span> {
-            <span class="comment">// only for test</span>
-            <span class="ident">WorkerBuilder</span>::<span class="ident">new</span>(<span class="string">&quot;background&quot;</span>).<span class="ident">create</span>()
-        };
+
         <span class="self">self</span>.<span class="ident">system</span>.<span class="ident">spawn</span>(
             <span class="ident">store</span>,
             <span class="ident">cfg</span>,
@@ -850,7 +838,7 @@
             <span class="ident">coprocessor_host</span>,
             <span class="ident">importer</span>,
             <span class="ident">split_check_scheduler</span>,
-            <span class="ident">background_worker</span>,
+            <span class="self">self</span>.<span class="ident">bg_worker</span>.<span class="ident">clone</span>(),
             <span class="ident">auto_split_controller</span>,
             <span class="self">self</span>.<span class="ident">state</span>.<span class="ident">clone</span>(),
             <span class="ident">concurrency_manager</span>,
@@ -866,10 +854,8 @@
     <span class="doccomment">/// Stops the Node.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">stop</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
         <span class="kw">let</span> <span class="ident">store_id</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">store</span>.<span class="ident">get_id</span>();
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">worker</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">bg_worker</span>.<span class="ident">take</span>() {
-            <span class="ident">worker</span>.<span class="ident">stop</span>();
-        }
-        <span class="self">self</span>.<span class="ident">stop_store</span>(<span class="ident">store_id</span>)
+        <span class="self">self</span>.<span class="ident">stop_store</span>(<span class="ident">store_id</span>);
+        <span class="self">self</span>.<span class="ident">bg_worker</span>.<span class="ident">stop</span>();
     }
 }
 </pre></div>
