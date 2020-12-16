@@ -454,6 +454,16 @@
 <span id="451">451</span>
 <span id="452">452</span>
 <span id="453">453</span>
+<span id="454">454</span>
+<span id="455">455</span>
+<span id="456">456</span>
+<span id="457">457</span>
+<span id="458">458</span>
+<span id="459">459</span>
+<span id="460">460</span>
+<span id="461">461</span>
+<span id="462">462</span>
+<span id="463">463</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -584,6 +594,7 @@
                 <span class="ident">RegionSnapshot</span>::<span class="ident">from_snapshot</span>(<span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">engine</span>.<span class="ident">snapshot</span>()), <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">region</span>));
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reader</span> <span class="op">=</span> <span class="ident">OldValueReader</span>::<span class="ident">new</span>(<span class="ident">snapshot</span>);
             <span class="kw">let</span> <span class="ident">get_old_value</span> <span class="op">=</span> <span class="kw">move</span> <span class="op">|</span><span class="ident">key</span>,
+                                      <span class="ident">query_ts</span>,
                                       <span class="ident">old_value_cache</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">OldValueCache</span>,
                                       <span class="ident">statistics</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Statistics</span><span class="op">|</span> {
                 <span class="ident">old_value_cache</span>.<span class="ident">access_count</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
@@ -615,6 +626,7 @@
                 <span class="comment">// Cannot get old value from cache, seek for it in engine.</span>
                 <span class="ident">old_value_cache</span>.<span class="ident">miss_count</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
                 <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now</span>();
+                <span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> <span class="ident">key</span>.<span class="ident">truncate_ts</span>().<span class="ident">unwrap</span>().<span class="ident">append_ts</span>(<span class="ident">query_ts</span>);
                 <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">reader</span>
                     .<span class="ident">near_seek_old_value</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="ident">statistics</span>)
                     .<span class="ident">unwrap_or_default</span>();
@@ -723,7 +735,8 @@
         <span class="kw">match</span> <span class="self">self</span>.<span class="ident">snapshot</span>.<span class="ident">get_cf_opt</span>(<span class="ident">opts</span>, <span class="ident">CF_LOCK</span>, <span class="kw-2">&amp;</span><span class="ident">user_key</span>).<span class="ident">unwrap</span>() {
             <span class="prelude-val">Some</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> <span class="ident">lock</span> <span class="op">=</span> <span class="ident">Lock</span>::<span class="ident">parse</span>(<span class="ident">v</span>.<span class="ident">deref</span>()).<span class="ident">unwrap</span>();
-                <span class="ident">lock</span>.<span class="ident">ts</span> <span class="op">=</span><span class="op">=</span> <span class="ident">Key</span>::<span class="ident">decode_ts_from</span>(<span class="ident">key_slice</span>).<span class="ident">unwrap</span>()
+                <span class="ident">std</span>::<span class="ident">cmp</span>::<span class="ident">max</span>(<span class="ident">lock</span>.<span class="ident">ts</span>, <span class="ident">lock</span>.<span class="ident">for_update_ts</span>)
+                    <span class="op">=</span><span class="op">=</span> <span class="ident">Key</span>::<span class="ident">decode_ts_from</span>(<span class="ident">key_slice</span>).<span class="ident">unwrap</span>()
             }
             <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="bool-val">false</span>,
         }
@@ -748,10 +761,10 @@
                     <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">Vec</span>::<span class="ident">default</span>()));
                 }
             } <span class="kw">else</span> <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">check_lock</span>(<span class="ident">key</span>, <span class="ident">statistics</span>) {
+                <span class="comment">// Key was not committed, check if the lock is corresponding to the key.</span>
                 <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>);
             }
 
-            <span class="comment">// Key was not committed, check if the lock is corresponding to the key.</span>
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">old_value</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">Vec</span>::<span class="ident">default</span>());
             <span class="kw">while</span> <span class="ident">Key</span>::<span class="ident">is_user_key_eq</span>(<span class="ident">write_cursor</span>.<span class="ident">key</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">statistics</span>.<span class="ident">write</span>), <span class="ident">user_key</span>) {
                 <span class="kw">let</span> <span class="ident">write</span> <span class="op">=</span> <span class="ident">WriteRef</span>::<span class="ident">parse</span>(<span class="ident">write_cursor</span>.<span class="ident">value</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">statistics</span>.<span class="ident">write</span>)).<span class="ident">unwrap</span>();
@@ -791,9 +804,7 @@
     <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">raft_cmdpb</span>::<span class="kw-2">*</span>;
     <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">time</span>::<span class="ident">Duration</span>;
     <span class="kw">use</span> <span class="ident">tikv</span>::<span class="ident">storage</span>::<span class="ident">kv</span>::<span class="ident">TestEngineBuilder</span>;
-    <span class="kw">use</span> <span class="ident">tikv</span>::<span class="ident">storage</span>::<span class="ident">txn</span>::<span class="ident">tests</span>::{
-        <span class="ident">must_commit</span>, <span class="ident">must_prewrite_delete</span>, <span class="ident">must_prewrite_put</span>, <span class="ident">must_rollback</span>,
-    };
+    <span class="kw">use</span> <span class="ident">tikv</span>::<span class="ident">storage</span>::<span class="ident">txn</span>::<span class="ident">tests</span>::<span class="kw-2">*</span>;
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_register_and_deregister</span>() {
@@ -906,6 +917,15 @@
 
         <span class="ident">must_prewrite_delete</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">k</span>, <span class="ident">k</span>, <span class="number">6</span>);
         <span class="ident">must_get_eq</span>(<span class="number">6</span>, <span class="prelude-val">Some</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="string">b&#39;v&#39;</span>; <span class="number">5120</span>]));
+        <span class="ident">must_rollback</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">k</span>, <span class="number">6</span>);
+
+        <span class="ident">must_prewrite_put</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">k</span>, <span class="string">b&quot;v4&quot;</span>, <span class="ident">k</span>, <span class="number">7</span>);
+        <span class="ident">must_commit</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">k</span>, <span class="number">7</span>, <span class="number">9</span>);
+
+        <span class="ident">must_acquire_pessimistic_lock</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">k</span>, <span class="ident">k</span>, <span class="number">8</span>, <span class="number">10</span>);
+        <span class="ident">must_pessimistic_prewrite_put</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">k</span>, <span class="string">b&quot;v5&quot;</span>, <span class="ident">k</span>, <span class="number">8</span>, <span class="number">10</span>, <span class="bool-val">true</span>);
+        <span class="ident">must_get_eq</span>(<span class="number">10</span>, <span class="prelude-val">Some</span>(<span class="string">b&quot;v4&quot;</span>.<span class="ident">to_vec</span>()));
+        <span class="ident">must_commit</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">k</span>, <span class="number">8</span>, <span class="number">11</span>);
     }
 }
 </pre></div>
