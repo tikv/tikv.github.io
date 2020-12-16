@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["SnapHistogram",""],["SnapHistogramDelegator",""],["SnapHistogramInner",""]]});
+initSidebarItems({"struct":[["CheckSplitCounter",""],["CheckSplitCounterDelegator",""],["CheckSplitCounterInner",""]]});

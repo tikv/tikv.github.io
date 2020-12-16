@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["ReadRejectCounter",""]]});
+initSidebarItems({"struct":[["SnapHistogram",""],["SnapHistogramDelegator",""],["SnapHistogramInner",""]]});

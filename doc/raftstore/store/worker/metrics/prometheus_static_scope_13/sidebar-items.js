@@ -1,1 +1,0 @@
-initSidebarItems({"struct":[["SnapCounter",""],["SnapCounter2Delegator",""],["SnapCounter2Inner",""],["SnapCounterDelegator",""],["SnapCounterInner",""]]});
