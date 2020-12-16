@@ -371,7 +371,6 @@
 <span id="368">368</span>
 <span id="369">369</span>
 <span id="370">370</span>
-<span id="371">371</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.</span>
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">fs</span>::{<span class="ident">File</span>, <span class="ident">OpenOptions</span>};
@@ -385,7 +384,7 @@
 };
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{
     <span class="ident">CfName</span>, <span class="ident">EncryptionKeyManager</span>, <span class="ident">Error</span> <span class="kw">as</span> <span class="ident">EngineError</span>, <span class="ident">ImportExt</span>, <span class="ident">IngestExternalFileOptions</span>,
-    <span class="ident">Iterable</span>, <span class="ident">KvEngine</span>, <span class="ident">Mutable</span>, <span class="ident">SstWriter</span>, <span class="ident">SstWriterBuilder</span>,
+    <span class="ident">Iterable</span>, <span class="ident">KvEngine</span>, <span class="ident">Mutable</span>, <span class="ident">SstWriter</span>, <span class="ident">SstWriterBuilder</span>, <span class="ident">WriteBatch</span>,
 };
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">encryptionpb</span>::<span class="ident">EncryptionMethod</span>;
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">codec</span>::<span class="ident">bytes</span>::{<span class="ident">BytesEncoder</span>, <span class="ident">CompactBytesFromFileDecoder</span>};
@@ -532,15 +531,14 @@
     };
 
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">wb</span> <span class="op">=</span> <span class="ident">db</span>.<span class="ident">write_batch</span>();
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">write_to_db</span> <span class="op">=</span>
-        <span class="op">|</span><span class="ident">db</span>: <span class="kw-2">&amp;</span><span class="ident">E</span>, <span class="ident">batch</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>)<span class="op">&gt;</span><span class="op">|</span> <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">EngineError</span><span class="op">&gt;</span> {
-            <span class="ident">batch</span>.<span class="ident">iter</span>().<span class="ident">try_for_each</span>(<span class="op">|</span>(<span class="ident">k</span>, <span class="ident">v</span>)<span class="op">|</span> <span class="ident">wb</span>.<span class="ident">put_cf</span>(<span class="ident">cf</span>, <span class="kw-2">&amp;</span><span class="ident">k</span>, <span class="kw-2">&amp;</span><span class="ident">v</span>))<span class="question-mark">?</span>;
-            <span class="ident">db</span>.<span class="ident">write</span>(<span class="kw-2">&amp;</span><span class="ident">wb</span>)<span class="question-mark">?</span>;
-            <span class="ident">wb</span>.<span class="ident">clear</span>();
-            <span class="ident">callback</span>(<span class="ident">batch</span>);
-            <span class="ident">batch</span>.<span class="ident">clear</span>();
-            <span class="prelude-val">Ok</span>(())
-        };
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">write_to_db</span> <span class="op">=</span> <span class="op">|</span><span class="ident">batch</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>)<span class="op">&gt;</span><span class="op">|</span> <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">EngineError</span><span class="op">&gt;</span> {
+        <span class="ident">batch</span>.<span class="ident">iter</span>().<span class="ident">try_for_each</span>(<span class="op">|</span>(<span class="ident">k</span>, <span class="ident">v</span>)<span class="op">|</span> <span class="ident">wb</span>.<span class="ident">put_cf</span>(<span class="ident">cf</span>, <span class="kw-2">&amp;</span><span class="ident">k</span>, <span class="kw-2">&amp;</span><span class="ident">v</span>))<span class="question-mark">?</span>;
+        <span class="ident">wb</span>.<span class="ident">write</span>()<span class="question-mark">?</span>;
+        <span class="ident">wb</span>.<span class="ident">clear</span>();
+        <span class="ident">callback</span>(<span class="ident">batch</span>);
+        <span class="ident">batch</span>.<span class="ident">clear</span>();
+        <span class="prelude-val">Ok</span>(())
+    };
 
     <span class="comment">// Collect keys to a vec rather than wb so that we can invoke the callback less times.</span>
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">batch</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">with_capacity</span>(<span class="number">1024</span>);
@@ -553,7 +551,7 @@
         <span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> <span class="macro">box_try</span><span class="macro">!</span>(<span class="ident">decoder</span>.<span class="ident">decode_compact_bytes</span>());
         <span class="kw">if</span> <span class="ident">key</span>.<span class="ident">is_empty</span>() {
             <span class="kw">if</span> <span class="op">!</span><span class="ident">batch</span>.<span class="ident">is_empty</span>() {
-                <span class="macro">box_try</span><span class="macro">!</span>(<span class="ident">write_to_db</span>(<span class="ident">db</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">batch</span>));
+                <span class="macro">box_try</span><span class="macro">!</span>(<span class="ident">write_to_db</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">batch</span>));
             }
             <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
         }
@@ -561,7 +559,7 @@
         <span class="ident">batch_data_size</span> <span class="op">+</span><span class="op">=</span> <span class="ident">key</span>.<span class="ident">len</span>() <span class="op">+</span> <span class="ident">value</span>.<span class="ident">len</span>();
         <span class="ident">batch</span>.<span class="ident">push</span>((<span class="ident">key</span>, <span class="ident">value</span>));
         <span class="kw">if</span> <span class="ident">batch_data_size</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">batch_size</span> {
-            <span class="macro">box_try</span><span class="macro">!</span>(<span class="ident">write_to_db</span>(<span class="ident">db</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">batch</span>));
+            <span class="macro">box_try</span><span class="macro">!</span>(<span class="ident">write_to_db</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">batch</span>));
             <span class="ident">batch_data_size</span> <span class="op">=</span> <span class="number">0</span>;
         }
     }

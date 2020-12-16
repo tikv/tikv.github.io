@@ -600,6 +600,7 @@
 <span id="597">597</span>
 <span id="598">598</span>
 <span id="599">599</span>
+<span id="600">600</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -609,7 +610,8 @@
 <span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">util</span>, <span class="ident">RocksSstWriter</span>};
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{
     <span class="ident">CFNamesExt</span>, <span class="ident">DeleteStrategy</span>, <span class="ident">ImportExt</span>, <span class="ident">IngestExternalFileOptions</span>, <span class="ident">IterOptions</span>, <span class="ident">Iterable</span>,
-    <span class="ident">Iterator</span>, <span class="ident">MiscExt</span>, <span class="ident">Mutable</span>, <span class="ident">Range</span>, <span class="prelude-ty">Result</span>, <span class="ident">SstWriter</span>, <span class="ident">SstWriterBuilder</span>, <span class="ident">WriteBatchExt</span>, <span class="ident">ALL_CFS</span>,
+    <span class="ident">Iterator</span>, <span class="ident">MiscExt</span>, <span class="ident">Mutable</span>, <span class="ident">Range</span>, <span class="prelude-ty">Result</span>, <span class="ident">SstWriter</span>, <span class="ident">SstWriterBuilder</span>, <span class="ident">WriteBatch</span>,
+    <span class="ident">WriteBatchExt</span>, <span class="ident">ALL_CFS</span>,
 };
 <span class="kw">use</span> <span class="ident">rocksdb</span>::<span class="ident">Range</span> <span class="kw">as</span> <span class="ident">RocksRange</span>;
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">keybuilder</span>::<span class="ident">KeyBuilder</span>;
@@ -691,12 +693,12 @@
             <span class="kw">for</span> <span class="ident">key</span> <span class="kw">in</span> <span class="ident">data</span>.<span class="ident">iter</span>() {
                 <span class="ident">wb</span>.<span class="ident">delete_cf</span>(<span class="ident">cf</span>, <span class="ident">key</span>)<span class="question-mark">?</span>;
                 <span class="kw">if</span> <span class="ident">wb</span>.<span class="ident">count</span>() <span class="op">&gt;</span><span class="op">=</span> <span class="self">Self</span>::<span class="ident">WRITE_BATCH_MAX_KEYS</span> {
-                    <span class="self">self</span>.<span class="ident">write</span>(<span class="kw-2">&amp;</span><span class="ident">wb</span>)<span class="question-mark">?</span>;
+                    <span class="ident">wb</span>.<span class="ident">write</span>()<span class="question-mark">?</span>;
                     <span class="ident">wb</span>.<span class="ident">clear</span>();
                 }
             }
             <span class="kw">if</span> <span class="ident">wb</span>.<span class="ident">count</span>() <span class="op">&gt;</span> <span class="number">0</span> {
-                <span class="self">self</span>.<span class="ident">write</span>(<span class="kw-2">&amp;</span><span class="ident">wb</span>)<span class="question-mark">?</span>;
+                <span class="ident">wb</span>.<span class="ident">write</span>()<span class="question-mark">?</span>;
             }
         }
         <span class="prelude-val">Ok</span>(())
@@ -717,13 +719,13 @@
         <span class="kw">while</span> <span class="ident">it_valid</span> {
             <span class="ident">wb</span>.<span class="ident">delete_cf</span>(<span class="ident">cf</span>, <span class="ident">it</span>.<span class="ident">key</span>())<span class="question-mark">?</span>;
             <span class="kw">if</span> <span class="ident">wb</span>.<span class="ident">count</span>() <span class="op">&gt;</span><span class="op">=</span> <span class="self">Self</span>::<span class="ident">WRITE_BATCH_MAX_KEYS</span> {
-                <span class="self">self</span>.<span class="ident">write</span>(<span class="kw-2">&amp;</span><span class="ident">wb</span>)<span class="question-mark">?</span>;
+                <span class="ident">wb</span>.<span class="ident">write</span>()<span class="question-mark">?</span>;
                 <span class="ident">wb</span>.<span class="ident">clear</span>();
             }
             <span class="ident">it_valid</span> <span class="op">=</span> <span class="ident">it</span>.<span class="ident">next</span>()<span class="question-mark">?</span>;
         }
         <span class="kw">if</span> <span class="ident">wb</span>.<span class="ident">count</span>() <span class="op">&gt;</span> <span class="number">0</span> {
-            <span class="self">self</span>.<span class="ident">write</span>(<span class="kw-2">&amp;</span><span class="ident">wb</span>)<span class="question-mark">?</span>;
+            <span class="ident">wb</span>.<span class="ident">write</span>()<span class="question-mark">?</span>;
         }
         <span class="self">self</span>.<span class="ident">sync_wal</span>()<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
@@ -780,7 +782,7 @@
                 <span class="kw">for</span> <span class="ident">r</span> <span class="kw">in</span> <span class="ident">ranges</span>.<span class="ident">iter</span>() {
                     <span class="ident">wb</span>.<span class="ident">delete_range_cf</span>(<span class="ident">cf</span>, <span class="ident">r</span>.<span class="ident">start_key</span>, <span class="ident">r</span>.<span class="ident">end_key</span>)<span class="question-mark">?</span>;
                 }
-                <span class="self">self</span>.<span class="ident">write</span>(<span class="kw-2">&amp;</span><span class="ident">wb</span>)<span class="question-mark">?</span>;
+                <span class="ident">wb</span>.<span class="ident">write</span>()<span class="question-mark">?</span>;
             }
             <span class="ident">DeleteStrategy</span>::<span class="ident">DeleteByKey</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">for</span> <span class="ident">r</span> <span class="kw">in</span> <span class="ident">ranges</span> {
@@ -997,7 +999,7 @@
                 <span class="ident">wb</span>.<span class="ident">put_cf</span>(<span class="ident">cf</span>, <span class="ident">k</span>, <span class="ident">v</span>).<span class="ident">unwrap</span>();
             }
         }
-        <span class="ident">db</span>.<span class="ident">write</span>(<span class="kw-2">&amp;</span><span class="ident">wb</span>).<span class="ident">unwrap</span>();
+        <span class="ident">wb</span>.<span class="ident">write</span>().<span class="ident">unwrap</span>();
         <span class="ident">check_data</span>(<span class="kw-2">&amp;</span><span class="ident">db</span>, <span class="ident">ALL_CFS</span>, <span class="ident">kvs</span>.<span class="ident">as_slice</span>());
 
         <span class="comment">// Delete all in ranges.</span>
@@ -1188,7 +1190,7 @@
         <span class="kw">for</span> <span class="kw-2">&amp;</span>(<span class="ident">k</span>, <span class="ident">v</span>) <span class="kw">in</span> <span class="ident">kvs</span>.<span class="ident">as_slice</span>() {
             <span class="ident">wb</span>.<span class="ident">put_cf</span>(<span class="ident">cf</span>, <span class="ident">k</span>, <span class="ident">v</span>).<span class="ident">unwrap</span>();
         }
-        <span class="ident">db</span>.<span class="ident">write</span>(<span class="kw-2">&amp;</span><span class="ident">wb</span>).<span class="ident">unwrap</span>();
+        <span class="ident">wb</span>.<span class="ident">write</span>().<span class="ident">unwrap</span>();
         <span class="ident">check_data</span>(<span class="kw-2">&amp;</span><span class="ident">db</span>, <span class="kw-2">&amp;</span>[<span class="ident">cf</span>], <span class="ident">kvs</span>.<span class="ident">as_slice</span>());
 
         <span class="comment">// Delete all in [&quot;k2&quot;, &quot;k4&quot;).</span>
