@@ -804,6 +804,31 @@
 <span id="801">801</span>
 <span id="802">802</span>
 <span id="803">803</span>
+<span id="804">804</span>
+<span id="805">805</span>
+<span id="806">806</span>
+<span id="807">807</span>
+<span id="808">808</span>
+<span id="809">809</span>
+<span id="810">810</span>
+<span id="811">811</span>
+<span id="812">812</span>
+<span id="813">813</span>
+<span id="814">814</span>
+<span id="815">815</span>
+<span id="816">816</span>
+<span id="817">817</span>
+<span id="818">818</span>
+<span id="819">819</span>
+<span id="820">820</span>
+<span id="821">821</span>
+<span id="822">822</span>
+<span id="823">823</span>
+<span id="824">824</span>
+<span id="825">825</span>
+<span id="826">826</span>
+<span id="827">827</span>
+<span id="828">828</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -893,8 +918,31 @@
     <span class="ident">MvccByStartTs</span>(<span class="ident">MvccByStartTs</span>),
 }
 
+<span class="doccomment">/// A `Command` with its return type, reified as the generic parameter `T`.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Incoming grpc requests (like `CommitRequest`, `PrewriteRequest`) are converted to</span>
+<span class="doccomment">/// this type via a series of transformations. That process is described below using</span>
+<span class="doccomment">/// `CommitRequest` as an example:</span>
+<span class="doccomment">/// 1. A `CommitRequest` is handled by the `future_commit` method in kv.rs, where it</span>
+<span class="doccomment">/// needs to be transformed to a `TypedCommand` before being passed to the</span>
+<span class="doccomment">/// `storage.sched_txn_command` method.</span>
+<span class="doccomment">/// 2. The `From&lt;CommitRequest&gt;` impl for `TypedCommand` gets chosen, and its generic</span>
+<span class="doccomment">/// parameter indicates that the result type for this instance of `TypedCommand` is</span>
+<span class="doccomment">/// going to be `TxnStatus` - one of the variants of the `StorageCallback` enum.</span>
+<span class="doccomment">/// 3. In the above `from` method, the details of the commit request are captured by</span>
+<span class="doccomment">/// creating an instance of the struct `storage::txn::commands::commit::Command`</span>
+<span class="doccomment">/// via its `new` method.</span>
+<span class="doccomment">/// 4. This struct is wrapped in a variant of the enum `storage::txn::commands::Command`.</span>
+<span class="doccomment">/// This enum exists to facilitate generic operations over different commands.</span>
+<span class="doccomment">/// 5. Finally, the `Command` enum variant for `Commit` is converted to the `TypedCommand`</span>
+<span class="doccomment">/// using the `From&lt;Command&gt;` impl for `TypedCommand`.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// For other requests, see the corresponding `future_` method, the `From` trait</span>
+<span class="doccomment">/// implementation and so on.</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">TypedCommand</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="ident">cmd</span>: <span class="ident">Command</span>,
+
+    <span class="doccomment">/// Track the type of the command&#39;s return value.</span>
     <span class="ident">_pd</span>: <span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
 }
 
@@ -1408,10 +1456,12 @@
     }
 }
 
+<span class="doccomment">/// Commands that do not need to modify the database during execution will implement this trait.</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">ReadCommand</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">Snapshot</span><span class="op">&gt;</span>: <span class="ident">CommandExt</span> {
     <span class="kw">fn</span> <span class="ident">process_read</span>(<span class="self">self</span>, <span class="ident">snapshot</span>: <span class="ident">S</span>, <span class="ident">statistics</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Statistics</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">ProcessResult</span><span class="op">&gt;</span>;
 }
 
+<span class="doccomment">/// Commands that need to modify the database during execution will implement this trait.</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">WriteCommand</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">Snapshot</span>, <span class="ident">L</span>: <span class="ident">LockManager</span><span class="op">&gt;</span>: <span class="ident">CommandExt</span> {
     <span class="kw">fn</span> <span class="ident">process_write</span>(<span class="self">self</span>, <span class="ident">snapshot</span>: <span class="ident">S</span>, <span class="ident">context</span>: <span class="ident">WriteContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="ident">L</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">WriteResult</span><span class="op">&gt;</span>;
 }
