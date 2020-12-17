@@ -1496,6 +1496,16 @@
 <span id="1493">1493</span>
 <span id="1494">1494</span>
 <span id="1495">1495</span>
+<span id="1496">1496</span>
+<span id="1497">1497</span>
+<span id="1498">1498</span>
+<span id="1499">1499</span>
+<span id="1500">1500</span>
+<span id="1501">1501</span>
+<span id="1502">1502</span>
+<span id="1503">1503</span>
+<span id="1504">1504</span>
+<span id="1505">1505</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1535,7 +1545,6 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">metrics</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="kw-2">*</span>;
 
-<span class="kw">const</span> <span class="ident">WORKER_TAKE_RANGE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">6</span>;
 <span class="kw">const</span> <span class="ident">BACKUP_BATCH_LIMIT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1024</span>;
 
 <span class="comment">// if thread pool has been idle for such long time, we will shutdown it.</span>
@@ -1682,6 +1691,8 @@
             <span class="ident">pb_ctx</span>: <span class="kw-2">&amp;</span><span class="ident">ctx</span>,
             ..<span class="ident">Default</span>::<span class="ident">default</span>()
         };
+
+        <span class="kw">let</span> <span class="ident">start_snapshot</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now</span>();
         <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="ident">snap_ctx</span>) {
             <span class="prelude-val">Ok</span>(<span class="ident">s</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">s</span>,
             <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
@@ -1689,6 +1700,9 @@
                 <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>.<span class="ident">into</span>());
             }
         };
+        <span class="ident">BACKUP_RANGE_HISTOGRAM_VEC</span>
+            .<span class="ident">with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="string">&quot;snapshot&quot;</span>])
+            .<span class="ident">observe</span>(<span class="ident">start_snapshot</span>.<span class="ident">elapsed</span>().<span class="ident">as_secs_f64</span>());
         <span class="kw">let</span> <span class="ident">snap_store</span> <span class="op">=</span> <span class="ident">SnapshotStore</span>::<span class="ident">new</span>(
             <span class="ident">snapshot</span>,
             <span class="ident">backup_ts</span>,
@@ -1705,7 +1719,7 @@
             .<span class="ident">entry_scanner</span>(<span class="ident">start_key</span>, <span class="ident">end_key</span>, <span class="ident">begin_ts</span>, <span class="ident">incremental</span>)
             .<span class="ident">unwrap</span>();
 
-        <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now</span>();
+        <span class="kw">let</span> <span class="ident">start_scan</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">batch</span> <span class="op">=</span> <span class="ident">EntryBatch</span>::<span class="ident">with_capacity</span>(<span class="ident">BACKUP_BATCH_LIMIT</span>);
         <span class="kw">loop</span> {
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">scanner</span>.<span class="ident">scan_entries</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">batch</span>) {
@@ -1724,7 +1738,7 @@
         }
         <span class="ident">BACKUP_RANGE_HISTOGRAM_VEC</span>
             .<span class="ident">with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="string">&quot;scan&quot;</span>])
-            .<span class="ident">observe</span>(<span class="ident">start</span>.<span class="ident">elapsed</span>().<span class="ident">as_secs_f64</span>());
+            .<span class="ident">observe</span>(<span class="ident">start_scan</span>.<span class="ident">elapsed</span>().<span class="ident">as_secs_f64</span>());
         <span class="kw">let</span> <span class="ident">stat</span> <span class="op">=</span> <span class="ident">scanner</span>.<span class="ident">take_statistics</span>();
         <span class="prelude-val">Ok</span>(<span class="ident">stat</span>)
     }
@@ -1932,7 +1946,7 @@
             <span class="ident">next_start</span>,
             <span class="ident">end_key</span>,
             <span class="ident">region_info</span>,
-            <span class="ident">finished</span>: <span class="ident">Default</span>::<span class="ident">default</span>(),
+            <span class="ident">finished</span>: <span class="bool-val">false</span>,
             <span class="ident">is_raw_kv</span>,
             <span class="ident">cf</span>,
         }
@@ -1959,7 +1973,7 @@
         <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">region_info</span>.<span class="ident">seek_region</span>(
             <span class="kw-2">&amp;</span><span class="ident">start_key_</span>,
             <span class="ident">Box</span>::<span class="ident">new</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">iter</span><span class="op">|</span> {
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">sended</span> <span class="op">=</span> <span class="number">0</span>;
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">count</span> <span class="op">=</span> <span class="number">0</span>;
                 <span class="kw">for</span> <span class="ident">info</span> <span class="kw">in</span> <span class="ident">iter</span> {
                     <span class="kw">let</span> <span class="ident">region</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">info</span>.<span class="ident">region</span>;
                     <span class="kw">if</span> <span class="ident">end_key</span>.<span class="ident">is_some</span>() {
@@ -1985,8 +1999,8 @@
                             <span class="ident">cf</span>: <span class="ident">cf_name</span>,
                         };
                         <span class="ident">tx</span>.<span class="ident">send</span>(<span class="ident">backup_range</span>).<span class="ident">unwrap</span>();
-                        <span class="ident">sended</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
-                        <span class="kw">if</span> <span class="ident">sended</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">limit</span> {
+                        <span class="ident">count</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+                        <span class="kw">if</span> <span class="ident">count</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">limit</span> {
                             <span class="kw">break</span>;
                         }
                     }
@@ -2053,7 +2067,7 @@
             <span class="kw">return</span>;
         }
         <span class="kw">let</span> <span class="ident">workers</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(
-            <span class="ident">yatp</span>::<span class="ident">Builder</span>::<span class="ident">new</span>(<span class="macro">thd_name</span><span class="macro">!</span>(<span class="string">&quot;backup-worker&quot;</span>))
+            <span class="ident">yatp</span>::<span class="ident">Builder</span>::<span class="ident">new</span>(<span class="macro">thd_name</span><span class="macro">!</span>(<span class="string">&quot;bkwkr&quot;</span>))
                 .<span class="ident">max_thread_count</span>(<span class="ident">new_size</span>)
                 .<span class="ident">build_callback_pool</span>(),
         );
@@ -2117,24 +2131,13 @@
         <span class="kw">let</span> <span class="ident">db</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">db</span>.<span class="ident">clone</span>();
         <span class="kw">let</span> <span class="ident">store_id</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">store_id</span>;
         <span class="kw">let</span> <span class="ident">concurrency_manager</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">concurrency_manager</span>.<span class="ident">clone</span>();
+        <span class="kw">let</span> <span class="ident">batch_size</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">config_manager</span>.<span class="number">0</span>.<span class="ident">read</span>().<span class="ident">unwrap</span>().<span class="ident">batch_size</span>;
         <span class="comment">// TODO: make it async.</span>
-        <span class="self">self</span>.<span class="ident">pool</span>.<span class="ident">borrow_mut</span>().<span class="ident">spawn</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> <span class="kw">loop</span> {
-            <span class="kw">let</span> (<span class="ident">branges</span>, <span class="ident">is_raw_kv</span>, <span class="ident">cf</span>) <span class="op">=</span> {
-                <span class="comment">// Release lock as soon as possible.</span>
-                <span class="comment">// It is critical to speed up backup, otherwise workers are</span>
-                <span class="comment">// blocked by each other.</span>
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">progress</span> <span class="op">=</span> <span class="ident">prs</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
-                (
-                    <span class="ident">progress</span>.<span class="ident">forward</span>(<span class="ident">WORKER_TAKE_RANGE</span>),
-                    <span class="ident">progress</span>.<span class="ident">is_raw_kv</span>,
-                    <span class="ident">progress</span>.<span class="ident">cf</span>,
-                )
-            };
-            <span class="kw">if</span> <span class="ident">branges</span>.<span class="ident">is_empty</span>() {
-                <span class="kw">return</span>;
-            }
-
+        <span class="self">self</span>.<span class="ident">pool</span>.<span class="ident">borrow_mut</span>().<span class="ident">spawn</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
             <span class="ident">tikv_alloc</span>::<span class="ident">add_thread_memory_accessor</span>();
+            <span class="macro">defer</span><span class="macro">!</span>({
+                <span class="ident">tikv_alloc</span>::<span class="ident">remove_thread_memory_accessor</span>();
+            });
 
             <span class="comment">// Check if we can open external storage.</span>
             <span class="kw">let</span> <span class="ident">backend</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">create_storage</span>(<span class="kw-2">&amp;</span><span class="ident">request</span>.<span class="ident">backend</span>) {
@@ -2149,100 +2152,114 @@
                     <span class="kw">return</span>;
                 }
             };
+
             <span class="kw">let</span> <span class="ident">storage</span> <span class="op">=</span> <span class="ident">LimitedStorage</span> {
-                <span class="ident">limiter</span>: <span class="ident">request</span>.<span class="ident">limiter</span>.<span class="ident">clone</span>(),
+                <span class="ident">limiter</span>: <span class="ident">request</span>.<span class="ident">limiter</span>,
                 <span class="ident">storage</span>: <span class="ident">backend</span>,
             };
-            <span class="kw">for</span> <span class="ident">brange</span> <span class="kw">in</span> <span class="ident">branges</span> {
-                <span class="kw">if</span> <span class="ident">request</span>.<span class="ident">cancel</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>) {
-                    <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;backup task has canceled&quot;</span>; <span class="string">&quot;range&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">brange</span>);
-                    <span class="kw">return</span>;
-                }
-                <span class="comment">// TODO: make file_name unique and short</span>
-                <span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> <span class="ident">brange</span>.<span class="ident">start_key</span>.<span class="ident">clone</span>().<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">k</span><span class="op">|</span> {
-                    <span class="comment">// use start_key sha256 instead of start_key to avoid file name too long os error</span>
-                    <span class="kw">let</span> <span class="ident">input</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">is_raw_kv</span> {
-                        <span class="ident">k</span>.<span class="ident">into_encoded</span>()
-                    } <span class="kw">else</span> {
-                        <span class="ident">k</span>.<span class="ident">into_raw</span>().<span class="ident">unwrap</span>()
-                    };
-                    <span class="ident">file_system</span>::<span class="ident">sha256</span>(<span class="kw-2">&amp;</span><span class="ident">input</span>).<span class="ident">ok</span>().<span class="ident">map</span>(<span class="ident">hex</span>::<span class="ident">encode</span>)
-                });
-                <span class="kw">let</span> <span class="ident">name</span> <span class="op">=</span> <span class="ident">backup_file_name</span>(<span class="ident">store_id</span>, <span class="kw-2">&amp;</span><span class="ident">brange</span>.<span class="ident">region</span>, <span class="ident">key</span>);
-                <span class="kw">let</span> <span class="ident">ct</span> <span class="op">=</span> <span class="ident">to_sst_compression_type</span>(<span class="ident">request</span>.<span class="ident">compression_type</span>);
 
-                <span class="kw">let</span> (<span class="ident">res</span>, <span class="ident">start_key</span>, <span class="ident">end_key</span>) <span class="op">=</span> <span class="kw">if</span> <span class="ident">is_raw_kv</span> {
-                    (
-                        <span class="ident">brange</span>.<span class="ident">backup_raw_kv_to_file</span>(
-                            <span class="kw-2">&amp;</span><span class="ident">engine</span>,
-                            <span class="ident">db</span>.<span class="ident">clone</span>(),
-                            <span class="kw-2">&amp;</span><span class="ident">storage</span>,
-                            <span class="ident">name</span>,
-                            <span class="ident">cf</span>,
-                            <span class="ident">ct</span>,
-                            <span class="ident">request</span>.<span class="ident">compression_level</span>,
-                        ),
-                        <span class="ident">brange</span>.<span class="ident">start_key</span>.<span class="ident">map_or_else</span>(<span class="ident">Vec</span>::<span class="ident">new</span>, <span class="op">|</span><span class="ident">k</span><span class="op">|</span> <span class="ident">k</span>.<span class="ident">into_encoded</span>()),
-                        <span class="ident">brange</span>.<span class="ident">end_key</span>.<span class="ident">map_or_else</span>(<span class="ident">Vec</span>::<span class="ident">new</span>, <span class="op">|</span><span class="ident">k</span><span class="op">|</span> <span class="ident">k</span>.<span class="ident">into_encoded</span>()),
-                    )
-                } <span class="kw">else</span> {
-                    (
-                        <span class="ident">brange</span>.<span class="ident">backup_to_file</span>(
-                            <span class="kw-2">&amp;</span><span class="ident">engine</span>,
-                            <span class="ident">db</span>.<span class="ident">clone</span>(),
-                            <span class="kw-2">&amp;</span><span class="ident">storage</span>,
-                            <span class="ident">concurrency_manager</span>.<span class="ident">clone</span>(),
-                            <span class="ident">name</span>,
-                            <span class="ident">backup_ts</span>,
-                            <span class="ident">start_ts</span>,
-                            <span class="ident">ct</span>,
-                            <span class="ident">request</span>.<span class="ident">compression_level</span>,
-                        ),
-                        <span class="ident">brange</span>
-                            .<span class="ident">start_key</span>
-                            .<span class="ident">map_or_else</span>(<span class="ident">Vec</span>::<span class="ident">new</span>, <span class="op">|</span><span class="ident">k</span><span class="op">|</span> <span class="ident">k</span>.<span class="ident">into_raw</span>().<span class="ident">unwrap</span>()),
-                        <span class="ident">brange</span>
-                            .<span class="ident">end_key</span>
-                            .<span class="ident">map_or_else</span>(<span class="ident">Vec</span>::<span class="ident">new</span>, <span class="op">|</span><span class="ident">k</span><span class="op">|</span> <span class="ident">k</span>.<span class="ident">into_raw</span>().<span class="ident">unwrap</span>()),
-                    )
+            <span class="kw">loop</span> {
+                <span class="kw">let</span> (<span class="ident">batch</span>, <span class="ident">is_raw_kv</span>, <span class="ident">cf</span>) <span class="op">=</span> {
+                    <span class="comment">// Release lock as soon as possible.</span>
+                    <span class="comment">// It is critical to speed up backup, otherwise workers are</span>
+                    <span class="comment">// blocked by each other.</span>
+                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">progress</span> <span class="op">=</span> <span class="ident">prs</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+                    <span class="kw">let</span> <span class="ident">batch</span> <span class="op">=</span> <span class="ident">progress</span>.<span class="ident">forward</span>(<span class="ident">batch_size</span>);
+                    <span class="kw">if</span> <span class="ident">batch</span>.<span class="ident">is_empty</span>() {
+                        <span class="kw">return</span>;
+                    }
+                    (<span class="ident">batch</span>, <span class="ident">progress</span>.<span class="ident">is_raw_kv</span>, <span class="ident">progress</span>.<span class="ident">cf</span>)
                 };
 
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">response</span> <span class="op">=</span> <span class="ident">BackupResponse</span>::<span class="ident">default</span>();
-                <span class="kw">match</span> <span class="ident">res</span> {
-                    <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                        <span class="macro">error</span><span class="macro">!</span>(<span class="question-mark">?</span><span class="ident">e</span>; <span class="string">&quot;backup region failed&quot;</span>;
-                            <span class="string">&quot;region&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">brange</span>.<span class="ident">region</span>,
-                            <span class="string">&quot;start_key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">hex</span>::<span class="ident">encode_upper</span>(<span class="kw-2">&amp;</span><span class="ident">start_key</span>),
-                            <span class="string">&quot;end_key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">hex</span>::<span class="ident">encode_upper</span>(<span class="kw-2">&amp;</span><span class="ident">end_key</span>),
-                        );
-                        <span class="ident">response</span>.<span class="ident">set_error</span>(<span class="ident">e</span>.<span class="ident">into</span>());
+                <span class="kw">for</span> <span class="ident">brange</span> <span class="kw">in</span> <span class="ident">batch</span> {
+                    <span class="kw">if</span> <span class="ident">request</span>.<span class="ident">cancel</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>) {
+                        <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;backup task has canceled&quot;</span>; <span class="string">&quot;range&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">brange</span>);
+                        <span class="kw">return</span>;
                     }
-                    <span class="prelude-val">Ok</span>((<span class="kw-2">mut</span> <span class="ident">files</span>, <span class="ident">stat</span>)) <span class="op">=</span><span class="op">&gt;</span> {
-                        <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;backup region finish&quot;</span>;
+                    <span class="comment">// TODO: make file_name unique and short</span>
+                    <span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> <span class="ident">brange</span>.<span class="ident">start_key</span>.<span class="ident">clone</span>().<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">k</span><span class="op">|</span> {
+                        <span class="comment">// use start_key sha256 instead of start_key to avoid file name too long os error</span>
+                        <span class="kw">let</span> <span class="ident">input</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">is_raw_kv</span> {
+                            <span class="ident">k</span>.<span class="ident">into_encoded</span>()
+                        } <span class="kw">else</span> {
+                            <span class="ident">k</span>.<span class="ident">into_raw</span>().<span class="ident">unwrap</span>()
+                        };
+                        <span class="ident">file_system</span>::<span class="ident">sha256</span>(<span class="kw-2">&amp;</span><span class="ident">input</span>).<span class="ident">ok</span>().<span class="ident">map</span>(<span class="ident">hex</span>::<span class="ident">encode</span>)
+                    });
+                    <span class="kw">let</span> <span class="ident">name</span> <span class="op">=</span> <span class="ident">backup_file_name</span>(<span class="ident">store_id</span>, <span class="kw-2">&amp;</span><span class="ident">brange</span>.<span class="ident">region</span>, <span class="ident">key</span>);
+                    <span class="kw">let</span> <span class="ident">ct</span> <span class="op">=</span> <span class="ident">to_sst_compression_type</span>(<span class="ident">request</span>.<span class="ident">compression_type</span>);
+
+                    <span class="kw">let</span> (<span class="ident">res</span>, <span class="ident">start_key</span>, <span class="ident">end_key</span>) <span class="op">=</span> <span class="kw">if</span> <span class="ident">is_raw_kv</span> {
+                        (
+                            <span class="ident">brange</span>.<span class="ident">backup_raw_kv_to_file</span>(
+                                <span class="kw-2">&amp;</span><span class="ident">engine</span>,
+                                <span class="ident">db</span>.<span class="ident">clone</span>(),
+                                <span class="kw-2">&amp;</span><span class="ident">storage</span>,
+                                <span class="ident">name</span>,
+                                <span class="ident">cf</span>,
+                                <span class="ident">ct</span>,
+                                <span class="ident">request</span>.<span class="ident">compression_level</span>,
+                            ),
+                            <span class="ident">brange</span>.<span class="ident">start_key</span>.<span class="ident">map_or_else</span>(<span class="ident">Vec</span>::<span class="ident">new</span>, <span class="op">|</span><span class="ident">k</span><span class="op">|</span> <span class="ident">k</span>.<span class="ident">into_encoded</span>()),
+                            <span class="ident">brange</span>.<span class="ident">end_key</span>.<span class="ident">map_or_else</span>(<span class="ident">Vec</span>::<span class="ident">new</span>, <span class="op">|</span><span class="ident">k</span><span class="op">|</span> <span class="ident">k</span>.<span class="ident">into_encoded</span>()),
+                        )
+                    } <span class="kw">else</span> {
+                        (
+                            <span class="ident">brange</span>.<span class="ident">backup_to_file</span>(
+                                <span class="kw-2">&amp;</span><span class="ident">engine</span>,
+                                <span class="ident">db</span>.<span class="ident">clone</span>(),
+                                <span class="kw-2">&amp;</span><span class="ident">storage</span>,
+                                <span class="ident">concurrency_manager</span>.<span class="ident">clone</span>(),
+                                <span class="ident">name</span>,
+                                <span class="ident">backup_ts</span>,
+                                <span class="ident">start_ts</span>,
+                                <span class="ident">ct</span>,
+                                <span class="ident">request</span>.<span class="ident">compression_level</span>,
+                            ),
+                            <span class="ident">brange</span>
+                                .<span class="ident">start_key</span>
+                                .<span class="ident">map_or_else</span>(<span class="ident">Vec</span>::<span class="ident">new</span>, <span class="op">|</span><span class="ident">k</span><span class="op">|</span> <span class="ident">k</span>.<span class="ident">into_raw</span>().<span class="ident">unwrap</span>()),
+                            <span class="ident">brange</span>
+                                .<span class="ident">end_key</span>
+                                .<span class="ident">map_or_else</span>(<span class="ident">Vec</span>::<span class="ident">new</span>, <span class="op">|</span><span class="ident">k</span><span class="op">|</span> <span class="ident">k</span>.<span class="ident">into_raw</span>().<span class="ident">unwrap</span>()),
+                        )
+                    };
+
+                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">response</span> <span class="op">=</span> <span class="ident">BackupResponse</span>::<span class="ident">default</span>();
+                    <span class="kw">match</span> <span class="ident">res</span> {
+                        <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                            <span class="macro">error</span><span class="macro">!</span>(<span class="question-mark">?</span><span class="ident">e</span>; <span class="string">&quot;backup region failed&quot;</span>;
+                                <span class="string">&quot;region&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">brange</span>.<span class="ident">region</span>,
+                                <span class="string">&quot;start_key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">hex</span>::<span class="ident">encode_upper</span>(<span class="kw-2">&amp;</span><span class="ident">start_key</span>),
+                                <span class="string">&quot;end_key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">hex</span>::<span class="ident">encode_upper</span>(<span class="kw-2">&amp;</span><span class="ident">end_key</span>),
+                            );
+                            <span class="ident">response</span>.<span class="ident">set_error</span>(<span class="ident">e</span>.<span class="ident">into</span>());
+                        }
+                        <span class="prelude-val">Ok</span>((<span class="kw-2">mut</span> <span class="ident">files</span>, <span class="ident">stat</span>)) <span class="op">=</span><span class="op">&gt;</span> {
+                            <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;backup region finish&quot;</span>;
                             <span class="string">&quot;region&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">brange</span>.<span class="ident">region</span>,
                             <span class="string">&quot;start_key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">hex</span>::<span class="ident">encode_upper</span>(<span class="kw-2">&amp;</span><span class="ident">start_key</span>),
                             <span class="string">&quot;end_key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">hex</span>::<span class="ident">encode_upper</span>(<span class="kw-2">&amp;</span><span class="ident">end_key</span>),
                             <span class="string">&quot;details&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">stat</span>);
 
-                        <span class="kw">for</span> <span class="ident">file</span> <span class="kw">in</span> <span class="ident">files</span>.<span class="ident">iter_mut</span>() {
-                            <span class="ident">file</span>.<span class="ident">set_start_key</span>(<span class="ident">start_key</span>.<span class="ident">clone</span>());
-                            <span class="ident">file</span>.<span class="ident">set_end_key</span>(<span class="ident">end_key</span>.<span class="ident">clone</span>());
-                            <span class="ident">file</span>.<span class="ident">set_start_version</span>(<span class="ident">start_ts</span>.<span class="ident">into_inner</span>());
-                            <span class="ident">file</span>.<span class="ident">set_end_version</span>(<span class="ident">end_ts</span>.<span class="ident">into_inner</span>());
+                            <span class="kw">for</span> <span class="ident">file</span> <span class="kw">in</span> <span class="ident">files</span>.<span class="ident">iter_mut</span>() {
+                                <span class="ident">file</span>.<span class="ident">set_start_key</span>(<span class="ident">start_key</span>.<span class="ident">clone</span>());
+                                <span class="ident">file</span>.<span class="ident">set_end_key</span>(<span class="ident">end_key</span>.<span class="ident">clone</span>());
+                                <span class="ident">file</span>.<span class="ident">set_start_version</span>(<span class="ident">start_ts</span>.<span class="ident">into_inner</span>());
+                                <span class="ident">file</span>.<span class="ident">set_end_version</span>(<span class="ident">end_ts</span>.<span class="ident">into_inner</span>());
+                            }
+                            <span class="ident">response</span>.<span class="ident">set_files</span>(<span class="ident">files</span>.<span class="ident">into</span>());
                         }
-                        <span class="ident">response</span>.<span class="ident">set_files</span>(<span class="ident">files</span>.<span class="ident">into</span>());
+                    }
+                    <span class="ident">response</span>.<span class="ident">set_start_key</span>(<span class="ident">start_key</span>);
+                    <span class="ident">response</span>.<span class="ident">set_end_key</span>(<span class="ident">end_key</span>);
+
+                    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">tx</span>.<span class="ident">unbounded_send</span>(<span class="ident">response</span>) {
+                        <span class="macro">error</span><span class="macro">!</span>(<span class="question-mark">?</span><span class="ident">e</span>; <span class="string">&quot;backup failed to send response&quot;</span>);
+                        <span class="kw">return</span>;
                     }
                 }
-                <span class="ident">response</span>.<span class="ident">set_start_key</span>(<span class="ident">start_key</span>);
-                <span class="ident">response</span>.<span class="ident">set_end_key</span>(<span class="ident">end_key</span>);
-
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">tx</span>.<span class="ident">unbounded_send</span>(<span class="ident">response</span>) {
-                    <span class="macro">error</span><span class="macro">!</span>(<span class="question-mark">?</span><span class="ident">e</span>; <span class="string">&quot;backup failed to send response&quot;</span>);
-                    <span class="kw">return</span>;
-                }
             }
-
-            <span class="ident">tikv_alloc</span>::<span class="ident">remove_thread_memory_accessor</span>();
         });
     }
 
@@ -2474,7 +2491,10 @@
                 <span class="ident">rocks</span>,
                 <span class="ident">MockRegionInfoProvider</span>::<span class="ident">new</span>(),
                 <span class="ident">db</span>,
-                <span class="ident">BackupConfig</span> { <span class="ident">num_threads</span>: <span class="number">4</span> },
+                <span class="ident">BackupConfig</span> {
+                    <span class="ident">num_threads</span>: <span class="number">4</span>,
+                    <span class="ident">batch_size</span>: <span class="number">8</span>,
+                },
                 <span class="ident">concurrency_manager</span>,
             ),
         )
