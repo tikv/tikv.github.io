@@ -1611,6 +1611,19 @@
 <span id="1608">1608</span>
 <span id="1609">1609</span>
 <span id="1610">1610</span>
+<span id="1611">1611</span>
+<span id="1612">1612</span>
+<span id="1613">1613</span>
+<span id="1614">1614</span>
+<span id="1615">1615</span>
+<span id="1616">1616</span>
+<span id="1617">1617</span>
+<span id="1618">1618</span>
+<span id="1619">1619</span>
+<span id="1620">1620</span>
+<span id="1621">1621</span>
+<span id="1622">1622</span>
+<span id="1623">1623</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1633,13 +1646,22 @@
     <span class="doccomment">/// `start_ts`. That kind of record will be returned via the `overlapped_write` field.</span>
     <span class="doccomment">/// In this case, if the current transaction is to be rolled back, the `overlapped_write` must not</span>
     <span class="doccomment">/// be overwritten.</span>
-    <span class="prelude-val">None</span> { <span class="ident">overlapped_write</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Write</span><span class="op">&gt;</span> },
+    <span class="prelude-val">None</span> {
+        <span class="ident">overlapped_write</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">OverlappedWrite</span><span class="op">&gt;</span>,
+    },
     <span class="doccomment">/// Found the transaction&#39;s write record.</span>
     <span class="ident">SingleRecord</span> { <span class="ident">commit_ts</span>: <span class="ident">TimeStamp</span>, <span class="ident">write</span>: <span class="ident">Write</span> },
     <span class="doccomment">/// The transaction&#39;s status is found in another transaction&#39;s record&#39;s `overlapped_rollback`</span>
     <span class="doccomment">/// field. This may happen when the current transaction&#39;s `start_ts` is the same as the</span>
     <span class="doccomment">/// `commit_ts` of another transaction on this key.</span>
     <span class="ident">OverlappedRollback</span> { <span class="ident">commit_ts</span>: <span class="ident">TimeStamp</span> },
+}
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Debug</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">OverlappedWrite</span> {
+    <span class="kw">pub</span> <span class="ident">write</span>: <span class="ident">Write</span>,
+    <span class="doccomment">/// GC fence for `overlapped_write`. PTAL at `txn_types::Write::gc_fence`.</span>
+    <span class="kw">pub</span> <span class="ident">gc_fence</span>: <span class="ident">TimeStamp</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">TxnCommitRecord</span> {
@@ -1672,7 +1694,7 @@
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">unwrap_none</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Write</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">unwrap_none</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">OverlappedWrite</span><span class="op">&gt;</span> {
         <span class="kw">match</span> <span class="self">self</span> {
             <span class="self">Self</span>::<span class="prelude-val">None</span> { <span class="ident">overlapped_write</span> } <span class="op">=</span><span class="op">&gt;</span> <span class="ident">overlapped_write</span>,
             <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;txn record found but not expected: {:?}&quot;</span>, <span class="self">self</span>),
@@ -1874,6 +1896,7 @@
         <span class="comment">//</span>
         <span class="comment">// Scan all the versions from `TimeStamp::max()` to `start_ts`.</span>
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">seek_ts</span> <span class="op">=</span> <span class="ident">TimeStamp</span>::<span class="ident">max</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">gc_fence</span> <span class="op">=</span> <span class="ident">TimeStamp</span>::<span class="ident">from</span>(<span class="number">0</span>);
         <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="ident">commit_ts</span>, <span class="ident">write</span>)) <span class="op">=</span> <span class="self">self</span>.<span class="ident">seek_write</span>(<span class="ident">key</span>, <span class="ident">seek_ts</span>)<span class="question-mark">?</span> {
             <span class="kw">if</span> <span class="ident">write</span>.<span class="ident">start_ts</span> <span class="op">=</span><span class="op">=</span> <span class="ident">start_ts</span> {
                 <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">TxnCommitRecord</span>::<span class="ident">SingleRecord</span> { <span class="ident">commit_ts</span>, <span class="ident">write</span> });
@@ -1883,8 +1906,11 @@
                     <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">TxnCommitRecord</span>::<span class="ident">OverlappedRollback</span> { <span class="ident">commit_ts</span> });
                 }
                 <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">TxnCommitRecord</span>::<span class="prelude-val">None</span> {
-                    <span class="ident">overlapped_write</span>: <span class="prelude-val">Some</span>(<span class="ident">write</span>),
+                    <span class="ident">overlapped_write</span>: <span class="prelude-val">Some</span>(<span class="ident">OverlappedWrite</span> { <span class="ident">write</span>, <span class="ident">gc_fence</span> }),
                 });
+            }
+            <span class="kw">if</span> <span class="ident">write</span>.<span class="ident">write_type</span> <span class="op">=</span><span class="op">=</span> <span class="ident">WriteType</span>::<span class="ident">Put</span> <span class="op">|</span><span class="op">|</span> <span class="ident">write</span>.<span class="ident">write_type</span> <span class="op">=</span><span class="op">=</span> <span class="ident">WriteType</span>::<span class="ident">Delete</span> {
+                <span class="ident">gc_fence</span> <span class="op">=</span> <span class="ident">commit_ts</span>;
             }
             <span class="kw">if</span> <span class="ident">commit_ts</span> <span class="op">&lt;</span> <span class="ident">start_ts</span> {
                 <span class="kw">break</span>;
@@ -2655,8 +2681,8 @@
             .<span class="ident">unwrap</span>()
             .<span class="ident">unwrap_none</span>()
             .<span class="ident">unwrap</span>();
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">overlapped_write</span>.<span class="ident">start_ts</span>, <span class="number">45</span>.<span class="ident">into</span>());
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">overlapped_write</span>.<span class="ident">write_type</span>, <span class="ident">WriteType</span>::<span class="ident">Put</span>);
+        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">overlapped_write</span>.<span class="ident">write</span>.<span class="ident">start_ts</span>, <span class="number">45</span>.<span class="ident">into</span>());
+        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">overlapped_write</span>.<span class="ident">write</span>.<span class="ident">write_type</span>, <span class="ident">WriteType</span>::<span class="ident">Put</span>);
 
         <span class="kw">let</span> (<span class="ident">commit_ts</span>, <span class="ident">write_type</span>) <span class="op">=</span> <span class="ident">reader</span>
             .<span class="ident">get_txn_commit_record</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="number">45</span>.<span class="ident">into</span>())
