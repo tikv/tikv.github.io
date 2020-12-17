@@ -1224,9 +1224,6 @@
 <span id="1221">1221</span>
 <span id="1222">1222</span>
 <span id="1223">1223</span>
-<span id="1224">1224</span>
-<span id="1225">1225</span>
-<span id="1226">1226</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1242,7 +1239,7 @@
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">DeleteStrategy</span>, <span class="ident">MiscExt</span>, <span class="ident">Range</span>, <span class="ident">CF_DEFAULT</span>, <span class="ident">CF_LOCK</span>, <span class="ident">CF_WRITE</span>};
 <span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">executor</span>::<span class="ident">block_on</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">kvrpcpb</span>::{<span class="ident">Context</span>, <span class="ident">IsolationLevel</span>, <span class="ident">LockInfo</span>};
-<span class="kw">use</span> <span class="ident">pd_client</span>::{<span class="ident">ClusterVersion</span>, <span class="ident">PdClient</span>};
+<span class="kw">use</span> <span class="ident">pd_client</span>::{<span class="ident">FeatureGate</span>, <span class="ident">PdClient</span>};
 <span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">coprocessor</span>::{<span class="ident">CoprocessorHost</span>, <span class="ident">RegionInfoProvider</span>};
 <span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">router</span>::<span class="ident">RaftStoreRouter</span>;
 <span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">store</span>::<span class="ident">msg</span>::<span class="ident">StoreMsg</span>;
@@ -1802,7 +1799,7 @@
     <span class="ident">applied_lock_collector</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AppliedLockCollector</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 
     <span class="ident">gc_manager_handle</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">GcManagerHandle</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">cluster_version</span>: <span class="ident">ClusterVersion</span>,
+    <span class="ident">feature_gate</span>: <span class="ident">FeatureGate</span>,
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>, <span class="ident">RR</span><span class="op">&gt;</span> <span class="ident">Clone</span> <span class="kw">for</span> <span class="ident">GcWorker</span><span class="op">&lt;</span><span class="ident">E</span>, <span class="ident">RR</span><span class="op">&gt;</span>
@@ -1824,7 +1821,7 @@
             <span class="ident">worker_scheduler</span>: <span class="self">self</span>.<span class="ident">worker_scheduler</span>.<span class="ident">clone</span>(),
             <span class="ident">applied_lock_collector</span>: <span class="self">self</span>.<span class="ident">applied_lock_collector</span>.<span class="ident">clone</span>(),
             <span class="ident">gc_manager_handle</span>: <span class="self">self</span>.<span class="ident">gc_manager_handle</span>.<span class="ident">clone</span>(),
-            <span class="ident">cluster_version</span>: <span class="self">self</span>.<span class="ident">cluster_version</span>.<span class="ident">clone</span>(),
+            <span class="ident">feature_gate</span>: <span class="self">self</span>.<span class="ident">feature_gate</span>.<span class="ident">clone</span>(),
         }
     }
 }
@@ -1858,7 +1855,7 @@
         <span class="ident">engine</span>: <span class="ident">E</span>,
         <span class="ident">raft_store_router</span>: <span class="ident">RR</span>,
         <span class="ident">cfg</span>: <span class="ident">GcConfig</span>,
-        <span class="ident">cluster_version</span>: <span class="ident">ClusterVersion</span>,
+        <span class="ident">feature_gate</span>: <span class="ident">FeatureGate</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">GcWorker</span><span class="op">&lt;</span><span class="ident">E</span>, <span class="ident">RR</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">worker</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">FutureWorker</span>::<span class="ident">new</span>(<span class="string">&quot;gc-worker&quot;</span>)));
         <span class="kw">let</span> <span class="ident">worker_scheduler</span> <span class="op">=</span> <span class="ident">worker</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">scheduler</span>();
@@ -1872,7 +1869,7 @@
             <span class="ident">worker_scheduler</span>,
             <span class="ident">applied_lock_collector</span>: <span class="prelude-val">None</span>,
             <span class="ident">gc_manager_handle</span>: <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="prelude-val">None</span>)),
-            <span class="ident">cluster_version</span>,
+            <span class="ident">feature_gate</span>,
         }
     }
 
@@ -1884,8 +1881,8 @@
 
         <span class="kw">let</span> <span class="ident">kvdb</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">engine</span>.<span class="ident">kv_engine</span>();
         <span class="kw">let</span> <span class="ident">cfg_mgr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">config_manager</span>.<span class="ident">clone</span>();
-        <span class="kw">let</span> <span class="ident">cluster_version</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">cluster_version</span>.<span class="ident">clone</span>();
-        <span class="ident">kvdb</span>.<span class="ident">init_compaction_filter</span>(<span class="ident">safe_point</span>.<span class="ident">clone</span>(), <span class="ident">cfg_mgr</span>, <span class="ident">cluster_version</span>);
+        <span class="kw">let</span> <span class="ident">feature_gate</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">feature_gate</span>.<span class="ident">clone</span>();
+        <span class="ident">kvdb</span>.<span class="ident">init_compaction_filter</span>(<span class="ident">safe_point</span>.<span class="ident">clone</span>(), <span class="ident">cfg_mgr</span>, <span class="ident">feature_gate</span>);
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">handle</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">gc_manager_handle</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">handle</span>.<span class="ident">is_none</span>());
@@ -1894,7 +1891,7 @@
             <span class="ident">safe_point</span>.<span class="ident">clone</span>(),
             <span class="self">self</span>.<span class="ident">worker_scheduler</span>.<span class="ident">clone</span>(),
             <span class="self">self</span>.<span class="ident">config_manager</span>.<span class="ident">clone</span>(),
-            <span class="self">self</span>.<span class="ident">cluster_version</span>.<span class="ident">clone</span>(),
+            <span class="self">self</span>.<span class="ident">feature_gate</span>.<span class="ident">clone</span>(),
         )
         .<span class="ident">start</span>()<span class="question-mark">?</span>;
         <span class="kw-2">*</span><span class="ident">handle</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">new_handle</span>);
@@ -2223,12 +2220,9 @@
             <span class="ident">TestStorageBuilder</span>::<span class="ident">from_engine_and_lock_mgr</span>(<span class="ident">engine</span>.<span class="ident">clone</span>(), <span class="ident">DummyLockManager</span> {})
                 .<span class="ident">build</span>()
                 .<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">gc_worker</span> <span class="op">=</span> <span class="ident">GcWorker</span>::<span class="ident">new</span>(
-            <span class="ident">engine</span>,
-            <span class="ident">RaftStoreBlackHole</span>,
-            <span class="ident">GcConfig</span>::<span class="ident">default</span>(),
-            <span class="ident">ClusterVersion</span>::<span class="ident">new</span>(<span class="ident">semver</span>::<span class="ident">Version</span>::<span class="ident">new</span>(<span class="number">5</span>, <span class="number">0</span>, <span class="number">0</span>)),
-        );
+        <span class="kw">let</span> <span class="ident">gate</span> <span class="op">=</span> <span class="ident">FeatureGate</span>::<span class="ident">default</span>();
+        <span class="ident">gate</span>.<span class="ident">set_version</span>(<span class="string">&quot;5.0.0&quot;</span>).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">gc_worker</span> <span class="op">=</span> <span class="ident">GcWorker</span>::<span class="ident">new</span>(<span class="ident">engine</span>, <span class="ident">RaftStoreBlackHole</span>, <span class="ident">GcConfig</span>::<span class="ident">default</span>(), <span class="ident">gate</span>);
         <span class="ident">gc_worker</span>.<span class="ident">start</span>().<span class="ident">unwrap</span>();
         <span class="comment">// Convert keys to key value pairs, where the value is &quot;value-{key}&quot;.</span>
         <span class="kw">let</span> <span class="ident">data</span>: <span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="kw">_</span>, <span class="kw">_</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">init_keys</span>
@@ -2392,7 +2386,7 @@
             <span class="ident">prefixed_engine</span>,
             <span class="ident">RaftStoreBlackHole</span>,
             <span class="ident">GcConfig</span>::<span class="ident">default</span>(),
-            <span class="ident">ClusterVersion</span>::<span class="ident">default</span>(),
+            <span class="ident">FeatureGate</span>::<span class="ident">default</span>(),
         );
         <span class="ident">gc_worker</span>.<span class="ident">start</span>().<span class="ident">unwrap</span>();
 

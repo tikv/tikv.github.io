@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["ver_to_val","The function assumes only major, minor and patch are considered, and they are all less than u16::MAX, which is 65535."]],"struct":[["Feature",""],["FeatureGate",""]]});

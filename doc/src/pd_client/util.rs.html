@@ -483,6 +483,7 @@
 <span id="480">480</span>
 <span id="481">481</span>
 <span id="482">482</span>
+<span id="483">483</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2017 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -517,7 +518,7 @@
 <span class="kw">use</span> <span class="ident">tikv_util</span>::{<span class="ident">Either</span>, <span class="ident">HandyRwLock</span>};
 <span class="kw">use</span> <span class="ident">tokio_timer</span>::<span class="ident">timer</span>::<span class="ident">Handle</span>;
 
-<span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">ClusterVersion</span>, <span class="ident">Config</span>, <span class="ident">Error</span>, <span class="ident">PdFuture</span>, <span class="prelude-ty">Result</span>, <span class="ident">REQUEST_TIMEOUT</span>};
+<span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">Config</span>, <span class="ident">Error</span>, <span class="ident">FeatureGate</span>, <span class="ident">PdFuture</span>, <span class="prelude-ty">Result</span>, <span class="ident">REQUEST_TIMEOUT</span>};
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Inner</span> {
     <span class="ident">env</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Environment</span><span class="op">&gt;</span>,
@@ -532,13 +533,11 @@
     <span class="ident">on_reconnect</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">Fn</span>() <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 
     <span class="ident">last_update</span>: <span class="ident">Instant</span>,
-
-    <span class="kw">pub</span> <span class="ident">cluster_version</span>: <span class="ident">ClusterVersion</span>,
 }
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">HeartbeatReceiver</span> {
     <span class="ident">receiver</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ClientDuplexReceiver</span><span class="op">&lt;</span><span class="ident">RegionHeartbeatResponse</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">inner</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">Inner</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">inner</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">LeaderClient</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">Stream</span> <span class="kw">for</span> <span class="ident">HeartbeatReceiver</span> {
@@ -557,7 +556,7 @@
 
             <span class="self">self</span>.<span class="ident">receiver</span>.<span class="ident">take</span>();
 
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">inner</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">wl</span>();
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">inner</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">inner</span>.<span class="ident">wl</span>();
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">receiver</span> <span class="op">=</span> <span class="prelude-val">None</span>;
             <span class="kw">if</span> <span class="kw">let</span> <span class="ident">Either</span>::<span class="ident">Left</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">recv</span>) <span class="op">=</span> <span class="ident">inner</span>.<span class="ident">hb_receiver</span> {
                 <span class="ident">receiver</span> <span class="op">=</span> <span class="ident">recv</span>.<span class="ident">take</span>();
@@ -577,7 +576,8 @@
 <span class="doccomment">/// A leader client doing requests asynchronous.</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">LeaderClient</span> {
     <span class="ident">timer</span>: <span class="ident">Handle</span>,
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">inner</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">Inner</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">inner</span>: <span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">Inner</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">feature_gate</span>: <span class="ident">FeatureGate</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">LeaderClient</span> {
@@ -593,7 +593,7 @@
 
         <span class="ident">LeaderClient</span> {
             <span class="ident">timer</span>: <span class="ident">GLOBAL_TIMER_HANDLE</span>.<span class="ident">clone</span>(),
-            <span class="ident">inner</span>: <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">RwLock</span>::<span class="ident">new</span>(<span class="ident">Inner</span> {
+            <span class="ident">inner</span>: <span class="ident">RwLock</span>::<span class="ident">new</span>(<span class="ident">Inner</span> {
                 <span class="ident">env</span>,
                 <span class="ident">hb_sender</span>: <span class="ident">Either</span>::<span class="ident">Left</span>(<span class="prelude-val">Some</span>(<span class="ident">tx</span>)),
                 <span class="ident">hb_receiver</span>: <span class="ident">Either</span>::<span class="ident">Left</span>(<span class="prelude-val">Some</span>(<span class="ident">rx</span>)),
@@ -603,18 +603,18 @@
                 <span class="ident">on_reconnect</span>: <span class="prelude-val">None</span>,
 
                 <span class="ident">last_update</span>: <span class="ident">Instant</span>::<span class="ident">now</span>(),
-                <span class="ident">cluster_version</span>: <span class="ident">ClusterVersion</span>::<span class="ident">default</span>(),
-            })),
+            }),
+            <span class="ident">feature_gate</span>: <span class="ident">FeatureGate</span>::<span class="ident">default</span>(),
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_region_heartbeat_response</span><span class="op">&lt;</span><span class="ident">F</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="ident">F</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PdFuture</span><span class="op">&lt;</span>()<span class="op">&gt;</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_region_heartbeat_response</span><span class="op">&lt;</span><span class="ident">F</span><span class="op">&gt;</span>(<span class="self">self</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>, <span class="ident">f</span>: <span class="ident">F</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PdFuture</span><span class="op">&lt;</span>()<span class="op">&gt;</span>
     <span class="kw">where</span>
         <span class="ident">F</span>: <span class="ident">Fn</span>(<span class="ident">RegionHeartbeatResponse</span>) <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
     {
         <span class="kw">let</span> <span class="ident">recv</span> <span class="op">=</span> <span class="ident">HeartbeatReceiver</span> {
             <span class="ident">receiver</span>: <span class="prelude-val">None</span>,
-            <span class="ident">inner</span>: <span class="ident">Arc</span>::<span class="ident">clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">inner</span>),
+            <span class="ident">inner</span>: <span class="self">self</span>.<span class="ident">clone</span>(),
         };
         <span class="ident">Box</span>::<span class="ident">pin</span>(
             <span class="ident">recv</span>.<span class="ident">try_for_each</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">resp</span><span class="op">|</span> {
@@ -630,18 +630,20 @@
         <span class="ident">inner</span>.<span class="ident">on_reconnect</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">f</span>);
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">request</span><span class="op">&lt;</span><span class="ident">Req</span>, <span class="ident">Resp</span>, <span class="ident">F</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">req</span>: <span class="ident">Req</span>, <span class="ident">func</span>: <span class="ident">F</span>, <span class="ident">retry</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Request</span><span class="op">&lt;</span><span class="ident">Req</span>, <span class="ident">F</span><span class="op">&gt;</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">request</span><span class="op">&lt;</span><span class="ident">Req</span>, <span class="ident">Resp</span>, <span class="ident">F</span><span class="op">&gt;</span>(
+        <span class="self">self</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>,
+        <span class="ident">req</span>: <span class="ident">Req</span>,
+        <span class="ident">func</span>: <span class="ident">F</span>,
+        <span class="ident">retry</span>: <span class="ident">usize</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Request</span><span class="op">&lt;</span><span class="ident">Req</span>, <span class="ident">F</span><span class="op">&gt;</span>
     <span class="kw">where</span>
         <span class="ident">Req</span>: <span class="ident">Clone</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
-        <span class="ident">F</span>: <span class="ident">FnMut</span>(<span class="kw-2">&amp;</span><span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">Inner</span><span class="op">&gt;</span>, <span class="ident">Req</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PdFuture</span><span class="op">&lt;</span><span class="ident">Resp</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+        <span class="ident">F</span>: <span class="ident">FnMut</span>(<span class="kw-2">&amp;</span><span class="ident">LeaderClient</span>, <span class="ident">Req</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PdFuture</span><span class="op">&lt;</span><span class="ident">Resp</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
     {
         <span class="ident">Request</span> {
             <span class="ident">reconnect_count</span>: <span class="ident">retry</span>,
             <span class="ident">request_sent</span>: <span class="number">0</span>,
-            <span class="ident">client</span>: <span class="ident">LeaderClient</span> {
-                <span class="ident">timer</span>: <span class="self">self</span>.<span class="ident">timer</span>.<span class="ident">clone</span>(),
-                <span class="ident">inner</span>: <span class="ident">Arc</span>::<span class="ident">clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">inner</span>),
-            },
+            <span class="ident">client</span>: <span class="self">self</span>.<span class="ident">clone</span>(),
             <span class="ident">req</span>,
             <span class="ident">func</span>,
         }
@@ -708,7 +710,7 @@
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Request</span><span class="op">&lt;</span><span class="ident">Req</span>, <span class="ident">F</span><span class="op">&gt;</span> {
     <span class="ident">reconnect_count</span>: <span class="ident">usize</span>,
     <span class="ident">request_sent</span>: <span class="ident">usize</span>,
-    <span class="ident">client</span>: <span class="ident">LeaderClient</span>,
+    <span class="ident">client</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">LeaderClient</span><span class="op">&gt;</span>,
     <span class="ident">req</span>: <span class="ident">Req</span>,
     <span class="ident">func</span>: <span class="ident">F</span>,
 }
@@ -718,7 +720,7 @@
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">Req</span>, <span class="ident">Resp</span>, <span class="ident">F</span><span class="op">&gt;</span> <span class="ident">Request</span><span class="op">&lt;</span><span class="ident">Req</span>, <span class="ident">F</span><span class="op">&gt;</span>
 <span class="kw">where</span>
     <span class="ident">Req</span>: <span class="ident">Clone</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
-    <span class="ident">F</span>: <span class="ident">FnMut</span>(<span class="kw-2">&amp;</span><span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">Inner</span><span class="op">&gt;</span>, <span class="ident">Req</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PdFuture</span><span class="op">&lt;</span><span class="ident">Resp</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+    <span class="ident">F</span>: <span class="ident">FnMut</span>(<span class="kw-2">&amp;</span><span class="ident">LeaderClient</span>, <span class="ident">Req</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PdFuture</span><span class="op">&lt;</span><span class="ident">Resp</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
 {
     <span class="ident">async</span> <span class="kw">fn</span> <span class="ident">reconnect_if_needed</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
         <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;reconnecting ...&quot;</span>; <span class="string">&quot;remain&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">reconnect_count</span>);
@@ -754,7 +756,7 @@
         <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;request sent: {}&quot;</span>, <span class="self">self</span>.<span class="ident">request_sent</span>);
         <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">req</span>.<span class="ident">clone</span>();
 
-        (<span class="self">self</span>.<span class="ident">func</span>)(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">client</span>.<span class="ident">inner</span>, <span class="ident">r</span>).<span class="ident">await</span>
+        (<span class="self">self</span>.<span class="ident">func</span>)(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">client</span>, <span class="ident">r</span>).<span class="ident">await</span>
     }
 
     <span class="kw">fn</span> <span class="ident">should_not_retry</span>(<span class="ident">resp</span>: <span class="kw-2">&amp;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Resp</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {

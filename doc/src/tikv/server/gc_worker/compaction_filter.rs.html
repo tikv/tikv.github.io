@@ -1271,10 +1271,6 @@
 <span id="1268">1268</span>
 <span id="1269">1269</span>
 <span id="1270">1270</span>
-<span id="1271">1271</span>
-<span id="1272">1272</span>
-<span id="1273">1273</span>
-<span id="1274">1274</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1296,7 +1292,7 @@
     <span class="ident">RocksWriteBatch</span>,
 };
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">Iterator</span>, <span class="ident">MiscExt</span>, <span class="ident">Mutable</span>, <span class="ident">MvccProperties</span>, <span class="ident">SeekKey</span>, <span class="ident">WriteBatch</span>, <span class="ident">CF_WRITE</span>};
-<span class="kw">use</span> <span class="ident">pd_client</span>::<span class="ident">ClusterVersion</span>;
+<span class="kw">use</span> <span class="ident">pd_client</span>::{<span class="ident">Feature</span>, <span class="ident">FeatureGate</span>};
 <span class="kw">use</span> <span class="ident">prometheus</span>::{<span class="ident">local</span>::<span class="kw-2">*</span>, <span class="kw-2">*</span>};
 <span class="kw">use</span> <span class="ident">txn_types</span>::{<span class="ident">Key</span>, <span class="ident">TimeStamp</span>, <span class="ident">WriteRef</span>, <span class="ident">WriteType</span>};
 
@@ -1310,7 +1306,7 @@
 <span class="comment">// The default version that can enable compaction filter for GC. This is necessary because after</span>
 <span class="comment">// compaction filter is enabled, it&#39;s impossible to fallback to ealier version which modifications</span>
 <span class="comment">// of GC are distributed to other replicas by Raft.</span>
-<span class="kw">const</span> <span class="ident">COMPACTION_FILTER_MINIMAL_VERSION</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;5.0.0&quot;</span>;
+<span class="kw">const</span> <span class="ident">COMPACTION_FILTER_GC_FEATURE</span>: <span class="ident">Feature</span> <span class="op">=</span> <span class="ident">Feature</span>::<span class="ident">acquire</span>(<span class="number">5</span>, <span class="number">0</span>, <span class="number">0</span>);
 
 <span class="comment">// Global context to create a compaction filter for write CF. It&#39;s necessary as these fields are</span>
 <span class="comment">// not available when construcing `WriteCompactionFilterFactory`.</span>
@@ -1318,7 +1314,7 @@
     <span class="ident">db</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">DB</span><span class="op">&gt;</span>,
     <span class="ident">safe_point</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicU64</span><span class="op">&gt;</span>,
     <span class="ident">cfg_tracker</span>: <span class="ident">GcWorkerConfigManager</span>,
-    <span class="ident">cluster_version</span>: <span class="ident">ClusterVersion</span>,
+    <span class="ident">feature_gate</span>: <span class="ident">FeatureGate</span>,
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
     <span class="ident">callbacks_on_drop</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">Fn</span>(<span class="kw-2">&amp;</span><span class="ident">WriteCompactionFilter</span>) <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 }
@@ -1386,7 +1382,7 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">safe_point</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicU64</span><span class="op">&gt;</span>,
         <span class="ident">cfg_tracker</span>: <span class="ident">GcWorkerConfigManager</span>,
-        <span class="ident">cluster_version</span>: <span class="ident">ClusterVersion</span>,
+        <span class="ident">feature_gate</span>: <span class="ident">FeatureGate</span>,
     );
 }
 
@@ -1395,7 +1391,7 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">_safe_point</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicU64</span><span class="op">&gt;</span>,
         <span class="ident">_cfg_tracker</span>: <span class="ident">GcWorkerConfigManager</span>,
-        <span class="ident">_cluster_version</span>: <span class="ident">ClusterVersion</span>,
+        <span class="ident">_feature_gate</span>: <span class="ident">FeatureGate</span>,
     ) {
     }
 }
@@ -1405,7 +1401,7 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">safe_point</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicU64</span><span class="op">&gt;</span>,
         <span class="ident">cfg_tracker</span>: <span class="ident">GcWorkerConfigManager</span>,
-        <span class="ident">cluster_version</span>: <span class="ident">ClusterVersion</span>,
+        <span class="ident">feature_gate</span>: <span class="ident">FeatureGate</span>,
     ) {
         <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;initialize GC context for compaction filter&quot;</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">gc_context</span> <span class="op">=</span> <span class="ident">GC_CONTEXT</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
@@ -1414,7 +1410,7 @@
                 <span class="ident">db</span>: <span class="self">self</span>.<span class="ident">as_inner</span>().<span class="ident">clone</span>(),
                 <span class="ident">safe_point</span>,
                 <span class="ident">cfg_tracker</span>,
-                <span class="ident">cluster_version</span>,
+                <span class="ident">feature_gate</span>,
                 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
                 <span class="ident">callbacks_on_drop</span>: <span class="macro">vec</span><span class="macro">!</span>[],
             });
@@ -1423,7 +1419,7 @@
             <span class="ident">ctx</span>.<span class="ident">db</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">as_inner</span>().<span class="ident">clone</span>();
             <span class="ident">ctx</span>.<span class="ident">safe_point</span> <span class="op">=</span> <span class="ident">safe_point</span>;
             <span class="ident">ctx</span>.<span class="ident">cfg_tracker</span> <span class="op">=</span> <span class="ident">cfg_tracker</span>;
-            <span class="ident">ctx</span>.<span class="ident">cluster_version</span> <span class="op">=</span> <span class="ident">cluster_version</span>;
+            <span class="ident">ctx</span>.<span class="ident">feature_gate</span> <span class="op">=</span> <span class="ident">feature_gate</span>;
         }
     }
 }
@@ -1458,8 +1454,6 @@
         };
 
         <span class="kw">let</span> <span class="ident">db</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">clone</span>(<span class="kw-2">&amp;</span><span class="ident">gc_context</span>.<span class="ident">db</span>);
-        <span class="kw">let</span> <span class="ident">cluster_version</span> <span class="op">=</span> <span class="ident">gc_context</span>.<span class="ident">cluster_version</span>.<span class="ident">clone</span>();
-        <span class="ident">drop</span>(<span class="ident">gc_context_option</span>);
 
         <span class="macro">debug</span><span class="macro">!</span>(
             <span class="string">&quot;creating compaction filter&quot;</span>; <span class="string">&quot;feature_enable&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">enable</span>,
@@ -1467,10 +1461,11 @@
             <span class="string">&quot;ratio_threshold&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">ratio_threshold</span>,
         );
 
-        <span class="kw">if</span> <span class="op">!</span><span class="ident">do_check_allowed</span>(<span class="ident">enable</span>, <span class="ident">skip_vcheck</span>, <span class="kw-2">&amp;</span><span class="ident">cluster_version</span>) {
+        <span class="kw">if</span> <span class="op">!</span><span class="ident">do_check_allowed</span>(<span class="ident">enable</span>, <span class="ident">skip_vcheck</span>, <span class="kw-2">&amp;</span><span class="ident">gc_context</span>.<span class="ident">feature_gate</span>) {
             <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;skip gc in compaction filter because it&#39;s not allowed&quot;</span>);
             <span class="kw">return</span> <span class="ident">std</span>::<span class="ident">ptr</span>::<span class="ident">null_mut</span>();
         }
+        <span class="ident">drop</span>(<span class="ident">gc_context_option</span>);
 
         <span class="kw">if</span> <span class="op">!</span><span class="ident">check_need_gc</span>(<span class="ident">safe_point</span>.<span class="ident">into</span>(), <span class="ident">ratio_threshold</span>, <span class="ident">context</span>) {
             <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;skip gc in compaction filter because it&#39;s not necessary&quot;</span>);
@@ -1925,22 +1920,16 @@
     }
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_compaction_filter_allowd</span>(<span class="ident">cfg_value</span>: <span class="kw-2">&amp;</span><span class="ident">GcConfig</span>, <span class="ident">cluster_version</span>: <span class="kw-2">&amp;</span><span class="ident">ClusterVersion</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_compaction_filter_allowed</span>(<span class="ident">cfg_value</span>: <span class="kw-2">&amp;</span><span class="ident">GcConfig</span>, <span class="ident">feature_gate</span>: <span class="kw-2">&amp;</span><span class="ident">FeatureGate</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
     <span class="ident">do_check_allowed</span>(
         <span class="ident">cfg_value</span>.<span class="ident">enable_compaction_filter</span>,
         <span class="ident">cfg_value</span>.<span class="ident">compaction_filter_skip_version_check</span>,
-        <span class="ident">cluster_version</span>,
+        <span class="ident">feature_gate</span>,
     )
 }
 
-<span class="kw">fn</span> <span class="ident">do_check_allowed</span>(<span class="ident">enable</span>: <span class="ident">bool</span>, <span class="ident">skip_vcheck</span>: <span class="ident">bool</span>, <span class="ident">cluster_version</span>: <span class="kw-2">&amp;</span><span class="ident">ClusterVersion</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-    <span class="ident">enable</span>
-        <span class="op">&amp;&amp;</span> (<span class="ident">skip_vcheck</span> <span class="op">|</span><span class="op">|</span> {
-            <span class="ident">cluster_version</span>.<span class="ident">get</span>().<span class="ident">map_or</span>(<span class="bool-val">false</span>, <span class="op">|</span><span class="ident">cluster_version</span><span class="op">|</span> {
-                <span class="kw">let</span> <span class="ident">minimal</span> <span class="op">=</span> <span class="ident">semver</span>::<span class="ident">Version</span>::<span class="ident">parse</span>(<span class="ident">COMPACTION_FILTER_MINIMAL_VERSION</span>).<span class="ident">unwrap</span>();
-                <span class="ident">cluster_version</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">minimal</span>
-            })
-        })
+<span class="kw">fn</span> <span class="ident">do_check_allowed</span>(<span class="ident">enable</span>: <span class="ident">bool</span>, <span class="ident">skip_vcheck</span>: <span class="ident">bool</span>, <span class="ident">feature_gate</span>: <span class="kw-2">&amp;</span><span class="ident">FeatureGate</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="ident">enable</span> <span class="op">&amp;&amp;</span> (<span class="ident">skip_vcheck</span> <span class="op">|</span><span class="op">|</span> <span class="ident">feature_gate</span>.<span class="ident">can_enable</span>(<span class="ident">COMPACTION_FILTER_GC_FEATURE</span>))
 }
 
 <span class="kw">fn</span> <span class="ident">check_need_gc</span>(
@@ -2051,10 +2040,12 @@
                 <span class="ident">gc_cfg</span>.<span class="ident">ratio_threshold</span> <span class="op">=</span> <span class="ident">ratio_threshold</span>;
             }
             <span class="ident">gc_cfg</span>.<span class="ident">enable_compaction_filter</span> <span class="op">=</span> <span class="bool-val">true</span>;
+            <span class="kw">let</span> <span class="ident">feature_gate</span> <span class="op">=</span> <span class="ident">FeatureGate</span>::<span class="ident">default</span>();
+            <span class="ident">feature_gate</span>.<span class="ident">set_version</span>(<span class="string">&quot;5.0.0&quot;</span>).<span class="ident">unwrap</span>();
             <span class="ident">raw_engine</span>.<span class="ident">init_compaction_filter</span>(
                 <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">AtomicU64</span>::<span class="ident">new</span>(<span class="self">self</span>.<span class="ident">safe_point</span>)),
                 <span class="ident">GcWorkerConfigManager</span>(<span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">VersionTrack</span>::<span class="ident">new</span>(<span class="ident">gc_cfg</span>))),
-                <span class="ident">ClusterVersion</span>::<span class="ident">new</span>(<span class="ident">semver</span>::<span class="ident">Version</span>::<span class="ident">new</span>(<span class="number">5</span>, <span class="number">0</span>, <span class="number">0</span>)),
+                <span class="ident">feature_gate</span>,
             );
 
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">gc_context</span> <span class="op">=</span> <span class="ident">GC_CONTEXT</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
@@ -2123,19 +2114,20 @@
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_is_compaction_filter_allowed</span>() {
-        <span class="kw">let</span> <span class="ident">cluster_version</span> <span class="op">=</span> <span class="ident">ClusterVersion</span>::<span class="ident">new</span>(<span class="ident">semver</span>::<span class="ident">Version</span>::<span class="ident">new</span>(<span class="number">4</span>, <span class="number">1</span>, <span class="number">0</span>));
+        <span class="kw">let</span> <span class="ident">gate</span> <span class="op">=</span> <span class="ident">FeatureGate</span>::<span class="ident">default</span>();
+        <span class="ident">gate</span>.<span class="ident">set_version</span>(<span class="string">&quot;4.1.0&quot;</span>).<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cfg_value</span> <span class="op">=</span> <span class="ident">GcConfig</span>::<span class="ident">default</span>();
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">is_compaction_filter_allowd</span>(<span class="kw-2">&amp;</span><span class="ident">cfg_value</span>, <span class="kw-2">&amp;</span><span class="ident">cluster_version</span>));
+        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">is_compaction_filter_allowed</span>(<span class="kw-2">&amp;</span><span class="ident">cfg_value</span>, <span class="kw-2">&amp;</span><span class="ident">gate</span>));
 
         <span class="ident">cfg_value</span>.<span class="ident">enable_compaction_filter</span> <span class="op">=</span> <span class="bool-val">true</span>;
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">is_compaction_filter_allowd</span>(<span class="kw-2">&amp;</span><span class="ident">cfg_value</span>, <span class="kw-2">&amp;</span><span class="ident">cluster_version</span>));
+        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">is_compaction_filter_allowed</span>(<span class="kw-2">&amp;</span><span class="ident">cfg_value</span>, <span class="kw-2">&amp;</span><span class="ident">gate</span>));
 
         <span class="ident">cfg_value</span>.<span class="ident">compaction_filter_skip_version_check</span> <span class="op">=</span> <span class="bool-val">true</span>;
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">is_compaction_filter_allowd</span>(<span class="kw-2">&amp;</span><span class="ident">cfg_value</span>, <span class="kw-2">&amp;</span><span class="ident">cluster_version</span>));
+        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">is_compaction_filter_allowed</span>(<span class="kw-2">&amp;</span><span class="ident">cfg_value</span>, <span class="kw-2">&amp;</span><span class="ident">gate</span>));
 
-        <span class="kw">let</span> <span class="ident">cluster_version</span> <span class="op">=</span> <span class="ident">ClusterVersion</span>::<span class="ident">new</span>(<span class="ident">semver</span>::<span class="ident">Version</span>::<span class="ident">new</span>(<span class="number">5</span>, <span class="number">0</span>, <span class="number">0</span>));
+        <span class="ident">gate</span>.<span class="ident">set_version</span>(<span class="string">&quot;5.0.0&quot;</span>).<span class="ident">unwrap</span>();
         <span class="ident">cfg_value</span>.<span class="ident">compaction_filter_skip_version_check</span> <span class="op">=</span> <span class="bool-val">false</span>;
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">is_compaction_filter_allowd</span>(<span class="kw-2">&amp;</span><span class="ident">cfg_value</span>, <span class="kw-2">&amp;</span><span class="ident">cluster_version</span>));
+        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">is_compaction_filter_allowed</span>(<span class="kw-2">&amp;</span><span class="ident">cfg_value</span>, <span class="kw-2">&amp;</span><span class="ident">gate</span>));
     }
 
     <span class="comment">// Test compaction filter won&#39;t break basic GC rules.</span>
