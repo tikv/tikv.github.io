@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `/rust/git/checkouts/rust-rocksdb-a9a28e74c6ead8ef/59af34d/src/compaction_filter.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>compaction_filter.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `/rust/git/checkouts/rust-rocksdb-a9a28e74c6ead8ef/3f082c1/src/compaction_filter.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>compaction_filter.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
 <link rel="alternate icon" type="image/png" href="../../favicon-16x16.png">
 <link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../rocksdb/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><span class="help-button">?</span>
                 <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
@@ -336,14 +336,71 @@
 <span id="333">333</span>
 <span id="334">334</span>
 <span id="335">335</span>
+<span id="336">336</span>
+<span id="337">337</span>
+<span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+<span id="341">341</span>
+<span id="342">342</span>
+<span id="343">343</span>
+<span id="344">344</span>
+<span id="345">345</span>
+<span id="346">346</span>
+<span id="347">347</span>
+<span id="348">348</span>
+<span id="349">349</span>
+<span id="350">350</span>
+<span id="351">351</span>
+<span id="352">352</span>
+<span id="353">353</span>
+<span id="354">354</span>
+<span id="355">355</span>
+<span id="356">356</span>
+<span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
+<span id="361">361</span>
+<span id="362">362</span>
+<span id="363">363</span>
+<span id="364">364</span>
+<span id="365">365</span>
+<span id="366">366</span>
+<span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
+<span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">ffi</span>::<span class="ident">CString</span>;
-<span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">mem</span>, <span class="ident">ptr</span>, <span class="ident">slice</span>};
+<span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">ptr</span>, <span class="ident">slice</span>};
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">table_properties</span>::<span class="ident">TableProperties</span>;
+<span class="kw">use</span> <span class="ident">crocksdb_ffi</span>::<span class="ident">CompactionFilterDecision</span> <span class="kw">as</span> <span class="ident">RawCompactionFilterDecision</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">crocksdb_ffi</span>::<span class="ident">CompactionFilterValueType</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">crocksdb_ffi</span>::<span class="ident">DBCompactionFilter</span>;
 <span class="kw">use</span> <span class="ident">crocksdb_ffi</span>::{<span class="self">self</span>, <span class="ident">DBCompactionFilterContext</span>, <span class="ident">DBCompactionFilterFactory</span>};
 <span class="kw">use</span> <span class="ident">libc</span>::{<span class="ident">c_char</span>, <span class="ident">c_int</span>, <span class="ident">c_void</span>, <span class="ident">malloc</span>, <span class="ident">memcpy</span>, <span class="ident">size_t</span>};
+
+<span class="doccomment">/// Decision used in `CompactionFilter::filter`.</span>
+<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">CompactionFilterDecision</span> {
+    <span class="doccomment">/// The record will be kept instead of filtered.</span>
+    <span class="ident">Keep</span>,
+    <span class="doccomment">/// The record will be filtered, and a tombstone will be left.</span>
+    <span class="ident">Remove</span>,
+    <span class="doccomment">/// The record will be kept but the value will be replaced.</span>
+    <span class="ident">ChangeValue</span>(<span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>),
+    <span class="doccomment">/// All records between [current, `until`) will be filtered without any tombstones left.</span>
+    <span class="ident">RemoveAndSkipUntil</span>(<span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>),
+}
 
 <span class="doccomment">/// `CompactionFilter` allows an application to modify/delete a key-value at</span>
 <span class="doccomment">/// the time of compaction.</span>
@@ -354,16 +411,44 @@
     <span class="doccomment">/// of false indicates that the kv should be preserved in the</span>
     <span class="doccomment">/// output of this compaction run and a return value of true</span>
     <span class="doccomment">/// indicates that this key-value should be removed from the</span>
-    <span class="doccomment">/// output of the compaction.  The application can inspect</span>
+    <span class="doccomment">/// output of the compaction. The application can inspect</span>
     <span class="doccomment">/// the existing value of the key and make decision based on it.</span>
     <span class="kw">fn</span> <span class="ident">filter</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
+        <span class="ident">_level</span>: <span class="ident">usize</span>,
+        <span class="ident">_key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>],
+        <span class="ident">_value</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>],
+        <span class="ident">_new_value</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
+        <span class="ident">_value_changed</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">bool</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+        <span class="bool-val">false</span>
+    }
+
+    <span class="doccomment">/// This method will overwrite `filter` if a `CompactionFilter` implements both of them.</span>
+    <span class="kw">fn</span> <span class="ident">featured_filter</span>(
+        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
         <span class="ident">level</span>: <span class="ident">usize</span>,
         <span class="ident">key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>],
+        <span class="ident">_seqno</span>: <span class="ident">u64</span>,
         <span class="ident">value</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>],
-        <span class="ident">new_value</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
-        <span class="ident">value_changed</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">bool</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span>;
+        <span class="ident">value_type</span>: <span class="ident">CompactionFilterValueType</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">CompactionFilterDecision</span> {
+        <span class="kw">match</span> <span class="ident">value_type</span> {
+            <span class="ident">CompactionFilterValueType</span>::<span class="ident">Value</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="kw">let</span> (<span class="kw-2">mut</span> <span class="ident">new_value</span>, <span class="kw-2">mut</span> <span class="ident">value_changed</span>) <span class="op">=</span> (<span class="ident">Vec</span>::<span class="ident">new</span>(), <span class="bool-val">false</span>);
+                <span class="kw">if</span> <span class="self">self</span>.<span class="ident">filter</span>(<span class="ident">level</span>, <span class="ident">key</span>, <span class="ident">value</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">new_value</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">value_changed</span>) {
+                    <span class="kw">return</span> <span class="ident">CompactionFilterDecision</span>::<span class="ident">Remove</span>;
+                }
+                <span class="kw">if</span> <span class="ident">value_changed</span> {
+                    <span class="ident">CompactionFilterDecision</span>::<span class="ident">ChangeValue</span>(<span class="ident">new_value</span>)
+                } <span class="kw">else</span> {
+                    <span class="ident">CompactionFilterDecision</span>::<span class="ident">Keep</span>
+                }
+            }
+            <span class="comment">// Currently `MergeOperand` and `BlobIndex` will always be kept.</span>
+            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">CompactionFilterDecision</span>::<span class="ident">Keep</span>,
+        }
+    }
 }
 
 <span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
@@ -387,39 +472,40 @@
     <span class="ident">level</span>: <span class="ident">c_int</span>,
     <span class="ident">key</span>: <span class="kw-2">*</span><span class="kw">const</span> <span class="ident">u8</span>,
     <span class="ident">key_len</span>: <span class="ident">size_t</span>,
+    <span class="ident">seqno</span>: <span class="ident">u64</span>,
+    <span class="ident">value_type</span>: <span class="ident">CompactionFilterValueType</span>,
     <span class="ident">value</span>: <span class="kw-2">*</span><span class="kw">const</span> <span class="ident">u8</span>,
     <span class="ident">value_len</span>: <span class="ident">size_t</span>,
     <span class="ident">new_value</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">u8</span>,
     <span class="ident">new_value_len</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">size_t</span>,
-    <span class="ident">value_changed</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">bool</span>,
-) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="ident">skip_until</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">u8</span>,
+    <span class="ident">skip_until_length</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">size_t</span>,
+) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">RawCompactionFilterDecision</span> {
     <span class="kw">unsafe</span> {
         <span class="kw-2">*</span><span class="ident">new_value</span> <span class="op">=</span> <span class="ident">ptr</span>::<span class="ident">null_mut</span>();
         <span class="kw-2">*</span><span class="ident">new_value_len</span> <span class="op">=</span> <span class="number">0</span>;
-        <span class="kw-2">*</span><span class="ident">value_changed</span> <span class="op">=</span> <span class="bool-val">false</span>;
+        <span class="kw-2">*</span><span class="ident">skip_until</span> <span class="op">=</span> <span class="ident">ptr</span>::<span class="ident">null_mut</span>();
+        <span class="kw-2">*</span><span class="ident">skip_until_length</span> <span class="op">=</span> <span class="number">0</span>;
 
-        <span class="kw">let</span> <span class="ident">filter</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw-2">*</span>(<span class="ident">filter</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">CompactionFilterProxy</span>);
+        <span class="kw">let</span> <span class="ident">filter</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> (<span class="kw-2">*</span>(<span class="ident">filter</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">CompactionFilterProxy</span>)).<span class="ident">filter</span>;
         <span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> <span class="ident">slice</span>::<span class="ident">from_raw_parts</span>(<span class="ident">key</span>, <span class="ident">key_len</span>);
         <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">slice</span>::<span class="ident">from_raw_parts</span>(<span class="ident">value</span>, <span class="ident">value_len</span>);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_value_v</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">default</span>();
-        <span class="kw">let</span> <span class="ident">filtered</span> <span class="op">=</span> <span class="ident">filter</span>.<span class="ident">filter</span>.<span class="ident">filter</span>(
-            <span class="ident">level</span> <span class="kw">as</span> <span class="ident">usize</span>,
-            <span class="ident">key</span>,
-            <span class="ident">value</span>,
-            <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">new_value_v</span>,
-            <span class="ident">mem</span>::<span class="ident">transmute</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw-2">*</span><span class="ident">value_changed</span>),
-        );
-        <span class="kw">if</span> <span class="kw-2">*</span><span class="ident">value_changed</span> {
-            <span class="kw-2">*</span><span class="ident">new_value_len</span> <span class="op">=</span> <span class="ident">new_value_v</span>.<span class="ident">len</span>();
-            <span class="comment">// The vector is allocated in Rust, so dup it before pass into C.</span>
-            <span class="kw-2">*</span><span class="ident">new_value</span> <span class="op">=</span> <span class="ident">malloc</span>(<span class="kw-2">*</span><span class="ident">new_value_len</span>) <span class="kw">as</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">u8</span>;
-            <span class="ident">memcpy</span>(
-                <span class="ident">new_value</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">c_void</span>,
-                <span class="kw-2">&amp;</span><span class="ident">new_value_v</span>[<span class="number">0</span>] <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="ident">u8</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="ident">c_void</span>,
-                <span class="kw-2">*</span><span class="ident">new_value_len</span>,
-            );
+        <span class="kw">match</span> <span class="ident">filter</span>.<span class="ident">featured_filter</span>(<span class="ident">level</span> <span class="kw">as</span> <span class="ident">usize</span>, <span class="ident">key</span>, <span class="ident">seqno</span>, <span class="ident">value</span>, <span class="ident">value_type</span>) {
+            <span class="ident">CompactionFilterDecision</span>::<span class="ident">Keep</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">RawCompactionFilterDecision</span>::<span class="ident">Keep</span>,
+            <span class="ident">CompactionFilterDecision</span>::<span class="ident">Remove</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">RawCompactionFilterDecision</span>::<span class="ident">Remove</span>,
+            <span class="ident">CompactionFilterDecision</span>::<span class="ident">ChangeValue</span>(<span class="ident">new_v</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="kw-2">*</span><span class="ident">new_value_len</span> <span class="op">=</span> <span class="ident">new_v</span>.<span class="ident">len</span>();
+                <span class="kw-2">*</span><span class="ident">new_value</span> <span class="op">=</span> <span class="ident">malloc</span>(<span class="kw-2">*</span><span class="ident">new_value_len</span>) <span class="kw">as</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">u8</span>;
+                <span class="ident">memcpy</span>(<span class="kw-2">*</span><span class="ident">new_value</span> <span class="kw">as</span> <span class="kw">_</span>, <span class="ident">new_v</span>.<span class="ident">as_ptr</span>() <span class="kw">as</span> <span class="kw">_</span>, <span class="kw-2">*</span><span class="ident">new_value_len</span>);
+                <span class="ident">RawCompactionFilterDecision</span>::<span class="ident">ChangeValue</span>
+            }
+            <span class="ident">CompactionFilterDecision</span>::<span class="ident">RemoveAndSkipUntil</span>(<span class="ident">until</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="kw-2">*</span><span class="ident">skip_until_length</span> <span class="op">=</span> <span class="ident">until</span>.<span class="ident">len</span>();
+                <span class="kw-2">*</span><span class="ident">skip_until</span> <span class="op">=</span> <span class="ident">malloc</span>(<span class="kw-2">*</span><span class="ident">skip_until_length</span>) <span class="kw">as</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">u8</span>;
+                <span class="ident">memcpy</span>(<span class="kw-2">*</span><span class="ident">skip_until</span> <span class="kw">as</span> <span class="kw">_</span>, <span class="ident">until</span>.<span class="ident">as_ptr</span>() <span class="kw">as</span> <span class="kw">_</span>, <span class="kw-2">*</span><span class="ident">skip_until_length</span>);
+                <span class="ident">RawCompactionFilterDecision</span>::<span class="ident">RemoveAndSkipUntil</span>
+            }
         }
-        <span class="ident">filtered</span>
     }
 }
 
