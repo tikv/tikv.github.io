@@ -179,26 +179,13 @@
 <span id="176">176</span>
 <span id="177">177</span>
 <span id="178">178</span>
-<span id="179">179</span>
-<span id="180">180</span>
-<span id="181">181</span>
-<span id="182">182</span>
-<span id="183">183</span>
-<span id="184">184</span>
-<span id="185">185</span>
-<span id="186">186</span>
-<span id="187">187</span>
-<span id="188">188</span>
-<span id="189">189</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">Arc</span>;
 
 <span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">channel</span>::<span class="ident">mpsc</span>;
 <span class="kw">use</span> <span class="ident">futures</span>::{<span class="ident">FutureExt</span>, <span class="ident">SinkExt</span>, <span class="ident">StreamExt</span>, <span class="ident">TryFutureExt</span>};
 <span class="kw">use</span> <span class="ident">grpcio</span>::{<span class="self">self</span>, <span class="kw-2">*</span>};
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">backup</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident">security</span>::{<span class="ident">check_common_name</span>, <span class="ident">SecurityManager</span>};
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">worker</span>::<span class="kw-2">*</span>;
 
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">Task</span>;
@@ -207,16 +194,12 @@
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Service</span> {
     <span class="ident">scheduler</span>: <span class="ident">Scheduler</span><span class="op">&lt;</span><span class="ident">Task</span><span class="op">&gt;</span>,
-    <span class="ident">security_mgr</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">SecurityManager</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">Service</span> {
     <span class="doccomment">/// Create a new backup service.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">scheduler</span>: <span class="ident">Scheduler</span><span class="op">&lt;</span><span class="ident">Task</span><span class="op">&gt;</span>, <span class="ident">security_mgr</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">SecurityManager</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Service</span> {
-        <span class="ident">Service</span> {
-            <span class="ident">scheduler</span>,
-            <span class="ident">security_mgr</span>,
-        }
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">scheduler</span>: <span class="ident">Scheduler</span><span class="op">&lt;</span><span class="ident">Task</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Service</span> {
+        <span class="ident">Service</span> { <span class="ident">scheduler</span> }
     }
 }
 
@@ -227,9 +210,6 @@
         <span class="ident">req</span>: <span class="ident">BackupRequest</span>,
         <span class="kw-2">mut</span> <span class="ident">sink</span>: <span class="ident">ServerStreamingSink</span><span class="op">&lt;</span><span class="ident">BackupResponse</span><span class="op">&gt;</span>,
     ) {
-        <span class="kw">if</span> <span class="op">!</span><span class="ident">check_common_name</span>(<span class="self">self</span>.<span class="ident">security_mgr</span>.<span class="ident">cert_allowed_cn</span>(), <span class="kw-2">&amp;</span><span class="ident">ctx</span>) {
-            <span class="kw">return</span>;
-        }
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cancel</span> <span class="op">=</span> <span class="prelude-val">None</span>;
         <span class="comment">// TODO: make it a bounded channel.</span>
         <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">mpsc</span>::<span class="ident">unbounded</span>();
@@ -286,16 +266,14 @@
     <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
     <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">endpoint</span>::<span class="ident">tests</span>::<span class="kw-2">*</span>;
     <span class="kw">use</span> <span class="ident">external_storage</span>::<span class="ident">make_local_backend</span>;
-    <span class="kw">use</span> <span class="ident">security</span>::<span class="kw-2">*</span>;
     <span class="kw">use</span> <span class="ident">tikv</span>::<span class="ident">storage</span>::<span class="ident">txn</span>::<span class="ident">tests</span>::{<span class="ident">must_commit</span>, <span class="ident">must_prewrite_put</span>};
     <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">worker</span>::{<span class="ident">dummy_scheduler</span>, <span class="ident">ReceiverWrapper</span>};
     <span class="kw">use</span> <span class="ident">txn_types</span>::<span class="ident">TimeStamp</span>;
 
     <span class="kw">fn</span> <span class="ident">new_rpc_suite</span>() <span class="op">-</span><span class="op">&gt;</span> (<span class="ident">Server</span>, <span class="ident">BackupClient</span>, <span class="ident">ReceiverWrapper</span><span class="op">&lt;</span><span class="ident">Task</span><span class="op">&gt;</span>) {
-        <span class="kw">let</span> <span class="ident">security_mgr</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">SecurityManager</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">SecurityConfig</span>::<span class="ident">default</span>()).<span class="ident">unwrap</span>());
         <span class="kw">let</span> <span class="ident">env</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">EnvBuilder</span>::<span class="ident">new</span>().<span class="ident">build</span>());
         <span class="kw">let</span> (<span class="ident">scheduler</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">dummy_scheduler</span>();
-        <span class="kw">let</span> <span class="ident">backup_service</span> <span class="op">=</span> <span class="kw">super</span>::<span class="ident">Service</span>::<span class="ident">new</span>(<span class="ident">scheduler</span>, <span class="ident">security_mgr</span>);
+        <span class="kw">let</span> <span class="ident">backup_service</span> <span class="op">=</span> <span class="kw">super</span>::<span class="ident">Service</span>::<span class="ident">new</span>(<span class="ident">scheduler</span>);
         <span class="kw">let</span> <span class="ident">builder</span> <span class="op">=</span>
             <span class="ident">ServerBuilder</span>::<span class="ident">new</span>(<span class="ident">env</span>.<span class="ident">clone</span>()).<span class="ident">register_service</span>(<span class="ident">create_backup</span>(<span class="ident">backup_service</span>));
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">server</span> <span class="op">=</span> <span class="ident">builder</span>.<span class="ident">bind</span>(<span class="string">&quot;127.0.0.1&quot;</span>, <span class="number">0</span>).<span class="ident">build</span>().<span class="ident">unwrap</span>();

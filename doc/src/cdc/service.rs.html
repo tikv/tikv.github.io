@@ -475,22 +475,12 @@
 <span id="472">472</span>
 <span id="473">473</span>
 <span id="474">474</span>
-<span id="475">475</span>
-<span id="476">476</span>
-<span id="477">477</span>
-<span id="478">478</span>
-<span id="479">479</span>
-<span id="480">480</span>
-<span id="481">481</span>
-<span id="482">482</span>
-<span id="483">483</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">collections</span>::<span class="ident">hash_map</span>::<span class="ident">Entry</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">fmt</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::{<span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>};
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">Arc</span>;
 
 <span class="kw">use</span> <span class="ident">collections</span>::<span class="ident">HashMap</span>;
 <span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">future</span>::{<span class="self">self</span>, <span class="ident">TryFutureExt</span>};
@@ -504,7 +494,6 @@
     <span class="ident">ChangeData</span>, <span class="ident">ChangeDataEvent</span>, <span class="ident">ChangeDataRequest</span>, <span class="ident">Compatibility</span>, <span class="ident">Event</span>, <span class="ident">ResolvedTs</span>,
 };
 <span class="kw">use</span> <span class="ident">protobuf</span>::<span class="ident">Message</span>;
-<span class="kw">use</span> <span class="ident">security</span>::{<span class="ident">check_common_name</span>, <span class="ident">SecurityManager</span>};
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">mpsc</span>::<span class="ident">batch</span>::{<span class="self">self</span>, <span class="ident">BatchReceiver</span>, <span class="ident">Sender</span> <span class="kw">as</span> <span class="ident">BatchSender</span>, <span class="ident">VecCollector</span>};
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">worker</span>::<span class="kw-2">*</span>;
 
@@ -748,18 +737,14 @@
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Service</span> {
     <span class="ident">scheduler</span>: <span class="ident">Scheduler</span><span class="op">&lt;</span><span class="ident">Task</span><span class="op">&gt;</span>,
-    <span class="ident">security_mgr</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">SecurityManager</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">Service</span> {
     <span class="doccomment">/// Create a ChangeData service.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// It requires a scheduler of an `Endpoint` in order to schedule tasks.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">scheduler</span>: <span class="ident">Scheduler</span><span class="op">&lt;</span><span class="ident">Task</span><span class="op">&gt;</span>, <span class="ident">security_mgr</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">SecurityManager</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Service</span> {
-        <span class="ident">Service</span> {
-            <span class="ident">scheduler</span>,
-            <span class="ident">security_mgr</span>,
-        }
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">scheduler</span>: <span class="ident">Scheduler</span><span class="op">&lt;</span><span class="ident">Task</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Service</span> {
+        <span class="ident">Service</span> { <span class="ident">scheduler</span> }
     }
 }
 
@@ -770,9 +755,6 @@
         <span class="ident">stream</span>: <span class="ident">RequestStream</span><span class="op">&lt;</span><span class="ident">ChangeDataRequest</span><span class="op">&gt;</span>,
         <span class="kw-2">mut</span> <span class="ident">sink</span>: <span class="ident">DuplexSink</span><span class="op">&lt;</span><span class="ident">ChangeDataEvent</span><span class="op">&gt;</span>,
     ) {
-        <span class="kw">if</span> <span class="op">!</span><span class="ident">check_common_name</span>(<span class="self">self</span>.<span class="ident">security_mgr</span>.<span class="ident">cert_allowed_cn</span>(), <span class="kw-2">&amp;</span><span class="ident">ctx</span>) {
-            <span class="kw">return</span>;
-        }
         <span class="comment">// TODO: make it a bounded channel.</span>
         <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">batch</span>::<span class="ident">unbounded</span>(<span class="ident">CDC_MSG_NOTIFY_COUNT</span>);
         <span class="kw">let</span> <span class="ident">peer</span> <span class="op">=</span> <span class="ident">ctx</span>.<span class="ident">peer</span>();

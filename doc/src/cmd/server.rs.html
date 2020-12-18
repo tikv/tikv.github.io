@@ -1119,12 +1119,6 @@
 <span id="1116">1116</span>
 <span id="1117">1117</span>
 <span id="1118">1118</span>
-<span id="1119">1119</span>
-<span id="1120">1120</span>
-<span id="1121">1121</span>
-<span id="1122">1122</span>
-<span id="1123">1123</span>
-<span id="1124">1124</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! This module startups all the components of a TiKV server.</span>
 <span class="doccomment">//!</span>
@@ -1842,7 +1836,6 @@
             <span class="self">self</span>.<span class="ident">router</span>.<span class="ident">clone</span>(),
             <span class="ident">engines</span>.<span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">clone</span>(),
             <span class="ident">servers</span>.<span class="ident">importer</span>.<span class="ident">clone</span>(),
-            <span class="self">self</span>.<span class="ident">security_mgr</span>.<span class="ident">clone</span>(),
         );
         <span class="kw">if</span> <span class="ident">servers</span>
             .<span class="ident">server</span>
@@ -1858,7 +1851,6 @@
             <span class="ident">servers</span>.<span class="ident">server</span>.<span class="ident">get_debug_thread_pool</span>().<span class="ident">clone</span>(),
             <span class="self">self</span>.<span class="ident">router</span>.<span class="ident">clone</span>(),
             <span class="self">self</span>.<span class="ident">cfg_controller</span>.<span class="ident">as_ref</span>().<span class="ident">unwrap</span>().<span class="ident">clone</span>(),
-            <span class="self">self</span>.<span class="ident">security_mgr</span>.<span class="ident">clone</span>(),
         );
         <span class="kw">if</span> <span class="ident">servers</span>
             .<span class="ident">server</span>
@@ -1873,7 +1865,6 @@
             <span class="ident">servers</span>.<span class="ident">server</span>.<span class="ident">get_debug_thread_pool</span>().<span class="ident">clone</span>(),
             <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">log_file</span>.<span class="ident">clone</span>(),
             <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">slow_log_file</span>.<span class="ident">clone</span>(),
-            <span class="self">self</span>.<span class="ident">security_mgr</span>.<span class="ident">clone</span>(),
         );
         <span class="kw">if</span> <span class="ident">servers</span>
             .<span class="ident">server</span>
@@ -1886,9 +1877,7 @@
         <span class="comment">// Lock manager.</span>
         <span class="kw">if</span> <span class="ident">servers</span>
             .<span class="ident">server</span>
-            .<span class="ident">register_service</span>(<span class="ident">create_deadlock</span>(
-                <span class="ident">servers</span>.<span class="ident">lock_mgr</span>.<span class="ident">deadlock_service</span>(<span class="self">self</span>.<span class="ident">security_mgr</span>.<span class="ident">clone</span>()),
-            ))
+            .<span class="ident">register_service</span>(<span class="ident">create_deadlock</span>(<span class="ident">servers</span>.<span class="ident">lock_mgr</span>.<span class="ident">deadlock_service</span>()))
             .<span class="ident">is_some</span>()
         {
             <span class="macro">fatal</span><span class="macro">!</span>(<span class="string">&quot;failed to register deadlock service&quot;</span>);
@@ -1908,7 +1897,7 @@
         <span class="comment">// Backup service.</span>
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">backup_worker</span> <span class="op">=</span> <span class="ident">Box</span>::<span class="ident">new</span>(<span class="self">self</span>.<span class="ident">background_worker</span>.<span class="ident">lazy_build</span>(<span class="string">&quot;backup-endpoint&quot;</span>));
         <span class="kw">let</span> <span class="ident">backup_scheduler</span> <span class="op">=</span> <span class="ident">backup_worker</span>.<span class="ident">scheduler</span>();
-        <span class="kw">let</span> <span class="ident">backup_service</span> <span class="op">=</span> <span class="ident">backup</span>::<span class="ident">Service</span>::<span class="ident">new</span>(<span class="ident">backup_scheduler</span>, <span class="self">self</span>.<span class="ident">security_mgr</span>.<span class="ident">clone</span>());
+        <span class="kw">let</span> <span class="ident">backup_service</span> <span class="op">=</span> <span class="ident">backup</span>::<span class="ident">Service</span>::<span class="ident">new</span>(<span class="ident">backup_scheduler</span>);
         <span class="kw">if</span> <span class="ident">servers</span>
             .<span class="ident">server</span>
             .<span class="ident">register_service</span>(<span class="ident">create_backup</span>(<span class="ident">backup_service</span>))
@@ -1931,8 +1920,7 @@
         );
         <span class="ident">backup_worker</span>.<span class="ident">start_with_timer</span>(<span class="ident">backup_endpoint</span>);
 
-        <span class="kw">let</span> <span class="ident">cdc_service</span> <span class="op">=</span>
-            <span class="ident">cdc</span>::<span class="ident">Service</span>::<span class="ident">new</span>(<span class="ident">servers</span>.<span class="ident">cdc_scheduler</span>.<span class="ident">clone</span>(), <span class="self">self</span>.<span class="ident">security_mgr</span>.<span class="ident">clone</span>());
+        <span class="kw">let</span> <span class="ident">cdc_service</span> <span class="op">=</span> <span class="ident">cdc</span>::<span class="ident">Service</span>::<span class="ident">new</span>(<span class="ident">servers</span>.<span class="ident">cdc_scheduler</span>.<span class="ident">clone</span>());
         <span class="kw">if</span> <span class="ident">servers</span>
             .<span class="ident">server</span>
             .<span class="ident">register_service</span>(<span class="ident">create_change_data</span>(<span class="ident">cdc_service</span>))
