@@ -7,6 +7,7 @@ implementors["procfs"] = [{"text":"impl Not for NFSServerCaps","synthetic":false
 implementors["raftstore"] = [{"text":"impl Not for PeerTicks","synthetic":false,"types":[]},{"text":"impl Not for ProposalContext","synthetic":false,"types":[]}];
 implementors["subtle"] = [{"text":"impl Not for Choice","synthetic":false,"types":[]}];
 implementors["tidb_query_datatype"] = [{"text":"impl Not for FieldTypeFlag","synthetic":false,"types":[]},{"text":"impl Not for WeekMode","synthetic":false,"types":[]},{"text":"impl Not for Flags","synthetic":false,"types":[]},{"text":"impl Not for SqlMode","synthetic":false,"types":[]},{"text":"impl Not for Flag","synthetic":false,"types":[]}];
+implementors["tikv"] = [{"text":"impl Not for WriteBatchFlags","synthetic":false,"types":[]}];
 implementors["time"] = [{"text":"impl Not for Sign","synthetic":false,"types":[]}];
 implementors["typenum"] = [{"text":"impl Not for B0","synthetic":false,"types":[]},{"text":"impl Not for B1","synthetic":false,"types":[]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

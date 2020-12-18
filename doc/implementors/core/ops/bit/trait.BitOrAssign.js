@@ -7,4 +7,5 @@ implementors["procfs"] = [{"text":"impl BitOrAssign&lt;NFSServerCaps&gt; for NFS
 implementors["raftstore"] = [{"text":"impl BitOrAssign&lt;PeerTicks&gt; for PeerTicks","synthetic":false,"types":[]},{"text":"impl BitOrAssign&lt;ProposalContext&gt; for ProposalContext","synthetic":false,"types":[]}];
 implementors["subtle"] = [{"text":"impl BitOrAssign&lt;Choice&gt; for Choice","synthetic":false,"types":[]}];
 implementors["tidb_query_datatype"] = [{"text":"impl BitOrAssign&lt;FieldTypeFlag&gt; for FieldTypeFlag","synthetic":false,"types":[]},{"text":"impl BitOrAssign&lt;WeekMode&gt; for WeekMode","synthetic":false,"types":[]},{"text":"impl BitOrAssign&lt;Flags&gt; for Flags","synthetic":false,"types":[]},{"text":"impl BitOrAssign&lt;SqlMode&gt; for SqlMode","synthetic":false,"types":[]},{"text":"impl BitOrAssign&lt;Flag&gt; for Flag","synthetic":false,"types":[]}];
+implementors["tikv"] = [{"text":"impl BitOrAssign&lt;WriteBatchFlags&gt; for WriteBatchFlags","synthetic":false,"types":[]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

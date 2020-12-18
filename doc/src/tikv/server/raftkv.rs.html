@@ -755,6 +755,23 @@
 <span id="752">752</span>
 <span id="753">753</span>
 <span id="754">754</span>
+<span id="755">755</span>
+<span id="756">756</span>
+<span id="757">757</span>
+<span id="758">758</span>
+<span id="759">759</span>
+<span id="760">760</span>
+<span id="761">761</span>
+<span id="762">762</span>
+<span id="763">763</span>
+<span id="764">764</span>
+<span id="765">765</span>
+<span id="766">766</span>
+<span id="767">767</span>
+<span id="768">768</span>
+<span id="769">769</span>
+<span id="770">770</span>
+<span id="771">771</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -766,6 +783,7 @@
 };
 <span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">sync</span>::<span class="ident">atomic</span>::<span class="ident">Ordering</span>, <span class="ident">sync</span>::<span class="ident">Arc</span>, <span class="ident">time</span>::<span class="ident">Duration</span>};
 
+<span class="kw">use</span> <span class="ident">bitflags</span>::<span class="ident">bitflags</span>;
 <span class="kw">use</span> <span class="ident">concurrency_manager</span>::<span class="ident">ConcurrencyManager</span>;
 <span class="kw">use</span> <span class="ident">engine_rocks</span>::{<span class="ident">RocksEngine</span>, <span class="ident">RocksSnapshot</span>, <span class="ident">RocksTablePropertiesCollection</span>};
 <span class="kw">use</span> <span class="ident">engine_traits</span>::<span class="ident">CF_DEFAULT</span>;
@@ -781,7 +799,7 @@
 };
 <span class="kw">use</span> <span class="ident">kvproto</span>::{<span class="ident">errorpb</span>, <span class="ident">metapb</span>};
 <span class="kw">use</span> <span class="ident">raft</span>::<span class="ident">eraftpb</span>::{<span class="self">self</span>, <span class="ident">MessageType</span>};
-<span class="kw">use</span> <span class="ident">txn_types</span>::{<span class="ident">Key</span>, <span class="ident">TimeStamp</span>, <span class="ident">TxnExtraScheduler</span>, <span class="ident">Value</span>};
+<span class="kw">use</span> <span class="ident">txn_types</span>::{<span class="ident">Key</span>, <span class="ident">TimeStamp</span>, <span class="ident">TxnExtra</span>, <span class="ident">TxnExtraScheduler</span>, <span class="ident">Value</span>};
 
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">metrics</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">kv</span>::{
@@ -1001,6 +1019,7 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="ident">Context</span>,
         <span class="ident">reqs</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Request</span><span class="op">&gt;</span>,
+        <span class="ident">txn_extra</span>: <span class="ident">TxnExtra</span>,
         <span class="ident">write_cb</span>: <span class="ident">Callback</span><span class="op">&lt;</span><span class="ident">CmdRes</span><span class="op">&gt;</span>,
         <span class="ident">proposed_cb</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ExtCallback</span><span class="op">&gt;</span>,
         <span class="ident">committed_cb</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ExtCallback</span><span class="op">&gt;</span>,
@@ -1028,10 +1047,20 @@
         }
 
         <span class="kw">let</span> <span class="ident">len</span> <span class="op">=</span> <span class="ident">reqs</span>.<span class="ident">len</span>();
-        <span class="kw">let</span> <span class="ident">header</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">new_request_header</span>(<span class="ident">ctx</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">header</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">new_request_header</span>(<span class="ident">ctx</span>);
+        <span class="kw">if</span> <span class="ident">txn_extra</span>.<span class="ident">one_pc</span> {
+            <span class="ident">header</span>.<span class="ident">set_flags</span>(<span class="ident">WriteBatchFlags</span>::<span class="ident">ONE_PC</span>.<span class="ident">bits</span>());
+        }
+
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cmd</span> <span class="op">=</span> <span class="ident">RaftCmdRequest</span>::<span class="ident">default</span>();
         <span class="ident">cmd</span>.<span class="ident">set_header</span>(<span class="ident">header</span>);
         <span class="ident">cmd</span>.<span class="ident">set_requests</span>(<span class="ident">reqs</span>.<span class="ident">into</span>());
+
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">tx</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">txn_extra_scheduler</span>.<span class="ident">as_ref</span>() {
+            <span class="kw">if</span> <span class="op">!</span><span class="ident">txn_extra</span>.<span class="ident">is_empty</span>() {
+                <span class="ident">tx</span>.<span class="ident">schedule</span>(<span class="ident">txn_extra</span>);
+            }
+        }
 
         <span class="self">self</span>.<span class="ident">router</span>
             .<span class="ident">send_command</span>(
@@ -1180,15 +1209,10 @@
         <span class="ident">ASYNC_REQUESTS_COUNTER_VEC</span>.<span class="ident">write</span>.<span class="ident">all</span>.<span class="ident">inc</span>();
         <span class="kw">let</span> <span class="ident">begin_instant</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now_coarse</span>();
 
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">tx</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">txn_extra_scheduler</span>.<span class="ident">as_ref</span>() {
-            <span class="kw">if</span> <span class="op">!</span><span class="ident">batch</span>.<span class="ident">extra</span>.<span class="ident">is_empty</span>() {
-                <span class="ident">tx</span>.<span class="ident">schedule</span>(<span class="ident">batch</span>.<span class="ident">extra</span>);
-            }
-        }
-
         <span class="self">self</span>.<span class="ident">exec_write_requests</span>(
             <span class="ident">ctx</span>,
             <span class="ident">reqs</span>,
+            <span class="ident">batch</span>.<span class="ident">extra</span>,
             <span class="ident">Box</span>::<span class="ident">new</span>(<span class="kw">move</span> <span class="op">|</span>(<span class="ident">cb_ctx</span>, <span class="ident">res</span>)<span class="op">|</span> <span class="kw">match</span> <span class="ident">res</span> {
                 <span class="prelude-val">Ok</span>(<span class="ident">CmdRes</span>::<span class="ident">Resp</span>(<span class="kw">_</span>)) <span class="op">=</span><span class="op">&gt;</span> {
                     <span class="ident">ASYNC_REQUESTS_COUNTER_VEC</span>.<span class="ident">write</span>.<span class="ident">success</span>.<span class="ident">inc</span>();
@@ -1486,6 +1510,16 @@
             }
             <span class="ident">msg</span>.<span class="ident">mut_entries</span>()[<span class="number">0</span>].<span class="ident">set_data</span>(<span class="ident">rctx</span>.<span class="ident">to_bytes</span>());
         }
+    }
+}
+
+<span class="macro">bitflags</span><span class="macro">!</span> {
+    <span class="doccomment">/// Additional flags for a write batch.</span>
+    <span class="doccomment">/// They should be set in the `flags` field in `RaftRequestHeader`.</span>
+    <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">WriteBatchFlags</span>: <span class="ident">u64</span> {
+        <span class="doccomment">/// Indicates this request is from a 1PC transaction.</span>
+        <span class="doccomment">/// It helps CDC recognize 1PC transactions and handle them correctly.</span>
+        <span class="kw">const</span> <span class="ident">ONE_PC</span> <span class="op">=</span> <span class="number">0b00000001</span>;
     }
 }
 

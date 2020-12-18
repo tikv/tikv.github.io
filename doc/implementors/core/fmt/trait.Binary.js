@@ -8,4 +8,5 @@ implementors["openssl"] = [{"text":"impl Binary for CMSOptions","synthetic":fals
 implementors["procfs"] = [{"text":"impl Binary for NFSServerCaps","synthetic":false,"types":[]},{"text":"impl Binary for StatFlags","synthetic":false,"types":[]},{"text":"impl Binary for CoredumpFlags","synthetic":false,"types":[]},{"text":"impl Binary for FDPermissions","synthetic":false,"types":[]}];
 implementors["raftstore"] = [{"text":"impl Binary for PeerTicks","synthetic":false,"types":[]},{"text":"impl Binary for ProposalContext","synthetic":false,"types":[]}];
 implementors["tidb_query_datatype"] = [{"text":"impl Binary for FieldTypeFlag","synthetic":false,"types":[]},{"text":"impl Binary for WeekMode","synthetic":false,"types":[]},{"text":"impl Binary for Flags","synthetic":false,"types":[]},{"text":"impl Binary for SqlMode","synthetic":false,"types":[]},{"text":"impl Binary for Flag","synthetic":false,"types":[]}];
+implementors["tikv"] = [{"text":"impl Binary for WriteBatchFlags","synthetic":false,"types":[]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
