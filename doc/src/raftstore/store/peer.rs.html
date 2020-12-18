@@ -3961,6 +3961,14 @@
 <span id="3958">3958</span>
 <span id="3959">3959</span>
 <span id="3960">3960</span>
+<span id="3961">3961</span>
+<span id="3962">3962</span>
+<span id="3963">3963</span>
+<span id="3964">3964</span>
+<span id="3965">3965</span>
+<span id="3966">3966</span>
+<span id="3967">3967</span>
+<span id="3968">3968</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -4001,7 +4009,8 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">coprocessor</span>::{<span class="ident">CoprocessorHost</span>, <span class="ident">RegionChangeEvent</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">fsm</span>::<span class="ident">apply</span>::<span class="ident">CatchUpLogs</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">fsm</span>::<span class="ident">store</span>::<span class="ident">PollContext</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">fsm</span>::{<span class="ident">apply</span>, <span class="ident">Apply</span>, <span class="ident">ApplyMetrics</span>, <span class="ident">ApplyTask</span>, <span class="ident">GroupState</span>, <span class="ident">Proposal</span>};
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">fsm</span>::{<span class="ident">apply</span>, <span class="ident">Apply</span>, <span class="ident">ApplyMetrics</span>, <span class="ident">ApplyTask</span>, <span class="ident">Proposal</span>};
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">hibernate_state</span>::<span class="ident">GroupState</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">worker</span>::{<span class="ident">HeartbeatTask</span>, <span class="ident">ReadDelegate</span>, <span class="ident">ReadExecutor</span>, <span class="ident">ReadProgress</span>, <span class="ident">RegionTask</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::{
     <span class="ident">Callback</span>, <span class="ident">Config</span>, <span class="ident">GlobalReplicationState</span>, <span class="ident">PdTask</span>, <span class="ident">ReadIndexContext</span>, <span class="ident">ReadResponse</span>,
@@ -4152,6 +4161,7 @@
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CheckTickResult</span> {
     <span class="ident">leader</span>: <span class="ident">bool</span>,
     <span class="ident">up_to_date</span>: <span class="ident">bool</span>,
+    <span class="ident">reason</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>,
 }
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ProposedAdminCmd</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">Snapshot</span><span class="op">&gt;</span> {
@@ -4798,20 +4808,25 @@
                 <span class="kw">continue</span>;
             }
             <span class="kw">if</span> <span class="ident">pr</span>.<span class="ident">matched</span> <span class="op">!</span><span class="op">=</span> <span class="ident">last_index</span> {
+                <span class="ident">res</span>.<span class="ident">reason</span> <span class="op">=</span> <span class="string">&quot;replication&quot;</span>;
                 <span class="kw">return</span> <span class="ident">res</span>;
             }
         }
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">raft</span>.<span class="ident">pending_read_count</span>() <span class="op">&gt;</span> <span class="number">0</span> {
+            <span class="ident">res</span>.<span class="ident">reason</span> <span class="op">=</span> <span class="string">&quot;pending read&quot;</span>;
             <span class="kw">return</span> <span class="ident">res</span>;
         }
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">raft</span>.<span class="ident">lead_transferee</span>.<span class="ident">is_some</span>() {
+            <span class="ident">res</span>.<span class="ident">reason</span> <span class="op">=</span> <span class="string">&quot;transfer leader&quot;</span>;
             <span class="kw">return</span> <span class="ident">res</span>;
         }
         <span class="comment">// Unapplied entries can change the configuration of the group.</span>
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">get_store</span>().<span class="ident">applied_index</span>() <span class="op">&lt;</span> <span class="ident">last_index</span> {
+            <span class="ident">res</span>.<span class="ident">reason</span> <span class="op">=</span> <span class="string">&quot;unapplied&quot;</span>;
             <span class="kw">return</span> <span class="ident">res</span>;
         }
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">replication_mode_need_catch_up</span>() {
+            <span class="ident">res</span>.<span class="ident">reason</span> <span class="op">=</span> <span class="string">&quot;replication mode&quot;</span>;
             <span class="kw">return</span> <span class="ident">res</span>;
         }
         <span class="ident">res</span>.<span class="ident">up_to_date</span> <span class="op">=</span> <span class="bool-val">true</span>;
@@ -4820,7 +4835,14 @@
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">check_after_tick</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">state</span>: <span class="ident">GroupState</span>, <span class="ident">res</span>: <span class="ident">CheckTickResult</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
         <span class="kw">if</span> <span class="ident">res</span>.<span class="ident">leader</span> {
-            <span class="ident">res</span>.<span class="ident">up_to_date</span> <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">is_leader</span>()
+            <span class="kw">if</span> <span class="ident">res</span>.<span class="ident">up_to_date</span> {
+                <span class="self">self</span>.<span class="ident">is_leader</span>()
+            } <span class="kw">else</span> {
+                <span class="kw">if</span> <span class="op">!</span><span class="ident">res</span>.<span class="ident">reason</span>.<span class="ident">is_empty</span>() {
+                    <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;rejecting sleeping&quot;</span>; <span class="string">&quot;reason&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">res</span>.<span class="ident">reason</span>, <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">region_id</span>, <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">peer_id</span>());
+                }
+                <span class="bool-val">false</span>
+            }
         } <span class="kw">else</span> {
             <span class="comment">// If follower keeps receiving data from leader, then it&#39;s safe to stop</span>
             <span class="comment">// ticking, as leader will make sure it has the latest logs.</span>
@@ -4843,6 +4865,10 @@
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">is_leader</span>() {
             <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">ping</span>();
         }
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">has_uncommitted_log</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+        <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">raft</span>.<span class="ident">raft_log</span>.<span class="ident">committed</span> <span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">raft</span>.<span class="ident">raft_log</span>.<span class="ident">last_index</span>()
     }
 
     <span class="doccomment">/// Set the region of a peer.</span>
@@ -7166,13 +7192,44 @@
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">send_raft_message</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Transport</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">msg</span>: <span class="ident">eraftpb</span>::<span class="ident">Message</span>, <span class="ident">trans</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">T</span>) {
+    <span class="kw">fn</span> <span class="ident">prepare_raft_message</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">RaftMessage</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">send_msg</span> <span class="op">=</span> <span class="ident">RaftMessage</span>::<span class="ident">default</span>();
         <span class="ident">send_msg</span>.<span class="ident">set_region_id</span>(<span class="self">self</span>.<span class="ident">region_id</span>);
         <span class="comment">// set current epoch</span>
         <span class="ident">send_msg</span>.<span class="ident">set_region_epoch</span>(<span class="self">self</span>.<span class="ident">region</span>().<span class="ident">get_region_epoch</span>().<span class="ident">clone</span>());
+        <span class="ident">send_msg</span>.<span class="ident">set_from_peer</span>(<span class="self">self</span>.<span class="ident">peer</span>.<span class="ident">clone</span>());
+        <span class="ident">send_msg</span>
+    }
 
-        <span class="kw">let</span> <span class="ident">from_peer</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">peer</span>.<span class="ident">clone</span>();
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">send_extra_message</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Transport</span><span class="op">&gt;</span>(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="ident">msg</span>: <span class="ident">ExtraMessage</span>,
+        <span class="ident">trans</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">T</span>,
+        <span class="ident">to</span>: <span class="kw-2">&amp;</span><span class="ident">metapb</span>::<span class="ident">Peer</span>,
+    ) {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">send_msg</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">prepare_raft_message</span>();
+        <span class="kw">let</span> <span class="ident">ty</span> <span class="op">=</span> <span class="ident">msg</span>.<span class="ident">get_type</span>();
+        <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;send extra msg&quot;</span>;
+        <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">region_id</span>,
+        <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">peer</span>.<span class="ident">get_id</span>(),
+        <span class="string">&quot;msg_type&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">ty</span>,
+        <span class="string">&quot;to&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">to</span>.<span class="ident">get_id</span>());
+        <span class="ident">send_msg</span>.<span class="ident">set_extra_msg</span>(<span class="ident">msg</span>);
+        <span class="ident">send_msg</span>.<span class="ident">set_to_peer</span>(<span class="ident">to</span>.<span class="ident">clone</span>());
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">trans</span>.<span class="ident">send</span>(<span class="ident">send_msg</span>) {
+            <span class="macro">error</span><span class="macro">!</span>(<span class="question-mark">?</span><span class="ident">e</span>;
+                <span class="string">&quot;failed to send extra message&quot;</span>;
+                <span class="string">&quot;type&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">ty</span>,
+                <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">region_id</span>,
+                <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">peer</span>.<span class="ident">get_id</span>(),
+                <span class="string">&quot;target&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">to</span>,
+            );
+        }
+    }
+
+    <span class="kw">fn</span> <span class="ident">send_raft_message</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Transport</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">msg</span>: <span class="ident">eraftpb</span>::<span class="ident">Message</span>, <span class="ident">trans</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">T</span>) {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">send_msg</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">prepare_raft_message</span>();
+
         <span class="kw">let</span> <span class="ident">to_peer</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">get_peer_from_cache</span>(<span class="ident">msg</span>.<span class="ident">get_to</span>()) {
             <span class="prelude-val">Some</span>(<span class="ident">p</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">p</span>,
             <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> {
@@ -7195,11 +7252,9 @@
             <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">peer</span>.<span class="ident">get_id</span>(),
             <span class="string">&quot;msg_type&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">msg_type</span>,
             <span class="string">&quot;msg_size&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">msg</span>.<span class="ident">compute_size</span>(),
-            <span class="string">&quot;from&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">from_peer</span>.<span class="ident">get_id</span>(),
             <span class="string">&quot;to&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">to_peer_id</span>,
         );
 
-        <span class="ident">send_msg</span>.<span class="ident">set_from_peer</span>(<span class="ident">from_peer</span>);
         <span class="ident">send_msg</span>.<span class="ident">set_to_peer</span>(<span class="ident">to_peer</span>);
 
         <span class="comment">// There could be two cases:</span>
@@ -7253,22 +7308,9 @@
         <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">PollContext</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">T</span><span class="op">&gt;</span>,
         <span class="ident">peer</span>: <span class="kw-2">&amp;</span><span class="ident">metapb</span>::<span class="ident">Peer</span>,
     ) {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">send_msg</span> <span class="op">=</span> <span class="ident">RaftMessage</span>::<span class="ident">default</span>();
-        <span class="ident">send_msg</span>.<span class="ident">set_region_id</span>(<span class="self">self</span>.<span class="ident">region_id</span>);
-        <span class="ident">send_msg</span>.<span class="ident">set_from_peer</span>(<span class="self">self</span>.<span class="ident">peer</span>.<span class="ident">clone</span>());
-        <span class="ident">send_msg</span>.<span class="ident">set_region_epoch</span>(<span class="self">self</span>.<span class="ident">region</span>().<span class="ident">get_region_epoch</span>().<span class="ident">clone</span>());
-        <span class="ident">send_msg</span>.<span class="ident">set_to_peer</span>(<span class="ident">peer</span>.<span class="ident">clone</span>());
-        <span class="kw">let</span> <span class="ident">extra_msg</span> <span class="op">=</span> <span class="ident">send_msg</span>.<span class="ident">mut_extra_msg</span>();
-        <span class="ident">extra_msg</span>.<span class="ident">set_type</span>(<span class="ident">ExtraMessageType</span>::<span class="ident">MsgRegionWakeUp</span>);
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">ctx</span>.<span class="ident">trans</span>.<span class="ident">send</span>(<span class="ident">send_msg</span>) {
-            <span class="macro">error</span><span class="macro">!</span>(<span class="question-mark">?</span><span class="ident">e</span>;
-                <span class="string">&quot;failed to send wake up message&quot;</span>;
-                <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">region_id</span>,
-                <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">peer</span>.<span class="ident">get_id</span>(),
-                <span class="string">&quot;target_peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">peer</span>.<span class="ident">get_id</span>(),
-                <span class="string">&quot;target_store_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">peer</span>.<span class="ident">get_store_id</span>(),
-            );
-        }
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">msg</span> <span class="op">=</span> <span class="ident">ExtraMessage</span>::<span class="ident">default</span>();
+        <span class="ident">msg</span>.<span class="ident">set_type</span>(<span class="ident">ExtraMessageType</span>::<span class="ident">MsgRegionWakeUp</span>);
+        <span class="self">self</span>.<span class="ident">send_extra_message</span>(<span class="ident">msg</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>.<span class="ident">trans</span>, <span class="ident">peer</span>);
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">bcast_check_stale_peer_message</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Transport</span><span class="op">&gt;</span>(
@@ -7283,22 +7325,9 @@
             <span class="kw">if</span> <span class="ident">peer</span>.<span class="ident">get_id</span>() <span class="op">=</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">peer_id</span>() {
                 <span class="kw">continue</span>;
             }
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">send_msg</span> <span class="op">=</span> <span class="ident">RaftMessage</span>::<span class="ident">default</span>();
-            <span class="ident">send_msg</span>.<span class="ident">set_region_id</span>(<span class="self">self</span>.<span class="ident">region_id</span>);
-            <span class="ident">send_msg</span>.<span class="ident">set_from_peer</span>(<span class="self">self</span>.<span class="ident">peer</span>.<span class="ident">clone</span>());
-            <span class="ident">send_msg</span>.<span class="ident">set_region_epoch</span>(<span class="self">self</span>.<span class="ident">region</span>().<span class="ident">get_region_epoch</span>().<span class="ident">clone</span>());
-            <span class="ident">send_msg</span>.<span class="ident">set_to_peer</span>(<span class="ident">peer</span>.<span class="ident">clone</span>());
-            <span class="kw">let</span> <span class="ident">extra_msg</span> <span class="op">=</span> <span class="ident">send_msg</span>.<span class="ident">mut_extra_msg</span>();
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">extra_msg</span> <span class="op">=</span> <span class="ident">ExtraMessage</span>::<span class="ident">default</span>();
             <span class="ident">extra_msg</span>.<span class="ident">set_type</span>(<span class="ident">ExtraMessageType</span>::<span class="ident">MsgCheckStalePeer</span>);
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">ctx</span>.<span class="ident">trans</span>.<span class="ident">send</span>(<span class="ident">send_msg</span>) {
-                <span class="macro">error</span><span class="macro">!</span>(<span class="question-mark">?</span><span class="ident">e</span>;
-                    <span class="string">&quot;failed to send check stale peer message&quot;</span>;
-                    <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">region_id</span>,
-                    <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">peer</span>.<span class="ident">get_id</span>(),
-                    <span class="string">&quot;target_peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">peer</span>.<span class="ident">get_id</span>(),
-                    <span class="string">&quot;target_store_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">peer</span>.<span class="ident">get_store_id</span>(),
-                );
-            }
+            <span class="self">self</span>.<span class="ident">send_extra_message</span>(<span class="ident">extra_msg</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>.<span class="ident">trans</span>, <span class="ident">peer</span>);
         }
     }
 
@@ -7318,10 +7347,6 @@
         <span class="ident">premerge_commit</span>: <span class="ident">u64</span>,
         <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">PollContext</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">T</span><span class="op">&gt;</span>,
     ) {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">send_msg</span> <span class="op">=</span> <span class="ident">RaftMessage</span>::<span class="ident">default</span>();
-        <span class="ident">send_msg</span>.<span class="ident">set_region_id</span>(<span class="self">self</span>.<span class="ident">region_id</span>);
-        <span class="ident">send_msg</span>.<span class="ident">set_from_peer</span>(<span class="self">self</span>.<span class="ident">peer</span>.<span class="ident">clone</span>());
-        <span class="ident">send_msg</span>.<span class="ident">set_region_epoch</span>(<span class="self">self</span>.<span class="ident">region</span>().<span class="ident">get_region_epoch</span>().<span class="ident">clone</span>());
         <span class="kw">let</span> <span class="ident">to_peer</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">get_peer_from_cache</span>(<span class="self">self</span>.<span class="ident">leader_id</span>()) {
             <span class="prelude-val">Some</span>(<span class="ident">p</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">p</span>,
             <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> {
@@ -7334,19 +7359,10 @@
                 <span class="kw">return</span>;
             }
         };
-        <span class="ident">send_msg</span>.<span class="ident">set_to_peer</span>(<span class="ident">to_peer</span>.<span class="ident">clone</span>());
-        <span class="kw">let</span> <span class="ident">extra_msg</span> <span class="op">=</span> <span class="ident">send_msg</span>.<span class="ident">mut_extra_msg</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">extra_msg</span> <span class="op">=</span> <span class="ident">ExtraMessage</span>::<span class="ident">default</span>();
         <span class="ident">extra_msg</span>.<span class="ident">set_type</span>(<span class="ident">ExtraMessageType</span>::<span class="ident">MsgWantRollbackMerge</span>);
         <span class="ident">extra_msg</span>.<span class="ident">set_premerge_commit</span>(<span class="ident">premerge_commit</span>);
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">ctx</span>.<span class="ident">trans</span>.<span class="ident">send</span>(<span class="ident">send_msg</span>) {
-            <span class="macro">error</span><span class="macro">!</span>(<span class="question-mark">?</span><span class="ident">e</span>;
-                <span class="string">&quot;failed to send want rollback merge message&quot;</span>;
-                <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">region_id</span>,
-                <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">peer</span>.<span class="ident">get_id</span>(),
-                <span class="string">&quot;target_peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">to_peer</span>.<span class="ident">get_id</span>(),
-                <span class="string">&quot;target_store_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">to_peer</span>.<span class="ident">get_store_id</span>(),
-            );
-        }
+        <span class="self">self</span>.<span class="ident">send_extra_message</span>(<span class="ident">extra_msg</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>.<span class="ident">trans</span>, <span class="kw-2">&amp;</span><span class="ident">to_peer</span>);
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">require_updating_max_ts</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">pd_scheduler</span>: <span class="kw-2">&amp;</span><span class="ident">FutureScheduler</span><span class="op">&lt;</span><span class="ident">PdTask</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span><span class="op">&gt;</span>) {

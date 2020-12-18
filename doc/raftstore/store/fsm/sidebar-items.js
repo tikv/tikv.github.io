@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["GroupState","Represents state of the group."]],"mod":[["apply",""],["metrics",""],["peer",""],["store",""]],"struct":[["DestroyPeerJob",""],["PeerFsm",""]]});
+initSidebarItems({"mod":[["apply",""],["metrics",""],["peer",""],["store",""]],"struct":[["DestroyPeerJob",""],["PeerFsm",""]]});
