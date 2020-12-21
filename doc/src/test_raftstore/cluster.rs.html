@@ -1428,6 +1428,11 @@
 <span id="1425">1425</span>
 <span id="1426">1426</span>
 <span id="1427">1427</span>
+<span id="1428">1428</span>
+<span id="1429">1429</span>
+<span id="1430">1430</span>
+<span id="1431">1431</span>
+<span id="1432">1432</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1826,7 +1831,7 @@
         <span class="kw">let</span> <span class="ident">region_id</span> <span class="op">=</span> <span class="ident">request</span>.<span class="ident">get_header</span>().<span class="ident">get_region_id</span>();
         <span class="kw">loop</span> {
             <span class="kw">let</span> <span class="ident">leader</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">leader_of_region</span>(<span class="ident">region_id</span>) {
-                <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(<span class="string">&quot;can&#39;t get leader of region {}&quot;</span>, <span class="ident">region_id</span>)),
+                <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">NotLeader</span>(<span class="ident">region_id</span>, <span class="prelude-val">None</span>)),
                 <span class="prelude-val">Some</span>(<span class="ident">l</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">l</span>,
             };
             <span class="ident">request</span>.<span class="ident">mut_header</span>().<span class="ident">set_peer</span>(<span class="ident">leader</span>);
@@ -2176,13 +2181,18 @@
             );
             <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">call_command_on_leader</span>(<span class="ident">req</span>, <span class="ident">timeout</span>);
 
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">Timeout</span>(<span class="kw">_</span>)) <span class="op">=</span> <span class="ident">result</span> {
-                <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;call command timeout, let&#39;s retry&quot;</span>);
-                <span class="ident">sleep_ms</span>(<span class="number">100</span>);
-                <span class="kw">continue</span>;
-            }
+            <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">result</span> {
+                <span class="ident">e</span> @ <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">Timeout</span>(<span class="kw">_</span>))
+                <span class="op">|</span> <span class="ident">e</span> @ <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">NotLeader</span>(<span class="kw">_</span>, <span class="kw">_</span>))
+                <span class="op">|</span> <span class="ident">e</span> @ <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">StaleCommand</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;call command failed, retry it&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
+                    <span class="ident">sleep_ms</span>(<span class="number">100</span>);
+                    <span class="kw">continue</span>;
+                }
+                <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;call command failed {:?}&quot;</span>, <span class="ident">e</span>),
+                <span class="prelude-val">Ok</span>(<span class="ident">resp</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">resp</span>,
+            };
 
-            <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">result</span>.<span class="ident">unwrap</span>();
             <span class="kw">if</span> <span class="ident">resp</span>.<span class="ident">get_header</span>().<span class="ident">get_error</span>().<span class="ident">has_epoch_not_match</span>() {
                 <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;seems split, let&#39;s retry&quot;</span>);
                 <span class="ident">sleep_ms</span>(<span class="number">100</span>);
