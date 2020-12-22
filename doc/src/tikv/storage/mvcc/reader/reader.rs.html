@@ -1624,6 +1624,40 @@
 <span id="1621">1621</span>
 <span id="1622">1622</span>
 <span id="1623">1623</span>
+<span id="1624">1624</span>
+<span id="1625">1625</span>
+<span id="1626">1626</span>
+<span id="1627">1627</span>
+<span id="1628">1628</span>
+<span id="1629">1629</span>
+<span id="1630">1630</span>
+<span id="1631">1631</span>
+<span id="1632">1632</span>
+<span id="1633">1633</span>
+<span id="1634">1634</span>
+<span id="1635">1635</span>
+<span id="1636">1636</span>
+<span id="1637">1637</span>
+<span id="1638">1638</span>
+<span id="1639">1639</span>
+<span id="1640">1640</span>
+<span id="1641">1641</span>
+<span id="1642">1642</span>
+<span id="1643">1643</span>
+<span id="1644">1644</span>
+<span id="1645">1645</span>
+<span id="1646">1646</span>
+<span id="1647">1647</span>
+<span id="1648">1648</span>
+<span id="1649">1649</span>
+<span id="1650">1650</span>
+<span id="1651">1651</span>
+<span id="1652">1652</span>
+<span id="1653">1653</span>
+<span id="1654">1654</span>
+<span id="1655">1655</span>
+<span id="1656">1656</span>
+<span id="1657">1657</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1848,10 +1882,20 @@
         <span class="prelude-val">Ok</span>(())
     }
 
+    <span class="doccomment">/// Gets the value of the specified key&#39;s latest version before specified `ts`.</span>
+    <span class="doccomment">/// It tries to ensure the write record&#39;s `gc_fence`&#39;s ts, if any, greater than specified</span>
+    <span class="doccomment">/// `gc_fence_limit`. Pass `None` to `gc_fence_limit` to skip the check.</span>
+    <span class="doccomment">/// The caller must guarantee that there&#39;s no other `PUT` or `DELETE` versions whose `commit_ts`</span>
+    <span class="doccomment">/// is between the found version and the provided `gc_fence_limit` (`gc_fence_limit` is</span>
+    <span class="doccomment">/// inclusive).</span>
+    <span class="doccomment">/// For transactional reads, the `gc_fence_limit` must be provided to ensure the result is</span>
+    <span class="doccomment">/// correct. Generally, it should be the read_ts of the current transaction, which might be</span>
+    <span class="doccomment">/// different from the `ts` passed to this function.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
         <span class="ident">key</span>: <span class="kw-2">&amp;</span><span class="ident">Key</span>,
         <span class="ident">ts</span>: <span class="ident">TimeStamp</span>,
+        <span class="ident">gc_fence_limit</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">TimeStamp</span><span class="op">&gt;</span>,
         <span class="ident">skip_lock_check</span>: <span class="ident">bool</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="op">!</span><span class="ident">skip_lock_check</span> {
@@ -1861,25 +1905,46 @@
                 <span class="ident">IsolationLevel</span>::<span class="ident">Rc</span> <span class="op">=</span><span class="op">&gt;</span> {}
             }
         }
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">write</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_write</span>(<span class="ident">key</span>, <span class="ident">ts</span>)<span class="question-mark">?</span> {
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">write</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_write</span>(<span class="ident">key</span>, <span class="ident">ts</span>, <span class="ident">gc_fence_limit</span>)<span class="question-mark">?</span> {
             <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="self">self</span>.<span class="ident">load_data</span>(<span class="ident">key</span>, <span class="ident">write</span>)<span class="question-mark">?</span>))
         } <span class="kw">else</span> {
             <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_write</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">key</span>: <span class="kw-2">&amp;</span><span class="ident">Key</span>, <span class="kw-2">mut</span> <span class="ident">ts</span>: <span class="ident">TimeStamp</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Write</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    <span class="doccomment">/// Gets the write record of the specified key&#39;s latest version before specified `ts`.</span>
+    <span class="doccomment">/// It tries to ensure the write record&#39;s `gc_fence`&#39;s ts, if any, greater than specified</span>
+    <span class="doccomment">/// `gc_fence_limit`. Pass `None` to `gc_fence_limit` to skip the check.</span>
+    <span class="doccomment">/// The caller must guarantee that there&#39;s no other `PUT` or `DELETE` versions whose `commit_ts`</span>
+    <span class="doccomment">/// is between the found version and the provided `gc_fence_limit` (`gc_fence_limit` is</span>
+    <span class="doccomment">/// inclusive).</span>
+    <span class="doccomment">/// For transactional reads, the `gc_fence_limit` must be provided to ensure the result is</span>
+    <span class="doccomment">/// correct. Generally, it should be the read_ts of the current transaction, which might be</span>
+    <span class="doccomment">/// different from the `ts` passed to this function.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_write</span>(
+        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
+        <span class="ident">key</span>: <span class="kw-2">&amp;</span><span class="ident">Key</span>,
+        <span class="kw-2">mut</span> <span class="ident">ts</span>: <span class="ident">TimeStamp</span>,
+        <span class="ident">gc_fence_limit</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">TimeStamp</span><span class="op">&gt;</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Write</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="kw">loop</span> {
             <span class="kw">match</span> <span class="self">self</span>.<span class="ident">seek_write</span>(<span class="ident">key</span>, <span class="ident">ts</span>)<span class="question-mark">?</span> {
-                <span class="prelude-val">Some</span>((<span class="ident">commit_ts</span>, <span class="ident">write</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">match</span> <span class="ident">write</span>.<span class="ident">write_type</span> {
-                    <span class="ident">WriteType</span>::<span class="ident">Put</span> <span class="op">=</span><span class="op">&gt;</span> {
-                        <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">write</span>));
+                <span class="prelude-val">Some</span>((<span class="ident">commit_ts</span>, <span class="ident">write</span>)) <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">limit</span>) <span class="op">=</span> <span class="ident">gc_fence_limit</span> {
+                        <span class="kw">if</span> <span class="op">!</span><span class="ident">write</span>.<span class="ident">as_ref</span>().<span class="ident">check_gc_fence_as_latest_version</span>(<span class="ident">limit</span>) {
+                            <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>);
+                        }
                     }
-                    <span class="ident">WriteType</span>::<span class="ident">Delete</span> <span class="op">=</span><span class="op">&gt;</span> {
-                        <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>);
+                    <span class="kw">match</span> <span class="ident">write</span>.<span class="ident">write_type</span> {
+                        <span class="ident">WriteType</span>::<span class="ident">Put</span> <span class="op">=</span><span class="op">&gt;</span> {
+                            <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">write</span>));
+                        }
+                        <span class="ident">WriteType</span>::<span class="ident">Delete</span> <span class="op">=</span><span class="op">&gt;</span> {
+                            <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>);
+                        }
+                        <span class="ident">WriteType</span>::<span class="ident">Lock</span> <span class="op">|</span> <span class="ident">WriteType</span>::<span class="ident">Rollback</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">ts</span> <span class="op">=</span> <span class="ident">commit_ts</span>.<span class="ident">prev</span>(),
                     }
-                    <span class="ident">WriteType</span>::<span class="ident">Lock</span> <span class="op">|</span> <span class="ident">WriteType</span>::<span class="ident">Rollback</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">ts</span> <span class="op">=</span> <span class="ident">commit_ts</span>.<span class="ident">prev</span>(),
-                },
+                }
                 <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>),
             }
         }
@@ -2973,40 +3038,40 @@
         <span class="comment">//                   5_5 Rollback, 2_1 PUT].</span>
         <span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> <span class="ident">Key</span>::<span class="ident">from_raw</span>(<span class="ident">k</span>);
 
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">reader</span>.<span class="ident">get_write</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="number">1</span>.<span class="ident">into</span>()).<span class="ident">unwrap</span>().<span class="ident">is_none</span>());
+        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">reader</span>.<span class="ident">get_write</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="number">1</span>.<span class="ident">into</span>(), <span class="prelude-val">None</span>).<span class="ident">unwrap</span>().<span class="ident">is_none</span>());
 
-        <span class="kw">let</span> <span class="ident">write</span> <span class="op">=</span> <span class="ident">reader</span>.<span class="ident">get_write</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="number">2</span>.<span class="ident">into</span>()).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">write</span> <span class="op">=</span> <span class="ident">reader</span>.<span class="ident">get_write</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="number">2</span>.<span class="ident">into</span>(), <span class="prelude-val">None</span>).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>();
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">write</span>.<span class="ident">write_type</span>, <span class="ident">WriteType</span>::<span class="ident">Put</span>);
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">write</span>.<span class="ident">start_ts</span>, <span class="number">1</span>.<span class="ident">into</span>());
 
-        <span class="kw">let</span> <span class="ident">write</span> <span class="op">=</span> <span class="ident">reader</span>.<span class="ident">get_write</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="number">5</span>.<span class="ident">into</span>()).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">write</span> <span class="op">=</span> <span class="ident">reader</span>.<span class="ident">get_write</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="number">5</span>.<span class="ident">into</span>(), <span class="prelude-val">None</span>).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>();
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">write</span>.<span class="ident">write_type</span>, <span class="ident">WriteType</span>::<span class="ident">Put</span>);
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">write</span>.<span class="ident">start_ts</span>, <span class="number">1</span>.<span class="ident">into</span>());
 
-        <span class="kw">let</span> <span class="ident">write</span> <span class="op">=</span> <span class="ident">reader</span>.<span class="ident">get_write</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="number">7</span>.<span class="ident">into</span>()).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">write</span> <span class="op">=</span> <span class="ident">reader</span>.<span class="ident">get_write</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="number">7</span>.<span class="ident">into</span>(), <span class="prelude-val">None</span>).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>();
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">write</span>.<span class="ident">write_type</span>, <span class="ident">WriteType</span>::<span class="ident">Put</span>);
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">write</span>.<span class="ident">start_ts</span>, <span class="number">1</span>.<span class="ident">into</span>());
 
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">reader</span>.<span class="ident">get_write</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="number">9</span>.<span class="ident">into</span>()).<span class="ident">unwrap</span>().<span class="ident">is_none</span>());
+        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">reader</span>.<span class="ident">get_write</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="number">9</span>.<span class="ident">into</span>(), <span class="prelude-val">None</span>).<span class="ident">unwrap</span>().<span class="ident">is_none</span>());
 
-        <span class="kw">let</span> <span class="ident">write</span> <span class="op">=</span> <span class="ident">reader</span>.<span class="ident">get_write</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="number">14</span>.<span class="ident">into</span>()).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">write</span> <span class="op">=</span> <span class="ident">reader</span>.<span class="ident">get_write</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="number">14</span>.<span class="ident">into</span>(), <span class="prelude-val">None</span>).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>();
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">write</span>.<span class="ident">write_type</span>, <span class="ident">WriteType</span>::<span class="ident">Put</span>);
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">write</span>.<span class="ident">start_ts</span>, <span class="number">12</span>.<span class="ident">into</span>());
 
-        <span class="kw">let</span> <span class="ident">write</span> <span class="op">=</span> <span class="ident">reader</span>.<span class="ident">get_write</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="number">16</span>.<span class="ident">into</span>()).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">write</span> <span class="op">=</span> <span class="ident">reader</span>.<span class="ident">get_write</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="number">16</span>.<span class="ident">into</span>(), <span class="prelude-val">None</span>).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>();
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">write</span>.<span class="ident">write_type</span>, <span class="ident">WriteType</span>::<span class="ident">Put</span>);
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">write</span>.<span class="ident">start_ts</span>, <span class="number">12</span>.<span class="ident">into</span>());
 
-        <span class="kw">let</span> <span class="ident">write</span> <span class="op">=</span> <span class="ident">reader</span>.<span class="ident">get_write</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="number">20</span>.<span class="ident">into</span>()).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">write</span> <span class="op">=</span> <span class="ident">reader</span>.<span class="ident">get_write</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="number">20</span>.<span class="ident">into</span>(), <span class="prelude-val">None</span>).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>();
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">write</span>.<span class="ident">write_type</span>, <span class="ident">WriteType</span>::<span class="ident">Put</span>);
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">write</span>.<span class="ident">start_ts</span>, <span class="number">18</span>.<span class="ident">into</span>());
 
-        <span class="kw">let</span> <span class="ident">write</span> <span class="op">=</span> <span class="ident">reader</span>.<span class="ident">get_write</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="number">24</span>.<span class="ident">into</span>()).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">write</span> <span class="op">=</span> <span class="ident">reader</span>.<span class="ident">get_write</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="number">24</span>.<span class="ident">into</span>(), <span class="prelude-val">None</span>).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>();
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">write</span>.<span class="ident">write_type</span>, <span class="ident">WriteType</span>::<span class="ident">Put</span>);
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">write</span>.<span class="ident">start_ts</span>, <span class="number">18</span>.<span class="ident">into</span>());
 
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">reader</span>
-            .<span class="ident">get_write</span>(<span class="kw-2">&amp;</span><span class="ident">Key</span>::<span class="ident">from_raw</span>(<span class="string">b&quot;j&quot;</span>), <span class="number">100</span>.<span class="ident">into</span>())
+            .<span class="ident">get_write</span>(<span class="kw-2">&amp;</span><span class="ident">Key</span>::<span class="ident">from_raw</span>(<span class="string">b&quot;j&quot;</span>), <span class="number">100</span>.<span class="ident">into</span>(), <span class="prelude-val">None</span>)
             .<span class="ident">unwrap</span>()
             .<span class="ident">is_none</span>());
     }
@@ -3219,21 +3284,24 @@
 
         <span class="kw">for</span> <span class="kw-2">&amp;</span><span class="ident">skip_lock_check</span> <span class="kw">in</span> <span class="kw-2">&amp;</span>[<span class="bool-val">false</span>, <span class="bool-val">true</span>] {
             <span class="macro">assert_eq</span><span class="macro">!</span>(
-                <span class="ident">reader</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="number">2</span>.<span class="ident">into</span>(), <span class="ident">skip_lock_check</span>).<span class="ident">unwrap</span>(),
+                <span class="ident">reader</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="number">2</span>.<span class="ident">into</span>(), <span class="prelude-val">None</span>, <span class="ident">skip_lock_check</span>).<span class="ident">unwrap</span>(),
                 <span class="prelude-val">Some</span>(<span class="ident">short_value</span>.<span class="ident">to_vec</span>())
             );
             <span class="macro">assert_eq</span><span class="macro">!</span>(
-                <span class="ident">reader</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="number">5</span>.<span class="ident">into</span>(), <span class="ident">skip_lock_check</span>).<span class="ident">unwrap</span>(),
+                <span class="ident">reader</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="number">5</span>.<span class="ident">into</span>(), <span class="prelude-val">None</span>, <span class="ident">skip_lock_check</span>).<span class="ident">unwrap</span>(),
                 <span class="prelude-val">Some</span>(<span class="ident">short_value</span>.<span class="ident">to_vec</span>())
             );
             <span class="macro">assert_eq</span><span class="macro">!</span>(
-                <span class="ident">reader</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="number">7</span>.<span class="ident">into</span>(), <span class="ident">skip_lock_check</span>).<span class="ident">unwrap</span>(),
+                <span class="ident">reader</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="number">7</span>.<span class="ident">into</span>(), <span class="prelude-val">None</span>, <span class="ident">skip_lock_check</span>).<span class="ident">unwrap</span>(),
                 <span class="prelude-val">Some</span>(<span class="ident">short_value</span>.<span class="ident">to_vec</span>())
             );
-            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">reader</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="number">9</span>.<span class="ident">into</span>(), <span class="ident">skip_lock_check</span>).<span class="ident">unwrap</span>(), <span class="prelude-val">None</span>);
+            <span class="macro">assert_eq</span><span class="macro">!</span>(
+                <span class="ident">reader</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="number">9</span>.<span class="ident">into</span>(), <span class="prelude-val">None</span>, <span class="ident">skip_lock_check</span>).<span class="ident">unwrap</span>(),
+                <span class="prelude-val">None</span>
+            );
 
-            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">reader</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="number">11</span>.<span class="ident">into</span>(), <span class="bool-val">false</span>).<span class="ident">is_err</span>());
-            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">reader</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="number">9</span>.<span class="ident">into</span>(), <span class="bool-val">true</span>).<span class="ident">unwrap</span>(), <span class="prelude-val">None</span>);
+            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">reader</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="number">11</span>.<span class="ident">into</span>(), <span class="prelude-val">None</span>, <span class="bool-val">false</span>).<span class="ident">is_err</span>());
+            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">reader</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="number">9</span>.<span class="ident">into</span>(), <span class="prelude-val">None</span>, <span class="bool-val">true</span>).<span class="ident">unwrap</span>(), <span class="prelude-val">None</span>);
         }
 
         <span class="comment">// Commit the long value</span>
@@ -3242,7 +3310,7 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reader</span> <span class="op">=</span> <span class="ident">MvccReader</span>::<span class="ident">new</span>(<span class="ident">snap</span>, <span class="prelude-val">None</span>, <span class="bool-val">false</span>, <span class="ident">IsolationLevel</span>::<span class="ident">Si</span>);
         <span class="kw">for</span> <span class="kw-2">&amp;</span><span class="ident">skip_lock_check</span> <span class="kw">in</span> <span class="kw-2">&amp;</span>[<span class="bool-val">false</span>, <span class="bool-val">true</span>] {
             <span class="macro">assert_eq</span><span class="macro">!</span>(
-                <span class="ident">reader</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="number">11</span>.<span class="ident">into</span>(), <span class="ident">skip_lock_check</span>).<span class="ident">unwrap</span>(),
+                <span class="ident">reader</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="number">11</span>.<span class="ident">into</span>(), <span class="prelude-val">None</span>, <span class="ident">skip_lock_check</span>).<span class="ident">unwrap</span>(),
                 <span class="prelude-val">Some</span>(<span class="ident">long_value</span>.<span class="ident">to_vec</span>())
             );
         }

@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["must_err",""],["must_succeed",""]]});
+initSidebarItems({"fn":[["must_cleanup_with_gc_fence",""],["must_err",""],["must_succeed",""]]});

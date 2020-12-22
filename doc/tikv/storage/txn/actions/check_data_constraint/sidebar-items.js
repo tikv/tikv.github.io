@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["check_data_constraint","Checks the existence of the key according to `should_not_exist`. If not, returns an `AlreadyExist` error."]]});
+initSidebarItems({"fn":[["check_data_constraint","Checks the existence of the key according to `should_not_exist`. If not, returns an `AlreadyExist` error. The caller must guarantee that the given `write` is the latest version of the key."]]});

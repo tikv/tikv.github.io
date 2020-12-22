@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["EntryBuilder",""]]});
+initSidebarItems({"fn":[["prepare_test_data_for_check_gc_fence",""]],"struct":[["EntryBuilder",""]]});
