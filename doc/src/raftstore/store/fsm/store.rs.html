@@ -2442,6 +2442,10 @@
 <span id="2439">2439</span>
 <span id="2440">2440</span>
 <span id="2441">2441</span>
+<span id="2442">2442</span>
+<span id="2443">2443</span>
+<span id="2444">2444</span>
+<span id="2445">2445</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -2540,8 +2544,8 @@
     <span class="kw">pub</span> <span class="ident">regions</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">u64</span>, <span class="ident">Region</span><span class="op">&gt;</span>,
     <span class="doccomment">/// region_id -&gt; reader</span>
     <span class="kw">pub</span> <span class="ident">readers</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">u64</span>, <span class="ident">ReadDelegate</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// region_id -&gt; (term, leader)</span>
-    <span class="kw">pub</span> <span class="ident">leaders</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">u64</span>, (<span class="ident">u64</span>, <span class="ident">metapb</span>::<span class="ident">Peer</span>)<span class="op">&gt;</span>,
+    <span class="doccomment">/// region_id -&gt; (term, leader_peer_id)</span>
+    <span class="kw">pub</span> <span class="ident">leaders</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">u64</span>, (<span class="ident">u64</span>, <span class="ident">u64</span>)<span class="op">&gt;</span>,
     <span class="doccomment">/// `MsgRequestPreVote`, `MsgRequestVote` or `MsgAppend` messages from newly split Regions shouldn&#39;t be</span>
     <span class="doccomment">/// dropped if there is no such Region in this store now. So the messages are recorded temporarily and</span>
     <span class="doccomment">/// will be handled later.</span>
@@ -4798,10 +4802,10 @@
         <span class="kw">let</span> <span class="ident">regions</span> <span class="op">=</span> <span class="ident">leaders</span>
             .<span class="ident">into_iter</span>()
             .<span class="ident">map</span>(<span class="op">|</span><span class="ident">leader_info</span><span class="op">|</span> {
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="ident">term</span>, <span class="ident">leader</span>)) <span class="op">=</span> <span class="ident">meta</span>.<span class="ident">leaders</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">leader_info</span>.<span class="ident">region_id</span>) {
+                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="ident">term</span>, <span class="ident">leader_id</span>)) <span class="op">=</span> <span class="ident">meta</span>.<span class="ident">leaders</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">leader_info</span>.<span class="ident">region_id</span>) {
                     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">region</span>) <span class="op">=</span> <span class="ident">meta</span>.<span class="ident">regions</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">leader_info</span>.<span class="ident">region_id</span>) {
                         <span class="kw">if</span> <span class="kw-2">*</span><span class="ident">term</span> <span class="op">=</span><span class="op">=</span> <span class="ident">leader_info</span>.<span class="ident">term</span>
-                            <span class="op">&amp;&amp;</span> <span class="ident">leader</span>.<span class="ident">id</span> <span class="op">=</span><span class="op">=</span> <span class="ident">leader_info</span>.<span class="ident">peer_id</span>
+                            <span class="op">&amp;&amp;</span> <span class="kw-2">*</span><span class="ident">leader_id</span> <span class="op">=</span><span class="op">=</span> <span class="ident">leader_info</span>.<span class="ident">peer_id</span>
                             <span class="op">&amp;&amp;</span> <span class="ident">util</span>::<span class="ident">compare_region_epoch</span>(
                                 <span class="ident">leader_info</span>.<span class="ident">get_region_epoch</span>(),
                                 <span class="ident">region</span>,
@@ -4815,11 +4819,15 @@
                         }
                         <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;check leader failed&quot;</span>;
                             <span class="string">&quot;leader_info&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">leader_info</span>,
+                            <span class="string">&quot;current_leader&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">leader_id</span>,
                             <span class="string">&quot;current_term&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">term</span>,
                             <span class="string">&quot;current_region&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">region</span>,
                         );
                     }
                 }
+                <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;check leader failed, meta not found&quot;</span>;
+                    <span class="string">&quot;leader_info&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">leader_info</span>,
+                );
                 <span class="prelude-val">None</span>
             })
             .<span class="ident">filter_map</span>(<span class="op">|</span><span class="ident">r</span><span class="op">|</span> <span class="ident">r</span>)
