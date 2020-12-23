@@ -1271,6 +1271,50 @@
 <span id="1268">1268</span>
 <span id="1269">1269</span>
 <span id="1270">1270</span>
+<span id="1271">1271</span>
+<span id="1272">1272</span>
+<span id="1273">1273</span>
+<span id="1274">1274</span>
+<span id="1275">1275</span>
+<span id="1276">1276</span>
+<span id="1277">1277</span>
+<span id="1278">1278</span>
+<span id="1279">1279</span>
+<span id="1280">1280</span>
+<span id="1281">1281</span>
+<span id="1282">1282</span>
+<span id="1283">1283</span>
+<span id="1284">1284</span>
+<span id="1285">1285</span>
+<span id="1286">1286</span>
+<span id="1287">1287</span>
+<span id="1288">1288</span>
+<span id="1289">1289</span>
+<span id="1290">1290</span>
+<span id="1291">1291</span>
+<span id="1292">1292</span>
+<span id="1293">1293</span>
+<span id="1294">1294</span>
+<span id="1295">1295</span>
+<span id="1296">1296</span>
+<span id="1297">1297</span>
+<span id="1298">1298</span>
+<span id="1299">1299</span>
+<span id="1300">1300</span>
+<span id="1301">1301</span>
+<span id="1302">1302</span>
+<span id="1303">1303</span>
+<span id="1304">1304</span>
+<span id="1305">1305</span>
+<span id="1306">1306</span>
+<span id="1307">1307</span>
+<span id="1308">1308</span>
+<span id="1309">1309</span>
+<span id="1310">1310</span>
+<span id="1311">1311</span>
+<span id="1312">1312</span>
+<span id="1313">1313</span>
+<span id="1314">1314</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1937,29 +1981,29 @@
     <span class="ident">ratio_threshold</span>: <span class="ident">f64</span>,
     <span class="ident">context</span>: <span class="kw-2">&amp;</span><span class="ident">CompactionFilterContext</span>,
 ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-    <span class="kw">if</span> <span class="ident">ratio_threshold</span> <span class="op">&lt;</span> <span class="number">1.0</span> <span class="op">|</span><span class="op">|</span> <span class="ident">context</span>.<span class="ident">is_bottommost_level</span>() {
-        <span class="comment">// According to our tests, `split_ts` on keys and `parse_write` on values</span>
-        <span class="comment">// won&#39;t utilize much CPU.</span>
-        <span class="kw">return</span> <span class="bool-val">true</span>;
-    }
-
-    <span class="kw">let</span> <span class="ident">check_props</span> <span class="op">=</span> <span class="op">|</span><span class="ident">props</span>: <span class="kw-2">&amp;</span><span class="ident">MvccProperties</span><span class="op">|</span> {
+    <span class="kw">let</span> <span class="ident">check_props</span> <span class="op">=</span> <span class="op">|</span><span class="ident">props</span>: <span class="kw-2">&amp;</span><span class="ident">MvccProperties</span><span class="op">|</span> <span class="op">-</span><span class="op">&gt;</span> (<span class="ident">bool</span>, <span class="ident">bool</span> <span class="comment">/*skip_more_checks*/</span>) {
         <span class="kw">if</span> <span class="ident">props</span>.<span class="ident">min_ts</span> <span class="op">&gt;</span> <span class="ident">safe_point</span> {
-            <span class="kw">return</span> <span class="bool-val">false</span>;
+            <span class="kw">return</span> (<span class="bool-val">false</span>, <span class="bool-val">false</span>);
+        }
+        <span class="kw">if</span> <span class="ident">ratio_threshold</span> <span class="op">&lt;</span> <span class="number">1.0</span> <span class="op">|</span><span class="op">|</span> <span class="ident">context</span>.<span class="ident">is_bottommost_level</span>() {
+            <span class="comment">// According to our tests, `split_ts` on keys and `parse_write` on values</span>
+            <span class="comment">// won&#39;t utilize much CPU. So always perform GC at the bottommost level</span>
+            <span class="comment">// to avoid garbage accumulation.</span>
+            <span class="kw">return</span> (<span class="bool-val">true</span>, <span class="bool-val">true</span>);
         }
         <span class="kw">if</span> <span class="ident">props</span>.<span class="ident">num_versions</span> <span class="kw">as</span> <span class="ident">f64</span> <span class="op">&gt;</span> <span class="ident">props</span>.<span class="ident">num_rows</span> <span class="kw">as</span> <span class="ident">f64</span> <span class="op">*</span> <span class="ident">ratio_threshold</span> {
             <span class="comment">// When comparing `num_versions` with `num_rows`, it&#39;s unnecessary to</span>
             <span class="comment">// treat internal levels specially.</span>
-            <span class="kw">return</span> <span class="bool-val">true</span>;
+            <span class="kw">return</span> (<span class="bool-val">true</span>, <span class="bool-val">false</span>);
         }
 
         <span class="comment">// When comparing `num_versions` with `num_puts`, trait internal levels specially</span>
         <span class="comment">// because MVCC-delete marks can&#39;t be handled at those levels.</span>
         <span class="kw">let</span> <span class="ident">num_rollback_and_locks</span> <span class="op">=</span> (<span class="ident">props</span>.<span class="ident">num_versions</span> <span class="op">-</span> <span class="ident">props</span>.<span class="ident">num_deletes</span>) <span class="kw">as</span> <span class="ident">f64</span>;
         <span class="kw">if</span> <span class="ident">num_rollback_and_locks</span> <span class="op">&gt;</span> <span class="ident">props</span>.<span class="ident">num_puts</span> <span class="kw">as</span> <span class="ident">f64</span> <span class="op">*</span> <span class="ident">ratio_threshold</span> {
-            <span class="kw">return</span> <span class="bool-val">true</span>;
+            <span class="kw">return</span> (<span class="bool-val">true</span>, <span class="bool-val">false</span>);
         }
-        <span class="ident">props</span>.<span class="ident">max_row_versions</span> <span class="op">&gt;</span> <span class="number">1024</span>
+        (<span class="ident">props</span>.<span class="ident">max_row_versions</span> <span class="op">&gt;</span> <span class="number">1024</span>, <span class="bool-val">false</span>)
     };
 
     <span class="kw">let</span> (<span class="kw-2">mut</span> <span class="ident">sum_props</span>, <span class="kw-2">mut</span> <span class="ident">needs_gc</span>) <span class="op">=</span> (<span class="ident">MvccProperties</span>::<span class="ident">new</span>(), <span class="number">0</span>);
@@ -1971,13 +2015,19 @@
         };
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">props</span>) <span class="op">=</span> <span class="ident">RocksMvccProperties</span>::<span class="ident">decode</span>(<span class="ident">user_props</span>) {
             <span class="ident">sum_props</span>.<span class="ident">add</span>(<span class="kw-2">&amp;</span><span class="ident">props</span>);
-            <span class="kw">if</span> <span class="ident">check_props</span>(<span class="kw-2">&amp;</span><span class="ident">props</span>) {
+            <span class="kw">let</span> (<span class="ident">sst_needs_gc</span>, <span class="ident">skip_more_checks</span>) <span class="op">=</span> <span class="ident">check_props</span>(<span class="kw-2">&amp;</span><span class="ident">props</span>);
+            <span class="kw">if</span> <span class="ident">sst_needs_gc</span> {
                 <span class="ident">needs_gc</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+            }
+            <span class="kw">if</span> <span class="ident">skip_more_checks</span> {
+                <span class="comment">// It&#39;s the bottommost level or ratio_threshold is less than 1.</span>
+                <span class="ident">needs_gc</span> <span class="op">=</span> <span class="ident">context</span>.<span class="ident">file_numbers</span>().<span class="ident">len</span>();
+                <span class="kw">break</span>;
             }
         }
     }
 
-    (<span class="ident">needs_gc</span> <span class="op">&gt;</span><span class="op">=</span> ((<span class="ident">context</span>.<span class="ident">file_numbers</span>().<span class="ident">len</span>() <span class="op">+</span> <span class="number">1</span>) <span class="op">/</span> <span class="number">2</span>)) <span class="op">|</span><span class="op">|</span> <span class="ident">check_props</span>(<span class="kw-2">&amp;</span><span class="ident">sum_props</span>)
+    (<span class="ident">needs_gc</span> <span class="op">&gt;</span><span class="op">=</span> ((<span class="ident">context</span>.<span class="ident">file_numbers</span>().<span class="ident">len</span>() <span class="op">+</span> <span class="number">1</span>) <span class="op">/</span> <span class="number">2</span>)) <span class="op">|</span><span class="op">|</span> <span class="ident">check_props</span>(<span class="kw-2">&amp;</span><span class="ident">sum_props</span>).<span class="number">0</span>
 }
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
@@ -2055,13 +2105,14 @@
                 <span class="ident">callbacks</span>.<span class="ident">push</span>(<span class="ident">callback</span>.<span class="ident">clone</span>());
             }
         }
-        <span class="kw">fn</span> <span class="ident">post_gc</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">fn</span> <span class="ident">post_gc</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
+            <span class="self">self</span>.<span class="ident">callbacks_on_drop</span>.<span class="ident">clear</span>();
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">gc_context</span> <span class="op">=</span> <span class="ident">GC_CONTEXT</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
             <span class="kw">let</span> <span class="ident">callbacks</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">gc_context</span>.<span class="ident">as_mut</span>().<span class="ident">unwrap</span>().<span class="ident">callbacks_on_drop</span>;
             <span class="ident">callbacks</span>.<span class="ident">clear</span>();
         }
 
-        <span class="kw">fn</span> <span class="ident">gc</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">raw_engine</span>: <span class="kw-2">&amp;</span><span class="ident">RocksEngine</span>) {
+        <span class="kw">fn</span> <span class="ident">gc</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">raw_engine</span>: <span class="kw-2">&amp;</span><span class="ident">RocksEngine</span>) {
             <span class="kw">let</span> <span class="ident">_guard</span> <span class="op">=</span> <span class="ident">LOCK</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
             <span class="self">self</span>.<span class="ident">prepare_gc</span>(<span class="ident">raw_engine</span>);
 
@@ -2076,7 +2127,7 @@
             <span class="self">self</span>.<span class="ident">post_gc</span>();
         }
 
-        <span class="kw">fn</span> <span class="ident">gc_on_files</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">raw_engine</span>: <span class="kw-2">&amp;</span><span class="ident">RocksEngine</span>, <span class="ident">input_files</span>: <span class="kw-2">&amp;</span>[<span class="ident">String</span>]) {
+        <span class="kw">fn</span> <span class="ident">gc_on_files</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">raw_engine</span>: <span class="kw-2">&amp;</span><span class="ident">RocksEngine</span>, <span class="ident">input_files</span>: <span class="kw-2">&amp;</span>[<span class="ident">String</span>]) {
             <span class="kw">let</span> <span class="ident">_guard</span> <span class="op">=</span> <span class="ident">LOCK</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
             <span class="self">self</span>.<span class="ident">prepare_gc</span>(<span class="ident">raw_engine</span>);
             <span class="kw">let</span> <span class="ident">db</span> <span class="op">=</span> <span class="ident">raw_engine</span>.<span class="ident">as_inner</span>();
@@ -2194,11 +2245,15 @@
     <span class="comment">// filter will be created.</span>
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_mvcc_properties</span>() {
-        <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span> <span class="ident">TestEngineBuilder</span>::<span class="ident">new</span>().<span class="ident">build</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cfg</span> <span class="op">=</span> <span class="ident">DbConfig</span>::<span class="ident">default</span>();
+        <span class="ident">cfg</span>.<span class="ident">writecf</span>.<span class="ident">disable_auto_compactions</span> <span class="op">=</span> <span class="bool-val">true</span>;
+        <span class="ident">cfg</span>.<span class="ident">writecf</span>.<span class="ident">dynamic_level_bytes</span> <span class="op">=</span> <span class="bool-val">false</span>;
+        <span class="kw">let</span> <span class="ident">dir</span> <span class="op">=</span> <span class="ident">tempfile</span>::<span class="ident">TempDir</span>::<span class="ident">new</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">builder</span> <span class="op">=</span> <span class="ident">TestEngineBuilder</span>::<span class="ident">new</span>().<span class="ident">path</span>(<span class="ident">dir</span>.<span class="ident">path</span>());
+        <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span> <span class="ident">builder</span>.<span class="ident">build_with_cfg</span>(<span class="kw-2">&amp;</span><span class="ident">cfg</span>).<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">raw_engine</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">get_rocksdb</span>();
         <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[<span class="string">b&#39;v&#39;</span>; <span class="number">512</span>];
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">gc_runner</span> <span class="op">=</span> <span class="ident">TestGCRunner</span>::<span class="ident">default</span>();
-        <span class="ident">gc_runner</span>.<span class="ident">ratio_threshold</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="number">10.0</span>);
 
         <span class="kw">for</span> <span class="ident">start_ts</span> <span class="kw">in</span> <span class="kw-2">&amp;</span>[<span class="number">100</span>, <span class="number">110</span>, <span class="number">120</span>, <span class="number">130</span>] {
             <span class="ident">must_prewrite_put</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="string">b&quot;zkey&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">value</span>, <span class="string">b&quot;zkey&quot;</span>, <span class="kw-2">*</span><span class="ident">start_ts</span>);
@@ -2207,9 +2262,42 @@
         <span class="ident">must_prewrite_delete</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="string">b&quot;zkey&quot;</span>, <span class="string">b&quot;zkey&quot;</span>, <span class="number">140</span>);
         <span class="ident">must_commit</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="string">b&quot;zkey&quot;</span>, <span class="number">140</span>, <span class="number">145</span>);
 
-        <span class="comment">// Can&#39;t GC stale versions because of the threshold.</span>
-        <span class="ident">gc_runner</span>.<span class="ident">gc</span>(<span class="kw-2">&amp;</span><span class="ident">raw_engine</span>);
-        <span class="kw">for</span> <span class="ident">commit_ts</span> <span class="kw">in</span> <span class="kw-2">&amp;</span>[<span class="number">105</span>, <span class="number">115</span>, <span class="number">125</span>, <span class="number">135</span>] {
+        <span class="comment">// Can&#39;t perform GC because the min timestamp is greater than safe point.</span>
+        <span class="ident">gc_runner</span>
+            .<span class="ident">callbacks_on_drop</span>
+            .<span class="ident">push</span>(<span class="ident">Arc</span>::<span class="ident">new</span>(<span class="op">|</span><span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="ident">WriteCompactionFilter</span><span class="op">|</span> {
+                <span class="macro">unreachable</span><span class="macro">!</span>();
+            }));
+        <span class="ident">gc_runner</span>.<span class="ident">target_level</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="number">6</span>);
+        <span class="ident">gc_runner</span>.<span class="ident">safe_point</span>(<span class="number">100</span>).<span class="ident">gc</span>(<span class="kw-2">&amp;</span><span class="ident">raw_engine</span>);
+
+        <span class="comment">// Can perform GC at the bottommost level even if the threshold can&#39;t be reached.</span>
+        <span class="ident">gc_runner</span>.<span class="ident">ratio_threshold</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="number">10.0</span>);
+        <span class="ident">gc_runner</span>.<span class="ident">target_level</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="number">6</span>);
+        <span class="ident">gc_runner</span>.<span class="ident">safe_point</span>(<span class="number">140</span>).<span class="ident">gc</span>(<span class="kw-2">&amp;</span><span class="ident">raw_engine</span>);
+        <span class="kw">for</span> <span class="ident">commit_ts</span> <span class="kw">in</span> <span class="kw-2">&amp;</span>[<span class="number">105</span>, <span class="number">115</span>, <span class="number">125</span>] {
+            <span class="ident">must_get_none</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="string">b&quot;zkey&quot;</span>, <span class="ident">commit_ts</span>);
+        }
+
+        <span class="comment">// Put an extra key to make the memtable overlap with the bottommost one.</span>
+        <span class="ident">must_prewrite_put</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="string">b&quot;zkey1&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">value</span>, <span class="string">b&quot;zkey1&quot;</span>, <span class="number">200</span>);
+        <span class="ident">must_commit</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="string">b&quot;zkey1&quot;</span>, <span class="number">200</span>, <span class="number">205</span>);
+        <span class="kw">for</span> <span class="ident">start_ts</span> <span class="kw">in</span> <span class="kw-2">&amp;</span>[<span class="number">200</span>, <span class="number">210</span>, <span class="number">220</span>, <span class="number">230</span>] {
+            <span class="ident">must_prewrite_put</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="string">b&quot;zkey&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">value</span>, <span class="string">b&quot;zkey&quot;</span>, <span class="kw-2">*</span><span class="ident">start_ts</span>);
+            <span class="ident">must_commit</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="string">b&quot;zkey&quot;</span>, <span class="kw-2">*</span><span class="ident">start_ts</span>, <span class="kw-2">*</span><span class="ident">start_ts</span> <span class="op">+</span> <span class="number">5</span>);
+        }
+        <span class="ident">must_prewrite_delete</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="string">b&quot;zkey&quot;</span>, <span class="string">b&quot;zkey&quot;</span>, <span class="number">240</span>);
+        <span class="ident">must_commit</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="string">b&quot;zkey&quot;</span>, <span class="number">240</span>, <span class="number">245</span>);
+        <span class="ident">raw_engine</span>.<span class="ident">flush_cf</span>(<span class="ident">CF_WRITE</span>, <span class="bool-val">true</span>).<span class="ident">unwrap</span>();
+
+        <span class="comment">// At internal levels can&#39;t perform GC because the threshold is not reached.</span>
+        <span class="kw">let</span> <span class="ident">level_files</span> <span class="op">=</span> <span class="ident">rocksdb_level_files</span>(<span class="kw-2">&amp;</span><span class="ident">raw_engine</span>, <span class="ident">CF_WRITE</span>);
+        <span class="kw">let</span> <span class="ident">l0_file</span> <span class="op">=</span> <span class="ident">dir</span>.<span class="ident">path</span>().<span class="ident">join</span>(<span class="kw-2">&amp;</span><span class="ident">level_files</span>[<span class="number">0</span>][<span class="number">0</span>]);
+        <span class="kw">let</span> <span class="ident">files</span> <span class="op">=</span> <span class="kw-2">&amp;</span>[<span class="ident">l0_file</span>.<span class="ident">to_str</span>().<span class="ident">unwrap</span>().<span class="ident">to_owned</span>()];
+        <span class="ident">gc_runner</span>.<span class="ident">target_level</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="number">5</span>);
+        <span class="ident">gc_runner</span>.<span class="ident">ratio_threshold</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="number">10.0</span>);
+        <span class="ident">gc_runner</span>.<span class="ident">safe_point</span>(<span class="number">300</span>).<span class="ident">gc_on_files</span>(<span class="kw-2">&amp;</span><span class="ident">raw_engine</span>, <span class="ident">files</span>);
+        <span class="kw">for</span> <span class="ident">commit_ts</span> <span class="kw">in</span> <span class="kw-2">&amp;</span>[<span class="number">205</span>, <span class="number">215</span>, <span class="number">225</span>, <span class="number">235</span>] {
             <span class="ident">must_get</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="string">b&quot;zkey&quot;</span>, <span class="ident">commit_ts</span>, <span class="kw-2">&amp;</span><span class="ident">value</span>);
         }
     }
