@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `/rust/registry/src/github.com-1ecc6299db9ec823/regex-1.3.1/src/re_unicode.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>re_unicode.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `/rust/registry/src/github.com-1ecc6299db9ec823/regex-1.4.2/src/re_unicode.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>re_unicode.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
 <link rel="alternate icon" type="image/png" href="../../favicon-16x16.png">
 <link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../regex/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><span class="help-button">?</span>
                 <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">   1</span>
@@ -1202,11 +1202,38 @@
 <span id="1199">1199</span>
 <span id="1200">1200</span>
 <span id="1201">1201</span>
+<span id="1202">1202</span>
+<span id="1203">1203</span>
+<span id="1204">1204</span>
+<span id="1205">1205</span>
+<span id="1206">1206</span>
+<span id="1207">1207</span>
+<span id="1208">1208</span>
+<span id="1209">1209</span>
+<span id="1210">1210</span>
+<span id="1211">1211</span>
+<span id="1212">1212</span>
+<span id="1213">1213</span>
+<span id="1214">1214</span>
+<span id="1215">1215</span>
+<span id="1216">1216</span>
+<span id="1217">1217</span>
+<span id="1218">1218</span>
+<span id="1219">1219</span>
+<span id="1220">1220</span>
+<span id="1221">1221</span>
+<span id="1222">1222</span>
+<span id="1223">1223</span>
+<span id="1224">1224</span>
+<span id="1225">1225</span>
+<span id="1226">1226</span>
+<span id="1227">1227</span>
+<span id="1228">1228</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">borrow</span>::<span class="ident">Cow</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">collections</span>::<span class="ident">HashMap</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">fmt</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">ops</span>::<span class="ident">Index</span>;
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">ops</span>::{<span class="ident">Index</span>, <span class="ident">Range</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">str</span>::<span class="ident">FromStr</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">Arc</span>;
 
@@ -1250,10 +1277,17 @@
         <span class="self">self</span>.<span class="ident">end</span>
     }
 
+    <span class="doccomment">/// Returns the range over the starting and ending byte offsets of the</span>
+    <span class="doccomment">/// match in the haystack.</span>
+    <span class="attribute">#[<span class="ident">inline</span>]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">range</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Range</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">start</span>..<span class="self">self</span>.<span class="ident">end</span>
+    }
+
     <span class="doccomment">/// Returns the matched text.</span>
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">as_str</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="ident">str</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">text</span>[<span class="self">self</span>.<span class="ident">start</span>..<span class="self">self</span>.<span class="ident">end</span>]
+        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">text</span>[<span class="self">self</span>.<span class="ident">range</span>()]
     }
 
     <span class="doccomment">/// Creates a new match from the given haystack and byte offsets.</span>
@@ -1266,6 +1300,12 @@
 <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Match</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="ident">str</span> {
     <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">m</span>: <span class="ident">Match</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="ident">str</span> {
         <span class="ident">m</span>.<span class="ident">as_str</span>()
+    }
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Match</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Range</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">m</span>: <span class="ident">Match</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Range</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> {
+        <span class="ident">m</span>.<span class="ident">range</span>()
     }
 }
 
@@ -1367,7 +1407,8 @@
         <span class="ident">RegexBuilder</span>::<span class="ident">new</span>(<span class="ident">re</span>).<span class="ident">build</span>()
     }
 
-    <span class="doccomment">/// Returns true if and only if the regex matches the string given.</span>
+    <span class="doccomment">/// Returns true if and only if there is a match for the regex in the</span>
+    <span class="doccomment">/// string given.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// It is recommended to use this method if all you need to do is test</span>
     <span class="doccomment">/// a match, since the underlying matching engine may be able to do less</span>
@@ -1971,11 +2012,11 @@
         <span class="kw">let</span> <span class="ident">text</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">finder</span>.<span class="number">0</span>.<span class="ident">text</span>();
         <span class="kw">match</span> <span class="self">self</span>.<span class="ident">finder</span>.<span class="ident">next</span>() {
             <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">if</span> <span class="self">self</span>.<span class="ident">last</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">text</span>.<span class="ident">len</span>() {
+                <span class="kw">if</span> <span class="self">self</span>.<span class="ident">last</span> <span class="op">&gt;</span> <span class="ident">text</span>.<span class="ident">len</span>() {
                     <span class="prelude-val">None</span>
                 } <span class="kw">else</span> {
                     <span class="kw">let</span> <span class="ident">s</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">text</span>[<span class="self">self</span>.<span class="ident">last</span>..];
-                    <span class="self">self</span>.<span class="ident">last</span> <span class="op">=</span> <span class="ident">text</span>.<span class="ident">len</span>();
+                    <span class="self">self</span>.<span class="ident">last</span> <span class="op">=</span> <span class="ident">text</span>.<span class="ident">len</span>() <span class="op">+</span> <span class="number">1</span>; <span class="comment">// Next call will return None</span>
                     <span class="prelude-val">Some</span>(<span class="ident">s</span>)
                 }
             }
@@ -2006,12 +2047,19 @@
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">n</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
             <span class="kw">return</span> <span class="prelude-val">None</span>;
         }
+
         <span class="self">self</span>.<span class="ident">n</span> <span class="op">-</span><span class="op">=</span> <span class="number">1</span>;
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">n</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
-            <span class="kw">let</span> <span class="ident">text</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">splits</span>.<span class="ident">finder</span>.<span class="number">0</span>.<span class="ident">text</span>();
-            <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">text</span>[<span class="self">self</span>.<span class="ident">splits</span>.<span class="ident">last</span>..])
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">n</span> <span class="op">&gt;</span> <span class="number">0</span> {
+            <span class="kw">return</span> <span class="self">self</span>.<span class="ident">splits</span>.<span class="ident">next</span>();
+        }
+
+        <span class="kw">let</span> <span class="ident">text</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">splits</span>.<span class="ident">finder</span>.<span class="number">0</span>.<span class="ident">text</span>();
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">splits</span>.<span class="ident">last</span> <span class="op">&gt;</span> <span class="ident">text</span>.<span class="ident">len</span>() {
+            <span class="comment">// We&#39;ve already returned all substrings.</span>
+            <span class="prelude-val">None</span>
         } <span class="kw">else</span> {
-            <span class="self">self</span>.<span class="ident">splits</span>.<span class="ident">next</span>()
+            <span class="comment">// self.n == 0, so future calls will return None immediately</span>
+            <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">text</span>[<span class="self">self</span>.<span class="ident">splits</span>.<span class="ident">last</span>..])
         }
     }
 }
@@ -2132,17 +2180,22 @@
     <span class="doccomment">/// Expands all instances of `$name` in `replacement` to the corresponding</span>
     <span class="doccomment">/// capture group `name`, and writes them to the `dst` buffer given.</span>
     <span class="doccomment">///</span>
-    <span class="doccomment">/// `name` may be an integer corresponding to the index of the</span>
-    <span class="doccomment">/// capture group (counted by order of opening parenthesis where `0` is the</span>
+    <span class="doccomment">/// `name` may be an integer corresponding to the index of the capture</span>
+    <span class="doccomment">/// group (counted by order of opening parenthesis where `0` is the</span>
     <span class="doccomment">/// entire match) or it can be a name (consisting of letters, digits or</span>
     <span class="doccomment">/// underscores) corresponding to a named capture group.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// If `name` isn&#39;t a valid capture group (whether the name doesn&#39;t exist</span>
     <span class="doccomment">/// or isn&#39;t a valid index), then it is replaced with the empty string.</span>
     <span class="doccomment">///</span>
-    <span class="doccomment">/// The longest possible name is used. e.g., `$1a` looks up the capture</span>
-    <span class="doccomment">/// group named `1a` and not the capture group at index `1`. To exert more</span>
-    <span class="doccomment">/// precise control over the name, use braces, e.g., `${1}a`.</span>
+    <span class="doccomment">/// The longest possible name consisting of the characters `[_0-9A-Za-z]`</span>
+    <span class="doccomment">/// is used. e.g., `$1a` looks up the capture group named `1a` and not the</span>
+    <span class="doccomment">/// capture group at index `1`. To exert more precise control over the</span>
+    <span class="doccomment">/// name, or to refer to a capture group name that uses characters outside</span>
+    <span class="doccomment">/// of `[_0-9A-Za-z]`, use braces, e.g., `${1}a` or `${foo[bar].baz}`. When</span>
+    <span class="doccomment">/// using braces, any sequence of characters is permitted. If the sequence</span>
+    <span class="doccomment">/// does not refer to a capture group name in the corresponding regex, then</span>
+    <span class="doccomment">/// it is replaced with an empty string.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// To write a literal `$` use `$$`.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">expand</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">replacement</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">dst</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">String</span>) {
@@ -2238,6 +2291,7 @@
 <span class="doccomment">///</span>
 <span class="doccomment">/// The lifetime `&#39;c` corresponds to the lifetime of the `Captures` value, and</span>
 <span class="doccomment">/// the lifetime `&#39;t` corresponds to the originally matched text.</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">SubCaptureMatches</span><span class="op">&lt;</span><span class="lifetime">&#39;c</span>, <span class="lifetime">&#39;t</span>: <span class="lifetime">&#39;c</span><span class="op">&gt;</span> {
     <span class="ident">caps</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;c</span> <span class="ident">Captures</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span>,
     <span class="ident">it</span>: <span class="ident">SubCapturesPosIter</span><span class="op">&lt;</span><span class="lifetime">&#39;c</span><span class="op">&gt;</span>,
@@ -2307,7 +2361,7 @@
     <span class="doccomment">/// have a match at capture group `0`.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// For example, a no-op replacement would be</span>
-    <span class="doccomment">/// `dst.extend(caps.get(0).unwrap().as_str())`.</span>
+    <span class="doccomment">/// `dst.push_str(caps.get(0).unwrap().as_str())`.</span>
     <span class="kw">fn</span> <span class="ident">replace_append</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">caps</span>: <span class="kw-2">&amp;</span><span class="ident">Captures</span>, <span class="ident">dst</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">String</span>);
 
     <span class="doccomment">/// Return a fixed unchanging replacement string.</span>

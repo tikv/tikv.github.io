@@ -36,6 +36,7 @@ implementors["engine_traits"] = [{"text":"impl Default for FileEncryptionInfo","
 implementors["external_storage"] = [{"text":"impl Default for NoopStorage","synthetic":false,"types":[]}];
 implementors["failure"] = [{"text":"impl Default for Backtrace","synthetic":false,"types":[]},{"text":"impl&lt;E:&nbsp;Default&gt; Default for Compat&lt;E&gt;","synthetic":false,"types":[]}];
 implementors["farmhash"] = [{"text":"impl Default for FarmHasher","synthetic":false,"types":[]}];
+implementors["file_system"] = [{"text":"impl Default for IOStats","synthetic":false,"types":[]}];
 implementors["flate2"] = [{"text":"impl Default for GzHeader","synthetic":false,"types":[]},{"text":"impl Default for Compression","synthetic":false,"types":[]}];
 implementors["fnv"] = [{"text":"impl Default for FnvHasher","synthetic":false,"types":[]}];
 implementors["futures"] = [{"text":"impl&lt;T&gt; Default for FuturesUnordered&lt;T&gt; <span class=\"where fmt-newline\">where<br>&nbsp;&nbsp;&nbsp;&nbsp;T: Future,&nbsp;</span>","synthetic":false,"types":[]},{"text":"impl&lt;T&gt; Default for FuturesOrdered&lt;T&gt; <span class=\"where fmt-newline\">where<br>&nbsp;&nbsp;&nbsp;&nbsp;T: Future,&nbsp;</span>","synthetic":false,"types":[]},{"text":"impl Default for AtomicTask","synthetic":false,"types":[]}];

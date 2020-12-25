@@ -18,6 +18,7 @@ implementors["encoding_rs"] = [{"text":"impl Hash for Encoding","synthetic":fals
 implementors["encryption"] = [{"text":"impl Hash for MetadataKey","synthetic":false,"types":[]},{"text":"impl Hash for MetadataMethod","synthetic":false,"types":[]}];
 implementors["engine_rocks"] = [{"text":"impl Hash for TickerName","synthetic":false,"types":[]},{"text":"impl Hash for TickerEnum","synthetic":false,"types":[]}];
 implementors["failure"] = [{"text":"impl&lt;E:&nbsp;Hash&gt; Hash for Compat&lt;E&gt;","synthetic":false,"types":[]}];
+implementors["file_system"] = [{"text":"impl Hash for IOType","synthetic":false,"types":[]},{"text":"impl Hash for IOOp","synthetic":false,"types":[]},{"text":"impl Hash for IOType","synthetic":false,"types":[]}];
 implementors["fs2"] = [{"text":"impl Hash for FsStats","synthetic":false,"types":[]}];
 implementors["futures_util"] = [{"text":"impl&lt;T:&nbsp;Hash&gt; Hash for AllowStdIo&lt;T&gt;","synthetic":false,"types":[]}];
 implementors["generic_array"] = [{"text":"impl&lt;T:&nbsp;Hash, N&gt; Hash for GenericArray&lt;T, N&gt; <span class=\"where fmt-newline\">where<br>&nbsp;&nbsp;&nbsp;&nbsp;N: ArrayLength&lt;T&gt;,&nbsp;</span>","synthetic":false,"types":[]}];
