@@ -1125,6 +1125,14 @@
 <span id="1122">1122</span>
 <span id="1123">1123</span>
 <span id="1124">1124</span>
+<span id="1125">1125</span>
+<span id="1126">1126</span>
+<span id="1127">1127</span>
+<span id="1128">1128</span>
+<span id="1129">1129</span>
+<span id="1130">1130</span>
+<span id="1131">1131</span>
+<span id="1132">1132</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1144,7 +1152,7 @@
 <span class="kw">use</span> <span class="ident">keys</span>::{<span class="ident">data_end_key</span>, <span class="ident">data_key</span>};
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">metapb</span>::<span class="ident">Region</span>;
 <span class="kw">use</span> <span class="ident">raft</span>::<span class="ident">StateRole</span>;
-<span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">worker</span>::{<span class="ident">Runnable</span>, <span class="ident">RunnableWithTimer</span>, <span class="ident">Scheduler</span>, <span class="ident">Worker</span>};
+<span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">worker</span>::{<span class="ident">Builder</span> <span class="kw">as</span> <span class="ident">WorkerBuilder</span>, <span class="ident">Runnable</span>, <span class="ident">RunnableWithTimer</span>, <span class="ident">Scheduler</span>, <span class="ident">Worker</span>};
 
 <span class="doccomment">/// `RegionInfoAccessor` is used to collect all regions&#39; information on this TiKV into a collection</span>
 <span class="doccomment">/// so that other parts of TiKV can get region information from it. It registers a observer to</span>
@@ -1618,6 +1626,12 @@
 <span class="doccomment">/// `RegionInfoAccessor` keeps all region information separately from raftstore itself.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">RegionInfoAccessor</span> {
+    <span class="comment">// We use a dedicated worker for region info accessor. If we later want to share a worker with</span>
+    <span class="comment">// other tasks, we must make sure the other tasks don&#39;t block on flush or compaction, which</span>
+    <span class="comment">// may cause a deadlock between the flush or compaction task, and the region info accessor task</span>
+    <span class="comment">// fired by compaction guard from the RocksDB compaction thread.</span>
+    <span class="comment">// https://github.com/tikv/tikv/issues/9044</span>
+    <span class="ident">worker</span>: <span class="ident">Worker</span>,
     <span class="ident">scheduler</span>: <span class="ident">Scheduler</span><span class="op">&lt;</span><span class="ident">RegionInfoQuery</span><span class="op">&gt;</span>,
 }
 
@@ -1625,16 +1639,18 @@
     <span class="doccomment">/// Creates a new `RegionInfoAccessor` and register to `host`.</span>
     <span class="doccomment">/// `RegionInfoAccessor` doesn&#39;t need, and should not be created more than once. If it&#39;s needed</span>
     <span class="doccomment">/// in different places, just clone it, and their contents are shared.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">host</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">CoprocessorHost</span><span class="op">&lt;</span><span class="kw">impl</span> <span class="ident">KvEngine</span><span class="op">&gt;</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;</span><span class="ident">Worker</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">host</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">CoprocessorHost</span><span class="op">&lt;</span><span class="kw">impl</span> <span class="ident">KvEngine</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+        <span class="kw">let</span> <span class="ident">worker</span> <span class="op">=</span> <span class="ident">WorkerBuilder</span>::<span class="ident">new</span>(<span class="string">&quot;region-collector-worker&quot;</span>).<span class="ident">create</span>();
         <span class="kw">let</span> <span class="ident">scheduler</span> <span class="op">=</span> <span class="ident">worker</span>.<span class="ident">start_with_timer</span>(<span class="string">&quot;region-collector-worker&quot;</span>, <span class="ident">RegionCollector</span>::<span class="ident">new</span>());
         <span class="ident">register_region_event_listener</span>(<span class="ident">host</span>, <span class="ident">scheduler</span>.<span class="ident">clone</span>());
 
-        <span class="self">Self</span> { <span class="ident">scheduler</span> }
+        <span class="self">Self</span> { <span class="ident">worker</span>, <span class="ident">scheduler</span> }
     }
 
     <span class="doccomment">/// Stops the `RegionInfoAccessor`. It should be stopped after raftstore.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">stop</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="self">self</span>.<span class="ident">scheduler</span>.<span class="ident">stop</span>();
+        <span class="self">self</span>.<span class="ident">worker</span>.<span class="ident">stop</span>();
     }
 
     <span class="doccomment">/// Gets all content from the collection. Only used for testing.</span>
