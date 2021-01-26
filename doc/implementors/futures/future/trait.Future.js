@@ -1,5 +1,4 @@
 (function() {var implementors = {};
-implementors["futures"] = [];
 implementors["futures_util"] = [{"text":"impl&lt;Fut&gt; Future for Compat&lt;Fut&gt; <span class=\"where fmt-newline\">where<br>&nbsp;&nbsp;&nbsp;&nbsp;Fut: TryFuture03 + Unpin,&nbsp;</span>","synthetic":false,"types":[]}];
 implementors["minitrace"] = [{"text":"impl&lt;T:&nbsp;Future&gt; Future for TraceSpawned&lt;T&gt;","synthetic":false,"types":[]},{"text":"impl&lt;T:&nbsp;Future&gt; Future for TraceWrapped&lt;T&gt;","synthetic":false,"types":[]},{"text":"impl&lt;T:&nbsp;Future&gt; Future for MayTraceRootFuture&lt;T&gt;","synthetic":false,"types":[]},{"text":"impl&lt;T:&nbsp;Future&gt; Future for TraceRootFuture&lt;T&gt;","synthetic":false,"types":[]}];
 implementors["tokio_timer"] = [{"text":"impl&lt;T&gt; Future for Timeout&lt;T&gt; <span class=\"where fmt-newline\">where<br>&nbsp;&nbsp;&nbsp;&nbsp;T: Future,&nbsp;</span>","synthetic":false,"types":[]},{"text":"impl Future for Delay","synthetic":false,"types":[]}];

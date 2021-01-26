@@ -1,1 +1,1 @@
-initSidebarItems({"macro":[["observe_perf_context_type",""],["report_perf_context",""]],"mod":[["coprocessor",""],["errors",""],["router",""],["store",""]]});
+initSidebarItems({"mod":[["coprocessor",""],["errors",""],["router",""],["store",""]]});

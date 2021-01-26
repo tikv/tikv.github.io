@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["create_backend",""]],"mod":[["file",""],["kms",""],["mem",""],["metadata",""]],"struct":[["PlaintextBackend",""]],"trait":[["Backend","Provide API to encrypt/decrypt key dictionary content."]]});
+initSidebarItems({"fn":[["create_backend",""],["create_backend_inner",""]],"mod":[["file",""],["kms",""],["mem",""],["metadata",""]],"struct":[["PlaintextBackend",""]],"trait":[["Backend","Provide API to encrypt/decrypt key dictionary content."]]});

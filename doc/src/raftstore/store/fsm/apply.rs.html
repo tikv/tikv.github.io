@@ -1,6 +1,6 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `components/raftstore/src/store/fsm/apply.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>apply.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../../ayu.css" disabled ><script src="../../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `components/raftstore/src/store/fsm/apply.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>apply.rs - source</title><link rel="stylesheet" type="text/css" href="../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg">
 <link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../../raftstore/index.html'><div class='logo-container rust-logo'><img src='../../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><span class="help-button">?</span>
+<link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../../raftstore/index.html'><div class='logo-container rust-logo'><img src='../../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><script src="../../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
                 <a id="settings-menu" href="../../../../settings.html"><img src="../../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">   1</span>
 <span id="2">   2</span>
 <span id="3">   3</span>
@@ -5111,6 +5111,36 @@
 <span id="5108">5108</span>
 <span id="5109">5109</span>
 <span id="5110">5110</span>
+<span id="5111">5111</span>
+<span id="5112">5112</span>
+<span id="5113">5113</span>
+<span id="5114">5114</span>
+<span id="5115">5115</span>
+<span id="5116">5116</span>
+<span id="5117">5117</span>
+<span id="5118">5118</span>
+<span id="5119">5119</span>
+<span id="5120">5120</span>
+<span id="5121">5121</span>
+<span id="5122">5122</span>
+<span id="5123">5123</span>
+<span id="5124">5124</span>
+<span id="5125">5125</span>
+<span id="5126">5126</span>
+<span id="5127">5127</span>
+<span id="5128">5128</span>
+<span id="5129">5129</span>
+<span id="5130">5130</span>
+<span id="5131">5131</span>
+<span id="5132">5132</span>
+<span id="5133">5133</span>
+<span id="5134">5134</span>
+<span id="5135">5135</span>
+<span id="5136">5136</span>
+<span id="5137">5137</span>
+<span id="5138">5138</span>
+<span id="5139">5139</span>
+<span id="5140">5140</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2017 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -5132,7 +5162,8 @@
 <span class="kw">use</span> <span class="ident">batch_system</span>::{<span class="ident">BasicMailbox</span>, <span class="ident">BatchRouter</span>, <span class="ident">BatchSystem</span>, <span class="ident">Fsm</span>, <span class="ident">HandlerBuilder</span>, <span class="ident">PollHandler</span>};
 <span class="kw">use</span> <span class="ident">collections</span>::{<span class="ident">HashMap</span>, <span class="ident">HashMapEntry</span>, <span class="ident">HashSet</span>};
 <span class="kw">use</span> <span class="ident">crossbeam</span>::<span class="ident">channel</span>::{<span class="ident">TryRecvError</span>, <span class="ident">TrySendError</span>};
-<span class="kw">use</span> <span class="ident">engine_rocks</span>::{<span class="ident">PerfContext</span>, <span class="ident">PerfLevel</span>};
+<span class="kw">use</span> <span class="ident">engine_traits</span>::<span class="ident">PerfContext</span>;
+<span class="kw">use</span> <span class="ident">engine_traits</span>::<span class="ident">PerfContextKind</span>;
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{
     <span class="ident">DeleteStrategy</span>, <span class="ident">KvEngine</span>, <span class="ident">RaftEngine</span>, <span class="ident">Range</span> <span class="kw">as</span> <span class="ident">EngineRange</span>, <span class="ident">Snapshot</span>, <span class="ident">WriteBatch</span>,
 };
@@ -5170,10 +5201,10 @@
 };
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">util</span>::{
     <span class="ident">check_region_epoch</span>, <span class="ident">compare_region_epoch</span>, <span class="ident">is_learner</span>, <span class="ident">ChangePeerI</span>, <span class="ident">ConfChangeKind</span>,
-    <span class="ident">KeysInfoFormatter</span>, <span class="ident">PerfContextStatistics</span>, <span class="ident">ADMIN_CMD_EPOCH_MAP</span>,
+    <span class="ident">KeysInfoFormatter</span>, <span class="ident">ADMIN_CMD_EPOCH_MAP</span>,
 };
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::{<span class="ident">cmd_resp</span>, <span class="ident">util</span>, <span class="ident">Config</span>, <span class="ident">RegionSnapshot</span>, <span class="ident">RegionTask</span>};
-<span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">observe_perf_context_type</span>, <span class="ident">report_perf_context</span>, <span class="ident">Error</span>, <span class="prelude-ty">Result</span>};
+<span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">Error</span>, <span class="prelude-ty">Result</span>};
 
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">metrics</span>::<span class="kw-2">*</span>;
 
@@ -5431,7 +5462,7 @@
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Notifier</span><span class="op">&lt;</span><span class="ident">EK</span>: <span class="ident">KvEngine</span><span class="op">&gt;</span>: <span class="ident">Send</span> {
     <span class="kw">fn</span> <span class="ident">notify</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">apply_res</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">ApplyRes</span><span class="op">&lt;</span><span class="ident">EK</span>::<span class="ident">Snapshot</span><span class="op">&gt;</span><span class="op">&gt;</span>);
     <span class="kw">fn</span> <span class="ident">notify_one</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">region_id</span>: <span class="ident">u64</span>, <span class="ident">msg</span>: <span class="ident">PeerMsg</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>);
-    <span class="kw">fn</span> <span class="ident">clone_box</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">Notifier</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span><span class="op">&gt;</span>;
+    <span class="kw">fn</span> <span class="ident">clone_box</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Notifier</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span><span class="op">&gt;</span>;
 }
 
 <span class="kw">struct</span> <span class="ident">ApplyContext</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">W</span><span class="op">&gt;</span>
@@ -5445,7 +5476,7 @@
     <span class="ident">importer</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">SSTImporter</span><span class="op">&gt;</span>,
     <span class="ident">region_scheduler</span>: <span class="ident">Scheduler</span><span class="op">&lt;</span><span class="ident">RegionTask</span><span class="op">&lt;</span><span class="ident">EK</span>::<span class="ident">Snapshot</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">router</span>: <span class="ident">ApplyRouter</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>,
-    <span class="ident">notifier</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">Notifier</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">notifier</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Notifier</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">engine</span>: <span class="ident">EK</span>,
     <span class="ident">cbs</span>: <span class="ident">MustConsumeVec</span><span class="op">&lt;</span><span class="ident">ApplyCallback</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">apply_res</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">ApplyRes</span><span class="op">&lt;</span><span class="ident">EK</span>::<span class="ident">Snapshot</span><span class="op">&gt;</span><span class="op">&gt;</span>,
@@ -5463,7 +5494,7 @@
     <span class="comment">// Whether to use the delete range API instead of deleting one by one.</span>
     <span class="ident">use_delete_range</span>: <span class="ident">bool</span>,
 
-    <span class="ident">perf_context_statistics</span>: <span class="ident">PerfContextStatistics</span>,
+    <span class="ident">perf_context</span>: <span class="ident">EK</span>::<span class="ident">PerfContext</span>,
 
     <span class="ident">yield_duration</span>: <span class="ident">Duration</span>,
 
@@ -5472,6 +5503,13 @@
     <span class="doccomment">/// Used for handling race between splitting and creating new peer.</span>
     <span class="doccomment">/// An uninitialized peer can be replaced to the one from splitting iff they are exactly the same peer.</span>
     <span class="ident">pending_create_peers</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">u64</span>, (<span class="ident">u64</span>, <span class="ident">bool</span>)<span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+
+    <span class="doccomment">/// We must delete the ingested file before calling `callback` so that any ingest-request reaching this</span>
+    <span class="doccomment">/// peer could see this update if leader had changed. We must also delete them after the applied-index</span>
+    <span class="doccomment">/// has been persisted to kvdb because this entry may replay because of panic or power-off, which</span>
+    <span class="doccomment">/// happened before `WriteBatch::write` and after `SSTImporter::delete`. We shall make sure that</span>
+    <span class="doccomment">/// this entry will never apply again at first, then we can delete the ssts files.</span>
+    <span class="ident">delete_ssts</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SstMeta</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">W</span><span class="op">&gt;</span> <span class="ident">ApplyContext</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">W</span><span class="op">&gt;</span>
@@ -5486,7 +5524,7 @@
         <span class="ident">region_scheduler</span>: <span class="ident">Scheduler</span><span class="op">&lt;</span><span class="ident">RegionTask</span><span class="op">&lt;</span><span class="ident">EK</span>::<span class="ident">Snapshot</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">engine</span>: <span class="ident">EK</span>,
         <span class="ident">router</span>: <span class="ident">ApplyRouter</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>,
-        <span class="ident">notifier</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">Notifier</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+        <span class="ident">notifier</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Notifier</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">cfg</span>: <span class="kw-2">&amp;</span><span class="ident">Config</span>,
         <span class="ident">store_id</span>: <span class="ident">u64</span>,
         <span class="ident">pending_create_peers</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">u64</span>, (<span class="ident">u64</span>, <span class="ident">bool</span>)<span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
@@ -5501,7 +5539,7 @@
             <span class="ident">host</span>,
             <span class="ident">importer</span>,
             <span class="ident">region_scheduler</span>,
-            <span class="ident">engine</span>,
+            <span class="ident">engine</span>: <span class="ident">engine</span>.<span class="ident">clone</span>(),
             <span class="ident">router</span>,
             <span class="ident">notifier</span>,
             <span class="ident">kv_wb</span>,
@@ -5514,8 +5552,9 @@
             <span class="ident">sync_log_hint</span>: <span class="bool-val">false</span>,
             <span class="ident">exec_ctx</span>: <span class="prelude-val">None</span>,
             <span class="ident">use_delete_range</span>: <span class="ident">cfg</span>.<span class="ident">use_delete_range</span>,
-            <span class="ident">perf_context_statistics</span>: <span class="ident">PerfContextStatistics</span>::<span class="ident">new</span>(<span class="ident">cfg</span>.<span class="ident">perf_level</span>),
+            <span class="ident">perf_context</span>: <span class="ident">engine</span>.<span class="ident">get_perf_context</span>(<span class="ident">cfg</span>.<span class="ident">perf_level</span>, <span class="ident">PerfContextKind</span>::<span class="ident">RaftstoreApply</span>),
             <span class="ident">yield_duration</span>: <span class="ident">cfg</span>.<span class="ident">apply_yield_duration</span>.<span class="number">0</span>,
+            <span class="ident">delete_ssts</span>: <span class="macro">vec</span><span class="macro">!</span>[],
             <span class="ident">store_id</span>,
             <span class="ident">pending_create_peers</span>,
         }
@@ -5575,10 +5614,7 @@
             <span class="self">self</span>.<span class="ident">kv_wb</span>().<span class="ident">write_opt</span>(<span class="kw-2">&amp;</span><span class="ident">write_opts</span>).<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
                 <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;failed to write to engine: {:?}&quot;</span>, <span class="ident">e</span>);
             });
-            <span class="macro">report_perf_context</span><span class="macro">!</span>(
-                <span class="self">self</span>.<span class="ident">perf_context_statistics</span>,
-                <span class="ident">APPLY_PERF_CONTEXT_TIME_HISTOGRAM_STATIC</span>
-            );
+            <span class="self">self</span>.<span class="ident">perf_context</span>.<span class="ident">report_metrics</span>();
             <span class="self">self</span>.<span class="ident">sync_log_hint</span> <span class="op">=</span> <span class="bool-val">false</span>;
             <span class="kw">let</span> <span class="ident">data_size</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">kv_wb</span>().<span class="ident">data_size</span>();
             <span class="kw">if</span> <span class="ident">data_size</span> <span class="op">&gt;</span> <span class="ident">APPLY_WB_SHRINK_SIZE</span> {
@@ -5591,6 +5627,14 @@
             }
             <span class="self">self</span>.<span class="ident">kv_wb_last_bytes</span> <span class="op">=</span> <span class="number">0</span>;
             <span class="self">self</span>.<span class="ident">kv_wb_last_keys</span> <span class="op">=</span> <span class="number">0</span>;
+        }
+        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">delete_ssts</span>.<span class="ident">is_empty</span>() {
+            <span class="kw">let</span> <span class="ident">tag</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">tag</span>.<span class="ident">clone</span>();
+            <span class="kw">for</span> <span class="ident">sst</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">delete_ssts</span>.<span class="ident">drain</span>(..) {
+                <span class="self">self</span>.<span class="ident">importer</span>.<span class="ident">delete</span>(<span class="kw-2">&amp;</span><span class="ident">sst</span>).<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
+                    <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;{} cleanup ingested file {:?}: {:?}&quot;</span>, <span class="ident">tag</span>, <span class="ident">sst</span>, <span class="ident">e</span>);
+                });
+            }
         }
         <span class="comment">// Call it before invoking callback for preventing Commit is executed before Prewrite is observed.</span>
         <span class="self">self</span>.<span class="ident">host</span>.<span class="ident">on_flush_apply</span>(<span class="self">self</span>.<span class="ident">engine</span>.<span class="ident">clone</span>());
@@ -6410,9 +6454,11 @@
                 <span class="ident">CmdType</span>::<span class="ident">Put</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">handle_put</span>(<span class="ident">ctx</span>.<span class="ident">kv_wb_mut</span>(), <span class="ident">req</span>),
                 <span class="ident">CmdType</span>::<span class="ident">Delete</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">handle_delete</span>(<span class="ident">ctx</span>.<span class="ident">kv_wb_mut</span>(), <span class="ident">req</span>),
                 <span class="ident">CmdType</span>::<span class="ident">DeleteRange</span> <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">ctx</span>.<span class="ident">kv_wb</span>.<span class="ident">is_empty</span>());
                     <span class="self">self</span>.<span class="ident">handle_delete_range</span>(<span class="kw-2">&amp;</span><span class="ident">ctx</span>.<span class="ident">engine</span>, <span class="ident">req</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ranges</span>, <span class="ident">ctx</span>.<span class="ident">use_delete_range</span>)
                 }
                 <span class="ident">CmdType</span>::<span class="ident">IngestSst</span> <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">ctx</span>.<span class="ident">kv_wb</span>.<span class="ident">is_empty</span>());
                     <span class="self">self</span>.<span class="ident">handle_ingest_sst</span>(<span class="kw-2">&amp;</span><span class="ident">ctx</span>.<span class="ident">importer</span>, <span class="kw-2">&amp;</span><span class="ident">ctx</span>.<span class="ident">engine</span>, <span class="ident">req</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ssts</span>)
                 }
                 <span class="comment">// Readonly commands are handled in raftstore directly.</span>
@@ -6449,6 +6495,7 @@
         <span class="kw">let</span> <span class="ident">exec_res</span> <span class="op">=</span> <span class="kw">if</span> <span class="op">!</span><span class="ident">ranges</span>.<span class="ident">is_empty</span>() {
             <span class="ident">ApplyResult</span>::<span class="ident">Res</span>(<span class="ident">ExecResult</span>::<span class="ident">DeleteRange</span> { <span class="ident">ranges</span> })
         } <span class="kw">else</span> <span class="kw">if</span> <span class="op">!</span><span class="ident">ssts</span>.<span class="ident">is_empty</span>() {
+            <span class="ident">ctx</span>.<span class="ident">delete_ssts</span>.<span class="ident">append</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ssts</span>.<span class="ident">clone</span>());
             <span class="ident">ApplyResult</span>::<span class="ident">Res</span>(<span class="ident">ExecResult</span>::<span class="ident">IngestSst</span> { <span class="ident">ssts</span> })
         } <span class="kw">else</span> {
             <span class="ident">ApplyResult</span>::<span class="prelude-val">None</span>
@@ -7870,6 +7917,8 @@
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">GenSnapTask</span> {
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">region_id</span>: <span class="ident">u64</span>,
     <span class="ident">snap_notifier</span>: <span class="ident">SyncSender</span><span class="op">&lt;</span><span class="ident">RaftSnapshot</span><span class="op">&gt;</span>,
+    <span class="comment">// indicates whether the snapshot is triggered due to load balance</span>
+    <span class="ident">for_balance</span>: <span class="ident">bool</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">GenSnapTask</span> {
@@ -7877,7 +7926,12 @@
         <span class="ident">GenSnapTask</span> {
             <span class="ident">region_id</span>,
             <span class="ident">snap_notifier</span>,
+            <span class="ident">for_balance</span>: <span class="bool-val">false</span>,
         }
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_for_balance</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
+        <span class="self">self</span>.<span class="ident">for_balance</span> <span class="op">=</span> <span class="bool-val">true</span>;
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">generate_and_schedule_snapshot</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>(
@@ -7893,6 +7947,7 @@
         <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">RegionTask</span>::<span class="ident">Gen</span> {
             <span class="ident">region_id</span>: <span class="self">self</span>.<span class="ident">region_id</span>,
             <span class="ident">notifier</span>: <span class="self">self</span>.<span class="ident">snap_notifier</span>,
+            <span class="ident">for_balance</span>: <span class="self">self</span>.<span class="ident">for_balance</span>,
             <span class="ident">last_applied_index_term</span>,
             <span class="ident">last_applied_state</span>,
             <span class="comment">// This snapshot may be held for a long time, which may cause too many</span>
@@ -7968,7 +8023,7 @@
     },
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">any</span>(<span class="ident">test</span>, <span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;testexport&quot;</span>))]</span>
     <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy</span>::<span class="ident">type_complexity</span>)]</span>
-    <span class="ident">Validate</span>(<span class="ident">u64</span>, <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">FnOnce</span>(<span class="kw-2">*</span><span class="kw">const</span> <span class="ident">u8</span>) <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span>),
+    <span class="ident">Validate</span>(<span class="ident">u64</span>, <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">FnOnce</span>(<span class="kw-2">*</span><span class="kw">const</span> <span class="ident">u8</span>) <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span>),
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span> <span class="ident">Msg</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>
@@ -8151,9 +8206,6 @@
         <span class="self">self</span>.<span class="ident">delegate</span>
             .<span class="ident">handle_raft_committed_entries</span>(<span class="ident">apply_ctx</span>, <span class="ident">apply</span>.<span class="ident">entries</span>.<span class="ident">drain</span>(..));
         <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;post_handle_apply_1003&quot;</span>, <span class="self">self</span>.<span class="ident">delegate</span>.<span class="ident">id</span>() <span class="op">=</span><span class="op">=</span> <span class="number">1003</span>, <span class="op">|</span><span class="kw">_</span><span class="op">|</span> {});
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">delegate</span>.<span class="ident">yield_state</span>.<span class="ident">is_some</span>() {
-            <span class="kw">return</span>;
-        }
     }
 
     <span class="doccomment">/// Handles proposals, and appends the commands to the apply delegate.</span>
@@ -8553,7 +8605,7 @@
                 <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> {}
             }
         }
-        <span class="self">self</span>.<span class="ident">apply_ctx</span>.<span class="ident">perf_context_statistics</span>.<span class="ident">start</span>();
+        <span class="self">self</span>.<span class="ident">apply_ctx</span>.<span class="ident">perf_context</span>.<span class="ident">start_observe</span>();
     }
 
     <span class="doccomment">/// There is no control fsm in apply poller.</span>
@@ -8635,7 +8687,7 @@
     <span class="ident">importer</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">SSTImporter</span><span class="op">&gt;</span>,
     <span class="ident">region_scheduler</span>: <span class="ident">Scheduler</span><span class="op">&lt;</span><span class="ident">RegionTask</span><span class="op">&lt;</span><span class="op">&lt;</span><span class="ident">EK</span> <span class="kw">as</span> <span class="ident">KvEngine</span><span class="op">&gt;</span>::<span class="ident">Snapshot</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">engine</span>: <span class="ident">EK</span>,
-    <span class="ident">sender</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">Notifier</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">sender</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Notifier</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">router</span>: <span class="ident">ApplyRouter</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>,
     <span class="ident">_phantom</span>: <span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span>,
     <span class="ident">store_id</span>: <span class="ident">u64</span>,
@@ -8648,7 +8700,7 @@
 {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">ER</span>: <span class="ident">RaftEngine</span><span class="op">&gt;</span>(
         <span class="ident">builder</span>: <span class="kw-2">&amp;</span><span class="ident">RaftPollerBuilder</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">T</span><span class="op">&gt;</span>,
-        <span class="ident">sender</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">Notifier</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+        <span class="ident">sender</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Notifier</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">router</span>: <span class="ident">ApplyRouter</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Builder</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">W</span><span class="op">&gt;</span> {
         <span class="ident">Builder</span> {
@@ -8917,7 +8969,7 @@
         <span class="kw">fn</span> <span class="ident">notify_one</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw">_</span>: <span class="ident">u64</span>, <span class="ident">msg</span>: <span class="ident">PeerMsg</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>) {
             <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">tx</span>.<span class="ident">send</span>(<span class="ident">msg</span>);
         }
-        <span class="kw">fn</span> <span class="ident">clone_box</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">Notifier</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+        <span class="kw">fn</span> <span class="ident">clone_box</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Notifier</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span><span class="op">&gt;</span> {
             <span class="ident">Box</span>::<span class="ident">new</span>(<span class="self">self</span>.<span class="ident">clone</span>())
         }
     }
@@ -9014,10 +9066,10 @@
         <span class="ident">E</span>: <span class="ident">KvEngine</span>,
     {
         <span class="kw">match</span> <span class="ident">receiver</span>.<span class="ident">recv_timeout</span>(<span class="ident">Duration</span>::<span class="ident">from_secs</span>(<span class="number">3</span>)) {
-            <span class="prelude-val">Ok</span>(<span class="ident">PeerMsg</span>::<span class="ident">ApplyRes</span> { <span class="ident">res</span>, .. }) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">match</span> <span class="ident">res</span> {
-                <span class="ident">TaskRes</span>::<span class="ident">Apply</span>(<span class="ident">res</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">res</span>,
-                <span class="ident">e</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;unexpected res {:?}&quot;</span>, <span class="ident">e</span>),
-            },
+            <span class="prelude-val">Ok</span>(<span class="ident">PeerMsg</span>::<span class="ident">ApplyRes</span> {
+                <span class="ident">res</span>: <span class="ident">TaskRes</span>::<span class="ident">Apply</span>(<span class="ident">res</span>),
+                ..
+            }) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">res</span>,
             <span class="ident">e</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;unexpected res {:?}&quot;</span>, <span class="ident">e</span>),
         }
     }
@@ -9073,12 +9125,14 @@
         };
         <span class="ident">system</span>.<span class="ident">spawn</span>(<span class="string">&quot;test-basic&quot;</span>.<span class="ident">to_owned</span>(), <span class="ident">builder</span>);
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reg</span> <span class="op">=</span> <span class="ident">Registration</span>::<span class="ident">default</span>();
-        <span class="ident">reg</span>.<span class="ident">id</span> <span class="op">=</span> <span class="number">1</span>;
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reg</span> <span class="op">=</span> <span class="ident">Registration</span> {
+            <span class="ident">id</span>: <span class="number">1</span>,
+            <span class="ident">term</span>: <span class="number">4</span>,
+            <span class="ident">applied_index_term</span>: <span class="number">5</span>,
+            ..<span class="ident">Default</span>::<span class="ident">default</span>()
+        };
         <span class="ident">reg</span>.<span class="ident">region</span>.<span class="ident">set_id</span>(<span class="number">2</span>);
         <span class="ident">reg</span>.<span class="ident">apply_state</span>.<span class="ident">set_applied_index</span>(<span class="number">3</span>);
-        <span class="ident">reg</span>.<span class="ident">term</span> <span class="op">=</span> <span class="number">4</span>;
-        <span class="ident">reg</span>.<span class="ident">applied_index_term</span> <span class="op">=</span> <span class="number">5</span>;
         <span class="ident">router</span>.<span class="ident">schedule_task</span>(<span class="number">2</span>, <span class="ident">Msg</span>::<span class="ident">Registration</span>(<span class="ident">reg</span>.<span class="ident">clone</span>()));
         <span class="ident">validate</span>(<span class="kw-2">&amp;</span><span class="ident">router</span>, <span class="number">2</span>, <span class="kw">move</span> <span class="op">|</span><span class="ident">delegate</span><span class="op">|</span> {
             <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">delegate</span>.<span class="ident">id</span>, <span class="number">1</span>);
@@ -9143,10 +9197,10 @@
             ],
         );
         <span class="kw">let</span> <span class="ident">apply_res</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">rx</span>.<span class="ident">recv_timeout</span>(<span class="ident">Duration</span>::<span class="ident">from_secs</span>(<span class="number">3</span>)) {
-            <span class="prelude-val">Ok</span>(<span class="ident">PeerMsg</span>::<span class="ident">ApplyRes</span> { <span class="ident">res</span>, .. }) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">match</span> <span class="ident">res</span> {
-                <span class="ident">TaskRes</span>::<span class="ident">Apply</span>(<span class="ident">res</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">res</span>,
-                <span class="ident">e</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;unexpected apply result: {:?}&quot;</span>, <span class="ident">e</span>),
-            },
+            <span class="prelude-val">Ok</span>(<span class="ident">PeerMsg</span>::<span class="ident">ApplyRes</span> {
+                <span class="ident">res</span>: <span class="ident">TaskRes</span>::<span class="ident">Apply</span>(<span class="ident">res</span>),
+                ..
+            }) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">res</span>,
             <span class="ident">e</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;unexpected apply result: {:?}&quot;</span>, <span class="ident">e</span>),
         };
         <span class="kw">let</span> <span class="ident">apply_state_key</span> <span class="op">=</span> <span class="ident">keys</span>::<span class="ident">apply_state_key</span>(<span class="number">2</span>);
@@ -9176,12 +9230,12 @@
 
         <span class="ident">router</span>.<span class="ident">schedule_task</span>(<span class="number">2</span>, <span class="ident">Msg</span>::<span class="ident">destroy</span>(<span class="number">2</span>, <span class="bool-val">false</span>));
         <span class="kw">let</span> (<span class="ident">region_id</span>, <span class="ident">peer_id</span>) <span class="op">=</span> <span class="kw">match</span> <span class="ident">rx</span>.<span class="ident">recv_timeout</span>(<span class="ident">Duration</span>::<span class="ident">from_secs</span>(<span class="number">3</span>)) {
-            <span class="prelude-val">Ok</span>(<span class="ident">PeerMsg</span>::<span class="ident">ApplyRes</span> { <span class="ident">res</span>, .. }) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">match</span> <span class="ident">res</span> {
-                <span class="ident">TaskRes</span>::<span class="ident">Destroy</span> {
+            <span class="prelude-val">Ok</span>(<span class="ident">PeerMsg</span>::<span class="ident">ApplyRes</span> {
+                <span class="ident">res</span>: <span class="ident">TaskRes</span>::<span class="ident">Destroy</span> {
                     <span class="ident">region_id</span>, <span class="ident">peer_id</span>, ..
-                } <span class="op">=</span><span class="op">&gt;</span> (<span class="ident">region_id</span>, <span class="ident">peer_id</span>),
-                <span class="ident">e</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;expected destroy result, but got {:?}&quot;</span>, <span class="ident">e</span>),
-            },
+                },
+                ..
+            }) <span class="op">=</span><span class="op">&gt;</span> (<span class="ident">region_id</span>, <span class="ident">peer_id</span>),
             <span class="ident">e</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;expected destroy result, but got {:?}&quot;</span>, <span class="ident">e</span>),
         };
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">peer_id</span>, <span class="number">1</span>);
@@ -9415,8 +9469,10 @@
         <span class="ident">system</span>.<span class="ident">spawn</span>(<span class="string">&quot;test-handle-raft&quot;</span>.<span class="ident">to_owned</span>(), <span class="ident">builder</span>);
 
         <span class="kw">let</span> <span class="ident">peer_id</span> <span class="op">=</span> <span class="number">3</span>;
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reg</span> <span class="op">=</span> <span class="ident">Registration</span>::<span class="ident">default</span>();
-        <span class="ident">reg</span>.<span class="ident">id</span> <span class="op">=</span> <span class="ident">peer_id</span>;
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reg</span> <span class="op">=</span> <span class="ident">Registration</span> {
+            <span class="ident">id</span>: <span class="ident">peer_id</span>,
+            ..<span class="ident">Default</span>::<span class="ident">default</span>()
+        };
         <span class="ident">reg</span>.<span class="ident">region</span>.<span class="ident">set_id</span>(<span class="number">1</span>);
         <span class="ident">reg</span>.<span class="ident">region</span>.<span class="ident">mut_peers</span>().<span class="ident">push</span>(<span class="ident">new_peer</span>(<span class="number">2</span>, <span class="number">3</span>));
         <span class="ident">reg</span>.<span class="ident">region</span>.<span class="ident">set_end_key</span>(<span class="string">b&quot;k5&quot;</span>.<span class="ident">to_vec</span>());
@@ -9734,8 +9790,10 @@
         <span class="ident">system</span>.<span class="ident">spawn</span>(<span class="string">&quot;test-handle-raft&quot;</span>.<span class="ident">to_owned</span>(), <span class="ident">builder</span>);
 
         <span class="kw">let</span> <span class="ident">peer_id</span> <span class="op">=</span> <span class="number">3</span>;
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reg</span> <span class="op">=</span> <span class="ident">Registration</span>::<span class="ident">default</span>();
-        <span class="ident">reg</span>.<span class="ident">id</span> <span class="op">=</span> <span class="ident">peer_id</span>;
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reg</span> <span class="op">=</span> <span class="ident">Registration</span> {
+            <span class="ident">id</span>: <span class="ident">peer_id</span>,
+            ..<span class="ident">Default</span>::<span class="ident">default</span>()
+        };
         <span class="ident">reg</span>.<span class="ident">region</span>.<span class="ident">set_id</span>(<span class="number">1</span>);
         <span class="ident">reg</span>.<span class="ident">region</span>.<span class="ident">mut_peers</span>().<span class="ident">push</span>(<span class="ident">new_peer</span>(<span class="number">2</span>, <span class="number">3</span>));
         <span class="ident">reg</span>.<span class="ident">region</span>.<span class="ident">set_end_key</span>(<span class="string">b&quot;k5&quot;</span>.<span class="ident">to_vec</span>());
@@ -9981,9 +10039,11 @@
         <span class="kw">let</span> (<span class="ident">_path</span>, <span class="ident">engine</span>) <span class="op">=</span> <span class="ident">create_tmp_engine</span>(<span class="string">&quot;test-delegate&quot;</span>);
         <span class="kw">let</span> (<span class="ident">_import_dir</span>, <span class="ident">importer</span>) <span class="op">=</span> <span class="ident">create_tmp_importer</span>(<span class="string">&quot;test-delegate&quot;</span>);
         <span class="kw">let</span> <span class="ident">peer_id</span> <span class="op">=</span> <span class="number">3</span>;
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reg</span> <span class="op">=</span> <span class="ident">Registration</span>::<span class="ident">default</span>();
-        <span class="ident">reg</span>.<span class="ident">id</span> <span class="op">=</span> <span class="ident">peer_id</span>;
-        <span class="ident">reg</span>.<span class="ident">term</span> <span class="op">=</span> <span class="number">1</span>;
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reg</span> <span class="op">=</span> <span class="ident">Registration</span> {
+            <span class="ident">id</span>: <span class="ident">peer_id</span>,
+            <span class="ident">term</span>: <span class="number">1</span>,
+            ..<span class="ident">Default</span>::<span class="ident">default</span>()
+        };
         <span class="ident">reg</span>.<span class="ident">region</span>.<span class="ident">set_id</span>(<span class="number">1</span>);
         <span class="ident">reg</span>.<span class="ident">region</span>.<span class="ident">set_end_key</span>(<span class="string">b&quot;k5&quot;</span>.<span class="ident">to_vec</span>());
         <span class="ident">reg</span>.<span class="ident">region</span>.<span class="ident">mut_region_epoch</span>().<span class="ident">set_version</span>(<span class="number">3</span>);
@@ -10223,4 +10283,5 @@
     }
 }
 </pre></div>
-</section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../../../";window.currentCrate = "raftstore";</script><script src="../../../../main.js"></script><script src="../../../../source-script.js"></script><script src="../../../../source-files.js"></script><script defer src="../../../../search-index.js"></script></body></html>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="raftstore"></div>
+    <script src="../../../../main.js"></script><script src="../../../../source-script.js"></script><script src="../../../../source-files.js"></script><script defer src="../../../../search-index.js"></script></body></html>

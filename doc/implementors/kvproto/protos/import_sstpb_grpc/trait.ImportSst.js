@@ -1,3 +1,3 @@
 (function() {var implementors = {};
-implementors["tikv"] = [{"text":"impl&lt;E, Router&gt; ImportSst for ImportSSTService&lt;E, Router&gt; <span class=\"where fmt-newline\">where<br>&nbsp;&nbsp;&nbsp;&nbsp;E: KvEngine,<br>&nbsp;&nbsp;&nbsp;&nbsp;Router: RaftStoreRouter&lt;E&gt;,&nbsp;</span>","synthetic":false,"types":[]}];
+implementors["tikv"] = [{"text":"impl&lt;E, Router&gt; ImportSst for ImportSSTService&lt;E, Router&gt; <span class=\"where fmt-newline\">where<br>&nbsp;&nbsp;&nbsp;&nbsp;E: KvEngine,<br>&nbsp;&nbsp;&nbsp;&nbsp;Router: 'static + ProposalRouter&lt;E::Snapshot&gt; + Clone + Send,&nbsp;</span>","synthetic":false,"types":[]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

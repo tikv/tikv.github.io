@@ -1,6 +1,6 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `src/storage/mvcc/txn.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>txn.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../../ayu.css" disabled ><script src="../../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/storage/mvcc/txn.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>txn.rs - source</title><link rel="stylesheet" type="text/css" href="../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg">
 <link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../../tikv/index.html'><div class='logo-container rust-logo'><img src='../../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><span class="help-button">?</span>
+<link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../../tikv/index.html'><div class='logo-container rust-logo'><img src='../../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><script src="../../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
                 <a id="settings-menu" href="../../../../settings.html"><img src="../../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">   1</span>
 <span id="2">   2</span>
 <span id="3">   3</span>
@@ -1721,214 +1721,17 @@
 <span id="1718">1718</span>
 <span id="1719">1719</span>
 <span id="1720">1720</span>
-<span id="1721">1721</span>
-<span id="1722">1722</span>
-<span id="1723">1723</span>
-<span id="1724">1724</span>
-<span id="1725">1725</span>
-<span id="1726">1726</span>
-<span id="1727">1727</span>
-<span id="1728">1728</span>
-<span id="1729">1729</span>
-<span id="1730">1730</span>
-<span id="1731">1731</span>
-<span id="1732">1732</span>
-<span id="1733">1733</span>
-<span id="1734">1734</span>
-<span id="1735">1735</span>
-<span id="1736">1736</span>
-<span id="1737">1737</span>
-<span id="1738">1738</span>
-<span id="1739">1739</span>
-<span id="1740">1740</span>
-<span id="1741">1741</span>
-<span id="1742">1742</span>
-<span id="1743">1743</span>
-<span id="1744">1744</span>
-<span id="1745">1745</span>
-<span id="1746">1746</span>
-<span id="1747">1747</span>
-<span id="1748">1748</span>
-<span id="1749">1749</span>
-<span id="1750">1750</span>
-<span id="1751">1751</span>
-<span id="1752">1752</span>
-<span id="1753">1753</span>
-<span id="1754">1754</span>
-<span id="1755">1755</span>
-<span id="1756">1756</span>
-<span id="1757">1757</span>
-<span id="1758">1758</span>
-<span id="1759">1759</span>
-<span id="1760">1760</span>
-<span id="1761">1761</span>
-<span id="1762">1762</span>
-<span id="1763">1763</span>
-<span id="1764">1764</span>
-<span id="1765">1765</span>
-<span id="1766">1766</span>
-<span id="1767">1767</span>
-<span id="1768">1768</span>
-<span id="1769">1769</span>
-<span id="1770">1770</span>
-<span id="1771">1771</span>
-<span id="1772">1772</span>
-<span id="1773">1773</span>
-<span id="1774">1774</span>
-<span id="1775">1775</span>
-<span id="1776">1776</span>
-<span id="1777">1777</span>
-<span id="1778">1778</span>
-<span id="1779">1779</span>
-<span id="1780">1780</span>
-<span id="1781">1781</span>
-<span id="1782">1782</span>
-<span id="1783">1783</span>
-<span id="1784">1784</span>
-<span id="1785">1785</span>
-<span id="1786">1786</span>
-<span id="1787">1787</span>
-<span id="1788">1788</span>
-<span id="1789">1789</span>
-<span id="1790">1790</span>
-<span id="1791">1791</span>
-<span id="1792">1792</span>
-<span id="1793">1793</span>
-<span id="1794">1794</span>
-<span id="1795">1795</span>
-<span id="1796">1796</span>
-<span id="1797">1797</span>
-<span id="1798">1798</span>
-<span id="1799">1799</span>
-<span id="1800">1800</span>
-<span id="1801">1801</span>
-<span id="1802">1802</span>
-<span id="1803">1803</span>
-<span id="1804">1804</span>
-<span id="1805">1805</span>
-<span id="1806">1806</span>
-<span id="1807">1807</span>
-<span id="1808">1808</span>
-<span id="1809">1809</span>
-<span id="1810">1810</span>
-<span id="1811">1811</span>
-<span id="1812">1812</span>
-<span id="1813">1813</span>
-<span id="1814">1814</span>
-<span id="1815">1815</span>
-<span id="1816">1816</span>
-<span id="1817">1817</span>
-<span id="1818">1818</span>
-<span id="1819">1819</span>
-<span id="1820">1820</span>
-<span id="1821">1821</span>
-<span id="1822">1822</span>
-<span id="1823">1823</span>
-<span id="1824">1824</span>
-<span id="1825">1825</span>
-<span id="1826">1826</span>
-<span id="1827">1827</span>
-<span id="1828">1828</span>
-<span id="1829">1829</span>
-<span id="1830">1830</span>
-<span id="1831">1831</span>
-<span id="1832">1832</span>
-<span id="1833">1833</span>
-<span id="1834">1834</span>
-<span id="1835">1835</span>
-<span id="1836">1836</span>
-<span id="1837">1837</span>
-<span id="1838">1838</span>
-<span id="1839">1839</span>
-<span id="1840">1840</span>
-<span id="1841">1841</span>
-<span id="1842">1842</span>
-<span id="1843">1843</span>
-<span id="1844">1844</span>
-<span id="1845">1845</span>
-<span id="1846">1846</span>
-<span id="1847">1847</span>
-<span id="1848">1848</span>
-<span id="1849">1849</span>
-<span id="1850">1850</span>
-<span id="1851">1851</span>
-<span id="1852">1852</span>
-<span id="1853">1853</span>
-<span id="1854">1854</span>
-<span id="1855">1855</span>
-<span id="1856">1856</span>
-<span id="1857">1857</span>
-<span id="1858">1858</span>
-<span id="1859">1859</span>
-<span id="1860">1860</span>
-<span id="1861">1861</span>
-<span id="1862">1862</span>
-<span id="1863">1863</span>
-<span id="1864">1864</span>
-<span id="1865">1865</span>
-<span id="1866">1866</span>
-<span id="1867">1867</span>
-<span id="1868">1868</span>
-<span id="1869">1869</span>
-<span id="1870">1870</span>
-<span id="1871">1871</span>
-<span id="1872">1872</span>
-<span id="1873">1873</span>
-<span id="1874">1874</span>
-<span id="1875">1875</span>
-<span id="1876">1876</span>
-<span id="1877">1877</span>
-<span id="1878">1878</span>
-<span id="1879">1879</span>
-<span id="1880">1880</span>
-<span id="1881">1881</span>
-<span id="1882">1882</span>
-<span id="1883">1883</span>
-<span id="1884">1884</span>
-<span id="1885">1885</span>
-<span id="1886">1886</span>
-<span id="1887">1887</span>
-<span id="1888">1888</span>
-<span id="1889">1889</span>
-<span id="1890">1890</span>
-<span id="1891">1891</span>
-<span id="1892">1892</span>
-<span id="1893">1893</span>
-<span id="1894">1894</span>
-<span id="1895">1895</span>
-<span id="1896">1896</span>
-<span id="1897">1897</span>
-<span id="1898">1898</span>
-<span id="1899">1899</span>
-<span id="1900">1900</span>
-<span id="1901">1901</span>
-<span id="1902">1902</span>
-<span id="1903">1903</span>
-<span id="1904">1904</span>
-<span id="1905">1905</span>
-<span id="1906">1906</span>
-<span id="1907">1907</span>
-<span id="1908">1908</span>
-<span id="1909">1909</span>
-<span id="1910">1910</span>
-<span id="1911">1911</span>
-<span id="1912">1912</span>
-<span id="1913">1913</span>
-<span id="1914">1914</span>
-<span id="1915">1915</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">kv</span>::{<span class="ident">Modify</span>, <span class="ident">ScanMode</span>, <span class="ident">Snapshot</span>, <span class="ident">Statistics</span>, <span class="ident">WriteData</span>};
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">kv</span>::{<span class="ident">Modify</span>, <span class="ident">ScanMode</span>, <span class="ident">Snapshot</span>, <span class="ident">Statistics</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">mvcc</span>::<span class="ident">reader</span>::{<span class="ident">MvccReader</span>, <span class="ident">OverlappedWrite</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">mvcc</span>::<span class="prelude-ty">Result</span>;
 <span class="kw">use</span> <span class="ident">concurrency_manager</span>::{<span class="ident">ConcurrencyManager</span>, <span class="ident">KeyHandleGuard</span>};
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">CF_DEFAULT</span>, <span class="ident">CF_LOCK</span>, <span class="ident">CF_WRITE</span>};
-<span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">kvrpcpb</span>::{<span class="ident">ExtraOp</span>, <span class="ident">IsolationLevel</span>};
+<span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">kvrpcpb</span>::<span class="ident">IsolationLevel</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">fmt</span>;
-<span class="kw">use</span> <span class="ident">txn_types</span>::{
-    <span class="ident">Key</span>, <span class="ident">Lock</span>, <span class="ident">LockType</span>, <span class="ident">MutationType</span>, <span class="ident">OldValue</span>, <span class="ident">TimeStamp</span>, <span class="ident">TxnExtra</span>, <span class="ident">Value</span>, <span class="ident">Write</span>, <span class="ident">WriteType</span>,
-};
+<span class="kw">use</span> <span class="ident">txn_types</span>::{<span class="ident">Key</span>, <span class="ident">Lock</span>, <span class="ident">LockType</span>, <span class="ident">TimeStamp</span>, <span class="ident">Value</span>, <span class="ident">Write</span>, <span class="ident">WriteType</span>};
 
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MAX_TXN_WRITE_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">32</span> <span class="op">*</span> <span class="number">1024</span>;
 
@@ -2022,14 +1825,13 @@
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">reader</span>: <span class="ident">MvccReader</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>,
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">start_ts</span>: <span class="ident">TimeStamp</span>,
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">write_size</span>: <span class="ident">usize</span>,
-    <span class="ident">writes</span>: <span class="ident">WriteData</span>,
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">modifies</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Modify</span><span class="op">&gt;</span>,
     <span class="comment">// When 1PC is enabled, locks will be collected here instead of marshalled and put into `writes`,</span>
     <span class="comment">// so it can be further processed. The elements are tuples representing</span>
     <span class="comment">// (key, lock, remove_pessimistic_lock)</span>
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">locks_for_1pc</span>: <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">Key</span>, <span class="ident">Lock</span>, <span class="ident">bool</span>)<span class="op">&gt;</span>,
     <span class="comment">// collapse continuous rollbacks.</span>
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">collapse_rollback</span>: <span class="ident">bool</span>,
-    <span class="kw">pub</span> <span class="ident">extra_op</span>: <span class="ident">ExtraOp</span>,
     <span class="comment">// `concurrency_manager` is used to set memory locks for prewritten keys.</span>
     <span class="comment">// Prewritten locks of async commit transactions should be visible to</span>
     <span class="comment">// readers before they are written to the engine.</span>
@@ -2089,10 +1891,9 @@
             <span class="ident">reader</span>,
             <span class="ident">start_ts</span>,
             <span class="ident">write_size</span>: <span class="number">0</span>,
-            <span class="ident">writes</span>: <span class="ident">WriteData</span>::<span class="ident">default</span>(),
+            <span class="ident">modifies</span>: <span class="macro">vec</span><span class="macro">!</span>[],
             <span class="ident">locks_for_1pc</span>: <span class="ident">Vec</span>::<span class="ident">new</span>(),
             <span class="ident">collapse_rollback</span>: <span class="bool-val">true</span>,
-            <span class="ident">extra_op</span>: <span class="ident">ExtraOp</span>::<span class="ident">Noop</span>,
             <span class="ident">concurrency_manager</span>,
             <span class="ident">guards</span>: <span class="macro">vec</span><span class="macro">!</span>[],
         }
@@ -2108,11 +1909,7 @@
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">into_modifies</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Modify</span><span class="op">&gt;</span> {
         <span class="macro">assert</span><span class="macro">!</span>(<span class="self">self</span>.<span class="ident">locks_for_1pc</span>.<span class="ident">is_empty</span>());
-        <span class="self">self</span>.<span class="ident">writes</span>.<span class="ident">modifies</span>
-    }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">take_extra</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">TxnExtra</span> {
-        <span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">take</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">writes</span>.<span class="ident">extra</span>)
+        <span class="self">self</span>.<span class="ident">modifies</span>
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">take_guards</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">KeyHandleGuard</span><span class="op">&gt;</span> {
@@ -2132,7 +1929,7 @@
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">put_lock</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">key</span>: <span class="ident">Key</span>, <span class="ident">lock</span>: <span class="kw-2">&amp;</span><span class="ident">Lock</span>) {
         <span class="kw">let</span> <span class="ident">write</span> <span class="op">=</span> <span class="ident">Modify</span>::<span class="ident">Put</span>(<span class="ident">CF_LOCK</span>, <span class="ident">key</span>, <span class="ident">lock</span>.<span class="ident">to_bytes</span>());
         <span class="self">self</span>.<span class="ident">write_size</span> <span class="op">+</span><span class="op">=</span> <span class="ident">write</span>.<span class="ident">size</span>();
-        <span class="self">self</span>.<span class="ident">writes</span>.<span class="ident">modifies</span>.<span class="ident">push</span>(<span class="ident">write</span>);
+        <span class="self">self</span>.<span class="ident">modifies</span>.<span class="ident">push</span>(<span class="ident">write</span>);
     }
 
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">put_locks_for_1pc</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">key</span>: <span class="ident">Key</span>, <span class="ident">lock</span>: <span class="ident">Lock</span>, <span class="ident">remove_pessimstic_lock</span>: <span class="ident">bool</span>) {
@@ -2143,32 +1940,32 @@
         <span class="kw">let</span> <span class="ident">released</span> <span class="op">=</span> <span class="ident">ReleasedLock</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="ident">pessimistic</span>);
         <span class="kw">let</span> <span class="ident">write</span> <span class="op">=</span> <span class="ident">Modify</span>::<span class="ident">Delete</span>(<span class="ident">CF_LOCK</span>, <span class="ident">key</span>);
         <span class="self">self</span>.<span class="ident">write_size</span> <span class="op">+</span><span class="op">=</span> <span class="ident">write</span>.<span class="ident">size</span>();
-        <span class="self">self</span>.<span class="ident">writes</span>.<span class="ident">modifies</span>.<span class="ident">push</span>(<span class="ident">write</span>);
+        <span class="self">self</span>.<span class="ident">modifies</span>.<span class="ident">push</span>(<span class="ident">write</span>);
         <span class="prelude-val">Some</span>(<span class="ident">released</span>)
     }
 
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">put_value</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">key</span>: <span class="ident">Key</span>, <span class="ident">ts</span>: <span class="ident">TimeStamp</span>, <span class="ident">value</span>: <span class="ident">Value</span>) {
         <span class="kw">let</span> <span class="ident">write</span> <span class="op">=</span> <span class="ident">Modify</span>::<span class="ident">Put</span>(<span class="ident">CF_DEFAULT</span>, <span class="ident">key</span>.<span class="ident">append_ts</span>(<span class="ident">ts</span>), <span class="ident">value</span>);
         <span class="self">self</span>.<span class="ident">write_size</span> <span class="op">+</span><span class="op">=</span> <span class="ident">write</span>.<span class="ident">size</span>();
-        <span class="self">self</span>.<span class="ident">writes</span>.<span class="ident">modifies</span>.<span class="ident">push</span>(<span class="ident">write</span>);
+        <span class="self">self</span>.<span class="ident">modifies</span>.<span class="ident">push</span>(<span class="ident">write</span>);
     }
 
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">delete_value</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">key</span>: <span class="ident">Key</span>, <span class="ident">ts</span>: <span class="ident">TimeStamp</span>) {
         <span class="kw">let</span> <span class="ident">write</span> <span class="op">=</span> <span class="ident">Modify</span>::<span class="ident">Delete</span>(<span class="ident">CF_DEFAULT</span>, <span class="ident">key</span>.<span class="ident">append_ts</span>(<span class="ident">ts</span>));
         <span class="self">self</span>.<span class="ident">write_size</span> <span class="op">+</span><span class="op">=</span> <span class="ident">write</span>.<span class="ident">size</span>();
-        <span class="self">self</span>.<span class="ident">writes</span>.<span class="ident">modifies</span>.<span class="ident">push</span>(<span class="ident">write</span>);
+        <span class="self">self</span>.<span class="ident">modifies</span>.<span class="ident">push</span>(<span class="ident">write</span>);
     }
 
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">put_write</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">key</span>: <span class="ident">Key</span>, <span class="ident">ts</span>: <span class="ident">TimeStamp</span>, <span class="ident">value</span>: <span class="ident">Value</span>) {
         <span class="kw">let</span> <span class="ident">write</span> <span class="op">=</span> <span class="ident">Modify</span>::<span class="ident">Put</span>(<span class="ident">CF_WRITE</span>, <span class="ident">key</span>.<span class="ident">append_ts</span>(<span class="ident">ts</span>), <span class="ident">value</span>);
         <span class="self">self</span>.<span class="ident">write_size</span> <span class="op">+</span><span class="op">=</span> <span class="ident">write</span>.<span class="ident">size</span>();
-        <span class="self">self</span>.<span class="ident">writes</span>.<span class="ident">modifies</span>.<span class="ident">push</span>(<span class="ident">write</span>);
+        <span class="self">self</span>.<span class="ident">modifies</span>.<span class="ident">push</span>(<span class="ident">write</span>);
     }
 
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">delete_write</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">key</span>: <span class="ident">Key</span>, <span class="ident">ts</span>: <span class="ident">TimeStamp</span>) {
         <span class="kw">let</span> <span class="ident">write</span> <span class="op">=</span> <span class="ident">Modify</span>::<span class="ident">Delete</span>(<span class="ident">CF_WRITE</span>, <span class="ident">key</span>.<span class="ident">append_ts</span>(<span class="ident">ts</span>));
         <span class="self">self</span>.<span class="ident">write_size</span> <span class="op">+</span><span class="op">=</span> <span class="ident">write</span>.<span class="ident">size</span>();
-        <span class="self">self</span>.<span class="ident">writes</span>.<span class="ident">modifies</span>.<span class="ident">push</span>(<span class="ident">write</span>);
+        <span class="self">self</span>.<span class="ident">modifies</span>.<span class="ident">push</span>(<span class="ident">write</span>);
     }
 
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">key_exist</span>(
@@ -2262,57 +2059,6 @@
         }
         <span class="prelude-val">Ok</span>(())
     }
-
-    <span class="comment">// Check and execute the extra operation.</span>
-    <span class="comment">// Currently we use it only for reading the old value for CDC.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">check_extra_op</span>(
-        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
-        <span class="ident">key</span>: <span class="kw-2">&amp;</span><span class="ident">Key</span>,
-        <span class="ident">mutation_type</span>: <span class="ident">MutationType</span>,
-        <span class="ident">prev_write</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Write</span><span class="op">&gt;</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">mvcc</span>::<span class="ident">reader</span>::<span class="ident">seek_for_valid_write</span>;
-
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">extra_op</span> <span class="op">=</span><span class="op">=</span> <span class="ident">ExtraOp</span>::<span class="ident">ReadOldValue</span>
-            <span class="op">&amp;&amp;</span> (<span class="ident">mutation_type</span> <span class="op">=</span><span class="op">=</span> <span class="ident">MutationType</span>::<span class="ident">Put</span> <span class="op">|</span><span class="op">|</span> <span class="ident">mutation_type</span> <span class="op">=</span><span class="op">=</span> <span class="ident">MutationType</span>::<span class="ident">Delete</span>)
-        {
-            <span class="kw">let</span> <span class="ident">old_value</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">w</span>) <span class="op">=</span> <span class="ident">prev_write</span> {
-                <span class="comment">// If write is Rollback or Lock, seek for valid write record.</span>
-                <span class="kw">if</span> <span class="ident">w</span>.<span class="ident">write_type</span> <span class="op">=</span><span class="op">=</span> <span class="ident">WriteType</span>::<span class="ident">Rollback</span> <span class="op">|</span><span class="op">|</span> <span class="ident">w</span>.<span class="ident">write_type</span> <span class="op">=</span><span class="op">=</span> <span class="ident">WriteType</span>::<span class="ident">Lock</span> {
-                    <span class="kw">let</span> <span class="ident">write_cursor</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">reader</span>.<span class="ident">write_cursor</span>.<span class="ident">as_mut</span>().<span class="ident">unwrap</span>();
-                    <span class="comment">// Skip the current write record.</span>
-                    <span class="ident">write_cursor</span>.<span class="ident">next</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">reader</span>.<span class="ident">statistics</span>.<span class="ident">write</span>);
-                    <span class="kw">let</span> <span class="ident">write</span> <span class="op">=</span> <span class="ident">seek_for_valid_write</span>(
-                        <span class="ident">write_cursor</span>,
-                        <span class="ident">key</span>,
-                        <span class="self">self</span>.<span class="ident">start_ts</span>,
-                        <span class="self">self</span>.<span class="ident">start_ts</span>,
-                        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">reader</span>.<span class="ident">statistics</span>,
-                    )<span class="question-mark">?</span>;
-                    <span class="ident">write</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">w</span><span class="op">|</span> <span class="ident">OldValue</span> {
-                        <span class="ident">short_value</span>: <span class="ident">w</span>.<span class="ident">short_value</span>,
-                        <span class="ident">start_ts</span>: <span class="ident">w</span>.<span class="ident">start_ts</span>,
-                    })
-                } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">w</span>.<span class="ident">as_ref</span>().<span class="ident">check_gc_fence_as_latest_version</span>(<span class="self">self</span>.<span class="ident">start_ts</span>) {
-                    <span class="prelude-val">Some</span>(<span class="ident">OldValue</span> {
-                        <span class="ident">short_value</span>: <span class="ident">w</span>.<span class="ident">short_value</span>,
-                        <span class="ident">start_ts</span>: <span class="ident">w</span>.<span class="ident">start_ts</span>,
-                    })
-                } <span class="kw">else</span> {
-                    <span class="prelude-val">None</span>
-                }
-            } <span class="kw">else</span> {
-                <span class="prelude-val">None</span>
-            };
-            <span class="comment">// If write is None or cannot find a previously valid write record.</span>
-            <span class="self">self</span>.<span class="ident">writes</span>.<span class="ident">extra</span>.<span class="ident">add_old_value</span>(
-                <span class="ident">key</span>.<span class="ident">clone</span>().<span class="ident">append_ts</span>(<span class="self">self</span>.<span class="ident">start_ts</span>),
-                <span class="ident">old_value</span>,
-                <span class="ident">mutation_type</span>,
-            );
-        }
-        <span class="prelude-val">Ok</span>(())
-    }
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">Snapshot</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="ident">Debug</span> <span class="kw">for</span> <span class="ident">MvccTxn</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span> {
@@ -2392,17 +2138,16 @@
 }
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">tests</span> {
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">tests</span> {
     <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 
-    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">kv</span>::<span class="ident">RocksEngine</span>;
+    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">kv</span>::{<span class="ident">RocksEngine</span>, <span class="ident">WriteData</span>};
     <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">mvcc</span>::<span class="ident">tests</span>::<span class="kw-2">*</span>;
     <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">mvcc</span>::{<span class="ident">Error</span>, <span class="ident">ErrorInner</span>, <span class="ident">Mutation</span>, <span class="ident">MvccReader</span>};
     <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">txn</span>::<span class="ident">commands</span>::<span class="kw-2">*</span>;
     <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">txn</span>::<span class="ident">tests</span>::<span class="kw-2">*</span>;
     <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">txn</span>::{
-        <span class="ident">acquire_pessimistic_lock</span>, <span class="ident">commit</span>, <span class="ident">prewrite</span>, <span class="ident">CommitKind</span>, <span class="ident">TransactionKind</span>,
-        <span class="ident">TransactionProperties</span>,
+        <span class="ident">commit</span>, <span class="ident">prewrite</span>, <span class="ident">CommitKind</span>, <span class="ident">TransactionKind</span>, <span class="ident">TransactionProperties</span>,
     };
     <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">SecondaryLocksStatus</span>;
     <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::{
@@ -2411,7 +2156,6 @@
     };
     <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">kvrpcpb</span>::<span class="ident">Context</span>;
     <span class="kw">use</span> <span class="ident">txn_types</span>::{<span class="ident">TimeStamp</span>, <span class="ident">SHORT_VALUE_MAX_LEN</span>};
-
     <span class="kw">fn</span> <span class="ident">test_mvcc_txn_read_imp</span>(<span class="ident">k1</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">k2</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">v</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) {
         <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span> <span class="ident">TestEngineBuilder</span>::<span class="ident">new</span>().<span class="ident">build</span>().<span class="ident">unwrap</span>();
 
@@ -2838,7 +2582,7 @@
         <span class="ident">test_scan_keys_imp</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="string">b&quot;a&quot;</span>, <span class="string">b&quot;c&quot;</span>, <span class="string">b&quot;e&quot;</span>, <span class="string">b&quot;b&quot;</span>, <span class="string">b&quot;d&quot;</span>, <span class="string">b&quot;f&quot;</span>], <span class="macro">vec</span><span class="macro">!</span>[<span class="kw-2">&amp;</span><span class="ident">v1</span>, <span class="kw-2">&amp;</span><span class="ident">v4</span>]);
     }
 
-    <span class="kw">fn</span> <span class="ident">txn_props</span>(
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">txn_props</span>(
         <span class="ident">start_ts</span>: <span class="ident">TimeStamp</span>,
         <span class="ident">primary</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>],
         <span class="ident">commit_kind</span>: <span class="ident">CommitKind</span>,
@@ -2860,6 +2604,7 @@
             <span class="ident">txn_size</span>,
             <span class="ident">lock_ttl</span>: <span class="number">0</span>,
             <span class="ident">min_commit_ts</span>: <span class="ident">TimeStamp</span>::<span class="ident">default</span>(),
+            <span class="ident">need_old_value</span>: <span class="bool-val">false</span>,
         }
     }
 
@@ -3305,145 +3050,6 @@
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_extra_op_old_value</span>() {
-        <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span> <span class="ident">TestEngineBuilder</span>::<span class="ident">new</span>().<span class="ident">build</span>().<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> <span class="ident">Key</span>::<span class="ident">from_raw</span>(<span class="string">b&quot;key&quot;</span>);
-        <span class="kw">let</span> <span class="ident">ctx</span> <span class="op">=</span> <span class="ident">Context</span>::<span class="ident">default</span>();
-
-        <span class="kw">let</span> <span class="ident">new_old_value</span> <span class="op">=</span> <span class="op">|</span><span class="ident">short_value</span>, <span class="ident">start_ts</span><span class="op">|</span> <span class="ident">OldValue</span> {
-            <span class="ident">short_value</span>,
-            <span class="ident">start_ts</span>,
-        };
-
-        <span class="kw">let</span> <span class="ident">cases</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
-            (
-                <span class="ident">Mutation</span>::<span class="ident">Put</span>((<span class="ident">key</span>.<span class="ident">clone</span>(), <span class="string">b&quot;v0&quot;</span>.<span class="ident">to_vec</span>())),
-                <span class="bool-val">false</span>,
-                <span class="number">5</span>,
-                <span class="number">5</span>,
-                <span class="prelude-val">None</span>,
-                <span class="bool-val">true</span>,
-            ),
-            (
-                <span class="ident">Mutation</span>::<span class="ident">Put</span>((<span class="ident">key</span>.<span class="ident">clone</span>(), <span class="string">b&quot;v1&quot;</span>.<span class="ident">to_vec</span>())),
-                <span class="bool-val">false</span>,
-                <span class="number">6</span>,
-                <span class="number">6</span>,
-                <span class="prelude-val">Some</span>(<span class="ident">new_old_value</span>(<span class="prelude-val">Some</span>(<span class="string">b&quot;v0&quot;</span>.<span class="ident">to_vec</span>()), <span class="number">5</span>.<span class="ident">into</span>())),
-                <span class="bool-val">true</span>,
-            ),
-            (<span class="ident">Mutation</span>::<span class="ident">Lock</span>(<span class="ident">key</span>.<span class="ident">clone</span>()), <span class="bool-val">false</span>, <span class="number">7</span>, <span class="number">7</span>, <span class="prelude-val">None</span>, <span class="bool-val">false</span>),
-            (
-                <span class="ident">Mutation</span>::<span class="ident">Lock</span>(<span class="ident">key</span>.<span class="ident">clone</span>()),
-                <span class="bool-val">false</span>,
-                <span class="number">8</span>,
-                <span class="number">8</span>,
-                <span class="prelude-val">Some</span>(<span class="ident">new_old_value</span>(<span class="prelude-val">Some</span>(<span class="string">b&quot;v1&quot;</span>.<span class="ident">to_vec</span>()), <span class="number">6</span>.<span class="ident">into</span>())),
-                <span class="bool-val">false</span>,
-            ),
-            (
-                <span class="ident">Mutation</span>::<span class="ident">Put</span>((<span class="ident">key</span>.<span class="ident">clone</span>(), <span class="macro">vec</span><span class="macro">!</span>[<span class="string">b&#39;0&#39;</span>; <span class="number">5120</span>])),
-                <span class="bool-val">false</span>,
-                <span class="number">9</span>,
-                <span class="number">9</span>,
-                <span class="prelude-val">Some</span>(<span class="ident">new_old_value</span>(<span class="prelude-val">Some</span>(<span class="string">b&quot;v1&quot;</span>.<span class="ident">to_vec</span>()), <span class="number">6</span>.<span class="ident">into</span>())),
-                <span class="bool-val">true</span>,
-            ),
-            (
-                <span class="ident">Mutation</span>::<span class="ident">Put</span>((<span class="ident">key</span>.<span class="ident">clone</span>(), <span class="string">b&quot;v3&quot;</span>.<span class="ident">to_vec</span>())),
-                <span class="bool-val">false</span>,
-                <span class="number">10</span>,
-                <span class="number">10</span>,
-                <span class="prelude-val">Some</span>(<span class="ident">new_old_value</span>(<span class="prelude-val">None</span>, <span class="number">9</span>.<span class="ident">into</span>())),
-                <span class="bool-val">true</span>,
-            ),
-            (
-                <span class="ident">Mutation</span>::<span class="ident">Put</span>((<span class="ident">key</span>.<span class="ident">clone</span>(), <span class="string">b&quot;v4&quot;</span>.<span class="ident">to_vec</span>())),
-                <span class="bool-val">true</span>,
-                <span class="number">11</span>,
-                <span class="number">11</span>,
-                <span class="prelude-val">None</span>,
-                <span class="bool-val">true</span>,
-            ),
-        ];
-
-        <span class="kw">let</span> <span class="ident">write</span> <span class="op">=</span> <span class="op">|</span><span class="ident">modifies</span><span class="op">|</span> {
-            <span class="ident">engine</span>.<span class="ident">write</span>(<span class="kw-2">&amp;</span><span class="ident">ctx</span>, <span class="ident">modifies</span>).<span class="ident">unwrap</span>();
-        };
-
-        <span class="kw">let</span> <span class="ident">new_txn</span> <span class="op">=</span> <span class="op">|</span><span class="ident">start_ts</span>, <span class="ident">cm</span><span class="op">|</span> {
-            <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="ident">Default</span>::<span class="ident">default</span>()).<span class="ident">unwrap</span>();
-            <span class="ident">MvccTxn</span>::<span class="ident">new</span>(<span class="ident">snapshot</span>, <span class="ident">start_ts</span>, <span class="bool-val">true</span>, <span class="ident">cm</span>)
-        };
-
-        <span class="kw">for</span> <span class="ident">case</span> <span class="kw">in</span> <span class="ident">cases</span> {
-            <span class="kw">let</span> (<span class="ident">mutation</span>, <span class="ident">is_pessimistic</span>, <span class="ident">start_ts</span>, <span class="ident">commit_ts</span>, <span class="ident">old_value</span>, <span class="ident">check_old_value</span>) <span class="op">=</span> <span class="ident">case</span>;
-            <span class="kw">let</span> <span class="ident">mutation_type</span> <span class="op">=</span> <span class="ident">mutation</span>.<span class="ident">mutation_type</span>();
-            <span class="kw">let</span> <span class="ident">cm</span> <span class="op">=</span> <span class="ident">ConcurrencyManager</span>::<span class="ident">new</span>(<span class="ident">start_ts</span>.<span class="ident">into</span>());
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">txn</span> <span class="op">=</span> <span class="ident">new_txn</span>(<span class="ident">start_ts</span>.<span class="ident">into</span>(), <span class="ident">cm</span>.<span class="ident">clone</span>());
-
-            <span class="ident">txn</span>.<span class="ident">extra_op</span> <span class="op">=</span> <span class="ident">ExtraOp</span>::<span class="ident">ReadOldValue</span>;
-            <span class="kw">if</span> <span class="ident">is_pessimistic</span> {
-                <span class="ident">acquire_pessimistic_lock</span>(
-                    <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">txn</span>,
-                    <span class="ident">key</span>.<span class="ident">clone</span>(),
-                    <span class="string">b&quot;key&quot;</span>,
-                    <span class="bool-val">false</span>,
-                    <span class="number">0</span>,
-                    <span class="ident">start_ts</span>.<span class="ident">into</span>(),
-                    <span class="bool-val">false</span>,
-                    <span class="ident">TimeStamp</span>::<span class="ident">zero</span>(),
-                )
-                .<span class="ident">unwrap</span>();
-                <span class="ident">write</span>(<span class="ident">WriteData</span>::<span class="ident">from_modifies</span>(<span class="ident">txn</span>.<span class="ident">into_modifies</span>()));
-                <span class="ident">txn</span> <span class="op">=</span> <span class="ident">new_txn</span>(<span class="ident">start_ts</span>.<span class="ident">into</span>(), <span class="ident">cm</span>.<span class="ident">clone</span>());
-                <span class="ident">txn</span>.<span class="ident">extra_op</span> <span class="op">=</span> <span class="ident">ExtraOp</span>::<span class="ident">ReadOldValue</span>;
-                <span class="ident">prewrite</span>(
-                    <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">txn</span>,
-                    <span class="kw-2">&amp;</span><span class="ident">txn_props</span>(
-                        <span class="ident">start_ts</span>.<span class="ident">into</span>(),
-                        <span class="string">b&quot;key&quot;</span>,
-                        <span class="ident">CommitKind</span>::<span class="ident">TwoPc</span>,
-                        <span class="prelude-val">Some</span>(<span class="ident">TimeStamp</span>::<span class="ident">default</span>()),
-                        <span class="number">0</span>,
-                        <span class="bool-val">false</span>,
-                    ),
-                    <span class="ident">mutation</span>,
-                    <span class="kw-2">&amp;</span><span class="prelude-val">None</span>,
-                    <span class="bool-val">true</span>,
-                )
-                .<span class="ident">unwrap</span>();
-            } <span class="kw">else</span> {
-                <span class="ident">prewrite</span>(
-                    <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">txn</span>,
-                    <span class="kw-2">&amp;</span><span class="ident">txn_props</span>(<span class="ident">start_ts</span>.<span class="ident">into</span>(), <span class="string">b&quot;key&quot;</span>, <span class="ident">CommitKind</span>::<span class="ident">TwoPc</span>, <span class="prelude-val">None</span>, <span class="number">0</span>, <span class="bool-val">false</span>),
-                    <span class="ident">mutation</span>,
-                    <span class="kw-2">&amp;</span><span class="prelude-val">None</span>,
-                    <span class="bool-val">false</span>,
-                )
-                .<span class="ident">unwrap</span>();
-            }
-            <span class="kw">if</span> <span class="ident">check_old_value</span> {
-                <span class="kw">let</span> <span class="ident">extra</span> <span class="op">=</span> <span class="ident">txn</span>.<span class="ident">take_extra</span>();
-                <span class="kw">let</span> <span class="ident">ts_key</span> <span class="op">=</span> <span class="ident">key</span>.<span class="ident">clone</span>().<span class="ident">append_ts</span>(<span class="ident">start_ts</span>.<span class="ident">into</span>());
-                <span class="macro">assert</span><span class="macro">!</span>(
-                    <span class="ident">extra</span>.<span class="ident">old_values</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">ts_key</span>).<span class="ident">is_some</span>(),
-                    <span class="string">&quot;{}@{}&quot;</span>,
-                    <span class="ident">ts_key</span>,
-                    <span class="ident">start_ts</span>
-                );
-                <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">extra</span>.<span class="ident">old_values</span>[<span class="kw-2">&amp;</span><span class="ident">ts_key</span>], (<span class="ident">old_value</span>, <span class="ident">mutation_type</span>));
-            }
-            <span class="ident">write</span>(<span class="ident">WriteData</span>::<span class="ident">from_modifies</span>(<span class="ident">txn</span>.<span class="ident">into_modifies</span>()));
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">txn</span> <span class="op">=</span> <span class="ident">new_txn</span>(<span class="ident">start_ts</span>.<span class="ident">into</span>(), <span class="ident">cm</span>);
-            <span class="ident">commit</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">txn</span>, <span class="ident">key</span>.<span class="ident">clone</span>(), <span class="ident">commit_ts</span>.<span class="ident">into</span>()).<span class="ident">unwrap</span>();
-            <span class="ident">engine</span>
-                .<span class="ident">write</span>(<span class="kw-2">&amp;</span><span class="ident">ctx</span>, <span class="ident">WriteData</span>::<span class="ident">from_modifies</span>(<span class="ident">txn</span>.<span class="ident">into_modifies</span>()))
-                .<span class="ident">unwrap</span>();
-        }
-    }
-
-    <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_async_prewrite_primary</span>() {
         <span class="comment">// copy must_prewrite_put_impl, check that the key is written with the correct secondaries and the right timestamp</span>
 
@@ -3455,7 +3061,7 @@
             <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="ident">Default</span>::<span class="ident">default</span>()).<span class="ident">unwrap</span>();
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">txn</span> <span class="op">=</span> <span class="ident">MvccTxn</span>::<span class="ident">new</span>(<span class="ident">snapshot</span>, <span class="ident">TimeStamp</span>::<span class="ident">new</span>(<span class="number">2</span>), <span class="bool-val">true</span>, <span class="ident">cm</span>.<span class="ident">clone</span>());
             <span class="kw">let</span> <span class="ident">mutation</span> <span class="op">=</span> <span class="ident">Mutation</span>::<span class="ident">Put</span>((<span class="ident">Key</span>::<span class="ident">from_raw</span>(<span class="string">b&quot;key&quot;</span>), <span class="string">b&quot;value&quot;</span>.<span class="ident">to_vec</span>()));
-            <span class="kw">let</span> <span class="ident">min_commit_ts</span> <span class="op">=</span> <span class="ident">prewrite</span>(
+            <span class="kw">let</span> (<span class="ident">min_commit_ts</span>, <span class="kw">_</span>) <span class="op">=</span> <span class="ident">prewrite</span>(
                 <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">txn</span>,
                 <span class="kw-2">&amp;</span><span class="ident">txn_props</span>(
                     <span class="ident">TimeStamp</span>::<span class="ident">new</span>(<span class="number">2</span>),
@@ -3510,7 +3116,7 @@
             <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="ident">Default</span>::<span class="ident">default</span>()).<span class="ident">unwrap</span>();
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">txn</span> <span class="op">=</span> <span class="ident">MvccTxn</span>::<span class="ident">new</span>(<span class="ident">snapshot</span>, <span class="ident">TimeStamp</span>::<span class="ident">new</span>(<span class="number">2</span>), <span class="bool-val">true</span>, <span class="ident">cm</span>.<span class="ident">clone</span>());
             <span class="kw">let</span> <span class="ident">mutation</span> <span class="op">=</span> <span class="ident">Mutation</span>::<span class="ident">Put</span>((<span class="ident">Key</span>::<span class="ident">from_raw</span>(<span class="string">b&quot;key&quot;</span>), <span class="string">b&quot;value&quot;</span>.<span class="ident">to_vec</span>()));
-            <span class="kw">let</span> <span class="ident">min_commit_ts</span> <span class="op">=</span> <span class="ident">prewrite</span>(
+            <span class="kw">let</span> (<span class="ident">min_commit_ts</span>, <span class="kw">_</span>) <span class="op">=</span> <span class="ident">prewrite</span>(
                 <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">txn</span>,
                 <span class="kw-2">&amp;</span><span class="ident">txn_props</span>(
                     <span class="ident">TimeStamp</span>::<span class="ident">new</span>(<span class="number">2</span>),
@@ -3564,7 +3170,7 @@
         <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="ident">Default</span>::<span class="ident">default</span>()).<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">txn</span> <span class="op">=</span> <span class="ident">MvccTxn</span>::<span class="ident">new</span>(<span class="ident">snapshot</span>, <span class="ident">TimeStamp</span>::<span class="ident">new</span>(<span class="number">2</span>), <span class="bool-val">true</span>, <span class="ident">cm</span>);
         <span class="kw">let</span> <span class="ident">mutation</span> <span class="op">=</span> <span class="ident">Mutation</span>::<span class="ident">Put</span>((<span class="ident">Key</span>::<span class="ident">from_raw</span>(<span class="string">b&quot;key&quot;</span>), <span class="string">b&quot;value&quot;</span>.<span class="ident">to_vec</span>()));
-        <span class="kw">let</span> <span class="ident">min_commit_ts</span> <span class="op">=</span> <span class="ident">prewrite</span>(
+        <span class="kw">let</span> (<span class="ident">min_commit_ts</span>, <span class="kw">_</span>) <span class="op">=</span> <span class="ident">prewrite</span>(
             <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">txn</span>,
             <span class="kw-2">&amp;</span><span class="ident">txn_props</span>(
                 <span class="ident">TimeStamp</span>::<span class="ident">new</span>(<span class="number">2</span>),
@@ -3643,6 +3249,8 @@
         <span class="ident">must_commit</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">k</span>, <span class="number">10</span>, <span class="number">15</span>);
         <span class="kw">let</span> <span class="ident">w</span> <span class="op">=</span> <span class="ident">must_written</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">k</span>, <span class="number">10</span>, <span class="number">15</span>, <span class="ident">WriteType</span>::<span class="ident">Put</span>);
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">w</span>.<span class="ident">has_overlapped_rollback</span>);
+        <span class="comment">// GC fence shouldn&#39;t be set in this case.</span>
+        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">w</span>.<span class="ident">gc_fence</span>.<span class="ident">is_none</span>());
 
         <span class="ident">must_prewrite_put_async_commit</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">k</span>, <span class="ident">v</span>, <span class="ident">k</span>, <span class="kw-2">&amp;</span><span class="prelude-val">Some</span>(<span class="macro">vec</span><span class="macro">!</span>[]), <span class="number">20</span>, <span class="number">0</span>);
         <span class="ident">check_txn_status</span>::<span class="ident">tests</span>::<span class="ident">must_success</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">k</span>, <span class="number">25</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="bool-val">true</span>, <span class="bool-val">false</span>, <span class="bool-val">false</span>, <span class="op">|</span><span class="ident">s</span><span class="op">|</span> {
@@ -3651,6 +3259,7 @@
         <span class="ident">must_commit</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">k</span>, <span class="number">20</span>, <span class="number">25</span>);
         <span class="kw">let</span> <span class="ident">w</span> <span class="op">=</span> <span class="ident">must_written</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">k</span>, <span class="number">20</span>, <span class="number">25</span>, <span class="ident">WriteType</span>::<span class="ident">Put</span>);
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">w</span>.<span class="ident">has_overlapped_rollback</span>);
+        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">w</span>.<span class="ident">gc_fence</span>.<span class="ident">is_none</span>());
 
         <span class="ident">must_prewrite_put_async_commit</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">k</span>, <span class="ident">v</span>, <span class="ident">k</span>, <span class="kw-2">&amp;</span><span class="prelude-val">Some</span>(<span class="macro">vec</span><span class="macro">!</span>[]), <span class="number">30</span>, <span class="number">0</span>);
         <span class="ident">check_secondary_locks</span>::<span class="ident">tests</span>::<span class="ident">must_success</span>(
@@ -3662,6 +3271,7 @@
         <span class="ident">must_commit</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">k</span>, <span class="number">30</span>, <span class="number">35</span>);
         <span class="kw">let</span> <span class="ident">w</span> <span class="op">=</span> <span class="ident">must_written</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">k</span>, <span class="number">30</span>, <span class="number">35</span>, <span class="ident">WriteType</span>::<span class="ident">Put</span>);
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">w</span>.<span class="ident">has_overlapped_rollback</span>);
+        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">w</span>.<span class="ident">gc_fence</span>.<span class="ident">is_none</span>());
 
         <span class="comment">// Do not commit with overlapped_rollback if the rollback ts doesn&#39;t equal to commit_ts.</span>
         <span class="ident">must_prewrite_put_async_commit</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">k</span>, <span class="ident">v</span>, <span class="ident">k</span>, <span class="kw-2">&amp;</span><span class="prelude-val">Some</span>(<span class="macro">vec</span><span class="macro">!</span>[]), <span class="number">40</span>, <span class="number">0</span>);
@@ -3833,4 +3443,5 @@
     }
 }
 </pre></div>
-</section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../../../";window.currentCrate = "tikv";</script><script src="../../../../main.js"></script><script src="../../../../source-script.js"></script><script src="../../../../source-files.js"></script><script defer src="../../../../search-index.js"></script></body></html>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="tikv"></div>
+    <script src="../../../../main.js"></script><script src="../../../../source-script.js"></script><script src="../../../../source-files.js"></script><script defer src="../../../../search-index.js"></script></body></html>

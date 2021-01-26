@@ -1,4 +1,3 @@
 (function() {var implementors = {};
-implementors["batch_system"] = [];
 implementors["raftstore"] = [{"text":"impl&lt;EK, W&gt; PollHandler&lt;ApplyFsm&lt;EK&gt;, ControlFsm&gt; for ApplyPoller&lt;EK, W&gt; <span class=\"where fmt-newline\">where<br>&nbsp;&nbsp;&nbsp;&nbsp;EK: KvEngine,<br>&nbsp;&nbsp;&nbsp;&nbsp;W: WriteBatch&lt;EK&gt;,&nbsp;</span>","synthetic":false,"types":[]},{"text":"impl&lt;EK:&nbsp;KvEngine, ER:&nbsp;RaftEngine, T:&nbsp;Transport&gt; PollHandler&lt;PeerFsm&lt;EK, ER&gt;, StoreFsm&lt;EK&gt;&gt; for RaftPoller&lt;EK, ER, T&gt;","synthetic":false,"types":[]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

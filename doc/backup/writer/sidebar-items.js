@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["BackupRawKVWriter","A writer writes Raw kv into SST files."],["BackupWriter","A writer writes txn entries into SST files."],["Writer",""]]});
+initSidebarItems({"struct":[["BackupRawKVWriter","A writer writes Raw kv into SST files."],["BackupWriter","A writer writes txn entries into SST files."],["BackupWriterBuilder",""],["Writer",""]]});

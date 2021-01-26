@@ -1,1 +1,0 @@
-initSidebarItems({"enum":[["Message","Message `Runner` can accepts."]],"struct":[["Builder",""],["HandleMetrics",""],["Handler",""],["Runner","A simple runner used for benchmarking only."]]});

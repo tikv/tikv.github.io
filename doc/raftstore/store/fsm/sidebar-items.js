@@ -1,1 +1,1 @@
-initSidebarItems({"mod":[["apply",""],["metrics",""],["peer",""],["store",""]],"struct":[["DestroyPeerJob",""],["PeerFsm",""]]});
+initSidebarItems({"mod":[["apply",""],["metrics",""],["peer",""],["store",""]],"struct":[["CollectedReady",""],["DestroyPeerJob",""],["PeerFsm",""]]});

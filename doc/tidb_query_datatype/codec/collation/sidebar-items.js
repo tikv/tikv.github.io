@@ -1,1 +1,1 @@
-initSidebarItems({"mod":[["charset",""],["collator",""]],"struct":[["SortKey",""]],"trait":[["Charset",""],["Collator",""]]});
+initSidebarItems({"macro":[["match_template_collator",""]],"mod":[["charset",""],["collator",""]],"struct":[["SortKey",""]],"trait":[["Charset",""],["Collator",""]]});

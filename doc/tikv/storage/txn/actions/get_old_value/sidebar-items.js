@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["get_old_value","Read the old value for key for CDC. `prev_write` stands for the previous write record of the key it must be read in the caller and be passed in for optimization"]]});

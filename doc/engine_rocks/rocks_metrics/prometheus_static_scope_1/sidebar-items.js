@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["SimpleEngineTickerMetrics",""],["SimpleEngineTickerMetricsDelegator",""],["SimpleEngineTickerMetricsInner",""]]});
+initSidebarItems({"struct":[["EngineTickerMetrics",""],["EngineTickerMetrics2Delegator",""],["EngineTickerMetrics2Inner",""],["EngineTickerMetricsDelegator",""],["EngineTickerMetricsInner",""]]});

@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["READ_BUF_SIZE",""]],"enum":[["CredentialsProvider",""]],"fn":[["get_region",""],["new_http_client",""]],"macro":[["new_client",""]],"struct":[["DefaultCredentialsProvider",""]]});
+initSidebarItems({"constant":[["READ_BUF_SIZE",""]],"fn":[["get_region",""],["new_http_client",""]],"struct":[["CredentialsProvider",""],["DefaultCredentialsProvider",""]]});

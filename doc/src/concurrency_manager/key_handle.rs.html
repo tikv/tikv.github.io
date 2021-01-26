@@ -1,6 +1,6 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `components/concurrency_manager/src/key_handle.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>key_handle.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `components/concurrency_manager/src/key_handle.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>key_handle.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
 <link rel="alternate icon" type="image/png" href="../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../concurrency_manager/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><span class="help-button">?</span>
+<link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../concurrency_manager/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
                 <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
 <span id="2">  2</span>
 <span id="3">  3</span>
@@ -134,12 +134,30 @@
 <span id="131">131</span>
 <span id="132">132</span>
 <span id="133">133</span>
+<span id="134">134</span>
+<span id="135">135</span>
+<span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
+<span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
+<span id="144">144</span>
+<span id="145">145</span>
+<span id="146">146</span>
+<span id="147">147</span>
+<span id="148">148</span>
+<span id="149">149</span>
+<span id="150">150</span>
+<span id="151">151</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">lock_table</span>::<span class="ident">LockTable</span>;
 <span class="kw">use</span> <span class="ident">parking_lot</span>::<span class="ident">Mutex</span>;
-<span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">mem</span>, <span class="ident">sync</span>::<span class="ident">Arc</span>};
+<span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">cell</span>::<span class="ident">UnsafeCell</span>, <span class="ident">mem</span>, <span class="ident">sync</span>::<span class="ident">Arc</span>};
 <span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">sync</span>::{<span class="ident">Mutex</span> <span class="kw">as</span> <span class="ident">AsyncMutex</span>, <span class="ident">MutexGuard</span> <span class="kw">as</span> <span class="ident">AsyncMutexGuard</span>};
 <span class="kw">use</span> <span class="ident">txn_types</span>::{<span class="ident">Key</span>, <span class="ident">Lock</span>};
 
@@ -147,26 +165,26 @@
 <span class="doccomment">/// key.</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">KeyHandle</span> {
     <span class="kw">pub</span> <span class="ident">key</span>: <span class="ident">Key</span>,
-    <span class="ident">table</span>: <span class="ident">LockTable</span>,
+    <span class="ident">table</span>: <span class="ident">UnsafeCell</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">LockTable</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">mutex</span>: <span class="ident">AsyncMutex</span><span class="op">&lt;</span>()<span class="op">&gt;</span>,
     <span class="ident">lock_store</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Lock</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">KeyHandle</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">key</span>: <span class="ident">Key</span>, <span class="ident">table</span>: <span class="ident">LockTable</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">key</span>: <span class="ident">Key</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="ident">KeyHandle</span> {
             <span class="ident">key</span>,
-            <span class="ident">table</span>,
+            <span class="ident">table</span>: <span class="ident">UnsafeCell</span>::<span class="ident">new</span>(<span class="prelude-val">None</span>),
             <span class="ident">mutex</span>: <span class="ident">AsyncMutex</span>::<span class="ident">new</span>(()),
             <span class="ident">lock_store</span>: <span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="prelude-val">None</span>),
         }
     }
 
-    <span class="kw">pub</span> <span class="ident">async</span> <span class="kw">fn</span> <span class="ident">lock</span>(<span class="self">self</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">KeyHandleGuard</span> {
+    <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">lock</span>(<span class="self">self</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">KeyHandleGuard</span> {
         <span class="comment">// Safety: `_mutex_guard` is declared before `handle_ref` in `KeyHandleGuard`.</span>
         <span class="comment">// So the mutex guard will be released earlier than the `Arc&lt;KeyHandle&gt;`.</span>
         <span class="comment">// Then we can make sure the mutex guard doesn&#39;t point to released memory.</span>
-        <span class="kw">let</span> <span class="ident">mutex_guard</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">mem</span>::<span class="ident">transmute</span>(<span class="self">self</span>.<span class="ident">mutex</span>.<span class="ident">lock</span>().<span class="ident">await</span>) };
+        <span class="kw">let</span> <span class="ident">mutex_guard</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">mem</span>::<span class="ident">transmute</span>(<span class="self">self</span>.<span class="ident">mutex</span>.<span class="ident">lock</span>().<span class="kw">await</span>) };
         <span class="ident">KeyHandleGuard</span> {
             <span class="ident">_mutex_guard</span>: <span class="ident">mutex_guard</span>,
             <span class="ident">handle</span>: <span class="self">self</span>,
@@ -176,13 +194,28 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">with_lock</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw">impl</span> <span class="ident">FnOnce</span>(<span class="kw-2">&amp;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Lock</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">T</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">T</span> {
         <span class="ident">f</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="self">self</span>.<span class="ident">lock_store</span>.<span class="ident">lock</span>())
     }
+
+    <span class="doccomment">/// Set the LockTable that the KeyHandle is in.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// This method is not thread safe. Make sure that no other threads access</span>
+    <span class="doccomment">/// `table` at the same time.</span>
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">set_table</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">table</span>: <span class="ident">LockTable</span>) {
+        <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">table</span>.<span class="ident">get</span>() <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">table</span>);
+    }
 }
 
 <span class="kw">impl</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">KeyHandle</span> {
     <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">table</span>.<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">key</span>);
+        <span class="comment">// SAFETY: `&amp;mut self` ensures it&#39;s the only thread that can access `table`.</span>
+        <span class="kw">unsafe</span> {
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">table</span>) <span class="op">=</span> <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="self">self</span>.<span class="ident">table</span>.<span class="ident">get</span>() {
+                <span class="ident">table</span>.<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">key</span>);
+            }
+        }
     }
 }
+
+<span class="kw">unsafe</span> <span class="kw">impl</span> <span class="ident">Sync</span> <span class="kw">for</span> <span class="ident">KeyHandle</span> {}
 
 <span class="doccomment">/// A `KeyHandle` with its mutex locked.</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">KeyHandleGuard</span> {
@@ -201,6 +234,10 @@
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">with_lock</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw">impl</span> <span class="ident">FnOnce</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Lock</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">T</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">T</span> {
         <span class="ident">f</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">handle</span>.<span class="ident">lock_store</span>.<span class="ident">lock</span>())
+    }
+
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">handle</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">KeyHandle</span><span class="op">&gt;</span> {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">handle</span>
     }
 }
 
@@ -223,42 +260,41 @@
     <span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">time</span>::<span class="ident">delay_for</span>;
 
     <span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">test</span>]</span>
-    <span class="ident">async</span> <span class="kw">fn</span> <span class="ident">test_key_mutex</span>() {
-        <span class="kw">let</span> <span class="ident">table</span> <span class="op">=</span> <span class="ident">LockTable</span>::<span class="ident">default</span>();
-        <span class="kw">let</span> <span class="ident">key_handle</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">KeyHandle</span>::<span class="ident">new</span>(<span class="ident">Key</span>::<span class="ident">from_raw</span>(<span class="string">b&quot;k&quot;</span>), <span class="ident">table</span>.<span class="ident">clone</span>()));
-        <span class="ident">table</span>
-            .<span class="number">0</span>
-            .<span class="ident">insert</span>(<span class="ident">Key</span>::<span class="ident">from_raw</span>(<span class="string">b&quot;k&quot;</span>), <span class="ident">Arc</span>::<span class="ident">downgrade</span>(<span class="kw-2">&amp;</span><span class="ident">key_handle</span>));
+    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">test_key_mutex</span>() {
+        <span class="kw">let</span> <span class="ident">key_handle</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">KeyHandle</span>::<span class="ident">new</span>(<span class="ident">Key</span>::<span class="ident">from_raw</span>(<span class="string">b&quot;k&quot;</span>)));
 
         <span class="kw">let</span> <span class="ident">counter</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">AtomicUsize</span>::<span class="ident">new</span>(<span class="number">0</span>));
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">handles</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">new</span>();
         <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="number">100</span> {
             <span class="kw">let</span> <span class="ident">key_handle</span> <span class="op">=</span> <span class="ident">key_handle</span>.<span class="ident">clone</span>();
             <span class="kw">let</span> <span class="ident">counter</span> <span class="op">=</span> <span class="ident">counter</span>.<span class="ident">clone</span>();
-            <span class="kw">let</span> <span class="ident">handle</span> <span class="op">=</span> <span class="ident">tokio</span>::<span class="ident">spawn</span>(<span class="ident">async</span> <span class="kw">move</span> {
-                <span class="kw">let</span> <span class="ident">_guard</span> <span class="op">=</span> <span class="ident">key_handle</span>.<span class="ident">lock</span>().<span class="ident">await</span>;
+            <span class="kw">let</span> <span class="ident">handle</span> <span class="op">=</span> <span class="ident">tokio</span>::<span class="ident">spawn</span>(<span class="kw">async</span> <span class="kw">move</span> {
+                <span class="kw">let</span> <span class="ident">_guard</span> <span class="op">=</span> <span class="ident">key_handle</span>.<span class="ident">lock</span>().<span class="kw">await</span>;
                 <span class="comment">// Modify an atomic counter with a mutex guard. The value of the counter</span>
                 <span class="comment">// should remain unchanged if the mutex works.</span>
                 <span class="kw">let</span> <span class="ident">counter_val</span> <span class="op">=</span> <span class="ident">counter</span>.<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>) <span class="op">+</span> <span class="number">1</span>;
-                <span class="ident">delay_for</span>(<span class="ident">Duration</span>::<span class="ident">from_millis</span>(<span class="number">1</span>)).<span class="ident">await</span>;
+                <span class="ident">delay_for</span>(<span class="ident">Duration</span>::<span class="ident">from_millis</span>(<span class="number">1</span>)).<span class="kw">await</span>;
                 <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">counter</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>), <span class="ident">counter_val</span>);
             });
             <span class="ident">handles</span>.<span class="ident">push</span>(<span class="ident">handle</span>);
         }
         <span class="kw">for</span> <span class="ident">handle</span> <span class="kw">in</span> <span class="ident">handles</span> {
-            <span class="ident">handle</span>.<span class="ident">await</span>.<span class="ident">unwrap</span>();
+            <span class="ident">handle</span>.<span class="kw">await</span>.<span class="ident">unwrap</span>();
         }
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">counter</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>), <span class="number">100</span>);
     }
 
     <span class="attribute">#[<span class="ident">tokio</span>::<span class="ident">test</span>]</span>
-    <span class="ident">async</span> <span class="kw">fn</span> <span class="ident">test_ref_count</span>() {
+    <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">test_ref_count</span>() {
         <span class="kw">let</span> <span class="ident">table</span> <span class="op">=</span> <span class="ident">LockTable</span>::<span class="ident">default</span>();
 
         <span class="kw">let</span> <span class="ident">k</span> <span class="op">=</span> <span class="ident">Key</span>::<span class="ident">from_raw</span>(<span class="string">b&quot;k&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">handle</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">KeyHandle</span>::<span class="ident">new</span>(<span class="ident">k</span>.<span class="ident">clone</span>(), <span class="ident">table</span>.<span class="ident">clone</span>()));
+        <span class="kw">let</span> <span class="ident">handle</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">KeyHandle</span>::<span class="ident">new</span>(<span class="ident">k</span>.<span class="ident">clone</span>()));
         <span class="ident">table</span>.<span class="number">0</span>.<span class="ident">insert</span>(<span class="ident">k</span>.<span class="ident">clone</span>(), <span class="ident">Arc</span>::<span class="ident">downgrade</span>(<span class="kw-2">&amp;</span><span class="ident">handle</span>));
+        <span class="kw">unsafe</span> {
+            <span class="ident">handle</span>.<span class="ident">set_table</span>(<span class="ident">table</span>.<span class="ident">clone</span>());
+        }
         <span class="kw">let</span> <span class="ident">lock_ref1</span> <span class="op">=</span> <span class="ident">table</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">k</span>).<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">lock_ref2</span> <span class="op">=</span> <span class="ident">table</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">k</span>).<span class="ident">unwrap</span>();
         <span class="ident">drop</span>(<span class="ident">handle</span>);
@@ -269,4 +305,5 @@
     }
 }
 </pre></div>
-</section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../";window.currentCrate = "concurrency_manager";</script><script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script><script defer src="../../search-index.js"></script></body></html>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="concurrency_manager"></div>
+    <script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script><script defer src="../../search-index.js"></script></body></html>

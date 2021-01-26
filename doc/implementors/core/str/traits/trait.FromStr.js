@@ -19,7 +19,6 @@ implementors["num_format"] = [{"text":"impl FromStr for Locale","synthetic":fals
 implementors["num_rational"] = [{"text":"impl&lt;T:&nbsp;FromStr + Clone + Integer&gt; FromStr for Ratio&lt;T&gt;","synthetic":false,"types":[]}];
 implementors["ordered_float"] = [{"text":"impl&lt;T:&nbsp;Float + FromStr&gt; FromStr for OrderedFloat&lt;T&gt;","synthetic":false,"types":[]},{"text":"impl&lt;T:&nbsp;Float + FromStr&gt; FromStr for NotNan&lt;T&gt;","synthetic":false,"types":[]}];
 implementors["pnet_base"] = [{"text":"impl FromStr for MacAddr","synthetic":false,"types":[]}];
-implementors["proc_macro2"] = [{"text":"impl FromStr for TokenStream","synthetic":false,"types":[]}];
 implementors["procfs"] = [{"text":"impl FromStr for LimitValue","synthetic":false,"types":[]},{"text":"impl FromStr for ProcState","synthetic":false,"types":[]},{"text":"impl FromStr for FDTarget","synthetic":false,"types":[]},{"text":"impl FromStr for Version","synthetic":false,"types":[]},{"text":"impl FromStr for DropCache","synthetic":false,"types":[]}];
 implementors["regex"] = [{"text":"impl FromStr for Regex","synthetic":false,"types":[]},{"text":"impl FromStr for Regex","synthetic":false,"types":[]}];
 implementors["rusoto_signature"] = [{"text":"impl FromStr for Region","synthetic":false,"types":[]}];

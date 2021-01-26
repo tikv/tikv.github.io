@@ -1,1 +1,0 @@
-initSidebarItems({"enum":[["Err","Contains the error that a parser can return"]]});
