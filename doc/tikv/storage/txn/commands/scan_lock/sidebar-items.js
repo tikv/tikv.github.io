@@ -1,1 +1,0 @@
-initSidebarItems({"struct":[["ScanLock","Scan locks from `start_key`, and find all locks whose timestamp is before `max_ts`."]]});
