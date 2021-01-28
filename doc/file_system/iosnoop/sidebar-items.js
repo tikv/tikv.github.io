@@ -1,1 +1,1 @@
-initSidebarItems({"mod":[["imp",""],["metrics",""]],"struct":[["IOStats",""]]});
+initSidebarItems({"mod":[["imp",""]]});

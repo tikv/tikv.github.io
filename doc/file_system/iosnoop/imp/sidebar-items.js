@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["IO_TYPE",""]],"fn":[["flush_io_metrics",""],["get_io_type",""],["init_io_snooper",""],["set_io_type",""]],"struct":[["IOContext",""]]});
+initSidebarItems({"constant":[["IO_TYPE",""]],"fn":[["fetch_io_bytes",""],["flush_io_latency_metrics",""],["get_io_type",""],["init_io_snooper",""],["set_io_type",""]]});

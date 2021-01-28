@@ -243,6 +243,7 @@
 <span id="240">240</span>
 <span id="241">241</span>
 <span id="242">242</span>
+<span id="243">243</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -455,8 +456,9 @@
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_instrumented_file</span>() {
-        <span class="kw">let</span> <span class="ident">recorder</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">BytesRecorder</span>::<span class="ident">new</span>());
-        <span class="ident">set_io_rate_limiter</span>(<span class="ident">IORateLimiter</span>::<span class="ident">new</span>(<span class="number">1</span>, <span class="prelude-val">Some</span>(<span class="ident">recorder</span>.<span class="ident">clone</span>())));
+        <span class="kw">let</span> <span class="ident">limiter</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">IORateLimiter</span>::<span class="ident">new</span>(<span class="number">1</span>, <span class="bool-val">true</span>));
+        <span class="kw">let</span> <span class="ident">stats</span> <span class="op">=</span> <span class="ident">limiter</span>.<span class="ident">statistics</span>();
+        <span class="kw">let</span> <span class="ident">_guard</span> <span class="op">=</span> <span class="ident">WithIORateLimiter</span>::<span class="ident">new</span>(<span class="prelude-val">Some</span>(<span class="ident">limiter</span>));
 
         <span class="kw">let</span> <span class="ident">tmp_dir</span> <span class="op">=</span> <span class="ident">TempDir</span>::<span class="ident">new</span>().<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">tmp_file</span> <span class="op">=</span> <span class="ident">tmp_dir</span>.<span class="ident">path</span>().<span class="ident">join</span>(<span class="string">&quot;instrumented.txt&quot;</span>);
@@ -467,7 +469,7 @@
             <span class="ident">f</span>.<span class="ident">write_all</span>(<span class="ident">content</span>.<span class="ident">as_bytes</span>()).<span class="ident">unwrap</span>();
             <span class="ident">f</span>.<span class="ident">sync_all</span>().<span class="ident">unwrap</span>();
             <span class="macro">assert_eq</span><span class="macro">!</span>(
-                <span class="ident">recorder</span>.<span class="ident">fetch</span>(<span class="ident">IOType</span>::<span class="ident">ForegroundWrite</span>, <span class="ident">IOOp</span>::<span class="ident">Write</span>),
+                <span class="ident">stats</span>.<span class="ident">fetch</span>(<span class="ident">IOType</span>::<span class="ident">ForegroundWrite</span>, <span class="ident">IOOp</span>::<span class="ident">Write</span>),
                 <span class="ident">content</span>.<span class="ident">len</span>()
             );
         }
@@ -480,7 +482,7 @@
             <span class="comment">// read_to_string only exit when file.read() returns zero, which means</span>
             <span class="comment">// it requires two EOF reads to finish the call.</span>
             <span class="macro">assert_eq</span><span class="macro">!</span>(
-                <span class="ident">recorder</span>.<span class="ident">fetch</span>(<span class="ident">IOType</span>::<span class="ident">ForegroundRead</span>, <span class="ident">IOOp</span>::<span class="ident">Read</span>),
+                <span class="ident">stats</span>.<span class="ident">fetch</span>(<span class="ident">IOType</span>::<span class="ident">ForegroundRead</span>, <span class="ident">IOOp</span>::<span class="ident">Read</span>),
                 <span class="ident">content</span>.<span class="ident">len</span>() <span class="op">+</span> <span class="number">2</span>
             );
         }

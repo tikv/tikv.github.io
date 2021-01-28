@@ -112,28 +112,56 @@
 <span id="109">109</span>
 <span id="110">110</span>
 <span id="111">111</span>
+<span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
+<span id="118">118</span>
+<span id="119">119</span>
+<span id="120">120</span>
+<span id="121">121</span>
+<span id="122">122</span>
+<span id="123">123</span>
+<span id="124">124</span>
+<span id="125">125</span>
+<span id="126">126</span>
+<span id="127">127</span>
+<span id="128">128</span>
+<span id="129">129</span>
+<span id="130">130</span>
+<span id="131">131</span>
+<span id="132">132</span>
+<span id="133">133</span>
+<span id="134">134</span>
+<span id="135">135</span>
+<span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
 <span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">IOOp</span>, <span class="ident">IOType</span>};
 
+<span class="kw">use</span> <span class="ident">crossbeam_utils</span>::<span class="ident">CachePadded</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">future</span>::{<span class="self">self</span>, <span class="ident">Future</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::{
-    <span class="ident">atomic</span>::{<span class="self">self</span>, <span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>},
+    <span class="ident">atomic</span>::{<span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>},
     <span class="ident">Arc</span>, <span class="ident">Mutex</span>,
 };
 
 <span class="doccomment">/// Record accumulated bytes through of different types.</span>
 <span class="doccomment">/// Used for testing and metrics.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">BytesRecorder</span> {
-    <span class="ident">read</span>: [<span class="ident">AtomicUsize</span>; <span class="ident">IOType</span>::<span class="ident">VARIANT_COUNT</span>],
-    <span class="ident">write</span>: [<span class="ident">AtomicUsize</span>; <span class="ident">IOType</span>::<span class="ident">VARIANT_COUNT</span>],
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">IORateLimiterStatistics</span> {
+    <span class="ident">read</span>: [<span class="ident">CachePadded</span><span class="op">&lt;</span><span class="ident">AtomicUsize</span><span class="op">&gt;</span>; <span class="ident">IOType</span>::<span class="ident">VARIANT_COUNT</span>],
+    <span class="ident">write</span>: [<span class="ident">CachePadded</span><span class="op">&lt;</span><span class="ident">AtomicUsize</span><span class="op">&gt;</span>; <span class="ident">IOType</span>::<span class="ident">VARIANT_COUNT</span>],
 }
 
-<span class="kw">impl</span> <span class="ident">BytesRecorder</span> {
+<span class="kw">impl</span> <span class="ident">IORateLimiterStatistics</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="ident">BytesRecorder</span> {
+        <span class="ident">IORateLimiterStatistics</span> {
             <span class="ident">read</span>: <span class="ident">Default</span>::<span class="ident">default</span>(),
             <span class="ident">write</span>: <span class="ident">Default</span>::<span class="ident">default</span>(),
         }
@@ -172,25 +200,35 @@
 <span class="doccomment">/// An instance of `IORateLimiter` should be safely shared between threads.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">IORateLimiter</span> {
-    <span class="ident">refill_bytes</span>: <span class="ident">AtomicUsize</span>,
-    <span class="ident">recorder</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">BytesRecorder</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">refill_bytes</span>: <span class="ident">usize</span>,
+    <span class="ident">enable_statistics</span>: <span class="ident">bool</span>,
+    <span class="ident">stats</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">IORateLimiterStatistics</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">IORateLimiter</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">refill_bytes</span>: <span class="ident">usize</span>, <span class="ident">recorder</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">BytesRecorder</span><span class="op">&gt;</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">IORateLimiter</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">refill_bytes</span>: <span class="ident">usize</span>, <span class="ident">enable_statistics</span>: <span class="ident">bool</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">IORateLimiter</span> {
         <span class="ident">IORateLimiter</span> {
-            <span class="ident">refill_bytes</span>: <span class="ident">AtomicUsize</span>::<span class="ident">new</span>(<span class="ident">refill_bytes</span>),
-            <span class="ident">recorder</span>,
+            <span class="ident">refill_bytes</span>,
+            <span class="ident">enable_statistics</span>,
+            <span class="ident">stats</span>: <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">IORateLimiterStatistics</span>::<span class="ident">new</span>()),
         }
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">statistics</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">IORateLimiterStatistics</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">stats</span>.<span class="ident">clone</span>()
     }
 
     <span class="doccomment">/// Request for token for bytes and potentially update statistics. If this</span>
     <span class="doccomment">/// request can not be satisfied, the call is blocked. Granted token can be</span>
     <span class="doccomment">/// less than the requested bytes, but must be greater than zero.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">request</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">io_type</span>: <span class="ident">IOType</span>, <span class="ident">io_op</span>: <span class="ident">IOOp</span>, <span class="ident">bytes</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
-        <span class="kw">let</span> <span class="ident">bytes</span> <span class="op">=</span> <span class="ident">std</span>::<span class="ident">cmp</span>::<span class="ident">min</span>(<span class="self">self</span>.<span class="ident">refill_bytes</span>.<span class="ident">load</span>(<span class="ident">atomic</span>::<span class="ident">Ordering</span>::<span class="ident">Relaxed</span>), <span class="ident">bytes</span>);
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">recorder</span>) <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">recorder</span> {
-            <span class="ident">recorder</span>.<span class="ident">add</span>(<span class="ident">io_type</span>, <span class="ident">io_op</span>, <span class="ident">bytes</span>);
+        <span class="kw">let</span> <span class="ident">bytes</span> <span class="op">=</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">refill_bytes</span> <span class="op">&gt;</span> <span class="number">0</span> {
+            <span class="ident">std</span>::<span class="ident">cmp</span>::<span class="ident">min</span>(<span class="self">self</span>.<span class="ident">refill_bytes</span>, <span class="ident">bytes</span>)
+        } <span class="kw">else</span> {
+            <span class="ident">bytes</span>
+        };
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">enable_statistics</span> {
+            <span class="self">self</span>.<span class="ident">stats</span>.<span class="ident">add</span>(<span class="ident">io_type</span>, <span class="ident">io_op</span>, <span class="ident">bytes</span>);
         }
         <span class="ident">bytes</span>
     }
@@ -203,18 +241,14 @@
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="kw">impl</span> <span class="ident">Future</span><span class="op">&lt;</span><span class="ident">Output</span> <span class="op">=</span> <span class="ident">usize</span><span class="op">&gt;</span> {
         <span class="ident">future</span>::<span class="ident">ready</span>(<span class="self">self</span>.<span class="ident">request</span>(<span class="ident">io_type</span>, <span class="ident">io_op</span>, <span class="ident">bytes</span>))
     }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">disable_rate_limit</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_io_type</span>: <span class="ident">IOType</span>) {}
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">enable_rate_limit</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_io_type</span>: <span class="ident">IOType</span>) {}
 }
 
 <span class="macro">lazy_static</span><span class="macro">!</span> {
     <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">IO_RATE_LIMITER</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">IORateLimiter</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="prelude-val">None</span>);
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_io_rate_limiter</span>(<span class="ident">limiter</span>: <span class="ident">IORateLimiter</span>) {
-    <span class="kw-2">*</span><span class="ident">IO_RATE_LIMITER</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>() <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">limiter</span>));
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_io_rate_limiter</span>(<span class="ident">limiter</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">IORateLimiter</span><span class="op">&gt;</span><span class="op">&gt;</span>) {
+    <span class="kw-2">*</span><span class="ident">IO_RATE_LIMITER</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>() <span class="op">=</span> <span class="ident">limiter</span>;
 }
 
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_io_rate_limiter</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">IORateLimiter</span><span class="op">&gt;</span><span class="op">&gt;</span> {
@@ -222,6 +256,26 @@
         <span class="prelude-val">Some</span>(<span class="ident">limiter</span>.<span class="ident">clone</span>())
     } <span class="kw">else</span> {
         <span class="prelude-val">None</span>
+    }
+}
+
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">WithIORateLimiter</span> {
+    <span class="ident">previous_io_rate_limiter</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">IORateLimiter</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+}
+
+<span class="kw">impl</span> <span class="ident">WithIORateLimiter</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">limiter</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">IORateLimiter</span><span class="op">&gt;</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+        <span class="kw">let</span> <span class="ident">previous_io_rate_limiter</span> <span class="op">=</span> <span class="ident">get_io_rate_limiter</span>();
+        <span class="ident">set_io_rate_limiter</span>(<span class="ident">limiter</span>);
+        <span class="ident">WithIORateLimiter</span> {
+            <span class="ident">previous_io_rate_limiter</span>,
+        }
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">WithIORateLimiter</span> {
+    <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
+        <span class="ident">set_io_rate_limiter</span>(<span class="self">self</span>.<span class="ident">previous_io_rate_limiter</span>.<span class="ident">take</span>());
     }
 }
 </pre></div>
