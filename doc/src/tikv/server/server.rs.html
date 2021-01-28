@@ -514,6 +514,19 @@
 <span id="511">511</span>
 <span id="512">512</span>
 <span id="513">513</span>
+<span id="514">514</span>
+<span id="515">515</span>
+<span id="516">516</span>
+<span id="517">517</span>
+<span id="518">518</span>
+<span id="519">519</span>
+<span id="520">520</span>
+<span id="521">521</span>
+<span id="522">522</span>
+<span id="523">523</span>
+<span id="524">524</span>
+<span id="525">525</span>
+<span id="526">526</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -521,7 +534,7 @@
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">net</span>::{<span class="ident">IpAddr</span>, <span class="ident">SocketAddr</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">str</span>::<span class="ident">FromStr</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">Arc</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">time</span>::{<span class="ident">Duration</span>, <span class="ident">Instant</span>};
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">time</span>::{<span class="ident">Duration</span>, <span class="ident">Instant</span>, <span class="ident">SystemTime</span>, <span class="ident">UNIX_EPOCH</span>};
 
 <span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">compat</span>::<span class="ident">Stream01CompatExt</span>;
 <span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">stream</span>::<span class="ident">StreamExt</span>;
@@ -543,12 +556,13 @@
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">Either</span>;
 
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">load_statistics</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="kw">super</span>::<span class="ident">metrics</span>::<span class="ident">SERVER_INFO_GAUGE_VEC</span>;
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">raft_client</span>::{<span class="ident">ConnectionBuilder</span>, <span class="ident">RaftClient</span>};
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">resolve</span>::<span class="ident">StoreAddrResolver</span>;
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">service</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">snap</span>::{<span class="ident">Runner</span> <span class="kw">as</span> <span class="ident">SnapHandler</span>, <span class="ident">Task</span> <span class="kw">as</span> <span class="ident">SnapTask</span>};
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">transport</span>::<span class="ident">ServerTransport</span>;
-<span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">Config</span>, <span class="prelude-ty">Result</span>};
+<span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">Config</span>, <span class="ident">Error</span>, <span class="prelude-ty">Result</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">read_pool</span>::<span class="ident">ReadPool</span>;
 
 <span class="kw">const</span> <span class="ident">LOAD_STATISTICS_SLOTS</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">4</span>;
@@ -760,6 +774,18 @@
                 }
             });
         };
+
+        <span class="kw">let</span> <span class="ident">startup_ts</span> <span class="op">=</span> <span class="ident">SystemTime</span>::<span class="ident">now</span>()
+            .<span class="ident">duration_since</span>(<span class="ident">UNIX_EPOCH</span>)
+            .<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">Error</span>::<span class="ident">Other</span>(<span class="macro">box_err</span><span class="macro">!</span>(<span class="string">&quot;Clock may have gone backwards&quot;</span>)))<span class="question-mark">?</span>
+            .<span class="ident">as_secs</span>();
+
+        <span class="ident">SERVER_INFO_GAUGE_VEC</span>
+            .<span class="ident">with_label_values</span>(<span class="kw-2">&amp;</span>[
+                <span class="kw-2">&amp;</span>(<span class="string">&quot;v&quot;</span>.<span class="ident">to_owned</span>() <span class="op">+</span> <span class="macro">env</span><span class="macro">!</span>(<span class="string">&quot;CARGO_PKG_VERSION&quot;</span>)),
+                <span class="macro">option_env</span><span class="macro">!</span>(<span class="string">&quot;TIKV_BUILD_GIT_HASH&quot;</span>).<span class="ident">unwrap_or</span>(<span class="string">&quot;None&quot;</span>),
+            ])
+            .<span class="ident">set</span>(<span class="ident">startup_ts</span> <span class="kw">as</span> <span class="ident">i64</span>);
 
         <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;TiKV is ready to serve&quot;</span>);
         <span class="prelude-val">Ok</span>(())
