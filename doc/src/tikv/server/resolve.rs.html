@@ -292,6 +292,17 @@
 <span id="289">289</span>
 <span id="290">290</span>
 <span id="291">291</span>
+<span id="292">292</span>
+<span id="293">293</span>
+<span id="294">294</span>
+<span id="295">295</span>
+<span id="296">296</span>
+<span id="297">297</span>
+<span id="298">298</span>
+<span id="299">299</span>
+<span id="300">300</span>
+<span id="301">301</span>
+<span id="302">302</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -301,7 +312,6 @@
 
 <span class="kw">use</span> <span class="ident">collections</span>::<span class="ident">HashMap</span>;
 <span class="kw">use</span> <span class="ident">engine_rocks</span>::<span class="ident">RocksEngine</span>;
-<span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">metapb</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">replication_modepb</span>::<span class="ident">ReplicationMode</span>;
 <span class="kw">use</span> <span class="ident">pd_client</span>::{<span class="ident">take_peer_address</span>, <span class="ident">PdClient</span>};
 <span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">router</span>::<span class="ident">RaftStoreRouter</span>;
@@ -377,7 +387,16 @@
 
     <span class="kw">fn</span> <span class="ident">get_address</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">store_id</span>: <span class="ident">u64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">pd_client</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">pd_client</span>);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">s</span> <span class="op">=</span> <span class="macro">box_try</span><span class="macro">!</span>(<span class="ident">pd_client</span>.<span class="ident">get_store</span>(<span class="ident">store_id</span>));
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">s</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">pd_client</span>.<span class="ident">get_store</span>(<span class="ident">store_id</span>) {
+            <span class="prelude-val">Ok</span>(<span class="ident">s</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">s</span>,
+            <span class="comment">// `get_store` will filter tombstone store, so here needs to handle</span>
+            <span class="comment">// it explicitly.</span>
+            <span class="prelude-val">Err</span>(<span class="ident">pd_client</span>::<span class="ident">Error</span>::<span class="ident">StoreTombstone</span>(<span class="kw">_</span>)) <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="ident">RESOLVE_STORE_COUNTER_STATIC</span>.<span class="ident">tombstone</span>.<span class="ident">inc</span>();
+                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(<span class="string">&quot;store {} has been removed&quot;</span>, <span class="ident">store_id</span>));
+            }
+            <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(<span class="ident">e</span>)),
+        };
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">group_id</span> <span class="op">=</span> <span class="prelude-val">None</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">state</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">state</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
         <span class="kw">if</span> <span class="ident">state</span>.<span class="ident">status</span>().<span class="ident">get_mode</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">ReplicationMode</span>::<span class="ident">DrAutoSync</span> {
@@ -391,10 +410,6 @@
         <span class="ident">drop</span>(<span class="ident">state</span>);
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">group_id</span>) <span class="op">=</span> <span class="ident">group_id</span> {
             <span class="self">self</span>.<span class="ident">router</span>.<span class="ident">report_resolved</span>(<span class="ident">store_id</span>, <span class="ident">group_id</span>);
-        }
-        <span class="kw">if</span> <span class="ident">s</span>.<span class="ident">get_state</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">metapb</span>::<span class="ident">StoreState</span>::<span class="ident">Tombstone</span> {
-            <span class="ident">RESOLVE_STORE_COUNTER_STATIC</span>.<span class="ident">tombstone</span>.<span class="ident">inc</span>();
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(<span class="string">&quot;store {} has been removed&quot;</span>, <span class="ident">store_id</span>));
         }
         <span class="kw">let</span> <span class="ident">addr</span> <span class="op">=</span> <span class="ident">take_peer_address</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">s</span>);
         <span class="comment">// In some tests, we use empty address for store first,</span>
@@ -486,6 +501,13 @@
 
     <span class="kw">impl</span> <span class="ident">PdClient</span> <span class="kw">for</span> <span class="ident">MockPdClient</span> {
         <span class="kw">fn</span> <span class="ident">get_store</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw">_</span>: <span class="ident">u64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">metapb</span>::<span class="ident">Store</span><span class="op">&gt;</span> {
+            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">store</span>.<span class="ident">get_state</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">metapb</span>::<span class="ident">StoreState</span>::<span class="ident">Tombstone</span> {
+                <span class="comment">// Simulate the behavior of `get_store` in pd client.</span>
+                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">pd_client</span>::<span class="ident">Error</span>::<span class="ident">StoreTombstone</span>(<span class="macro">format</span><span class="macro">!</span>(
+                    <span class="string">&quot;{:?}&quot;</span>,
+                    <span class="self">self</span>.<span class="ident">store</span>
+                )));
+            }
             <span class="comment">// The store address will be changed every millisecond.</span>
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">store</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">store</span>.<span class="ident">clone</span>();
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">sock</span> <span class="op">=</span> <span class="ident">SocketAddr</span>::<span class="ident">from_str</span>(<span class="ident">store</span>.<span class="ident">get_address</span>()).<span class="ident">unwrap</span>();
