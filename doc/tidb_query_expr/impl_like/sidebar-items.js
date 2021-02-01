@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["like",""],["like_fn_meta",""]],"struct":[["Like_Evaluator",""]],"trait":[["Like_Fn",""]]});
+initSidebarItems({"fn":[["init_regexp_data",""],["init_regexp_utf8_data",""],["like",""],["like_fn_meta",""],["regexp",""],["regexp_fn_meta",""],["regexp_utf8",""],["regexp_utf8_fn_meta",""]],"struct":[["Like_Evaluator",""],["RegexpUtf8_Evaluator",""],["Regexp_Evaluator",""]],"trait":[["Like_Fn",""],["RegexpUtf8_Fn",""],["Regexp_Fn",""]]});
