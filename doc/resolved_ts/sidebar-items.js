@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["Resolver",""]]});
+initSidebarItems({"enum":[["ChangeLog",""],["ChangeRow",""]],"mod":[["cmd",""],["resolver",""]],"struct":[["Resolver",""]]});

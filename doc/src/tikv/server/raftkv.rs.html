@@ -772,6 +772,10 @@
 <span id="769">769</span>
 <span id="770">770</span>
 <span id="771">771</span>
+<span id="772">772</span>
+<span id="773">773</span>
+<span id="774">774</span>
+<span id="775">775</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1170,42 +1174,7 @@
             <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">KvError</span>::<span class="ident">from</span>(<span class="ident">KvErrorInner</span>::<span class="ident">EmptyRequest</span>));
         }
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reqs</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">with_capacity</span>(<span class="ident">batch</span>.<span class="ident">modifies</span>.<span class="ident">len</span>());
-        <span class="kw">for</span> <span class="ident">m</span> <span class="kw">in</span> <span class="ident">batch</span>.<span class="ident">modifies</span> {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">Request</span>::<span class="ident">default</span>();
-            <span class="kw">match</span> <span class="ident">m</span> {
-                <span class="ident">Modify</span>::<span class="ident">Delete</span>(<span class="ident">cf</span>, <span class="ident">k</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">delete</span> <span class="op">=</span> <span class="ident">DeleteRequest</span>::<span class="ident">default</span>();
-                    <span class="ident">delete</span>.<span class="ident">set_key</span>(<span class="ident">k</span>.<span class="ident">into_encoded</span>());
-                    <span class="kw">if</span> <span class="ident">cf</span> <span class="op">!</span><span class="op">=</span> <span class="ident">CF_DEFAULT</span> {
-                        <span class="ident">delete</span>.<span class="ident">set_cf</span>(<span class="ident">cf</span>.<span class="ident">to_string</span>());
-                    }
-                    <span class="ident">req</span>.<span class="ident">set_cmd_type</span>(<span class="ident">CmdType</span>::<span class="ident">Delete</span>);
-                    <span class="ident">req</span>.<span class="ident">set_delete</span>(<span class="ident">delete</span>);
-                }
-                <span class="ident">Modify</span>::<span class="ident">Put</span>(<span class="ident">cf</span>, <span class="ident">k</span>, <span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">put</span> <span class="op">=</span> <span class="ident">PutRequest</span>::<span class="ident">default</span>();
-                    <span class="ident">put</span>.<span class="ident">set_key</span>(<span class="ident">k</span>.<span class="ident">into_encoded</span>());
-                    <span class="ident">put</span>.<span class="ident">set_value</span>(<span class="ident">v</span>);
-                    <span class="kw">if</span> <span class="ident">cf</span> <span class="op">!</span><span class="op">=</span> <span class="ident">CF_DEFAULT</span> {
-                        <span class="ident">put</span>.<span class="ident">set_cf</span>(<span class="ident">cf</span>.<span class="ident">to_string</span>());
-                    }
-                    <span class="ident">req</span>.<span class="ident">set_cmd_type</span>(<span class="ident">CmdType</span>::<span class="ident">Put</span>);
-                    <span class="ident">req</span>.<span class="ident">set_put</span>(<span class="ident">put</span>);
-                }
-                <span class="ident">Modify</span>::<span class="ident">DeleteRange</span>(<span class="ident">cf</span>, <span class="ident">start_key</span>, <span class="ident">end_key</span>, <span class="ident">notify_only</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">delete_range</span> <span class="op">=</span> <span class="ident">DeleteRangeRequest</span>::<span class="ident">default</span>();
-                    <span class="ident">delete_range</span>.<span class="ident">set_cf</span>(<span class="ident">cf</span>.<span class="ident">to_string</span>());
-                    <span class="ident">delete_range</span>.<span class="ident">set_start_key</span>(<span class="ident">start_key</span>.<span class="ident">into_encoded</span>());
-                    <span class="ident">delete_range</span>.<span class="ident">set_end_key</span>(<span class="ident">end_key</span>.<span class="ident">into_encoded</span>());
-                    <span class="ident">delete_range</span>.<span class="ident">set_notify_only</span>(<span class="ident">notify_only</span>);
-                    <span class="ident">req</span>.<span class="ident">set_cmd_type</span>(<span class="ident">CmdType</span>::<span class="ident">DeleteRange</span>);
-                    <span class="ident">req</span>.<span class="ident">set_delete_range</span>(<span class="ident">delete_range</span>);
-                }
-            }
-            <span class="ident">reqs</span>.<span class="ident">push</span>(<span class="ident">req</span>);
-        }
-
+        <span class="kw">let</span> <span class="ident">reqs</span> <span class="op">=</span> <span class="ident">modifies_to_requests</span>(<span class="ident">batch</span>.<span class="ident">modifies</span>);
         <span class="ident">ASYNC_REQUESTS_COUNTER_VEC</span>.<span class="ident">write</span>.<span class="ident">all</span>.<span class="ident">inc</span>();
         <span class="kw">let</span> <span class="ident">begin_instant</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now_coarse</span>();
 
@@ -1521,6 +1490,45 @@
         <span class="doccomment">/// It helps CDC recognize 1PC transactions and handle them correctly.</span>
         <span class="kw">const</span> <span class="ident">ONE_PC</span> <span class="op">=</span> <span class="number">0b00000001</span>;
     }
+}
+
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">modifies_to_requests</span>(<span class="ident">modifies</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Modify</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Request</span><span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reqs</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">with_capacity</span>(<span class="ident">modifies</span>.<span class="ident">len</span>());
+    <span class="kw">for</span> <span class="ident">m</span> <span class="kw">in</span> <span class="ident">modifies</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">Request</span>::<span class="ident">default</span>();
+        <span class="kw">match</span> <span class="ident">m</span> {
+            <span class="ident">Modify</span>::<span class="ident">Delete</span>(<span class="ident">cf</span>, <span class="ident">k</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">delete</span> <span class="op">=</span> <span class="ident">DeleteRequest</span>::<span class="ident">default</span>();
+                <span class="ident">delete</span>.<span class="ident">set_key</span>(<span class="ident">k</span>.<span class="ident">into_encoded</span>());
+                <span class="kw">if</span> <span class="ident">cf</span> <span class="op">!</span><span class="op">=</span> <span class="ident">CF_DEFAULT</span> {
+                    <span class="ident">delete</span>.<span class="ident">set_cf</span>(<span class="ident">cf</span>.<span class="ident">to_string</span>());
+                }
+                <span class="ident">req</span>.<span class="ident">set_cmd_type</span>(<span class="ident">CmdType</span>::<span class="ident">Delete</span>);
+                <span class="ident">req</span>.<span class="ident">set_delete</span>(<span class="ident">delete</span>);
+            }
+            <span class="ident">Modify</span>::<span class="ident">Put</span>(<span class="ident">cf</span>, <span class="ident">k</span>, <span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">put</span> <span class="op">=</span> <span class="ident">PutRequest</span>::<span class="ident">default</span>();
+                <span class="ident">put</span>.<span class="ident">set_key</span>(<span class="ident">k</span>.<span class="ident">into_encoded</span>());
+                <span class="ident">put</span>.<span class="ident">set_value</span>(<span class="ident">v</span>);
+                <span class="kw">if</span> <span class="ident">cf</span> <span class="op">!</span><span class="op">=</span> <span class="ident">CF_DEFAULT</span> {
+                    <span class="ident">put</span>.<span class="ident">set_cf</span>(<span class="ident">cf</span>.<span class="ident">to_string</span>());
+                }
+                <span class="ident">req</span>.<span class="ident">set_cmd_type</span>(<span class="ident">CmdType</span>::<span class="ident">Put</span>);
+                <span class="ident">req</span>.<span class="ident">set_put</span>(<span class="ident">put</span>);
+            }
+            <span class="ident">Modify</span>::<span class="ident">DeleteRange</span>(<span class="ident">cf</span>, <span class="ident">start_key</span>, <span class="ident">end_key</span>, <span class="ident">notify_only</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">delete_range</span> <span class="op">=</span> <span class="ident">DeleteRangeRequest</span>::<span class="ident">default</span>();
+                <span class="ident">delete_range</span>.<span class="ident">set_cf</span>(<span class="ident">cf</span>.<span class="ident">to_string</span>());
+                <span class="ident">delete_range</span>.<span class="ident">set_start_key</span>(<span class="ident">start_key</span>.<span class="ident">into_encoded</span>());
+                <span class="ident">delete_range</span>.<span class="ident">set_end_key</span>(<span class="ident">end_key</span>.<span class="ident">into_encoded</span>());
+                <span class="ident">delete_range</span>.<span class="ident">set_notify_only</span>(<span class="ident">notify_only</span>);
+                <span class="ident">req</span>.<span class="ident">set_cmd_type</span>(<span class="ident">CmdType</span>::<span class="ident">DeleteRange</span>);
+                <span class="ident">req</span>.<span class="ident">set_delete_range</span>(<span class="ident">delete_range</span>);
+            }
+        }
+        <span class="ident">reqs</span>.<span class="ident">push</span>(<span class="ident">req</span>);
+    }
+    <span class="ident">reqs</span>
 }
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
