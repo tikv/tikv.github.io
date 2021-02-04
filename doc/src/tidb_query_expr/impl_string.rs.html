@@ -3856,6 +3856,27 @@
 <span id="3853">3853</span>
 <span id="3854">3854</span>
 <span id="3855">3855</span>
+<span id="3856">3856</span>
+<span id="3857">3857</span>
+<span id="3858">3858</span>
+<span id="3859">3859</span>
+<span id="3860">3860</span>
+<span id="3861">3861</span>
+<span id="3862">3862</span>
+<span id="3863">3863</span>
+<span id="3864">3864</span>
+<span id="3865">3865</span>
+<span id="3866">3866</span>
+<span id="3867">3867</span>
+<span id="3868">3868</span>
+<span id="3869">3869</span>
+<span id="3870">3870</span>
+<span id="3871">3871</span>
+<span id="3872">3872</span>
+<span id="3873">3873</span>
+<span id="3874">3874</span>
+<span id="3875">3875</span>
+<span id="3876">3876</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -3863,6 +3884,8 @@
 <span class="kw">use</span> <span class="ident">tidb_query_codegen</span>::<span class="ident">rpn_fn</span>;
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">impl_math</span>::<span class="ident">i64_to_usize</span>;
+<span class="kw">use</span> <span class="ident">bstr</span>::<span class="ident">ByteSlice</span>;
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">cmp</span>::<span class="ident">Ordering</span>;
 <span class="kw">use</span> <span class="ident">tidb_query_common</span>::<span class="prelude-ty">Result</span>;
 <span class="kw">use</span> <span class="ident">tidb_query_datatype</span>::<span class="ident">codec</span>::<span class="ident">collation</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">tidb_query_datatype</span>::<span class="ident">codec</span>::<span class="ident">data_type</span>::<span class="kw-2">*</span>;
@@ -4561,15 +4584,19 @@
 
 <span class="attribute">#[<span class="ident">rpn_fn</span>]</span>
 <span class="attribute">#[<span class="ident">inline</span>]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">find_in_set</span>(<span class="ident">s</span>: <span class="ident">BytesRef</span>, <span class="ident">str_list</span>: <span class="ident">BytesRef</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Int</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">find_in_set</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">Collator</span><span class="op">&gt;</span>(<span class="ident">s</span>: <span class="ident">BytesRef</span>, <span class="ident">str_list</span>: <span class="ident">BytesRef</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Int</span><span class="op">&gt;</span><span class="op">&gt;</span> {
     <span class="kw">if</span> <span class="ident">str_list</span>.<span class="ident">is_empty</span>() {
         <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="number">0</span>));
     }
 
-    <span class="kw">let</span> <span class="ident">s</span> <span class="op">=</span> <span class="ident">String</span>::<span class="ident">from_utf8_lossy</span>(<span class="ident">s</span>);
-    <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">String</span>::<span class="ident">from_utf8_lossy</span>(<span class="ident">str_list</span>)
-        .<span class="ident">split</span>(<span class="string">&#39;,&#39;</span>)
-        .<span class="ident">position</span>(<span class="op">|</span><span class="ident">str_in_set</span><span class="op">|</span> <span class="ident">str_in_set</span> <span class="op">=</span><span class="op">=</span> <span class="ident">s</span>)
+    <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">str_list</span>
+        .<span class="ident">split_str</span>(<span class="string">&quot;,&quot;</span>)
+        .<span class="ident">position</span>(<span class="op">|</span><span class="ident">str_in_set</span><span class="op">|</span> {
+            <span class="ident">C</span>::<span class="ident">sort_compare</span>(<span class="ident">str_in_set</span>.<span class="ident">as_bytes</span>(), <span class="ident">s</span>)
+                .<span class="ident">ok</span>()
+                .<span class="ident">filter</span>(<span class="op">|</span><span class="ident">o</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">o</span> <span class="op">=</span><span class="op">=</span> <span class="ident">Ordering</span>::<span class="ident">Equal</span>)
+                .<span class="ident">is_some</span>()
+        })
         .<span class="ident">map</span>(<span class="op">|</span><span class="ident">p</span><span class="op">|</span> <span class="ident">p</span> <span class="kw">as</span> <span class="ident">i64</span> <span class="op">+</span> <span class="number">1</span>)
         .<span class="ident">or</span>(<span class="prelude-val">Some</span>(<span class="number">0</span>));
 
@@ -7112,18 +7139,27 @@
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_find_in_set</span>() {
         <span class="kw">let</span> <span class="ident">cases</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
-            (<span class="string">&quot;foo&quot;</span>, <span class="string">&quot;foo,bar&quot;</span>, <span class="number">1</span>),
-            (<span class="string">&quot;foo&quot;</span>, <span class="string">&quot;foobar,bar&quot;</span>, <span class="number">0</span>),
-            (<span class="string">&quot; foo &quot;</span>, <span class="string">&quot;foo, foo &quot;</span>, <span class="number">2</span>),
-            (<span class="string">&quot;&quot;</span>, <span class="string">&quot;foo,bar,&quot;</span>, <span class="number">3</span>),
-            (<span class="string">&quot;&quot;</span>, <span class="string">&quot;&quot;</span>, <span class="number">0</span>),
-            (<span class="string">&quot;a,b&quot;</span>, <span class="string">&quot;a,b,c&quot;</span>, <span class="number">0</span>),
+            (<span class="string">&quot;foo&quot;</span>, <span class="string">&quot;foo,bar&quot;</span>, <span class="ident">Collation</span>::<span class="ident">Utf8Mb4Bin</span>, <span class="number">1</span>),
+            (<span class="string">&quot;foo&quot;</span>, <span class="string">&quot;foobar,bar&quot;</span>, <span class="ident">Collation</span>::<span class="ident">Utf8Mb4Bin</span>, <span class="number">0</span>),
+            (<span class="string">&quot; foo &quot;</span>, <span class="string">&quot;foo, foo &quot;</span>, <span class="ident">Collation</span>::<span class="ident">Utf8Mb4Bin</span>, <span class="number">2</span>),
+            (<span class="string">&quot;&quot;</span>, <span class="string">&quot;foo,bar,&quot;</span>, <span class="ident">Collation</span>::<span class="ident">Utf8Mb4Bin</span>, <span class="number">3</span>),
+            (<span class="string">&quot;&quot;</span>, <span class="string">&quot;&quot;</span>, <span class="ident">Collation</span>::<span class="ident">Utf8Mb4Bin</span>, <span class="number">0</span>),
+            (<span class="string">&quot;a,b&quot;</span>, <span class="string">&quot;a,b,c&quot;</span>, <span class="ident">Collation</span>::<span class="ident">Utf8Mb4Bin</span>, <span class="number">0</span>),
+            (<span class="string">&quot;测试&quot;</span>, <span class="string">&quot;中文,测试,英文&quot;</span>, <span class="ident">Collation</span>::<span class="ident">Utf8Mb4Bin</span>, <span class="number">2</span>),
+            (<span class="string">&quot;foo&quot;</span>, <span class="string">&quot;A,FOO,BAR&quot;</span>, <span class="ident">Collation</span>::<span class="ident">Utf8Mb4GeneralCi</span>, <span class="number">2</span>),
+            (<span class="string">&quot;b&quot;</span>, <span class="string">&quot;A,B,C&quot;</span>, <span class="ident">Collation</span>::<span class="ident">Utf8Mb4GeneralCi</span>, <span class="number">2</span>),
         ];
 
-        <span class="kw">for</span> (<span class="ident">s</span>, <span class="ident">str_list</span>, <span class="ident">exp</span>) <span class="kw">in</span> <span class="ident">cases</span> {
+        <span class="kw">for</span> (<span class="ident">s</span>, <span class="ident">str_list</span>, <span class="ident">collation</span>, <span class="ident">exp</span>) <span class="kw">in</span> <span class="ident">cases</span> {
             <span class="kw">let</span> <span class="ident">s</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">s</span>.<span class="ident">as_bytes</span>().<span class="ident">to_vec</span>());
             <span class="kw">let</span> <span class="ident">str_list</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">str_list</span>.<span class="ident">as_bytes</span>().<span class="ident">to_vec</span>());
             <span class="kw">let</span> <span class="ident">got</span> <span class="op">=</span> <span class="ident">RpnFnScalarEvaluator</span>::<span class="ident">new</span>()
+                .<span class="ident">return_field_type</span>(
+                    <span class="ident">FieldTypeBuilder</span>::<span class="ident">new</span>()
+                        .<span class="ident">tp</span>(<span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>)
+                        .<span class="ident">collation</span>(<span class="ident">collation</span>)
+                        .<span class="ident">build</span>(),
+                )
                 .<span class="ident">push_param</span>(<span class="ident">s</span>)
                 .<span class="ident">push_param</span>(<span class="ident">str_list</span>)
                 .<span class="ident">evaluate</span>::<span class="op">&lt;</span><span class="ident">Int</span><span class="op">&gt;</span>(<span class="ident">ScalarFuncSig</span>::<span class="ident">FindInSet</span>)
@@ -7132,12 +7168,18 @@
         }
 
         <span class="kw">let</span> <span class="ident">null_cases</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
-            (<span class="prelude-val">Some</span>(<span class="string">b&quot;foo&quot;</span>.<span class="ident">to_vec</span>()), <span class="prelude-val">None</span>, <span class="prelude-val">None</span>),
-            (<span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="string">b&quot;bar&quot;</span>.<span class="ident">to_vec</span>()), <span class="prelude-val">None</span>),
-            (<span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>),
+            (<span class="prelude-val">Some</span>(<span class="string">b&quot;foo&quot;</span>.<span class="ident">to_vec</span>()), <span class="prelude-val">None</span>, <span class="ident">Collation</span>::<span class="ident">Utf8Mb4Bin</span>, <span class="prelude-val">None</span>),
+            (<span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="string">b&quot;bar&quot;</span>.<span class="ident">to_vec</span>()), <span class="ident">Collation</span>::<span class="ident">Utf8Mb4Bin</span>, <span class="prelude-val">None</span>),
+            (<span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="ident">Collation</span>::<span class="ident">Utf8Mb4Bin</span>, <span class="prelude-val">None</span>),
         ];
-        <span class="kw">for</span> (<span class="ident">s</span>, <span class="ident">str_list</span>, <span class="ident">exp</span>) <span class="kw">in</span> <span class="ident">null_cases</span> {
+        <span class="kw">for</span> (<span class="ident">s</span>, <span class="ident">str_list</span>, <span class="ident">collation</span>, <span class="ident">exp</span>) <span class="kw">in</span> <span class="ident">null_cases</span> {
             <span class="kw">let</span> <span class="ident">got</span> <span class="op">=</span> <span class="ident">RpnFnScalarEvaluator</span>::<span class="ident">new</span>()
+                .<span class="ident">return_field_type</span>(
+                    <span class="ident">FieldTypeBuilder</span>::<span class="ident">new</span>()
+                        .<span class="ident">tp</span>(<span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>)
+                        .<span class="ident">collation</span>(<span class="ident">collation</span>)
+                        .<span class="ident">build</span>(),
+                )
                 .<span class="ident">push_param</span>(<span class="ident">s</span>)
                 .<span class="ident">push_param</span>(<span class="ident">str_list</span>)
                 .<span class="ident">evaluate</span>::<span class="op">&lt;</span><span class="ident">Int</span><span class="op">&gt;</span>(<span class="ident">ScalarFuncSig</span>::<span class="ident">FindInSet</span>)
