@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["copy_and_sync","Copies the source file to a newly created file."],["prepare_sst_for_ingestion","Prepares the SST file for ingestion. The purpose is to make the ingestion retryable when using the `move_files` option. Things we need to consider here:"]]});
+initSidebarItems({"fn":[["prepare_sst_for_ingestion","Prepares the SST file for ingestion. The purpose is to make the ingestion retryable when using the `move_files` option. Things we need to consider here:"]]});

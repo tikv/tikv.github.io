@@ -139,6 +139,14 @@
 <span id="136">136</span>
 <span id="137">137</span>
 <span id="138">138</span>
+<span id="139">139</span>
+<span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
+<span id="144">144</span>
+<span id="145">145</span>
+<span id="146">146</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -259,21 +267,29 @@
     }
 }
 
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">WithIORateLimiter</span> {
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">WithIORateLimit</span> {
     <span class="ident">previous_io_rate_limiter</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">IORateLimiter</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 }
 
-<span class="kw">impl</span> <span class="ident">WithIORateLimiter</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">limiter</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">IORateLimiter</span><span class="op">&gt;</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+<span class="kw">impl</span> <span class="ident">WithIORateLimit</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">refill_bytes</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> (<span class="self">Self</span>, <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">IORateLimiterStatistics</span><span class="op">&gt;</span>) {
         <span class="kw">let</span> <span class="ident">previous_io_rate_limiter</span> <span class="op">=</span> <span class="ident">get_io_rate_limiter</span>();
-        <span class="ident">set_io_rate_limiter</span>(<span class="ident">limiter</span>);
-        <span class="ident">WithIORateLimiter</span> {
-            <span class="ident">previous_io_rate_limiter</span>,
-        }
+        <span class="kw">let</span> <span class="ident">limiter</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">IORateLimiter</span>::<span class="ident">new</span>(
+            <span class="ident">refill_bytes</span>,
+            <span class="bool-val">true</span>, <span class="comment">/*enable_statistics*/</span>
+        ));
+        <span class="kw">let</span> <span class="ident">stats</span> <span class="op">=</span> <span class="ident">limiter</span>.<span class="ident">statistics</span>();
+        <span class="ident">set_io_rate_limiter</span>(<span class="prelude-val">Some</span>(<span class="ident">limiter</span>));
+        (
+            <span class="ident">WithIORateLimit</span> {
+                <span class="ident">previous_io_rate_limiter</span>,
+            },
+            <span class="ident">stats</span>,
+        )
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">WithIORateLimiter</span> {
+<span class="kw">impl</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">WithIORateLimit</span> {
     <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
         <span class="ident">set_io_rate_limiter</span>(<span class="self">self</span>.<span class="ident">previous_io_rate_limiter</span>.<span class="ident">take</span>());
     }
