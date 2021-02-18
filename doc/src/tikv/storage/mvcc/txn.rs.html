@@ -1721,11 +1721,17 @@
 <span id="1718">1718</span>
 <span id="1719">1719</span>
 <span id="1720">1720</span>
+<span id="1721">1721</span>
+<span id="1722">1722</span>
+<span id="1723">1723</span>
+<span id="1724">1724</span>
+<span id="1725">1725</span>
+<span id="1726">1726</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">kv</span>::{<span class="ident">Modify</span>, <span class="ident">ScanMode</span>, <span class="ident">Snapshot</span>, <span class="ident">Statistics</span>};
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">mvcc</span>::<span class="ident">reader</span>::{<span class="ident">MvccReader</span>, <span class="ident">OverlappedWrite</span>};
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">mvcc</span>::<span class="ident">reader</span>::{<span class="ident">MvccReader</span>, <span class="ident">OverlappedWrite</span>, <span class="ident">TxnCommitRecord</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">mvcc</span>::<span class="prelude-ty">Result</span>;
 <span class="kw">use</span> <span class="ident">concurrency_manager</span>::{<span class="ident">ConcurrencyManager</span>, <span class="ident">KeyHandleGuard</span>};
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">CF_DEFAULT</span>, <span class="ident">CF_LOCK</span>, <span class="ident">CF_WRITE</span>};
@@ -1985,11 +1991,17 @@
         <span class="ident">lock</span>: <span class="kw-2">&amp;</span><span class="ident">Lock</span>,
         <span class="ident">is_pessimistic_txn</span>: <span class="ident">bool</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ReleasedLock</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">overlapped_write</span> <span class="op">=</span> <span class="self">self</span>
-            .<span class="ident">reader</span>
-            .<span class="ident">get_txn_commit_record</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="self">self</span>.<span class="ident">start_ts</span>)<span class="question-mark">?</span>
-            .<span class="ident">unwrap_none</span>();
-        <span class="self">self</span>.<span class="ident">rollback_lock</span>(<span class="ident">key</span>, <span class="ident">lock</span>, <span class="ident">is_pessimistic_txn</span>, <span class="ident">overlapped_write</span>)
+        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">reader</span>.<span class="ident">get_txn_commit_record</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="self">self</span>.<span class="ident">start_ts</span>)<span class="question-mark">?</span> {
+            <span class="ident">TxnCommitRecord</span>::<span class="prelude-val">None</span> { <span class="ident">overlapped_write</span> } <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="self">self</span>.<span class="ident">rollback_lock</span>(<span class="ident">key</span>, <span class="ident">lock</span>, <span class="ident">is_pessimistic_txn</span>, <span class="ident">overlapped_write</span>)
+            }
+            <span class="ident">TxnCommitRecord</span>::<span class="ident">SingleRecord</span> { <span class="ident">write</span>, .. }
+                <span class="kw">if</span> <span class="ident">write</span>.<span class="ident">write_type</span> <span class="op">!</span><span class="op">=</span> <span class="ident">WriteType</span>::<span class="ident">Rollback</span> <span class="op">=</span><span class="op">&gt;</span>
+            {
+                <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;txn record found but not expected: {:?}&quot;</span>, <span class="self">self</span>)
+            }
+            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="self">self</span>.<span class="ident">unlock_key</span>(<span class="ident">key</span>, <span class="ident">is_pessimistic_txn</span>)),
+        }
     }
 
     <span class="kw">fn</span> <span class="ident">rollback_lock</span>(
