@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["JsonVisitor",""]]});
+initSidebarItems({"struct":[["JsonVisitor",""],["MySQLFormatter","MySQL formatter follows the implementation in TiDB https://github.com/pingcap/tidb/blob/master/types/json/binary.go We add a space after `,` and `:`."]]});
