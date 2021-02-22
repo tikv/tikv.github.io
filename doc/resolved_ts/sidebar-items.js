@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["ChangeLog",""],["ChangeRow",""]],"mod":[["cmd",""],["resolver",""]],"struct":[["Resolver",""]]});
+initSidebarItems({"enum":[["ChangeLog",""],["ChangeRow",""],["Error",""],["Task",""]],"mod":[["advance",""],["cmd",""],["endpoint",""],["errors",""],["observer",""],["resolver",""],["sinker",""]],"struct":[["AdvanceTsWorker",""],["ChangeDataObserver",""],["Resolver",""],["SinkCmd",""]],"trait":[["CmdSinker",""]],"type":[["Result",""]]});
