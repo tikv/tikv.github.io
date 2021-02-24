@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["READ_BUF_SIZE",""]],"fn":[["get_region",""],["new_http_client",""]],"struct":[["CredentialsProvider",""],["DefaultCredentialsProvider",""]]});

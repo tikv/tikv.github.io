@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["Error","The error type for encryption."]],"type":[["Result",""]]});
+initSidebarItems({"enum":[["Error","The error type for encryption."]],"trait":[["RetryCodedError",""]],"type":[["Result",""]]});

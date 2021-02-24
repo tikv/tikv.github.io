@@ -1,6 +1,7 @@
 (function() {var implementors = {};
 implementors["backup"] = [{"text":"impl Fail for Error","synthetic":false,"types":[]}];
 implementors["cdc"] = [{"text":"impl Fail for Error","synthetic":false,"types":[]}];
+implementors["cloud"] = [{"text":"impl Fail for Error","synthetic":false,"types":[]},{"text":"impl Fail for KmsError","synthetic":false,"types":[]}];
 implementors["codec"] = [{"text":"impl Fail for ErrorInner","synthetic":false,"types":[]},{"text":"impl Fail for Error","synthetic":false,"types":[]}];
 implementors["encryption"] = [{"text":"impl Fail for Error","synthetic":false,"types":[]}];
 implementors["failure"] = [];

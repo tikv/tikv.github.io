@@ -1222,11 +1222,6 @@
 <span id="1219">1219</span>
 <span id="1220">1220</span>
 <span id="1221">1221</span>
-<span id="1222">1222</span>
-<span id="1223">1223</span>
-<span id="1224">1224</span>
-<span id="1225">1225</span>
-<span id="1226">1226</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1243,14 +1238,12 @@
 <span class="kw">use</span> <span class="ident">protobuf</span>::<span class="ident">Message</span>;
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">config</span>::<span class="ident">EncryptionConfig</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">config</span>::<span class="ident">MasterKeyConfig</span>;
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">crypter</span>::{<span class="self">self</span>, <span class="ident">compat</span>, <span class="ident">Iv</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">encrypted_file</span>::<span class="ident">EncryptedFile</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">file_dict_file</span>::<span class="ident">FileDictionaryFile</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">io</span>::<span class="ident">EncrypterWriter</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">master_key</span>::{<span class="ident">create_backend</span>, <span class="ident">Backend</span>};
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">master_key</span>::<span class="ident">Backend</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">metrics</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">Error</span>, <span class="prelude-ty">Result</span>};
 
@@ -1641,6 +1634,21 @@
     <span class="kw">pub</span> <span class="ident">dict_path</span>: <span class="ident">String</span>,
 }
 
+<span class="kw">impl</span> <span class="ident">DataKeyManagerArgs</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_encryption_config</span>(
+        <span class="ident">dict_path</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
+        <span class="ident">config</span>: <span class="kw-2">&amp;</span><span class="ident">EncryptionConfig</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">DataKeyManagerArgs</span> {
+        <span class="ident">DataKeyManagerArgs</span> {
+            <span class="ident">dict_path</span>: <span class="ident">dict_path</span>.<span class="ident">to_string</span>(),
+            <span class="ident">method</span>: <span class="ident">config</span>.<span class="ident">data_encryption_method</span>,
+            <span class="ident">rotation_period</span>: <span class="ident">config</span>.<span class="ident">data_key_rotation_period</span>.<span class="ident">into</span>(),
+            <span class="ident">enable_file_dictionary_log</span>: <span class="ident">config</span>.<span class="ident">enable_file_dictionary_log</span>,
+            <span class="ident">file_dictionary_rewrite_threshold</span>: <span class="ident">config</span>.<span class="ident">file_dictionary_rewrite_threshold</span>,
+        }
+    }
+}
+
 <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy</span>::<span class="ident">large_enum_variant</span>)]</span>
 <span class="kw">enum</span> <span class="ident">LoadDicts</span> {
     <span class="ident">EncryptionDisabled</span>,
@@ -1649,42 +1657,25 @@
 }
 
 <span class="kw">impl</span> <span class="ident">DataKeyManager</span> {
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">new_previous_loaded</span>(
+        <span class="ident">master_key</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Backend</span><span class="op">&gt;</span>,
+        <span class="ident">previous_master_key</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Backend</span><span class="op">&gt;</span>,
+        <span class="ident">args</span>: <span class="ident">DataKeyManagerArgs</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">DataKeyManager</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+        <span class="self">Self</span>::<span class="ident">new</span>(<span class="ident">master_key</span>, <span class="ident">Box</span>::<span class="ident">new</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> <span class="prelude-val">Ok</span>(<span class="ident">previous_master_key</span>)), <span class="ident">args</span>)
+    }
+
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
         <span class="ident">master_key</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Backend</span><span class="op">&gt;</span>,
-        <span class="ident">previous_master_key</span>: <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Backend</span>,
+        <span class="ident">previous_master_key</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">FnOnce</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Backend</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">args</span>: <span class="ident">DataKeyManagerArgs</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">DataKeyManager</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">dicts</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">Self</span>::<span class="ident">load_dicts</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">master_key</span>, <span class="kw-2">&amp;</span><span class="ident">args</span>)<span class="question-mark">?</span> {
             <span class="ident">LoadDicts</span>::<span class="ident">Loaded</span>(<span class="ident">dicts</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">dicts</span>,
             <span class="ident">LoadDicts</span>::<span class="ident">EncryptionDisabled</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>),
             <span class="ident">LoadDicts</span>::<span class="ident">WrongMasterKey</span>(<span class="ident">err</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="self">Self</span>::<span class="ident">load_previous_dicts</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">master_key</span>, <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">previous_master_key</span>, <span class="kw-2">&amp;</span><span class="ident">args</span>, <span class="ident">err</span>)<span class="question-mark">?</span>
-            }
-        };
-        <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="self">Self</span>::<span class="ident">from_dicts</span>(<span class="ident">dicts</span>, <span class="ident">args</span>.<span class="ident">method</span>, <span class="ident">master_key</span>)<span class="question-mark">?</span>))
-    }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_config</span>(
-        <span class="ident">config</span>: <span class="kw-2">&amp;</span><span class="ident">EncryptionConfig</span>,
-        <span class="ident">dict_path</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">DataKeyManager</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">master_key</span> <span class="op">=</span> <span class="ident">create_backend</span>(<span class="kw-2">&amp;</span><span class="ident">config</span>.<span class="ident">master_key</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
-            <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;failed to access master key, {}&quot;</span>, <span class="ident">e</span>);
-            <span class="ident">e</span>
-        })<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">args</span> <span class="op">=</span> <span class="ident">DataKeyManagerArgs</span> {
-            <span class="ident">dict_path</span>: <span class="ident">dict_path</span>.<span class="ident">to_string</span>(),
-            <span class="ident">method</span>: <span class="ident">config</span>.<span class="ident">data_encryption_method</span>,
-            <span class="ident">rotation_period</span>: <span class="ident">config</span>.<span class="ident">data_key_rotation_period</span>.<span class="ident">into</span>(),
-            <span class="ident">enable_file_dictionary_log</span>: <span class="ident">config</span>.<span class="ident">enable_file_dictionary_log</span>,
-            <span class="ident">file_dictionary_rewrite_threshold</span>: <span class="ident">config</span>.<span class="ident">file_dictionary_rewrite_threshold</span>,
-        };
-        <span class="kw">let</span> <span class="ident">dicts</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">Self</span>::<span class="ident">load_dicts</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">master_key</span>, <span class="kw-2">&amp;</span><span class="ident">args</span>)<span class="question-mark">?</span> {
-            <span class="ident">LoadDicts</span>::<span class="ident">Loaded</span>(<span class="ident">dicts</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">dicts</span>,
-            <span class="ident">LoadDicts</span>::<span class="ident">EncryptionDisabled</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>),
-            <span class="ident">LoadDicts</span>::<span class="ident">WrongMasterKey</span>(<span class="ident">err</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">let</span> <span class="ident">previous_master_key</span> <span class="op">=</span> <span class="ident">create_backend</span>(<span class="kw-2">&amp;</span><span class="ident">config</span>.<span class="ident">previous_master_key</span>)<span class="question-mark">?</span>;
-                <span class="self">Self</span>::<span class="ident">load_previous_dicts</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">master_key</span>, <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">previous_master_key</span>, <span class="kw-2">&amp;</span><span class="ident">args</span>, <span class="ident">err</span>)<span class="question-mark">?</span>
+                <span class="self">Self</span>::<span class="ident">load_previous_dicts</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">master_key</span>, <span class="kw-2">&amp;</span><span class="kw-2">*</span>(<span class="ident">previous_master_key</span>()<span class="question-mark">?</span>), <span class="kw-2">&amp;</span><span class="ident">args</span>, <span class="ident">err</span>)<span class="question-mark">?</span>
             }
         };
         <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="self">Self</span>::<span class="ident">from_dicts</span>(<span class="ident">dicts</span>, <span class="ident">args</span>.<span class="ident">method</span>, <span class="ident">master_key</span>)<span class="question-mark">?</span>))
@@ -1815,14 +1806,11 @@
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">dump_key_dict</span>(
-        <span class="ident">config</span>: <span class="kw-2">&amp;</span><span class="ident">EncryptionConfig</span>,
+        <span class="ident">backend</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Backend</span><span class="op">&gt;</span>,
         <span class="ident">dict_path</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
         <span class="ident">key_ids</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">dict_file</span> <span class="op">=</span> <span class="ident">EncryptedFile</span>::<span class="ident">new</span>(<span class="ident">Path</span>::<span class="ident">new</span>(<span class="ident">dict_path</span>), <span class="ident">KEY_DICT_NAME</span>);
-        <span class="comment">// Here we don&#39;t trigger master key rotation and don&#39;t care about</span>
-        <span class="comment">// config.previous_master_key.</span>
-        <span class="kw">let</span> <span class="ident">backend</span> <span class="op">=</span> <span class="ident">create_backend</span>(<span class="kw-2">&amp;</span><span class="ident">config</span>.<span class="ident">master_key</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">dict_bytes</span> <span class="op">=</span> <span class="ident">dict_file</span>.<span class="ident">read</span>(<span class="ident">backend</span>.<span class="ident">as_ref</span>())<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">dict</span> <span class="op">=</span> <span class="ident">KeyDictionary</span>::<span class="ident">default</span>();
         <span class="ident">dict</span>.<span class="ident">merge_from_bytes</span>(<span class="kw-2">&amp;</span><span class="ident">dict_bytes</span>)<span class="question-mark">?</span>;
@@ -1955,9 +1943,8 @@
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
 <span class="kw">mod</span> <span class="ident">tests</span> {
     <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
-    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">config</span>::<span class="ident">FileConfig</span>;
     <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">master_key</span>::<span class="ident">tests</span>::{<span class="ident">decrypt_called</span>, <span class="ident">encrypt_called</span>, <span class="ident">MockBackend</span>};
-    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">master_key</span>::<span class="ident">PlaintextBackend</span>;
+    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">master_key</span>::{<span class="ident">FileBackend</span>, <span class="ident">PlaintextBackend</span>};
 
     <span class="kw">use</span> <span class="ident">engine_traits</span>::<span class="ident">EncryptionMethod</span> <span class="kw">as</span> <span class="ident">DBEncryptionMethod</span>;
     <span class="kw">use</span> <span class="ident">file_system</span>::{<span class="ident">remove_file</span>, <span class="ident">File</span>};
@@ -1982,7 +1969,11 @@
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">method</span>) <span class="op">=</span> <span class="ident">method</span> {
             <span class="ident">args</span>.<span class="ident">method</span> <span class="op">=</span> <span class="ident">method</span>;
         }
-        <span class="kw">match</span> <span class="ident">DataKeyManager</span>::<span class="ident">new</span>(<span class="ident">master_backend</span>, <span class="kw-2">&amp;</span><span class="ident">MockBackend</span>::<span class="ident">default</span>(), <span class="ident">args</span>) {
+        <span class="kw">match</span> <span class="ident">DataKeyManager</span>::<span class="ident">new_previous_loaded</span>(
+            <span class="ident">master_backend</span>,
+            <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">MockBackend</span>::<span class="ident">default</span>()),
+            <span class="ident">args</span>,
+        ) {
             <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;expected encryption&quot;</span>),
             <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">dkm</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="ident">dkm</span>),
             <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>),
@@ -2004,13 +1995,13 @@
         <span class="ident">tmp_dir</span>: <span class="kw-2">&amp;</span><span class="ident">tempfile</span>::<span class="ident">TempDir</span>,
         <span class="ident">method</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">EncryptionMethod</span><span class="op">&gt;</span>,
         <span class="ident">master_backend</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">MockBackend</span><span class="op">&gt;</span>,
-        <span class="ident">previous_key</span>: <span class="kw-2">&amp;</span><span class="ident">MockBackend</span>,
+        <span class="ident">previous_key</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">MockBackend</span><span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">DataKeyManager</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">args</span> <span class="op">=</span> <span class="ident">def_data_key_args</span>(<span class="ident">tmp_dir</span>);
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">method</span>) <span class="op">=</span> <span class="ident">method</span> {
             <span class="ident">args</span>.<span class="ident">method</span> <span class="op">=</span> <span class="ident">method</span>;
         }
-        <span class="kw">match</span> <span class="ident">DataKeyManager</span>::<span class="ident">new</span>(<span class="ident">master_backend</span>, <span class="ident">previous_key</span>, <span class="ident">args</span>) {
+        <span class="kw">match</span> <span class="ident">DataKeyManager</span>::<span class="ident">new_previous_loaded</span>(<span class="ident">master_backend</span>, <span class="ident">previous_key</span>, <span class="ident">args</span>) {
             <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;expected encryption&quot;</span>),
             <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">dkm</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="ident">dkm</span>),
             <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>),
@@ -2021,13 +2012,13 @@
         <span class="ident">tmp_dir</span>: <span class="kw-2">&amp;</span><span class="ident">tempfile</span>::<span class="ident">TempDir</span>,
         <span class="ident">method</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">EncryptionMethod</span><span class="op">&gt;</span>,
         <span class="ident">master_backend</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Backend</span><span class="op">&gt;</span>,
-        <span class="ident">previous_key</span>: <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Backend</span>,
+        <span class="ident">previous_key</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Backend</span><span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">DataKeyManager</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">args</span> <span class="op">=</span> <span class="ident">def_data_key_args</span>(<span class="ident">tmp_dir</span>);
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">method</span>) <span class="op">=</span> <span class="ident">method</span> {
             <span class="ident">args</span>.<span class="ident">method</span> <span class="op">=</span> <span class="ident">method</span>;
         }
-        <span class="kw">match</span> <span class="ident">DataKeyManager</span>::<span class="ident">new</span>(<span class="ident">master_backend</span>, <span class="ident">previous_key</span>, <span class="ident">args</span>) {
+        <span class="kw">match</span> <span class="ident">DataKeyManager</span>::<span class="ident">new_previous_loaded</span>(<span class="ident">master_backend</span>, <span class="ident">previous_key</span>, <span class="ident">args</span>) {
             <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;expected encryption&quot;</span>),
             <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">dkm</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="ident">dkm</span>),
             <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>),
@@ -2050,7 +2041,12 @@
         <span class="kw">let</span> <span class="ident">tmp_dir</span> <span class="op">=</span> <span class="ident">tempfile</span>::<span class="ident">TempDir</span>::<span class="ident">new</span>().<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">args</span> <span class="op">=</span> <span class="ident">def_data_key_args</span>(<span class="kw-2">&amp;</span><span class="ident">tmp_dir</span>);
         <span class="ident">args</span>.<span class="ident">method</span> <span class="op">=</span> <span class="ident">EncryptionMethod</span>::<span class="ident">Plaintext</span>;
-        <span class="kw">let</span> <span class="ident">dkm</span> <span class="op">=</span> <span class="ident">DataKeyManager</span>::<span class="ident">new</span>(<span class="ident">new_mock_backend</span>(), <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">new_mock_backend</span>(), <span class="ident">args</span>).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">dkm</span> <span class="op">=</span> <span class="ident">DataKeyManager</span>::<span class="ident">new</span>(
+            <span class="ident">new_mock_backend</span>(),
+            <span class="ident">Box</span>::<span class="ident">new</span>(<span class="op">|</span><span class="op">|</span> <span class="prelude-val">Ok</span>(<span class="ident">new_mock_backend</span>())),
+            <span class="ident">args</span>,
+        )
+        .<span class="ident">unwrap</span>();
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">dkm</span>.<span class="ident">is_none</span>());
 
         <span class="comment">// encryption being enabled.</span>
@@ -2079,8 +2075,8 @@
         <span class="kw">let</span> <span class="ident">manager</span> <span class="op">=</span> <span class="ident">new_key_manager</span>(
             <span class="kw-2">&amp;</span><span class="ident">tmp_dir</span>,
             <span class="prelude-val">Some</span>(<span class="ident">EncryptionMethod</span>::<span class="ident">Aes256Ctr</span>),
-            <span class="ident">create_backend</span>(<span class="kw-2">&amp;</span><span class="ident">MasterKeyConfig</span>::<span class="ident">Plaintext</span>).<span class="ident">unwrap</span>(),
-            <span class="kw-2">&amp;</span><span class="kw-2">*</span>(<span class="ident">new_mock_backend</span>() <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Backend</span><span class="op">&gt;</span>),
+            <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">PlaintextBackend</span>::<span class="ident">default</span>()),
+            <span class="ident">new_mock_backend</span>() <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Backend</span><span class="op">&gt;</span>,
         );
         <span class="ident">manager</span>.<span class="ident">err</span>().<span class="ident">unwrap</span>();
     }
@@ -2107,7 +2103,7 @@
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">encrypt_called</span>(<span class="string">&quot;previous&quot;</span>), <span class="number">0</span>);
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">decrypt_called</span>(<span class="string">&quot;current&quot;</span>), <span class="number">0</span>);
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">decrypt_called</span>(<span class="string">&quot;previous&quot;</span>), <span class="number">0</span>);
-        <span class="kw">let</span> <span class="ident">manager</span> <span class="op">=</span> <span class="ident">new_mock_key_manager</span>(<span class="kw-2">&amp;</span><span class="ident">tmp_dir</span>, <span class="prelude-val">None</span>, <span class="ident">current_key</span>, <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">previous_key</span>).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">manager</span> <span class="op">=</span> <span class="ident">new_mock_key_manager</span>(<span class="kw-2">&amp;</span><span class="ident">tmp_dir</span>, <span class="prelude-val">None</span>, <span class="ident">current_key</span>, <span class="ident">previous_key</span>).<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">info2</span> <span class="op">=</span> <span class="ident">manager</span>.<span class="ident">get_file</span>(<span class="string">&quot;foo&quot;</span>).<span class="ident">expect</span>(<span class="string">&quot;get file foo&quot;</span>);
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">info1</span>, <span class="ident">info2</span>);
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">encrypt_called</span>(<span class="string">&quot;current&quot;</span>), <span class="number">1</span>);
@@ -2135,7 +2131,7 @@
         <span class="ident">current_key</span>.<span class="ident">track</span>(<span class="string">&quot;current&quot;</span>.<span class="ident">to_string</span>());
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">previous_key</span> <span class="op">=</span> <span class="ident">new_mock_backend</span>();
         <span class="ident">previous_key</span>.<span class="ident">track</span>(<span class="string">&quot;previous&quot;</span>.<span class="ident">to_string</span>());
-        <span class="kw">let</span> <span class="ident">manager</span> <span class="op">=</span> <span class="ident">new_mock_key_manager</span>(<span class="kw-2">&amp;</span><span class="ident">tmp_dir</span>, <span class="prelude-val">None</span>, <span class="ident">current_key</span>, <span class="kw-2">&amp;</span><span class="ident">previous_key</span>);
+        <span class="kw">let</span> <span class="ident">manager</span> <span class="op">=</span> <span class="ident">new_mock_key_manager</span>(<span class="kw-2">&amp;</span><span class="ident">tmp_dir</span>, <span class="prelude-val">None</span>, <span class="ident">current_key</span>, <span class="ident">previous_key</span>);
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">manager</span>.<span class="ident">is_err</span>());
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">encrypt_called</span>(<span class="string">&quot;current&quot;</span>), <span class="number">1</span>);
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">encrypt_called</span>(<span class="string">&quot;previous&quot;</span>), <span class="number">0</span>);
@@ -2161,7 +2157,7 @@
             <span class="ident">is_wrong_master_key</span>: <span class="bool-val">true</span>,
             ..<span class="ident">Default</span>::<span class="ident">default</span>()
         });
-        <span class="kw">let</span> <span class="ident">manager</span> <span class="op">=</span> <span class="ident">new_mock_key_manager</span>(<span class="kw-2">&amp;</span><span class="ident">tmp_dir</span>, <span class="prelude-val">None</span>, <span class="ident">master_key</span>, <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">previous_master_key</span>);
+        <span class="kw">let</span> <span class="ident">manager</span> <span class="op">=</span> <span class="ident">new_mock_key_manager</span>(<span class="kw-2">&amp;</span><span class="ident">tmp_dir</span>, <span class="prelude-val">None</span>, <span class="ident">master_key</span>, <span class="ident">previous_master_key</span>);
         <span class="macro">assert_matches</span><span class="macro">!</span>(<span class="ident">manager</span>.<span class="ident">err</span>(), <span class="prelude-val">Some</span>(<span class="ident">Error</span>::<span class="ident">BothMasterKeyFail</span>(<span class="kw">_</span>, <span class="kw">_</span>)));
     }
 
@@ -2340,21 +2336,18 @@
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_key_manager_rotate_on_key_expose</span>() {
         <span class="kw">let</span> (<span class="ident">key_path</span>, <span class="ident">_tmp_key_dir</span>) <span class="op">=</span> <span class="ident">create_key_file</span>(<span class="string">&quot;key&quot;</span>);
-        <span class="kw">let</span> <span class="ident">master_key</span> <span class="op">=</span> <span class="ident">MasterKeyConfig</span>::<span class="ident">File</span> {
-            <span class="ident">config</span>: <span class="ident">FileConfig</span> {
-                <span class="ident">path</span>: <span class="ident">key_path</span>.<span class="ident">to_str</span>().<span class="ident">unwrap</span>().<span class="ident">to_owned</span>(),
-            },
-        };
-        <span class="kw">let</span> <span class="ident">master_key_backend</span> <span class="op">=</span> <span class="ident">create_backend</span>(<span class="kw-2">&amp;</span><span class="ident">master_key</span>).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">master_key_backend</span> <span class="op">=</span>
+            <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">FileBackend</span>::<span class="ident">new</span>(<span class="ident">key_path</span>.<span class="ident">as_path</span>()).<span class="ident">unwrap</span>()) <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Backend</span><span class="op">&gt;</span>;
         <span class="kw">let</span> <span class="ident">tmp_dir</span> <span class="op">=</span> <span class="ident">tempfile</span>::<span class="ident">TempDir</span>::<span class="ident">new</span>().<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">previous</span> <span class="op">=</span> <span class="ident">new_mock_backend</span>() <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Backend</span><span class="op">&gt;</span>;
-        <span class="kw">let</span> <span class="ident">manager</span> <span class="op">=</span> <span class="ident">new_key_manager</span>(<span class="kw-2">&amp;</span><span class="ident">tmp_dir</span>, <span class="prelude-val">None</span>, <span class="ident">master_key_backend</span>, <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">previous</span>).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">manager</span> <span class="op">=</span> <span class="ident">new_key_manager</span>(<span class="kw-2">&amp;</span><span class="ident">tmp_dir</span>, <span class="prelude-val">None</span>, <span class="ident">master_key_backend</span>, <span class="ident">previous</span>).<span class="ident">unwrap</span>();
         <span class="kw">let</span> (<span class="ident">key_id</span>, <span class="ident">key</span>) <span class="op">=</span> {
             <span class="kw">let</span> (<span class="ident">id</span>, <span class="ident">k</span>) <span class="op">=</span> <span class="ident">manager</span>.<span class="ident">dicts</span>.<span class="ident">current_data_key</span>();
             (<span class="ident">id</span>, <span class="ident">k</span>)
         };
 
-        <span class="kw">let</span> <span class="ident">master_key_backend</span> <span class="op">=</span> <span class="ident">create_backend</span>(<span class="kw-2">&amp;</span><span class="ident">master_key</span>).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">master_key_backend</span> <span class="op">=</span>
+            <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">FileBackend</span>::<span class="ident">new</span>(<span class="ident">key_path</span>.<span class="ident">as_path</span>()).<span class="ident">unwrap</span>()) <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Backend</span><span class="op">&gt;</span>;
         <span class="comment">// Do not rotate.</span>
         <span class="ident">manager</span>
             .<span class="ident">dicts</span>
@@ -2392,18 +2385,14 @@
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_expose_keys_on_insecure_backend</span>() {
         <span class="kw">let</span> (<span class="ident">key_path</span>, <span class="ident">_tmp_key_dir</span>) <span class="op">=</span> <span class="ident">create_key_file</span>(<span class="string">&quot;key&quot;</span>);
-        <span class="kw">let</span> <span class="ident">master_key</span> <span class="op">=</span> <span class="ident">MasterKeyConfig</span>::<span class="ident">File</span> {
-            <span class="ident">config</span>: <span class="ident">FileConfig</span> {
-                <span class="ident">path</span>: <span class="ident">key_path</span>.<span class="ident">to_str</span>().<span class="ident">unwrap</span>().<span class="ident">to_owned</span>(),
-            },
-        };
-
-        <span class="kw">let</span> <span class="ident">master_key_backend</span> <span class="op">=</span> <span class="ident">create_backend</span>(<span class="kw-2">&amp;</span><span class="ident">master_key</span>).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">file_backend</span> <span class="op">=</span> <span class="ident">FileBackend</span>::<span class="ident">new</span>(<span class="ident">key_path</span>.<span class="ident">as_path</span>()).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">master_key_backend</span> <span class="op">=</span> <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">file_backend</span>);
         <span class="kw">let</span> <span class="ident">tmp_dir</span> <span class="op">=</span> <span class="ident">tempfile</span>::<span class="ident">TempDir</span>::<span class="ident">new</span>().<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">previous</span> <span class="op">=</span> <span class="ident">new_mock_backend</span>() <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Backend</span><span class="op">&gt;</span>;
-        <span class="kw">let</span> <span class="ident">manager</span> <span class="op">=</span> <span class="ident">new_key_manager</span>(<span class="kw-2">&amp;</span><span class="ident">tmp_dir</span>, <span class="prelude-val">None</span>, <span class="ident">master_key_backend</span>, <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">previous</span>).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">manager</span> <span class="op">=</span> <span class="ident">new_key_manager</span>(<span class="kw-2">&amp;</span><span class="ident">tmp_dir</span>, <span class="prelude-val">None</span>, <span class="ident">master_key_backend</span>, <span class="ident">previous</span>).<span class="ident">unwrap</span>();
 
-        <span class="kw">let</span> <span class="ident">master_key_backend</span> <span class="op">=</span> <span class="ident">create_backend</span>(<span class="kw-2">&amp;</span><span class="ident">master_key</span>).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">file_backend</span> <span class="op">=</span> <span class="ident">FileBackend</span>::<span class="ident">new</span>(<span class="ident">key_path</span>.<span class="ident">as_path</span>()).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">master_key_backend</span> <span class="op">=</span> <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">file_backend</span>);
         <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="number">100</span> {
             <span class="ident">manager</span>
                 .<span class="ident">dicts</span>
@@ -2447,10 +2436,11 @@
         });
         <span class="kw">let</span> <span class="ident">previous</span> <span class="op">=</span> <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">PlaintextBackend</span>::<span class="ident">default</span>()) <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Backend</span><span class="op">&gt;</span>;
 
-        <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">new_key_manager</span>(<span class="kw-2">&amp;</span><span class="ident">tmp_dir</span>, <span class="prelude-val">None</span>, <span class="ident">wrong_key</span>, <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">previous</span>);
+        <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">new_key_manager</span>(<span class="kw-2">&amp;</span><span class="ident">tmp_dir</span>, <span class="prelude-val">None</span>, <span class="ident">wrong_key</span>, <span class="ident">previous</span>);
         <span class="comment">// When the master key is invalid, the key manager left a empty file dict and return errors.</span>
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">result</span>.<span class="ident">is_err</span>());
-        <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">new_key_manager</span>(<span class="kw-2">&amp;</span><span class="ident">tmp_dir</span>, <span class="prelude-val">None</span>, <span class="ident">right_key</span>, <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">previous</span>);
+        <span class="kw">let</span> <span class="ident">previous</span> <span class="op">=</span> <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">PlaintextBackend</span>::<span class="ident">default</span>()) <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Backend</span><span class="op">&gt;</span>;
+        <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">new_key_manager</span>(<span class="kw-2">&amp;</span><span class="ident">tmp_dir</span>, <span class="prelude-val">None</span>, <span class="ident">right_key</span>, <span class="ident">previous</span>);
         <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">result</span>.<span class="ident">is_ok</span>());
     }
 }

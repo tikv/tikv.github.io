@@ -1,6 +1,8 @@
 (function() {var implementors = {};
+implementors["cloud"] = [{"text":"impl ErrorCodeExt for KmsError","synthetic":false,"types":[]},{"text":"impl ErrorCodeExt for Error","synthetic":false,"types":[]}];
 implementors["codec"] = [{"text":"impl ErrorCodeExt for Error","synthetic":false,"types":[]}];
 implementors["encryption"] = [{"text":"impl ErrorCodeExt for Error","synthetic":false,"types":[]}];
+implementors["encryption_export"] = [{"text":"impl ErrorCodeExt for CloudConvertError","synthetic":false,"types":[]}];
 implementors["engine_traits"] = [{"text":"impl ErrorCodeExt for Error","synthetic":false,"types":[]}];
 implementors["error_code"] = [];
 implementors["pd_client"] = [{"text":"impl ErrorCodeExt for Error","synthetic":false,"types":[]}];

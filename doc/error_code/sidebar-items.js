@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["UNKNOWN",""]],"mod":[["codec",""],["coprocessor",""],["encryption",""],["engine",""],["pd",""],["raft",""],["raftstore",""],["sst_importer",""],["storage",""]],"struct":[["ErrorCode",""]],"trait":[["ErrorCodeExt",""]]});
+initSidebarItems({"constant":[["UNKNOWN",""]],"mod":[["cloud",""],["codec",""],["coprocessor",""],["encryption",""],["engine",""],["pd",""],["raft",""],["raftstore",""],["sst_importer",""],["storage",""]],"struct":[["ErrorCode",""]],"trait":[["ErrorCodeExt",""]]});
