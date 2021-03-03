@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["DecodeHandleStrategy",""]],"struct":[["BatchIndexScanExecutor",""],["IndexScanExecutorImpl",""]]});
+initSidebarItems({"enum":[["DecodeHandleOp",""],["DecodeHandleStrategy",""],["DecodePartitionIdOp",""],["RestoreData",""]],"struct":[["BatchIndexScanExecutor",""],["IndexScanExecutorImpl",""]]});
