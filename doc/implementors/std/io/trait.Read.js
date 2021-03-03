@@ -1,6 +1,5 @@
 (function() {var implementors = {};
 implementors["base64"] = [{"text":"impl&lt;'a, R:&nbsp;Read&gt; Read for DecoderReader&lt;'a, R&gt;","synthetic":false,"types":[]}];
-implementors["bytes"] = [{"text":"impl&lt;B:&nbsp;Buf + Sized&gt; Read for Reader&lt;B&gt;","synthetic":false,"types":[]}];
 implementors["encryption"] = [{"text":"impl&lt;R:&nbsp;Read&gt; Read for EncrypterReader&lt;R&gt;","synthetic":false,"types":[]},{"text":"impl&lt;R:&nbsp;Read&gt; Read for DecrypterReader&lt;R&gt;","synthetic":false,"types":[]},{"text":"impl&lt;R:&nbsp;Read&gt; Read for CrypterReader&lt;R&gt;","synthetic":false,"types":[]}];
 implementors["engine_panic"] = [{"text":"impl Read for PanicExternalSstFileReader","synthetic":false,"types":[]}];
 implementors["file_system"] = [{"text":"impl Read for File","synthetic":false,"types":[]},{"text":"impl&lt;R:&nbsp;Read&gt; Read for Sha256Reader&lt;R&gt;","synthetic":false,"types":[]}];
@@ -17,6 +16,7 @@ implementors["raftstore"] = [{"text":"impl Read for Snap","synthetic":false,"typ
 implementors["rand_core"] = [{"text":"impl Read for dyn RngCore","synthetic":false,"types":[]}];
 implementors["reqwest"] = [{"text":"impl Read for Response","synthetic":false,"types":[]}];
 implementors["rocksdb"] = [{"text":"impl Read for SequentialFile","synthetic":false,"types":[]}];
+implementors["socket2"] = [{"text":"impl Read for Socket","synthetic":false,"types":[]},{"text":"impl&lt;'a&gt; Read for &amp;'a Socket","synthetic":false,"types":[]}];
 implementors["tame_gcs"] = [{"text":"impl Read for DownloadObjectResponse","synthetic":false,"types":[]},{"text":"impl&lt;B&gt; Read for Multipart&lt;B&gt; <span class=\"where fmt-newline\">where<br>&nbsp;&nbsp;&nbsp;&nbsp;B: Read,&nbsp;</span>","synthetic":false,"types":[]}];
 implementors["tempfile"] = [{"text":"impl Read for NamedTempFile","synthetic":false,"types":[]},{"text":"impl&lt;'a&gt; Read for &amp;'a NamedTempFile","synthetic":false,"types":[]},{"text":"impl Read for SpooledTempFile","synthetic":false,"types":[]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

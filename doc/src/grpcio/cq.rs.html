@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `/rust/registry/src/github.com-1ecc6299db9ec823/grpcio-0.7.1/src/cq.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>cq.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `/rust/registry/src/github.com-1ecc6299db9ec823/grpcio-0.8.0/src/cq.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>cq.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
 <link rel="alternate icon" type="image/png" href="../../favicon-16x16.png">
 <link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../grpcio/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
                 <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
@@ -217,6 +217,12 @@
 <span id="214">214</span>
 <span id="215">215</span>
 <span id="216">216</span>
+<span id="217">217</span>
+<span id="218">218</span>
+<span id="219">219</span>
+<span id="220">220</span>
+<span id="221">221</span>
+<span id="222">222</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -256,35 +262,39 @@
     }
 
     <span class="kw">fn</span> <span class="ident">add_ref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cnt</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">ref_cnt</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
         <span class="kw">loop</span> {
-            <span class="kw">let</span> <span class="ident">cnt</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">ref_cnt</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
             <span class="kw">if</span> <span class="ident">cnt</span> <span class="op">&lt;</span><span class="op">=</span> <span class="number">0</span> {
                 <span class="comment">// `shutdown` has been called, reject any requests.</span>
                 <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">QueueShutdown</span>);
             }
             <span class="kw">let</span> <span class="ident">new_cnt</span> <span class="op">=</span> <span class="ident">cnt</span> <span class="op">+</span> <span class="number">1</span>;
-            <span class="kw">if</span> <span class="ident">cnt</span>
-                <span class="op">=</span><span class="op">=</span> <span class="self">self</span>
-                    .<span class="ident">ref_cnt</span>
-                    .<span class="ident">compare_and_swap</span>(<span class="ident">cnt</span>, <span class="ident">new_cnt</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>)
-            {
-                <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
+            <span class="kw">match</span> <span class="self">self</span>.<span class="ident">ref_cnt</span>.<span class="ident">compare_exchange_weak</span>(
+                <span class="ident">cnt</span>,
+                <span class="ident">new_cnt</span>,
+                <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>,
+                <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>,
+            ) {
+                <span class="prelude-val">Ok</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="prelude-val">Ok</span>(()),
+                <span class="prelude-val">Err</span>(<span class="ident">c</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">cnt</span> <span class="op">=</span> <span class="ident">c</span>,
             }
         }
     }
 
     <span class="kw">fn</span> <span class="ident">unref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cnt</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">ref_cnt</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
         <span class="kw">let</span> <span class="ident">shutdown</span> <span class="op">=</span> <span class="kw">loop</span> {
-            <span class="kw">let</span> <span class="ident">cnt</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">ref_cnt</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
             <span class="comment">// If `shutdown` is not called, `cnt` &gt; 0, so minus 1 to unref.</span>
             <span class="comment">// If `shutdown` is called, `cnt` &lt; 0, so plus 1 to unref.</span>
             <span class="kw">let</span> <span class="ident">new_cnt</span> <span class="op">=</span> <span class="ident">cnt</span> <span class="op">-</span> <span class="ident">cnt</span>.<span class="ident">signum</span>();
-            <span class="kw">if</span> <span class="ident">cnt</span>
-                <span class="op">=</span><span class="op">=</span> <span class="self">self</span>
-                    .<span class="ident">ref_cnt</span>
-                    .<span class="ident">compare_and_swap</span>(<span class="ident">cnt</span>, <span class="ident">new_cnt</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>)
-            {
-                <span class="kw">break</span> <span class="ident">new_cnt</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span>;
+            <span class="kw">match</span> <span class="self">self</span>.<span class="ident">ref_cnt</span>.<span class="ident">compare_exchange_weak</span>(
+                <span class="ident">cnt</span>,
+                <span class="ident">new_cnt</span>,
+                <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>,
+                <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>,
+            ) {
+                <span class="prelude-val">Ok</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">break</span> <span class="ident">new_cnt</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span>,
+                <span class="prelude-val">Err</span>(<span class="ident">c</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">cnt</span> <span class="op">=</span> <span class="ident">c</span>,
             }
         };
         <span class="kw">if</span> <span class="ident">shutdown</span> {
@@ -295,8 +305,8 @@
     }
 
     <span class="kw">fn</span> <span class="ident">shutdown</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cnt</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">ref_cnt</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
         <span class="kw">let</span> <span class="ident">shutdown</span> <span class="op">=</span> <span class="kw">loop</span> {
-            <span class="kw">let</span> <span class="ident">cnt</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">ref_cnt</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
             <span class="kw">if</span> <span class="ident">cnt</span> <span class="op">&lt;</span><span class="op">=</span> <span class="number">0</span> {
                 <span class="comment">// `shutdown` is called, skipped.</span>
                 <span class="kw">return</span>;
@@ -305,12 +315,14 @@
             <span class="comment">// Because `cnt` is initialized to 1, so minus 1 to make it reach</span>
             <span class="comment">// toward 0. That is `new_cnt = -(cnt - 1) = -cnt + 1`.</span>
             <span class="kw">let</span> <span class="ident">new_cnt</span> <span class="op">=</span> <span class="op">-</span><span class="ident">cnt</span> <span class="op">+</span> <span class="number">1</span>;
-            <span class="kw">if</span> <span class="ident">cnt</span>
-                <span class="op">=</span><span class="op">=</span> <span class="self">self</span>
-                    .<span class="ident">ref_cnt</span>
-                    .<span class="ident">compare_and_swap</span>(<span class="ident">cnt</span>, <span class="ident">new_cnt</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>)
-            {
-                <span class="kw">break</span> <span class="ident">new_cnt</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span>;
+            <span class="kw">match</span> <span class="self">self</span>.<span class="ident">ref_cnt</span>.<span class="ident">compare_exchange_weak</span>(
+                <span class="ident">cnt</span>,
+                <span class="ident">new_cnt</span>,
+                <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>,
+                <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>,
+            ) {
+                <span class="prelude-val">Ok</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">break</span> <span class="ident">new_cnt</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span>,
+                <span class="prelude-val">Err</span>(<span class="ident">c</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">cnt</span> <span class="op">=</span> <span class="ident">c</span>,
             }
         };
         <span class="kw">if</span> <span class="ident">shutdown</span> {
