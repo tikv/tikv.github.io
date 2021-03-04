@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `/rust/git/checkouts/crossbeam-5d5b005504a37dac/28ad2b7/crossbeam-skiplist/src/base.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>base.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `/rust/git/checkouts/crossbeam-ce86b55714fafb3e/a585510/crossbeam-skiplist/src/base.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>base.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
 <link rel="alternate icon" type="image/png" href="../../favicon-16x16.png">
 <link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../crossbeam_skiplist/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
                 <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">   1</span>
@@ -2026,8 +2026,38 @@
 <span id="2023">2023</span>
 <span id="2024">2024</span>
 <span id="2025">2025</span>
+<span id="2026">2026</span>
+<span id="2027">2027</span>
+<span id="2028">2028</span>
+<span id="2029">2029</span>
+<span id="2030">2030</span>
+<span id="2031">2031</span>
+<span id="2032">2032</span>
+<span id="2033">2033</span>
+<span id="2034">2034</span>
+<span id="2035">2035</span>
+<span id="2036">2036</span>
+<span id="2037">2037</span>
+<span id="2038">2038</span>
+<span id="2039">2039</span>
+<span id="2040">2040</span>
+<span id="2041">2041</span>
+<span id="2042">2042</span>
+<span id="2043">2043</span>
+<span id="2044">2044</span>
+<span id="2045">2045</span>
+<span id="2046">2046</span>
+<span id="2047">2047</span>
+<span id="2048">2048</span>
+<span id="2049">2049</span>
+<span id="2050">2050</span>
+<span id="2051">2051</span>
+<span id="2052">2052</span>
+<span id="2053">2053</span>
+<span id="2054">2054</span>
+<span id="2055">2055</span>
 </pre><div class="example-wrap"><pre class="rust ">
-<span class="doccomment">//! TODO: docs</span>
+<span class="doccomment">//! A lock-free skip list. See [`SkipList`].</span>
 
 <span class="kw">use</span> <span class="ident">alloc</span>::<span class="ident">alloc</span>::{<span class="ident">alloc</span>, <span class="ident">dealloc</span>, <span class="ident">handle_alloc_error</span>, <span class="ident">Layout</span>};
 <span class="kw">use</span> <span class="ident">core</span>::<span class="ident">borrow</span>::<span class="ident">Borrow</span>;
@@ -2039,9 +2069,8 @@
 <span class="kw">use</span> <span class="ident">core</span>::<span class="ident">ptr</span>;
 <span class="kw">use</span> <span class="ident">core</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::{<span class="ident">fence</span>, <span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>};
 
-<span class="kw">use</span> <span class="ident">epoch</span>::{<span class="self">self</span>, <span class="ident">Atomic</span>, <span class="ident">Collector</span>, <span class="ident">Guard</span>, <span class="ident">Shared</span>};
-<span class="kw">use</span> <span class="ident">scopeguard</span>;
-<span class="kw">use</span> <span class="ident">utils</span>::<span class="ident">CachePadded</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">epoch</span>::{<span class="self">self</span>, <span class="ident">Atomic</span>, <span class="ident">Collector</span>, <span class="ident">Guard</span>, <span class="ident">Shared</span>};
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">utils</span>::<span class="ident">CachePadded</span>;
 
 <span class="doccomment">/// Number of bits needed to store height.</span>
 <span class="kw">const</span> <span class="ident">HEIGHT_BITS</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">5</span>;
@@ -2153,7 +2182,7 @@
 
     <span class="doccomment">/// Returns the layout of a node with the given `height`.</span>
     <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">get_layout</span>(<span class="ident">height</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Layout</span> {
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="number">1</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">height</span> <span class="op">&amp;&amp;</span> <span class="ident">height</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">MAX_HEIGHT</span>);
+        <span class="macro">assert</span><span class="macro">!</span>((<span class="number">1</span>..<span class="op">=</span><span class="ident">MAX_HEIGHT</span>).<span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="ident">height</span>));
 
         <span class="kw">let</span> <span class="ident">size_self</span> <span class="op">=</span> <span class="ident">mem</span>::<span class="ident">size_of</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>();
         <span class="kw">let</span> <span class="ident">align_self</span> <span class="op">=</span> <span class="ident">mem</span>::<span class="ident">align_of</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>();
@@ -2256,7 +2285,7 @@
         }
     }
 
-    <span class="doccomment">/// Decrements the reference count of a node, pinning the thread and destoying the node</span>
+    <span class="doccomment">/// Decrements the reference count of a node, pinning the thread and destroying the node</span>
     <span class="doccomment">/// if the count become zero.</span>
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">decrement_with_pin</span><span class="op">&lt;</span><span class="ident">F</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">parent</span>: <span class="kw-2">&amp;</span><span class="ident">SkipList</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span>, <span class="ident">pin</span>: <span class="ident">F</span>)
@@ -2295,7 +2324,7 @@
     <span class="ident">K</span>: <span class="ident">fmt</span>::<span class="ident">Debug</span>,
     <span class="ident">V</span>: <span class="ident">fmt</span>::<span class="ident">Debug</span>,
 {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt</span>::<span class="ident">Formatter</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="prelude-ty">Result</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt</span>::<span class="ident">Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="prelude-ty">Result</span> {
         <span class="ident">f</span>.<span class="ident">debug_tuple</span>(<span class="string">&quot;Node&quot;</span>)
             .<span class="ident">field</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">key</span>)
             .<span class="ident">field</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">value</span>)
@@ -2307,7 +2336,7 @@
 <span class="doccomment">///</span>
 <span class="doccomment">/// The result indicates whether the key was found, as well as what were the adjacent nodes to the</span>
 <span class="doccomment">/// key on each level of the skip list.</span>
-<span class="kw">struct</span> <span class="ident">Position</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">K</span>: <span class="lifetime">&#39;a</span>, <span class="ident">V</span>: <span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
+<span class="kw">struct</span> <span class="ident">Position</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> {
     <span class="doccomment">/// Reference to a node with the given key, if found.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// If this is `Some` then it will point to the same node as `right[0]`.</span>
@@ -2386,7 +2415,7 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">len</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
         <span class="kw">let</span> <span class="ident">len</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">hot_data</span>.<span class="ident">len</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">Relaxed</span>);
 
-        <span class="comment">// Due to the relaxed  memory ordering, the length counter may sometimes</span>
+        <span class="comment">// Due to the relaxed memory ordering, the length counter may sometimes</span>
         <span class="comment">// underflow and produce a very large value. We treat such values as 0.</span>
         <span class="kw">if</span> <span class="ident">len</span> <span class="op">&gt;</span> <span class="ident">isize</span>::<span class="ident">max_value</span>() <span class="kw">as</span> <span class="ident">usize</span> {
             <span class="number">0</span>
@@ -2500,7 +2529,7 @@
     }
 
     <span class="doccomment">/// Finds an entry with the specified key, or inserts a new `key`-`value` pair if none exist.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_or_insert</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">key</span>: <span class="ident">K</span>, <span class="ident">value</span>: <span class="ident">V</span>, <span class="ident">guard</span>: <span class="kw-2">&amp;</span><span class="ident">Guard</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">RefEntry</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_or_insert</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">key</span>: <span class="ident">K</span>, <span class="ident">value</span>: <span class="ident">V</span>, <span class="ident">guard</span>: <span class="kw-2">&amp;</span><span class="ident">Guard</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">RefEntry</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">insert_internal</span>(<span class="ident">key</span>, <span class="ident">value</span>, <span class="bool-val">false</span>, <span class="ident">guard</span>)
     }
 
@@ -2516,7 +2545,7 @@
     }
 
     <span class="doccomment">/// Returns an iterator over all entries in the skip list.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">ref_iter</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">RefIter</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">ref_iter</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">RefIter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> {
         <span class="ident">RefIter</span> {
             <span class="ident">parent</span>: <span class="self">self</span>,
             <span class="ident">head</span>: <span class="prelude-val">None</span>,
@@ -2547,7 +2576,8 @@
     }
 
     <span class="doccomment">/// Returns an iterator over a subset of entries in the skip list.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">ref_range</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="lifetime">&#39;g</span>, <span class="ident">Q</span>, <span class="ident">R</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="self">self</span>, <span class="ident">range</span>: <span class="ident">R</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">RefRange</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">Q</span>, <span class="ident">R</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span>
+    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy</span>::<span class="ident">needless_lifetimes</span>)]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">ref_range</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">Q</span>, <span class="ident">R</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="self">self</span>, <span class="ident">range</span>: <span class="ident">R</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">RefRange</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">Q</span>, <span class="ident">R</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span>
     <span class="kw">where</span>
         <span class="ident">K</span>: <span class="ident">Borrow</span><span class="op">&lt;</span><span class="ident">Q</span><span class="op">&gt;</span>,
         <span class="ident">R</span>: <span class="ident">RangeBounds</span><span class="op">&lt;</span><span class="ident">Q</span><span class="op">&gt;</span>,
@@ -2621,10 +2651,11 @@
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Shared</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">Node</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="comment">// If `succ` is marked, that means `curr` is removed. Let&#39;s try</span>
         <span class="comment">// unlinking it from the skip list at this level.</span>
-        <span class="kw">match</span> <span class="ident">pred</span>.<span class="ident">compare_and_set</span>(
+        <span class="kw">match</span> <span class="ident">pred</span>.<span class="ident">compare_exchange</span>(
             <span class="ident">Shared</span>::<span class="ident">from</span>(<span class="ident">curr</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="kw">_</span>),
             <span class="ident">succ</span>.<span class="ident">with_tag</span>(<span class="number">0</span>),
             <span class="ident">Ordering</span>::<span class="ident">Release</span>,
+            <span class="ident">Ordering</span>::<span class="ident">Relaxed</span>,
             <span class="ident">guard</span>,
         ) {
             <span class="prelude-val">Ok</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> {
@@ -2755,11 +2786,9 @@
                                 <span class="kw">break</span>;
                             }
                             <span class="ident">result</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">c</span>);
-                        } <span class="kw">else</span> {
-                            <span class="kw">if</span> <span class="ident">above_lower_bound</span>(<span class="kw-2">&amp;</span><span class="ident">bound</span>, <span class="ident">c</span>.<span class="ident">key</span>.<span class="ident">borrow</span>()) {
-                                <span class="ident">result</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">c</span>);
-                                <span class="kw">break</span>;
-                            }
+                        } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">above_lower_bound</span>(<span class="kw-2">&amp;</span><span class="ident">bound</span>, <span class="ident">c</span>.<span class="ident">key</span>.<span class="ident">borrow</span>()) {
+                            <span class="ident">result</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">c</span>);
+                            <span class="kw">break</span>;
                         }
 
                         <span class="comment">// Move one step forward.</span>
@@ -2861,7 +2890,13 @@
     <span class="doccomment">/// Inserts an entry with the specified `key` and `value`.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// If `replace` is `true`, then any existing entry with this key will first be removed.</span>
-    <span class="kw">fn</span> <span class="ident">insert_internal</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">key</span>: <span class="ident">K</span>, <span class="ident">value</span>: <span class="ident">V</span>, <span class="ident">replace</span>: <span class="ident">bool</span>, <span class="ident">guard</span>: <span class="kw-2">&amp;</span><span class="ident">Guard</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">RefEntry</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">insert_internal</span>(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="ident">key</span>: <span class="ident">K</span>,
+        <span class="ident">value</span>: <span class="ident">V</span>,
+        <span class="ident">replace</span>: <span class="ident">bool</span>,
+        <span class="ident">guard</span>: <span class="kw-2">&amp;</span><span class="ident">Guard</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">RefEntry</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">check_guard</span>(<span class="ident">guard</span>);
 
         <span class="kw">unsafe</span> {
@@ -2925,7 +2960,13 @@
                 <span class="comment">// Try installing the new node into the skip list (at level 0).</span>
                 <span class="comment">// TODO(Amanieu): can we use release ordering here?</span>
                 <span class="kw">if</span> <span class="ident">search</span>.<span class="ident">left</span>[<span class="number">0</span>][<span class="number">0</span>]
-                    .<span class="ident">compare_and_set</span>(<span class="ident">search</span>.<span class="ident">right</span>[<span class="number">0</span>], <span class="ident">node</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>, <span class="ident">guard</span>)
+                    .<span class="ident">compare_exchange</span>(
+                        <span class="ident">search</span>.<span class="ident">right</span>[<span class="number">0</span>],
+                        <span class="ident">node</span>,
+                        <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>,
+                        <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>,
+                        <span class="ident">guard</span>,
+                    )
                     .<span class="ident">is_ok</span>()
                 {
                     <span class="kw">break</span>;
@@ -3017,7 +3058,7 @@
                     <span class="comment">// should stop building the tower.</span>
                     <span class="comment">// TODO(Amanieu): can we use release ordering here?</span>
                     <span class="kw">if</span> <span class="ident">n</span>.<span class="ident">tower</span>[<span class="ident">level</span>]
-                        .<span class="ident">compare_and_set</span>(<span class="ident">next</span>, <span class="ident">succ</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>, <span class="ident">guard</span>)
+                        .<span class="ident">compare_exchange</span>(<span class="ident">next</span>, <span class="ident">succ</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>, <span class="ident">guard</span>)
                         .<span class="ident">is_err</span>()
                     {
                         <span class="kw">break</span> <span class="lifetime">&#39;build</span>;
@@ -3031,7 +3072,7 @@
                     <span class="comment">// Try installing the new node at the current level.</span>
                     <span class="comment">// TODO(Amanieu): can we use release ordering here?</span>
                     <span class="kw">if</span> <span class="ident">pred</span>[<span class="ident">level</span>]
-                        .<span class="ident">compare_and_set</span>(<span class="ident">succ</span>, <span class="ident">node</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>, <span class="ident">guard</span>)
+                        .<span class="ident">compare_exchange</span>(<span class="ident">succ</span>, <span class="ident">node</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>, <span class="ident">guard</span>)
                         .<span class="ident">is_ok</span>()
                     {
                         <span class="comment">// Success! Continue on the next level.</span>
@@ -3078,12 +3119,12 @@
     <span class="doccomment">///</span>
     <span class="doccomment">/// If there is an existing entry with this key, it will be removed before inserting the new</span>
     <span class="doccomment">/// one.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">insert</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">key</span>: <span class="ident">K</span>, <span class="ident">value</span>: <span class="ident">V</span>, <span class="ident">guard</span>: <span class="kw-2">&amp;</span><span class="ident">Guard</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">RefEntry</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">insert</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">key</span>: <span class="ident">K</span>, <span class="ident">value</span>: <span class="ident">V</span>, <span class="ident">guard</span>: <span class="kw-2">&amp;</span><span class="ident">Guard</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">RefEntry</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">insert_internal</span>(<span class="ident">key</span>, <span class="ident">value</span>, <span class="bool-val">true</span>, <span class="ident">guard</span>)
     }
 
     <span class="doccomment">/// Removes an entry with the specified `key` from the map and returns it.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">remove</span><span class="op">&lt;</span><span class="ident">Q</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">key</span>: <span class="kw-2">&amp;</span><span class="ident">Q</span>, <span class="ident">guard</span>: <span class="kw-2">&amp;</span><span class="ident">Guard</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RefEntry</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span><span class="op">&gt;</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">remove</span><span class="op">&lt;</span><span class="ident">Q</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">key</span>: <span class="kw-2">&amp;</span><span class="ident">Q</span>, <span class="ident">guard</span>: <span class="kw-2">&amp;</span><span class="ident">Guard</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RefEntry</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span><span class="op">&gt;</span>
     <span class="kw">where</span>
         <span class="ident">K</span>: <span class="ident">Borrow</span><span class="op">&lt;</span><span class="ident">Q</span><span class="op">&gt;</span>,
         <span class="ident">Q</span>: <span class="ident">Ord</span> <span class="op">+</span> <span class="question-mark">?</span><span class="ident">Sized</span>,
@@ -3124,9 +3165,10 @@
                         <span class="comment">// Try linking the predecessor and successor at this level.</span>
                         <span class="comment">// TODO(Amanieu): can we use release ordering here?</span>
                         <span class="kw">if</span> <span class="ident">search</span>.<span class="ident">left</span>[<span class="ident">level</span>][<span class="ident">level</span>]
-                            .<span class="ident">compare_and_set</span>(
+                            .<span class="ident">compare_exchange</span>(
                                 <span class="ident">Shared</span>::<span class="ident">from</span>(<span class="ident">n</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="kw">_</span>),
                                 <span class="ident">succ</span>,
+                                <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>,
                                 <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>,
                                 <span class="ident">guard</span>,
                             )
@@ -3140,15 +3182,14 @@
                             <span class="kw">break</span>;
                         }
                     }
-
-                    <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">entry</span>);
                 }
+                <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">entry</span>);
             }
         }
     }
 
     <span class="doccomment">/// Removes an entry from the front of the skip list.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">pop_front</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">guard</span>: <span class="kw-2">&amp;</span><span class="ident">Guard</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RefEntry</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">pop_front</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">guard</span>: <span class="kw-2">&amp;</span><span class="ident">Guard</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RefEntry</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">check_guard</span>(<span class="ident">guard</span>);
         <span class="kw">loop</span> {
             <span class="kw">let</span> <span class="ident">e</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">front</span>(<span class="ident">guard</span>)<span class="question-mark">?</span>;
@@ -3161,7 +3202,7 @@
     }
 
     <span class="doccomment">/// Removes an entry from the back of the skip list.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">pop_back</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">guard</span>: <span class="kw-2">&amp;</span><span class="ident">Guard</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RefEntry</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">pop_back</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">guard</span>: <span class="kw-2">&amp;</span><span class="ident">Guard</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RefEntry</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">check_guard</span>(<span class="ident">guard</span>);
         <span class="kw">loop</span> {
             <span class="kw">let</span> <span class="ident">e</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">back</span>(<span class="ident">guard</span>)<span class="question-mark">?</span>;
@@ -3182,7 +3223,7 @@
 
         <span class="kw">loop</span> {
             {
-                <span class="comment">// Search for the first entry in order to unlink all the preceeding entries</span>
+                <span class="comment">// Search for the first entry in order to unlink all the preceding entries</span>
                 <span class="comment">// we have removed.</span>
                 <span class="comment">//</span>
                 <span class="comment">// By unlinking nodes in batches we make sure that the final search doesn&#39;t</span>
@@ -3246,7 +3287,7 @@
     <span class="ident">K</span>: <span class="ident">Ord</span> <span class="op">+</span> <span class="ident">fmt</span>::<span class="ident">Debug</span>,
     <span class="ident">V</span>: <span class="ident">fmt</span>::<span class="ident">Debug</span>,
 {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt</span>::<span class="ident">Formatter</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="prelude-ty">Result</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt</span>::<span class="ident">Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="prelude-ty">Result</span> {
         <span class="ident">f</span>.<span class="ident">pad</span>(<span class="string">&quot;SkipList { .. }&quot;</span>)
     }
 }
@@ -3282,7 +3323,7 @@
 <span class="doccomment">/// The lifetimes of the key and value are the same as that of the `Guard`</span>
 <span class="doccomment">/// used when creating the `Entry` (`&#39;g`). This lifetime is also constrained to</span>
 <span class="doccomment">/// not outlive the `SkipList`.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Entry</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>: <span class="lifetime">&#39;g</span>, <span class="lifetime">&#39;g</span>, <span class="ident">K</span>: <span class="lifetime">&#39;a</span>, <span class="ident">V</span>: <span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Entry</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>: <span class="lifetime">&#39;g</span>, <span class="lifetime">&#39;g</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> {
     <span class="ident">parent</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">SkipList</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span>,
     <span class="ident">node</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;g</span> <span class="ident">Node</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span>,
     <span class="ident">guard</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;g</span> <span class="ident">Guard</span>,
@@ -3354,12 +3395,12 @@
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="lifetime">&#39;g</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="ident">Debug</span> <span class="kw">for</span> <span class="ident">Entry</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="lifetime">&#39;g</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span>
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="ident">Debug</span> <span class="kw">for</span> <span class="ident">Entry</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="lifetime">&#39;_</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span>
 <span class="kw">where</span>
     <span class="ident">K</span>: <span class="ident">fmt</span>::<span class="ident">Debug</span>,
     <span class="ident">V</span>: <span class="ident">fmt</span>::<span class="ident">Debug</span>,
 {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt</span>::<span class="ident">Formatter</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="prelude-ty">Result</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt</span>::<span class="ident">Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="prelude-ty">Result</span> {
         <span class="ident">f</span>.<span class="ident">debug_tuple</span>(<span class="string">&quot;Entry&quot;</span>)
             .<span class="ident">field</span>(<span class="self">self</span>.<span class="ident">key</span>())
             .<span class="ident">field</span>(<span class="self">self</span>.<span class="ident">value</span>())
@@ -3424,7 +3465,7 @@
 <span class="doccomment">///</span>
 <span class="doccomment">/// You *must* call `release` to free this type, otherwise the node will be</span>
 <span class="doccomment">/// leaked. This is because releasing the entry requires a `Guard`.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">RefEntry</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">K</span>: <span class="lifetime">&#39;a</span>, <span class="ident">V</span>: <span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">RefEntry</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> {
     <span class="ident">parent</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">SkipList</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span>,
     <span class="ident">node</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">Node</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span>,
 }
@@ -3485,7 +3526,7 @@
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> <span class="ident">RefEntry</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span>
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> <span class="ident">RefEntry</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span>
 <span class="kw">where</span>
     <span class="ident">K</span>: <span class="ident">Ord</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
     <span class="ident">V</span>: <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
@@ -3525,12 +3566,12 @@
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="ident">Debug</span> <span class="kw">for</span> <span class="ident">RefEntry</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span>
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="ident">Debug</span> <span class="kw">for</span> <span class="ident">RefEntry</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span>
 <span class="kw">where</span>
     <span class="ident">K</span>: <span class="ident">fmt</span>::<span class="ident">Debug</span>,
     <span class="ident">V</span>: <span class="ident">fmt</span>::<span class="ident">Debug</span>,
 {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt</span>::<span class="ident">Formatter</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="prelude-ty">Result</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt</span>::<span class="ident">Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="prelude-ty">Result</span> {
         <span class="ident">f</span>.<span class="ident">debug_tuple</span>(<span class="string">&quot;RefEntry&quot;</span>)
             .<span class="ident">field</span>(<span class="self">self</span>.<span class="ident">key</span>())
             .<span class="ident">field</span>(<span class="self">self</span>.<span class="ident">value</span>())
@@ -3568,6 +3609,7 @@
             }
         }
     }
+
     <span class="doccomment">/// Moves to the previous entry in the skip list.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">move_prev</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">guard</span>: <span class="kw-2">&amp;</span><span class="ident">Guard</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
         <span class="kw">match</span> <span class="self">self</span>.<span class="ident">prev</span>(<span class="ident">guard</span>) {
@@ -3597,7 +3639,7 @@
 }
 
 <span class="doccomment">/// An iterator over the entries of a `SkipList`.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Iter</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>: <span class="lifetime">&#39;g</span>, <span class="lifetime">&#39;g</span>, <span class="ident">K</span>: <span class="lifetime">&#39;a</span>, <span class="ident">V</span>: <span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Iter</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>: <span class="lifetime">&#39;g</span>, <span class="lifetime">&#39;g</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> {
     <span class="ident">parent</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">SkipList</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span>,
     <span class="ident">head</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;g</span> <span class="ident">Node</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">tail</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;g</span> <span class="ident">Node</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span><span class="op">&gt;</span>,
@@ -3658,12 +3700,12 @@
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="lifetime">&#39;g</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="ident">Debug</span> <span class="kw">for</span> <span class="ident">Iter</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="lifetime">&#39;g</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span>
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="ident">Debug</span> <span class="kw">for</span> <span class="ident">Iter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="lifetime">&#39;_</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span>
 <span class="kw">where</span>
     <span class="ident">K</span>: <span class="ident">fmt</span>::<span class="ident">Debug</span>,
     <span class="ident">V</span>: <span class="ident">fmt</span>::<span class="ident">Debug</span>,
 {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt</span>::<span class="ident">Formatter</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="prelude-ty">Result</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt</span>::<span class="ident">Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="prelude-ty">Result</span> {
         <span class="ident">f</span>.<span class="ident">debug_struct</span>(<span class="string">&quot;Iter&quot;</span>)
             .<span class="ident">field</span>(<span class="string">&quot;head&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">head</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">n</span><span class="op">|</span> (<span class="kw-2">&amp;</span><span class="ident">n</span>.<span class="ident">key</span>, <span class="kw-2">&amp;</span><span class="ident">n</span>.<span class="ident">value</span>)))
             .<span class="ident">field</span>(<span class="string">&quot;tail&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">tail</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">n</span><span class="op">|</span> (<span class="kw-2">&amp;</span><span class="ident">n</span>.<span class="ident">key</span>, <span class="kw-2">&amp;</span><span class="ident">n</span>.<span class="ident">value</span>)))
@@ -3672,18 +3714,18 @@
 }
 
 <span class="doccomment">/// An iterator over reference-counted entries of a `SkipList`.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">RefIter</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">K</span>: <span class="lifetime">&#39;a</span>, <span class="ident">V</span>: <span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">RefIter</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> {
     <span class="ident">parent</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">SkipList</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span>,
     <span class="ident">head</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RefEntry</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">tail</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RefEntry</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="ident">Debug</span> <span class="kw">for</span> <span class="ident">RefIter</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span>
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="ident">Debug</span> <span class="kw">for</span> <span class="ident">RefIter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span>
 <span class="kw">where</span>
     <span class="ident">K</span>: <span class="ident">fmt</span>::<span class="ident">Debug</span>,
     <span class="ident">V</span>: <span class="ident">fmt</span>::<span class="ident">Debug</span>,
 {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt</span>::<span class="ident">Formatter</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="prelude-ty">Result</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt</span>::<span class="ident">Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="prelude-ty">Result</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">d</span> <span class="op">=</span> <span class="ident">f</span>.<span class="ident">debug_struct</span>(<span class="string">&quot;RefIter&quot;</span>);
         <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">head</span> {
             <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">d</span>.<span class="ident">field</span>(<span class="string">&quot;head&quot;</span>, <span class="kw-2">&amp;</span><span class="prelude-val">None</span>::<span class="op">&lt;</span>(<span class="kw-2">&amp;</span><span class="ident">K</span>, <span class="kw-2">&amp;</span><span class="ident">V</span>)<span class="op">&gt;</span>),
@@ -3701,7 +3743,7 @@
 <span class="kw">where</span>
     <span class="ident">K</span>: <span class="ident">Ord</span>,
 {
-    <span class="doccomment">/// TODO</span>
+    <span class="doccomment">/// Advances the iterator and returns the next value.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">next</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">guard</span>: <span class="kw-2">&amp;</span><span class="ident">Guard</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RefEntry</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">parent</span>.<span class="ident">check_guard</span>(<span class="ident">guard</span>);
         <span class="self">self</span>.<span class="ident">head</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">head</span> {
@@ -3727,7 +3769,7 @@
         <span class="self">self</span>.<span class="ident">head</span>.<span class="ident">clone</span>()
     }
 
-    <span class="doccomment">/// TODO</span>
+    <span class="doccomment">/// Removes and returns an element from the end of the iterator.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">next_back</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">guard</span>: <span class="kw-2">&amp;</span><span class="ident">Guard</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RefEntry</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">parent</span>.<span class="ident">check_guard</span>(<span class="ident">guard</span>);
         <span class="self">self</span>.<span class="ident">tail</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">tail</span> {
@@ -3755,7 +3797,7 @@
 }
 
 <span class="doccomment">/// An iterator over a subset of entries of a `SkipList`.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Range</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>: <span class="lifetime">&#39;g</span>, <span class="lifetime">&#39;g</span>, <span class="ident">Q</span>, <span class="ident">R</span>, <span class="ident">K</span>: <span class="lifetime">&#39;a</span>, <span class="ident">V</span>: <span class="lifetime">&#39;a</span><span class="op">&gt;</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Range</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>: <span class="lifetime">&#39;g</span>, <span class="lifetime">&#39;g</span>, <span class="ident">Q</span>, <span class="ident">R</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span>
 <span class="kw">where</span>
     <span class="ident">K</span>: <span class="ident">Ord</span> <span class="op">+</span> <span class="ident">Borrow</span><span class="op">&lt;</span><span class="ident">Q</span><span class="op">&gt;</span>,
     <span class="ident">R</span>: <span class="ident">RangeBounds</span><span class="op">&lt;</span><span class="ident">Q</span><span class="op">&gt;</span>,
@@ -3837,14 +3879,14 @@
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="lifetime">&#39;g</span>, <span class="ident">Q</span>, <span class="ident">R</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="ident">Debug</span> <span class="kw">for</span> <span class="ident">Range</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="lifetime">&#39;g</span>, <span class="ident">Q</span>, <span class="ident">R</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span>
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">Q</span>, <span class="ident">R</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="ident">Debug</span> <span class="kw">for</span> <span class="ident">Range</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="lifetime">&#39;_</span>, <span class="ident">Q</span>, <span class="ident">R</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span>
 <span class="kw">where</span>
     <span class="ident">K</span>: <span class="ident">Ord</span> <span class="op">+</span> <span class="ident">Borrow</span><span class="op">&lt;</span><span class="ident">Q</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">fmt</span>::<span class="ident">Debug</span>,
     <span class="ident">V</span>: <span class="ident">fmt</span>::<span class="ident">Debug</span>,
     <span class="ident">R</span>: <span class="ident">RangeBounds</span><span class="op">&lt;</span><span class="ident">Q</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">fmt</span>::<span class="ident">Debug</span>,
     <span class="ident">Q</span>: <span class="ident">Ord</span> <span class="op">+</span> <span class="question-mark">?</span><span class="ident">Sized</span>,
 {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt</span>::<span class="ident">Formatter</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="prelude-ty">Result</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt</span>::<span class="ident">Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="prelude-ty">Result</span> {
         <span class="ident">f</span>.<span class="ident">debug_struct</span>(<span class="string">&quot;Range&quot;</span>)
             .<span class="ident">field</span>(<span class="string">&quot;range&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">range</span>)
             .<span class="ident">field</span>(<span class="string">&quot;head&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">head</span>)
@@ -3854,7 +3896,7 @@
 }
 
 <span class="doccomment">/// An iterator over reference-counted subset of entries of a `SkipList`.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">RefRange</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">Q</span>, <span class="ident">R</span>, <span class="ident">K</span>: <span class="lifetime">&#39;a</span>, <span class="ident">V</span>: <span class="lifetime">&#39;a</span><span class="op">&gt;</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">RefRange</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">Q</span>, <span class="ident">R</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span>
 <span class="kw">where</span>
     <span class="ident">K</span>: <span class="ident">Ord</span> <span class="op">+</span> <span class="ident">Borrow</span><span class="op">&lt;</span><span class="ident">Q</span><span class="op">&gt;</span>,
     <span class="ident">R</span>: <span class="ident">RangeBounds</span><span class="op">&lt;</span><span class="ident">Q</span><span class="op">&gt;</span>,
@@ -3867,7 +3909,7 @@
     <span class="ident">_marker</span>: <span class="ident">PhantomData</span><span class="op">&lt;</span><span class="kw">fn</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Q</span><span class="op">&gt;</span>, <span class="comment">// covariant over `Q`</span>
 }
 
-<span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">Q</span>, <span class="ident">R</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> <span class="ident">Send</span> <span class="kw">for</span> <span class="ident">RefRange</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">Q</span>, <span class="ident">R</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span>
+<span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">Q</span>, <span class="ident">R</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> <span class="ident">Send</span> <span class="kw">for</span> <span class="ident">RefRange</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="ident">Q</span>, <span class="ident">R</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span>
 <span class="kw">where</span>
     <span class="ident">K</span>: <span class="ident">Ord</span> <span class="op">+</span> <span class="ident">Borrow</span><span class="op">&lt;</span><span class="ident">Q</span><span class="op">&gt;</span>,
     <span class="ident">R</span>: <span class="ident">RangeBounds</span><span class="op">&lt;</span><span class="ident">Q</span><span class="op">&gt;</span>,
@@ -3875,7 +3917,7 @@
 {
 }
 
-<span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">Q</span>, <span class="ident">R</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> <span class="ident">Sync</span> <span class="kw">for</span> <span class="ident">RefRange</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">Q</span>, <span class="ident">R</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span>
+<span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">Q</span>, <span class="ident">R</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> <span class="ident">Sync</span> <span class="kw">for</span> <span class="ident">RefRange</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="ident">Q</span>, <span class="ident">R</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span>
 <span class="kw">where</span>
     <span class="ident">K</span>: <span class="ident">Ord</span> <span class="op">+</span> <span class="ident">Borrow</span><span class="op">&lt;</span><span class="ident">Q</span><span class="op">&gt;</span>,
     <span class="ident">R</span>: <span class="ident">RangeBounds</span><span class="op">&lt;</span><span class="ident">Q</span><span class="op">&gt;</span>,
@@ -3883,14 +3925,14 @@
 {
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">Q</span>, <span class="ident">R</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="ident">Debug</span> <span class="kw">for</span> <span class="ident">RefRange</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">Q</span>, <span class="ident">R</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span>
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">Q</span>, <span class="ident">R</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="ident">Debug</span> <span class="kw">for</span> <span class="ident">RefRange</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span>, <span class="ident">Q</span>, <span class="ident">R</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span>
 <span class="kw">where</span>
     <span class="ident">K</span>: <span class="ident">Ord</span> <span class="op">+</span> <span class="ident">Borrow</span><span class="op">&lt;</span><span class="ident">Q</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">fmt</span>::<span class="ident">Debug</span>,
     <span class="ident">V</span>: <span class="ident">fmt</span>::<span class="ident">Debug</span>,
     <span class="ident">R</span>: <span class="ident">RangeBounds</span><span class="op">&lt;</span><span class="ident">Q</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">fmt</span>::<span class="ident">Debug</span>,
     <span class="ident">Q</span>: <span class="ident">Ord</span> <span class="op">+</span> <span class="question-mark">?</span><span class="ident">Sized</span>,
 {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt</span>::<span class="ident">Formatter</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="prelude-ty">Result</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt</span>::<span class="ident">Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="prelude-ty">Result</span> {
         <span class="ident">f</span>.<span class="ident">debug_struct</span>(<span class="string">&quot;RefRange&quot;</span>)
             .<span class="ident">field</span>(<span class="string">&quot;range&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">range</span>)
             .<span class="ident">field</span>(<span class="string">&quot;head&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">head</span>)
@@ -3905,11 +3947,17 @@
     <span class="ident">R</span>: <span class="ident">RangeBounds</span><span class="op">&lt;</span><span class="ident">Q</span><span class="op">&gt;</span>,
     <span class="ident">Q</span>: <span class="ident">Ord</span> <span class="op">+</span> <span class="question-mark">?</span><span class="ident">Sized</span>,
 {
-    <span class="doccomment">/// TODO</span>
+    <span class="doccomment">/// Advances the iterator and returns the next value.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">next</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">guard</span>: <span class="kw-2">&amp;</span><span class="ident">Guard</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RefEntry</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">parent</span>.<span class="ident">check_guard</span>(<span class="ident">guard</span>);
         <span class="self">self</span>.<span class="ident">head</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">head</span> {
-            <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">e</span>.<span class="ident">next</span>(<span class="ident">guard</span>),
+            <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="kw">let</span> <span class="ident">next_head</span> <span class="op">=</span> <span class="ident">e</span>.<span class="ident">next</span>(<span class="ident">guard</span>);
+                <span class="kw">unsafe</span> {
+                    <span class="ident">e</span>.<span class="ident">node</span>.<span class="ident">decrement</span>(<span class="ident">guard</span>);
+                }
+                <span class="ident">next_head</span>
+            }
             <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">try_pin_loop</span>(<span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">parent</span>.<span class="ident">lower_bound</span>(<span class="self">self</span>.<span class="ident">range</span>.<span class="ident">start_bound</span>(), <span class="ident">guard</span>)),
         };
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">finished</span> <span class="op">=</span> <span class="bool-val">false</span>;
@@ -3920,6 +3968,9 @@
             };
             <span class="kw">if</span> <span class="op">!</span><span class="ident">below_upper_bound</span>(<span class="kw-2">&amp;</span><span class="ident">bound</span>, <span class="ident">h</span>.<span class="ident">key</span>().<span class="ident">borrow</span>()) {
                 <span class="ident">finished</span> <span class="op">=</span> <span class="bool-val">true</span>;
+                <span class="kw">unsafe</span> {
+                    <span class="ident">h</span>.<span class="ident">node</span>.<span class="ident">decrement</span>(<span class="ident">guard</span>);
+                }
             }
         }
         <span class="kw">if</span> <span class="ident">finished</span> {
@@ -3929,11 +3980,17 @@
         <span class="self">self</span>.<span class="ident">head</span>.<span class="ident">clone</span>()
     }
 
-    <span class="doccomment">/// TODO: docs</span>
+    <span class="doccomment">/// Removes and returns an element from the end of the iterator.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">next_back</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">guard</span>: <span class="kw-2">&amp;</span><span class="ident">Guard</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RefEntry</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">parent</span>.<span class="ident">check_guard</span>(<span class="ident">guard</span>);
         <span class="self">self</span>.<span class="ident">tail</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">tail</span> {
-            <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">e</span>.<span class="ident">prev</span>(<span class="ident">guard</span>),
+            <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="kw">let</span> <span class="ident">next_tail</span> <span class="op">=</span> <span class="ident">e</span>.<span class="ident">prev</span>(<span class="ident">guard</span>);
+                <span class="kw">unsafe</span> {
+                    <span class="ident">e</span>.<span class="ident">node</span>.<span class="ident">decrement</span>(<span class="ident">guard</span>);
+                }
+                <span class="ident">next_tail</span>
+            }
             <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">try_pin_loop</span>(<span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">parent</span>.<span class="ident">upper_bound</span>(<span class="self">self</span>.<span class="ident">range</span>.<span class="ident">start_bound</span>(), <span class="ident">guard</span>)),
         };
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">finished</span> <span class="op">=</span> <span class="bool-val">false</span>;
@@ -3944,6 +4001,9 @@
             };
             <span class="kw">if</span> <span class="op">!</span><span class="ident">above_lower_bound</span>(<span class="kw-2">&amp;</span><span class="ident">bound</span>, <span class="ident">t</span>.<span class="ident">key</span>().<span class="ident">borrow</span>()) {
                 <span class="ident">finished</span> <span class="op">=</span> <span class="bool-val">true</span>;
+                <span class="kw">unsafe</span> {
+                    <span class="ident">t</span>.<span class="ident">node</span>.<span class="ident">decrement</span>(<span class="ident">guard</span>);
+                }
             }
         }
         <span class="kw">if</span> <span class="ident">finished</span> {
@@ -3958,7 +4018,7 @@
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">IntoIter</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> {
     <span class="doccomment">/// The current node.</span>
     <span class="doccomment">///</span>
-    <span class="doccomment">/// All preceeding nods have already been destroyed.</span>
+    <span class="doccomment">/// All preceding nods have already been destroyed.</span>
     <span class="ident">node</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">Node</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span>,
 }
 
@@ -3971,7 +4031,7 @@
                 <span class="comment">// the skip list.</span>
                 <span class="kw">let</span> <span class="ident">next</span> <span class="op">=</span> (<span class="kw-2">*</span><span class="self">self</span>.<span class="ident">node</span>).<span class="ident">tower</span>[<span class="number">0</span>].<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">Relaxed</span>, <span class="ident">epoch</span>::<span class="ident">unprotected</span>());
 
-                <span class="comment">// We can safely do this without defering because references to</span>
+                <span class="comment">// We can safely do this without deferring because references to</span>
                 <span class="comment">// keys &amp; values that we give out never outlive the SkipList.</span>
                 <span class="ident">Node</span>::<span class="ident">finalize</span>(<span class="self">self</span>.<span class="ident">node</span>);
 
@@ -4017,7 +4077,7 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="ident">Debug</span> <span class="kw">for</span> <span class="ident">IntoIter</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt</span>::<span class="ident">Formatter</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="prelude-ty">Result</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt</span>::<span class="ident">Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="prelude-ty">Result</span> {
         <span class="ident">f</span>.<span class="ident">pad</span>(<span class="string">&quot;IntoIter { .. }&quot;</span>)
     }
 }

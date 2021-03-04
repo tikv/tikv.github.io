@@ -5,7 +5,7 @@ implementors["anyhow"] = [{"text":"impl DerefMut for Error","synthetic":false,"t
 implementors["arrayvec"] = [{"text":"impl&lt;A:&nbsp;Array&lt;Item = u8&gt;&gt; DerefMut for ArrayString&lt;A&gt;","synthetic":false,"types":[]},{"text":"impl&lt;A:&nbsp;Array&gt; DerefMut for ArrayVec&lt;A&gt;","synthetic":false,"types":[]}];
 implementors["bstr"] = [{"text":"impl DerefMut for BString","synthetic":false,"types":[]},{"text":"impl DerefMut for BStr","synthetic":false,"types":[]}];
 implementors["bytes"] = [{"text":"impl DerefMut for BytesMut","synthetic":false,"types":[]}];
-implementors["crossbeam_epoch"] = [{"text":"impl&lt;T&gt; DerefMut for Owned&lt;T&gt;","synthetic":false,"types":[]}];
+implementors["crossbeam_epoch"] = [{"text":"impl&lt;T:&nbsp;?Sized + Pointable&gt; DerefMut for Owned&lt;T&gt;","synthetic":false,"types":[]}];
 implementors["crossbeam_utils"] = [{"text":"impl&lt;T&gt; DerefMut for CachePadded&lt;T&gt;","synthetic":false,"types":[]},{"text":"impl&lt;T:&nbsp;?Sized&gt; DerefMut for ShardedLockWriteGuard&lt;'_, T&gt;","synthetic":false,"types":[]}];
 implementors["darling_core"] = [{"text":"impl&lt;T&gt; DerefMut for SpannedValue&lt;T&gt;","synthetic":false,"types":[]}];
 implementors["dashmap"] = [{"text":"impl&lt;'rwlock, T:&nbsp;?Sized&gt; DerefMut for RwLockWriteGuard&lt;'rwlock, T&gt;","synthetic":false,"types":[]},{"text":"impl&lt;'a, K:&nbsp;Eq + Hash, V, S:&nbsp;BuildHasher&gt; DerefMut for RefMutMulti&lt;'a, K, V, S&gt;","synthetic":false,"types":[]},{"text":"impl&lt;'a, K:&nbsp;Eq + Hash, V, S:&nbsp;BuildHasher&gt; DerefMut for RefMut&lt;'a, K, V, S&gt;","synthetic":false,"types":[]}];
