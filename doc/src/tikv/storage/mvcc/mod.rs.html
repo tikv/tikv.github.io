@@ -624,6 +624,12 @@
 <span id="621">621</span>
 <span id="622">622</span>
 <span id="623">623</span>
+<span id="624">624</span>
+<span id="625">625</span>
+<span id="626">626</span>
+<span id="627">627</span>
+<span id="628">628</span>
+<span id="629">629</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -675,8 +681,8 @@
             <span class="ident">cause</span>(<span class="ident">err</span>)
             <span class="ident">display</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">err</span>)
         }
-        <span class="ident">Committed</span> { <span class="ident">commit_ts</span>: <span class="ident">TimeStamp</span> } {
-            <span class="ident">display</span>(<span class="string">&quot;txn already committed @{}&quot;</span>, <span class="ident">commit_ts</span>)
+        <span class="ident">Committed</span> { <span class="ident">start_ts</span>: <span class="ident">TimeStamp</span>, <span class="ident">commit_ts</span>: <span class="ident">TimeStamp</span>, <span class="ident">key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> } {
+            <span class="ident">display</span>(<span class="string">&quot;txn already committed, start_ts: {}, commit_ts: {}, key: {}&quot;</span>, <span class="ident">start_ts</span>, <span class="ident">commit_ts</span>, <span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>(<span class="ident">key</span>))
         }
         <span class="ident">PessimisticLockRolledBack</span> { <span class="ident">start_ts</span>: <span class="ident">TimeStamp</span>, <span class="ident">key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> } {
             <span class="ident">display</span>(<span class="string">&quot;pessimistic lock already rollbacked, start_ts:{}, key:{}&quot;</span>, <span class="ident">start_ts</span>, <span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>(<span class="ident">key</span>))
@@ -684,7 +690,7 @@
         <span class="ident">TxnLockNotFound</span> { <span class="ident">start_ts</span>: <span class="ident">TimeStamp</span>, <span class="ident">commit_ts</span>: <span class="ident">TimeStamp</span>, <span class="ident">key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> } {
             <span class="ident">display</span>(<span class="string">&quot;txn lock not found {}-{} key:{}&quot;</span>, <span class="ident">start_ts</span>, <span class="ident">commit_ts</span>, <span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>(<span class="ident">key</span>))
         }
-        <span class="ident">TxnNotFound</span> { <span class="ident">start_ts</span>:  <span class="ident">TimeStamp</span>, <span class="ident">key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> } {
+        <span class="ident">TxnNotFound</span> { <span class="ident">start_ts</span>: <span class="ident">TimeStamp</span>, <span class="ident">key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> } {
             <span class="ident">display</span>(<span class="string">&quot;txn not found {} key: {}&quot;</span>, <span class="ident">start_ts</span>, <span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>(<span class="ident">key</span>))
         }
         <span class="ident">LockTypeNotMatch</span> { <span class="ident">start_ts</span>: <span class="ident">TimeStamp</span>, <span class="ident">key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>, <span class="ident">pessimistic</span>: <span class="ident">bool</span> } {
@@ -791,8 +797,14 @@
                 <span class="ident">min_commit_ts</span>: <span class="kw-2">*</span><span class="ident">min_commit_ts</span>,
             }),
             <span class="ident">ErrorInner</span>::<span class="ident">KeyVersion</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Some</span>(<span class="ident">ErrorInner</span>::<span class="ident">KeyVersion</span>),
-            <span class="ident">ErrorInner</span>::<span class="ident">Committed</span> { <span class="ident">commit_ts</span> } <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Some</span>(<span class="ident">ErrorInner</span>::<span class="ident">Committed</span> {
+            <span class="ident">ErrorInner</span>::<span class="ident">Committed</span> {
+                <span class="ident">start_ts</span>,
+                <span class="ident">commit_ts</span>,
+                <span class="ident">key</span>,
+            } <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Some</span>(<span class="ident">ErrorInner</span>::<span class="ident">Committed</span> {
+                <span class="ident">start_ts</span>: <span class="kw-2">*</span><span class="ident">start_ts</span>,
                 <span class="ident">commit_ts</span>: <span class="kw-2">*</span><span class="ident">commit_ts</span>,
+                <span class="ident">key</span>: <span class="ident">key</span>.<span class="ident">clone</span>(),
             }),
             <span class="ident">ErrorInner</span>::<span class="ident">PessimisticLockRolledBack</span> { <span class="ident">start_ts</span>, <span class="ident">key</span> } <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="prelude-val">Some</span>(<span class="ident">ErrorInner</span>::<span class="ident">PessimisticLockRolledBack</span> {
