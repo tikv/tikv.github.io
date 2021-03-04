@@ -395,6 +395,21 @@
 <span id="392">392</span>
 <span id="393">393</span>
 <span id="394">394</span>
+<span id="395">395</span>
+<span id="396">396</span>
+<span id="397">397</span>
+<span id="398">398</span>
+<span id="399">399</span>
+<span id="400">400</span>
+<span id="401">401</span>
+<span id="402">402</span>
+<span id="403">403</span>
+<span id="404">404</span>
+<span id="405">405</span>
+<span id="406">406</span>
+<span id="407">407</span>
+<span id="408">408</span>
+<span id="409">409</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -402,6 +417,7 @@
 
 <span class="kw">use</span> <span class="kw">super</span>::<span class="prelude-ty">Result</span>;
 <span class="kw">use</span> <span class="ident">grpcio</span>::<span class="ident">CompressionAlgorithms</span>;
+<span class="kw">use</span> <span class="ident">regex</span>::<span class="ident">Regex</span>;
 
 <span class="kw">use</span> <span class="ident">collections</span>::<span class="ident">HashMap</span>;
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">config</span>::{<span class="self">self</span>, <span class="ident">ReadableDuration</span>, <span class="ident">ReadableSize</span>};
@@ -665,8 +681,8 @@
         }
 
         <span class="kw">for</span> (<span class="ident">k</span>, <span class="ident">v</span>) <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">labels</span> {
-            <span class="ident">validate_label</span>(<span class="ident">k</span>, <span class="string">&quot;key&quot;</span>)<span class="question-mark">?</span>;
-            <span class="ident">validate_label</span>(<span class="ident">v</span>, <span class="string">&quot;value&quot;</span>)<span class="question-mark">?</span>;
+            <span class="ident">validate_label_key</span>(<span class="ident">k</span>)<span class="question-mark">?</span>;
+            <span class="ident">validate_label_value</span>(<span class="ident">v</span>)<span class="question-mark">?</span>;
         }
 
         <span class="prelude-val">Ok</span>(())
@@ -682,35 +698,34 @@
     }
 }
 
-<span class="kw">fn</span> <span class="ident">validate_label</span>(<span class="ident">s</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">tp</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">report_err</span> <span class="op">=</span> <span class="op">|</span><span class="op">|</span> {
-        <span class="macro">box_err</span><span class="macro">!</span>(
-            <span class="string">&quot;store label {}: {:?} not match ^[a-zA-Z0-9]([a-zA-Z0-9-._]*[a-zA-Z0-9])?&quot;</span>,
-            <span class="ident">tp</span>,
-            <span class="ident">s</span>
-        )
-    };
-    <span class="kw">if</span> <span class="ident">s</span>.<span class="ident">is_empty</span>() {
-        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">report_err</span>());
+<span class="macro">lazy_static</span><span class="macro">!</span> {
+    <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">LABEL_KEY_FORMAT</span>: <span class="ident">Regex</span> <span class="op">=</span>
+        <span class="ident">Regex</span>::<span class="ident">new</span>(<span class="string">&quot;^[$]?[A-Za-z0-9]([-A-Za-z0-9_./]*[A-Za-z0-9])?$&quot;</span>).<span class="ident">unwrap</span>();
+    <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">LABEL_VALUE_FORMAT</span>: <span class="ident">Regex</span> <span class="op">=</span> <span class="ident">Regex</span>::<span class="ident">new</span>(<span class="string">&quot;^[-A-Za-z0-9_./]*$&quot;</span>).<span class="ident">unwrap</span>();
+}
+
+<span class="kw">fn</span> <span class="ident">validate_label_key</span>(<span class="ident">s</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">if</span> <span class="ident">LABEL_KEY_FORMAT</span>.<span class="ident">is_match</span>(<span class="ident">s</span>) {
+        <span class="prelude-val">Ok</span>(())
+    } <span class="kw">else</span> {
+        <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(
+            <span class="string">&quot;store label key: {:?} not match {}&quot;</span>,
+            <span class="ident">s</span>,
+            <span class="kw-2">*</span><span class="ident">LABEL_KEY_FORMAT</span>
+        ))
     }
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">chrs</span> <span class="op">=</span> <span class="ident">s</span>.<span class="ident">chars</span>();
-    <span class="kw">let</span> <span class="ident">first_char</span> <span class="op">=</span> <span class="ident">chrs</span>.<span class="ident">next</span>().<span class="ident">unwrap</span>();
-    <span class="kw">if</span> <span class="op">!</span><span class="ident">first_char</span>.<span class="ident">is_ascii_alphanumeric</span>() {
-        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">report_err</span>());
+}
+
+<span class="kw">fn</span> <span class="ident">validate_label_value</span>(<span class="ident">s</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">if</span> <span class="ident">LABEL_VALUE_FORMAT</span>.<span class="ident">is_match</span>(<span class="ident">s</span>) {
+        <span class="prelude-val">Ok</span>(())
+    } <span class="kw">else</span> {
+        <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(
+            <span class="string">&quot;store label value: {:?} not match {}&quot;</span>,
+            <span class="ident">s</span>,
+            <span class="kw-2">*</span><span class="ident">LABEL_VALUE_FORMAT</span>
+        ))
     }
-    <span class="kw">let</span> <span class="ident">last_char</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">chrs</span>.<span class="ident">next_back</span>() {
-        <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="prelude-val">Ok</span>(()),
-        <span class="prelude-val">Some</span>(<span class="ident">c</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">c</span>,
-    };
-    <span class="kw">if</span> <span class="op">!</span><span class="ident">last_char</span>.<span class="ident">is_ascii_alphanumeric</span>() {
-        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">report_err</span>());
-    }
-    <span class="kw">for</span> <span class="ident">c</span> <span class="kw">in</span> <span class="ident">chrs</span> {
-        <span class="kw">if</span> <span class="op">!</span><span class="ident">c</span>.<span class="ident">is_ascii_alphanumeric</span>() <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="string">&quot;-._&quot;</span>.<span class="ident">contains</span>(<span class="ident">c</span>) {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">report_err</span>());
-        }
-    }
-    <span class="prelude-val">Ok</span>(())
 }
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
@@ -775,18 +790,33 @@
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_store_labels</span>() {
-        <span class="kw">let</span> <span class="ident">invalid_cases</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[<span class="string">&quot;&quot;</span>, <span class="string">&quot;123*&quot;</span>, <span class="string">&quot;.123&quot;</span>, <span class="string">&quot;💖&quot;</span>];
-
-        <span class="kw">for</span> <span class="ident">case</span> <span class="kw">in</span> <span class="ident">invalid_cases</span> {
-            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">validate_label</span>(<span class="ident">case</span>, <span class="string">&quot;dummy&quot;</span>).<span class="ident">is_err</span>());
-        }
-
-        <span class="kw">let</span> <span class="ident">valid_cases</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
-            <span class="string">&quot;a&quot;</span>, <span class="string">&quot;0&quot;</span>, <span class="string">&quot;a.1-2&quot;</span>, <span class="string">&quot;Cab&quot;</span>, <span class="string">&quot;abC&quot;</span>, <span class="string">&quot;b_1.2&quot;</span>, <span class="string">&quot;cab-012&quot;</span>, <span class="string">&quot;3ac.8b2&quot;</span>,
+        <span class="kw">let</span> <span class="ident">cases</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
+            (<span class="string">&quot;&quot;</span>, <span class="bool-val">false</span>, <span class="bool-val">true</span>),
+            (<span class="string">&quot;123*&quot;</span>, <span class="bool-val">false</span>, <span class="bool-val">false</span>),
+            (<span class="string">&quot;.123&quot;</span>, <span class="bool-val">false</span>, <span class="bool-val">true</span>),
+            (<span class="string">&quot;💖&quot;</span>, <span class="bool-val">false</span>, <span class="bool-val">false</span>),
+            (<span class="string">&quot;a&quot;</span>, <span class="bool-val">true</span>, <span class="bool-val">true</span>),
+            (<span class="string">&quot;0&quot;</span>, <span class="bool-val">true</span>, <span class="bool-val">true</span>),
+            (<span class="string">&quot;a.1-2&quot;</span>, <span class="bool-val">true</span>, <span class="bool-val">true</span>),
+            (<span class="string">&quot;Cab&quot;</span>, <span class="bool-val">true</span>, <span class="bool-val">true</span>),
+            (<span class="string">&quot;abC&quot;</span>, <span class="bool-val">true</span>, <span class="bool-val">true</span>),
+            (<span class="string">&quot;b_1.2&quot;</span>, <span class="bool-val">true</span>, <span class="bool-val">true</span>),
+            (<span class="string">&quot;cab-012&quot;</span>, <span class="bool-val">true</span>, <span class="bool-val">true</span>),
+            (<span class="string">&quot;3ac.8b2&quot;</span>, <span class="bool-val">true</span>, <span class="bool-val">true</span>),
+            (<span class="string">&quot;/abc&quot;</span>, <span class="bool-val">false</span>, <span class="bool-val">true</span>),
+            (<span class="string">&quot;abc/&quot;</span>, <span class="bool-val">false</span>, <span class="bool-val">true</span>),
+            (<span class="string">&quot;abc/def&quot;</span>, <span class="bool-val">true</span>, <span class="bool-val">true</span>),
+            (<span class="string">&quot;-abc&quot;</span>, <span class="bool-val">false</span>, <span class="bool-val">true</span>),
+            (<span class="string">&quot;abc-&quot;</span>, <span class="bool-val">false</span>, <span class="bool-val">true</span>),
+            (<span class="string">&quot;abc$def&quot;</span>, <span class="bool-val">false</span>, <span class="bool-val">false</span>),
+            (<span class="string">&quot;$abc&quot;</span>, <span class="bool-val">true</span>, <span class="bool-val">false</span>),
+            (<span class="string">&quot;$a.b-c/d_e&quot;</span>, <span class="bool-val">true</span>, <span class="bool-val">false</span>),
+            (<span class="string">&quot;.-_/&quot;</span>, <span class="bool-val">false</span>, <span class="bool-val">true</span>),
         ];
 
-        <span class="kw">for</span> <span class="ident">case</span> <span class="kw">in</span> <span class="ident">valid_cases</span> {
-            <span class="ident">validate_label</span>(<span class="ident">case</span>, <span class="string">&quot;dummy&quot;</span>).<span class="ident">unwrap</span>();
+        <span class="kw">for</span> (<span class="ident">text</span>, <span class="ident">can_be_key</span>, <span class="ident">can_be_value</span>) <span class="kw">in</span> <span class="ident">cases</span> {
+            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">validate_label_key</span>(<span class="ident">text</span>).<span class="ident">is_ok</span>(), <span class="ident">can_be_key</span>);
+            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">validate_label_value</span>(<span class="ident">text</span>).<span class="ident">is_ok</span>(), <span class="ident">can_be_value</span>);
         }
     }
 }
