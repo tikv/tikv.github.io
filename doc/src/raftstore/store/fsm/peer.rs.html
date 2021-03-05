@@ -4251,11 +4251,41 @@
 <span id="4248">4248</span>
 <span id="4249">4249</span>
 <span id="4250">4250</span>
+<span id="4251">4251</span>
+<span id="4252">4252</span>
+<span id="4253">4253</span>
+<span id="4254">4254</span>
+<span id="4255">4255</span>
+<span id="4256">4256</span>
+<span id="4257">4257</span>
+<span id="4258">4258</span>
+<span id="4259">4259</span>
+<span id="4260">4260</span>
+<span id="4261">4261</span>
+<span id="4262">4262</span>
+<span id="4263">4263</span>
+<span id="4264">4264</span>
+<span id="4265">4265</span>
+<span id="4266">4266</span>
+<span id="4267">4267</span>
+<span id="4268">4268</span>
+<span id="4269">4269</span>
+<span id="4270">4270</span>
+<span id="4271">4271</span>
+<span id="4272">4272</span>
+<span id="4273">4273</span>
+<span id="4274">4274</span>
+<span id="4275">4275</span>
+<span id="4276">4276</span>
+<span id="4277">4277</span>
+<span id="4278">4278</span>
+<span id="4279">4279</span>
+<span id="4280">4280</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">borrow</span>::<span class="ident">Cow</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">collections</span>::<span class="ident">Bound</span>::{<span class="ident">Excluded</span>, <span class="ident">Included</span>, <span class="ident">Unbounded</span>};
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">collections</span>::<span class="ident">Bound</span>::{<span class="ident">Excluded</span>, <span class="ident">Unbounded</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">collections</span>::<span class="ident">VecDeque</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">iter</span>::<span class="ident">Iterator</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::<span class="ident">AtomicU64</span>;
@@ -4315,6 +4345,10 @@
 <span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">Error</span>, <span class="prelude-ty">Result</span>};
 <span class="kw">use</span> <span class="ident">keys</span>::{<span class="self">self</span>, <span class="ident">enc_end_key</span>, <span class="ident">enc_start_key</span>};
 
+<span class="doccomment">/// Limits the maximum number of regions returned by error.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Another choice is using coprocessor batch limit, but 10 should be a good fit in most case.</span>
+<span class="kw">const</span> <span class="ident">MAX_REGIONS_IN_ERROR</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">10</span>;
 <span class="kw">const</span> <span class="ident">REGION_SPLIT_SKIP_MAX_COUNT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">3</span>;
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">DestroyPeerJob</span> {
@@ -7501,17 +7535,15 @@
         }
 
         <span class="kw">match</span> <span class="ident">util</span>::<span class="ident">check_region_epoch</span>(<span class="ident">msg</span>, <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">region</span>(), <span class="bool-val">true</span>) {
-            <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">EpochNotMatch</span>(<span class="ident">msg</span>, <span class="kw-2">mut</span> <span class="ident">new_regions</span>)) <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">EpochNotMatch</span>(<span class="ident">m</span>, <span class="kw-2">mut</span> <span class="ident">new_regions</span>)) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="comment">// Attach the region which might be split from the current region. But it doesn&#39;t</span>
                 <span class="comment">// matter if the region is not split from the current region. If the region meta</span>
                 <span class="comment">// received by the TiKV driver is newer than the meta cached in the driver, the meta is</span>
                 <span class="comment">// updated.</span>
-                <span class="kw">let</span> <span class="ident">sibling_region</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">find_sibling_region</span>();
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">sibling_region</span>) <span class="op">=</span> <span class="ident">sibling_region</span> {
-                    <span class="ident">new_regions</span>.<span class="ident">push</span>(<span class="ident">sibling_region</span>);
-                }
+                <span class="kw">let</span> <span class="ident">requested_version</span> <span class="op">=</span> <span class="ident">msg</span>.<span class="ident">get_header</span>().<span class="ident">get_region_epoch</span>().<span class="ident">version</span>;
+                <span class="self">self</span>.<span class="ident">collect_sibling_region</span>(<span class="ident">requested_version</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">new_regions</span>);
                 <span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">raft_metrics</span>.<span class="ident">invalid_proposal</span>.<span class="ident">epoch_not_match</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
-                <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">EpochNotMatch</span>(<span class="ident">msg</span>, <span class="ident">new_regions</span>))
+                <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">EpochNotMatch</span>(<span class="ident">m</span>, <span class="ident">new_regions</span>))
             }
             <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>),
             <span class="prelude-val">Ok</span>(()) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>),
@@ -7578,17 +7610,45 @@
         <span class="comment">// we will call the callback with timeout error.</span>
     }
 
-    <span class="kw">fn</span> <span class="ident">find_sibling_region</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Region</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">cfg</span>.<span class="ident">right_derive_when_split</span> {
-            <span class="ident">Included</span>(<span class="ident">enc_start_key</span>(<span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">region</span>()))
-        } <span class="kw">else</span> {
-            <span class="ident">Excluded</span>(<span class="ident">enc_end_key</span>(<span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">region</span>()))
-        };
+    <span class="kw">fn</span> <span class="ident">collect_sibling_region</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">requested_version</span>: <span class="ident">u64</span>, <span class="ident">regions</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Region</span><span class="op">&gt;</span>) {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">max_version</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">region</span>().<span class="ident">get_region_epoch</span>().<span class="ident">version</span>;
+        <span class="kw">if</span> <span class="ident">requested_version</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">max_version</span> {
+            <span class="comment">// Our information is stale.</span>
+            <span class="kw">return</span>;
+        }
+        <span class="comment">// Current region is included in the vec.</span>
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">collect_cnt</span> <span class="op">=</span> <span class="ident">max_version</span> <span class="op">-</span> <span class="ident">requested_version</span>;
+        <span class="kw">let</span> <span class="ident">anchor</span> <span class="op">=</span> <span class="ident">Excluded</span>(<span class="ident">enc_end_key</span>(<span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">region</span>()));
         <span class="kw">let</span> <span class="ident">meta</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">store_meta</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
-        <span class="ident">meta</span>.<span class="ident">region_ranges</span>
-            .<span class="ident">range</span>((<span class="ident">start</span>, <span class="ident">Unbounded</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span>))
-            .<span class="ident">next</span>()
-            .<span class="ident">map</span>(<span class="op">|</span>(<span class="kw">_</span>, <span class="ident">region_id</span>)<span class="op">|</span> <span class="ident">meta</span>.<span class="ident">regions</span>[<span class="ident">region_id</span>].<span class="ident">to_owned</span>())
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ranges</span> <span class="op">=</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">cfg</span>.<span class="ident">right_derive_when_split</span> {
+            <span class="ident">meta</span>.<span class="ident">region_ranges</span>.<span class="ident">range</span>((<span class="ident">Unbounded</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span>, <span class="ident">anchor</span>))
+        } <span class="kw">else</span> {
+            <span class="ident">meta</span>.<span class="ident">region_ranges</span>.<span class="ident">range</span>((<span class="ident">anchor</span>, <span class="ident">Unbounded</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span>))
+        };
+
+        <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">MAX_REGIONS_IN_ERROR</span> {
+            <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">cfg</span>.<span class="ident">right_derive_when_split</span> {
+                <span class="ident">ranges</span>.<span class="ident">next_back</span>()
+            } <span class="kw">else</span> {
+                <span class="ident">ranges</span>.<span class="ident">next</span>()
+            };
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="kw">_</span>, <span class="ident">id</span>)) <span class="op">=</span> <span class="ident">res</span> {
+                <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">meta</span>.<span class="ident">regions</span>[<span class="ident">id</span>];
+                <span class="ident">collect_cnt</span> <span class="op">-</span><span class="op">=</span> <span class="number">1</span>;
+                <span class="comment">// For example, A is split into B, A, and then B is split into C, B.</span>
+                <span class="kw">if</span> <span class="ident">r</span>.<span class="ident">get_region_epoch</span>().<span class="ident">version</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">max_version</span> {
+                    <span class="comment">// It doesn&#39;t matter if it&#39;s a false positive, as it&#39;s limited by MAX_REGIONS_IN_ERROR.</span>
+                    <span class="ident">collect_cnt</span> <span class="op">+</span><span class="op">=</span> <span class="ident">r</span>.<span class="ident">get_region_epoch</span>().<span class="ident">version</span> <span class="op">-</span> <span class="ident">max_version</span>;
+                    <span class="ident">max_version</span> <span class="op">=</span> <span class="ident">r</span>.<span class="ident">get_region_epoch</span>().<span class="ident">version</span>;
+                }
+                <span class="ident">regions</span>.<span class="ident">push</span>(<span class="ident">r</span>.<span class="ident">to_owned</span>());
+                <span class="kw">if</span> <span class="ident">collect_cnt</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
+                    <span class="kw">return</span>;
+                }
+            } <span class="kw">else</span> {
+                <span class="kw">return</span>;
+            }
+        }
     }
 
     <span class="kw">fn</span> <span class="ident">register_raft_gc_log_tick</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
