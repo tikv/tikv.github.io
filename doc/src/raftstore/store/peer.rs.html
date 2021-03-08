@@ -4156,6 +4156,10 @@
 <span id="4153">4153</span>
 <span id="4154">4154</span>
 <span id="4155">4155</span>
+<span id="4156">4156</span>
+<span id="4157">4157</span>
+<span id="4158">4158</span>
+<span id="4159">4159</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -4257,13 +4261,11 @@
     }
 
     <span class="kw">fn</span> <span class="ident">find_propose_time</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">term</span>: <span class="ident">u64</span>, <span class="ident">index</span>: <span class="ident">u64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Timespec</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> (<span class="ident">term</span>, <span class="ident">index</span>);
-        <span class="kw">let</span> <span class="ident">map</span> <span class="op">=</span> <span class="op">|</span><span class="ident">p</span>: <span class="kw-2">&amp;</span><span class="ident">Proposal</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">|</span> (<span class="ident">p</span>.<span class="ident">term</span>, <span class="ident">p</span>.<span class="ident">index</span>);
-        <span class="kw">let</span> (<span class="ident">front</span>, <span class="ident">back</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">queue</span>.<span class="ident">as_slices</span>();
-        <span class="kw">let</span> <span class="ident">idx</span> <span class="op">=</span> <span class="ident">front</span>
-            .<span class="ident">binary_search_by_key</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="ident">map</span>)
-            .<span class="ident">or_else</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">back</span>.<span class="ident">binary_search_by_key</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>, <span class="ident">map</span>));
-        <span class="ident">idx</span>.<span class="ident">ok</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">i</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">queue</span>[<span class="ident">i</span>].<span class="ident">renew_lease_time</span>).<span class="ident">flatten</span>()
+        <span class="self">self</span>.<span class="ident">queue</span>
+            .<span class="ident">binary_search_by_key</span>(<span class="kw-2">&amp;</span>(<span class="ident">term</span>, <span class="ident">index</span>), <span class="op">|</span><span class="ident">p</span>: <span class="kw-2">&amp;</span><span class="ident">Proposal</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">|</span> (<span class="ident">p</span>.<span class="ident">term</span>, <span class="ident">p</span>.<span class="ident">index</span>))
+            .<span class="ident">ok</span>()
+            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">i</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">queue</span>[<span class="ident">i</span>].<span class="ident">renew_lease_time</span>)
+            .<span class="ident">flatten</span>()
     }
 
     <span class="comment">// Find proposal in front or at the given term and index</span>
@@ -7923,6 +7925,7 @@
 <span class="kw">mod</span> <span class="ident">tests</span> {
     <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
     <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">msg</span>::<span class="ident">ExtCallback</span>;
+    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">util</span>::<span class="ident">u64_to_timespec</span>;
     <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">raft_cmdpb</span>;
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;protobuf-codec&quot;</span>)]</span>
     <span class="kw">use</span> <span class="ident">protobuf</span>::<span class="ident">ProtobufEnum</span>;
@@ -8112,22 +8115,34 @@
     <span class="kw">fn</span> <span class="ident">test_propose_queue_find_proposal</span>() {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">pq</span>: <span class="ident">ProposalQueue</span><span class="op">&lt;</span><span class="ident">engine_panic</span>::<span class="ident">PanicSnapshot</span><span class="op">&gt;</span> <span class="op">=</span>
             <span class="ident">ProposalQueue</span>::<span class="ident">new</span>(<span class="string">&quot;tag&quot;</span>.<span class="ident">to_owned</span>());
-        <span class="kw">let</span> <span class="ident">t</span> <span class="op">=</span> <span class="ident">monotonic_raw_now</span>();
         <span class="kw">let</span> <span class="ident">gen_term</span> <span class="op">=</span> <span class="op">|</span><span class="ident">index</span>: <span class="ident">u64</span><span class="op">|</span> (<span class="ident">index</span> <span class="op">/</span> <span class="number">10</span>) <span class="op">+</span> <span class="number">1</span>;
-        <span class="kw">for</span> <span class="ident">index</span> <span class="kw">in</span> <span class="number">1</span>..<span class="op">=</span><span class="number">100</span> {
-            <span class="kw">let</span> <span class="ident">renew_lease_time</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">index</span> <span class="op">%</span> <span class="number">3</span> <span class="op">=</span><span class="op">=</span> <span class="number">1</span> { <span class="prelude-val">None</span> } <span class="kw">else</span> { <span class="prelude-val">Some</span>(<span class="ident">t</span>) };
+        <span class="kw">let</span> <span class="ident">push_proposal</span> <span class="op">=</span> <span class="op">|</span><span class="ident">pq</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ProposalQueue</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span>, <span class="ident">index</span>: <span class="ident">u64</span><span class="op">|</span> {
             <span class="ident">pq</span>.<span class="ident">push</span>(<span class="ident">Proposal</span> {
                 <span class="ident">is_conf_change</span>: <span class="bool-val">false</span>,
                 <span class="ident">index</span>,
                 <span class="ident">term</span>: <span class="ident">gen_term</span>(<span class="ident">index</span>),
                 <span class="ident">cb</span>: <span class="ident">Callback</span>::<span class="ident">write</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> {})),
-                <span class="ident">renew_lease_time</span>,
+                <span class="ident">renew_lease_time</span>: <span class="prelude-val">Some</span>(<span class="ident">u64_to_timespec</span>(<span class="ident">index</span>)),
                 <span class="ident">must_pass_epoch_check</span>: <span class="bool-val">false</span>,
             });
+        };
+        <span class="kw">for</span> <span class="ident">index</span> <span class="kw">in</span> <span class="number">1</span>..<span class="op">=</span><span class="number">100</span> {
+            <span class="ident">push_proposal</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">pq</span>, <span class="ident">index</span>);
         }
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">pre_remove</span> <span class="op">=</span> <span class="number">0</span>;
-        <span class="kw">for</span> <span class="ident">remove_i</span> <span class="kw">in</span> <span class="kw-2">&amp;</span>[<span class="number">0</span>, <span class="number">1</span>, <span class="number">65</span>, <span class="number">98</span>, <span class="number">100</span>] {
-            <span class="kw">let</span> <span class="ident">remove_i</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">remove_i</span>;
+        <span class="kw">for</span> <span class="ident">remove_i</span> <span class="kw">in</span> <span class="number">1</span>..<span class="op">=</span><span class="number">100</span> {
+            <span class="kw">let</span> <span class="ident">index</span> <span class="op">=</span> <span class="ident">remove_i</span> <span class="op">+</span> <span class="number">100</span>;
+            <span class="comment">// Push more proposal</span>
+            <span class="ident">push_proposal</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">pq</span>, <span class="ident">index</span>);
+            <span class="comment">// Find propose time</span>
+            <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">1</span>..<span class="op">=</span><span class="ident">index</span> {
+                <span class="kw">let</span> <span class="ident">pt</span> <span class="op">=</span> <span class="ident">pq</span>.<span class="ident">find_propose_time</span>(<span class="ident">gen_term</span>(<span class="ident">i</span>), <span class="ident">i</span>);
+                <span class="kw">if</span> <span class="ident">i</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">pre_remove</span> {
+                    <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">pt</span>.<span class="ident">is_none</span>())
+                } <span class="kw">else</span> {
+                    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">pt</span>.<span class="ident">unwrap</span>(), <span class="ident">u64_to_timespec</span>(<span class="ident">i</span>))
+                };
+            }
             <span class="comment">// Find a proposal and remove all previous proposals</span>
             <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">1</span>..<span class="op">=</span><span class="ident">remove_i</span> {
                 <span class="kw">let</span> <span class="ident">p</span> <span class="op">=</span> <span class="ident">pq</span>.<span class="ident">find_proposal</span>(<span class="ident">gen_term</span>(<span class="ident">i</span>), <span class="ident">i</span>, <span class="number">0</span>);
@@ -8136,14 +8151,7 @@
                 <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">must_found_proposal</span> <span class="op">|</span><span class="op">|</span> <span class="ident">proposal_removed_previous</span>);
                 <span class="comment">// `find_proposal` will remove proposal so `pop` must return None</span>
                 <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">pq</span>.<span class="ident">pop</span>(<span class="ident">gen_term</span>(<span class="ident">i</span>), <span class="ident">i</span>).<span class="ident">is_none</span>());
-            }
-            <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">1</span>..<span class="op">=</span><span class="number">100</span> {
-                <span class="kw">let</span> <span class="ident">pt</span> <span class="op">=</span> <span class="ident">pq</span>.<span class="ident">find_propose_time</span>(<span class="ident">gen_term</span>(<span class="ident">i</span>), <span class="ident">i</span>);
-                <span class="kw">if</span> <span class="ident">i</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">remove_i</span> <span class="op">|</span><span class="op">|</span> <span class="ident">i</span> <span class="op">%</span> <span class="number">3</span> <span class="op">=</span><span class="op">=</span> <span class="number">1</span> {
-                    <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">pt</span>.<span class="ident">is_none</span>())
-                } <span class="kw">else</span> {
-                    <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">pt</span>.<span class="ident">is_some</span>())
-                };
+                <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">pq</span>.<span class="ident">find_propose_time</span>(<span class="ident">gen_term</span>(<span class="ident">i</span>), <span class="ident">i</span>).<span class="ident">is_none</span>());
             }
             <span class="ident">pre_remove</span> <span class="op">=</span> <span class="ident">remove_i</span>;
         }
