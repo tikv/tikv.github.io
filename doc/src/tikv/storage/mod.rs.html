@@ -6230,13 +6230,6 @@
 <span id="6227">6227</span>
 <span id="6228">6228</span>
 <span id="6229">6229</span>
-<span id="6230">6230</span>
-<span id="6231">6231</span>
-<span id="6232">6232</span>
-<span id="6233">6233</span>
-<span id="6234">6234</span>
-<span id="6235">6235</span>
-<span id="6236">6236</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -6289,9 +6282,9 @@
 <span class="kw">pub</span> <span class="kw">use</span> <span class="self">self</span>::{
     <span class="ident">errors</span>::{<span class="ident">get_error_kind_from_header</span>, <span class="ident">get_tag_from_header</span>, <span class="ident">Error</span>, <span class="ident">ErrorHeaderKind</span>, <span class="ident">ErrorInner</span>},
     <span class="ident">kv</span>::{
-        <span class="ident">CbContext</span>, <span class="ident">CfStatistics</span>, <span class="ident">Cursor</span>, <span class="ident">Engine</span>, <span class="ident">FlowStatistics</span>, <span class="ident">FlowStatsReporter</span>, <span class="ident">Iterator</span>,
-        <span class="ident">PerfStatisticsDelta</span>, <span class="ident">PerfStatisticsInstant</span>, <span class="ident">RocksEngine</span>, <span class="ident">ScanMode</span>, <span class="ident">Snapshot</span>, <span class="ident">Statistics</span>,
-        <span class="ident">TestEngineBuilder</span>,
+        <span class="ident">CbContext</span>, <span class="ident">CfStatistics</span>, <span class="ident">Cursor</span>, <span class="ident">CursorBuilder</span>, <span class="ident">Engine</span>, <span class="ident">FlowStatistics</span>, <span class="ident">FlowStatsReporter</span>,
+        <span class="ident">Iterator</span>, <span class="ident">PerfStatisticsDelta</span>, <span class="ident">PerfStatisticsInstant</span>, <span class="ident">RocksEngine</span>, <span class="ident">ScanMode</span>, <span class="ident">Snapshot</span>,
+        <span class="ident">Statistics</span>, <span class="ident">TestEngineBuilder</span>,
     },
     <span class="ident">read_pool</span>::{<span class="ident">build_read_pool</span>, <span class="ident">build_read_pool_for_test</span>},
     <span class="ident">txn</span>::{<span class="ident">Latches</span>, <span class="ident">Lock</span> <span class="kw">as</span> <span class="ident">LatchLock</span>, <span class="ident">ProcessResult</span>, <span class="ident">Scanner</span>, <span class="ident">SnapshotStore</span>, <span class="ident">Store</span>},
@@ -6312,7 +6305,6 @@
 };
 <span class="kw">use</span> <span class="ident">concurrency_manager</span>::<span class="ident">ConcurrencyManager</span>;
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">CfName</span>, <span class="ident">ALL_CFS</span>, <span class="ident">CF_DEFAULT</span>, <span class="ident">DATA_CFS</span>};
-<span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">IterOptions</span>, <span class="ident">DATA_KEY_PREFIX_LEN</span>};
 <span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">prelude</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">kvrpcpb</span>::{
     <span class="ident">CommandPri</span>, <span class="ident">Context</span>, <span class="ident">GetRequest</span>, <span class="ident">IsolationLevel</span>, <span class="ident">KeyRange</span>, <span class="ident">LockInfo</span>, <span class="ident">RawGetRequest</span>,
@@ -7484,14 +7476,11 @@
         <span class="ident">statistics</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Statistics</span>,
         <span class="ident">key_only</span>: <span class="ident">bool</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">KvPair</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">option</span> <span class="op">=</span> <span class="ident">IterOptions</span>::<span class="ident">default</span>();
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">end</span>) <span class="op">=</span> <span class="ident">end_key</span> {
-            <span class="ident">option</span>.<span class="ident">set_upper_bound</span>(<span class="ident">end</span>.<span class="ident">as_encoded</span>(), <span class="ident">DATA_KEY_PREFIX_LEN</span>);
-        }
-        <span class="kw">if</span> <span class="ident">key_only</span> {
-            <span class="ident">option</span>.<span class="ident">set_key_only</span>(<span class="ident">key_only</span>);
-        }
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cursor</span> <span class="op">=</span> <span class="ident">snapshot</span>.<span class="ident">iter_cf</span>(<span class="self">Self</span>::<span class="ident">rawkv_cf</span>(<span class="ident">cf</span>)<span class="question-mark">?</span>, <span class="ident">option</span>, <span class="ident">ScanMode</span>::<span class="ident">Forward</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cursor</span> <span class="op">=</span> <span class="ident">CursorBuilder</span>::<span class="ident">new</span>(<span class="ident">snapshot</span>, <span class="self">Self</span>::<span class="ident">rawkv_cf</span>(<span class="ident">cf</span>)<span class="question-mark">?</span>)
+            .<span class="ident">range</span>(<span class="prelude-val">None</span>, <span class="ident">end_key</span>)
+            .<span class="ident">scan_mode</span>(<span class="ident">ScanMode</span>::<span class="ident">Forward</span>)
+            .<span class="ident">key_only</span>(<span class="ident">key_only</span>)
+            .<span class="ident">build</span>()<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">statistics</span> <span class="op">=</span> <span class="ident">statistics</span>.<span class="ident">mut_cf_statistics</span>(<span class="ident">cf</span>);
         <span class="kw">if</span> <span class="op">!</span><span class="ident">cursor</span>.<span class="ident">seek</span>(<span class="ident">start_key</span>, <span class="ident">statistics</span>)<span class="question-mark">?</span> {
             <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="macro">vec</span><span class="macro">!</span>[]);
@@ -7535,14 +7524,11 @@
         <span class="ident">statistics</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Statistics</span>,
         <span class="ident">key_only</span>: <span class="ident">bool</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">KvPair</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">option</span> <span class="op">=</span> <span class="ident">IterOptions</span>::<span class="ident">default</span>();
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">end</span>) <span class="op">=</span> <span class="ident">end_key</span> {
-            <span class="ident">option</span>.<span class="ident">set_lower_bound</span>(<span class="ident">end</span>.<span class="ident">as_encoded</span>(), <span class="ident">DATA_KEY_PREFIX_LEN</span>);
-        }
-        <span class="kw">if</span> <span class="ident">key_only</span> {
-            <span class="ident">option</span>.<span class="ident">set_key_only</span>(<span class="ident">key_only</span>);
-        }
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cursor</span> <span class="op">=</span> <span class="ident">snapshot</span>.<span class="ident">iter_cf</span>(<span class="self">Self</span>::<span class="ident">rawkv_cf</span>(<span class="ident">cf</span>)<span class="question-mark">?</span>, <span class="ident">option</span>, <span class="ident">ScanMode</span>::<span class="ident">Backward</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cursor</span> <span class="op">=</span> <span class="ident">CursorBuilder</span>::<span class="ident">new</span>(<span class="ident">snapshot</span>, <span class="self">Self</span>::<span class="ident">rawkv_cf</span>(<span class="ident">cf</span>)<span class="question-mark">?</span>)
+            .<span class="ident">range</span>(<span class="ident">end_key</span>, <span class="prelude-val">None</span>)
+            .<span class="ident">scan_mode</span>(<span class="ident">ScanMode</span>::<span class="ident">Backward</span>)
+            .<span class="ident">key_only</span>(<span class="ident">key_only</span>)
+            .<span class="ident">build</span>()<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">statistics</span> <span class="op">=</span> <span class="ident">statistics</span>.<span class="ident">mut_cf_statistics</span>(<span class="ident">cf</span>);
         <span class="kw">if</span> <span class="op">!</span><span class="ident">cursor</span>.<span class="ident">reverse_seek</span>(<span class="ident">start_key</span>, <span class="ident">statistics</span>)<span class="question-mark">?</span> {
             <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="macro">vec</span><span class="macro">!</span>[]);

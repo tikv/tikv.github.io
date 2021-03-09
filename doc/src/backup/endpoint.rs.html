@@ -1568,7 +1568,6 @@
 <span id="1565">1565</span>
 <span id="1566">1566</span>
 <span id="1567">1567</span>
-<span id="1568">1568</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1583,7 +1582,7 @@
 <span class="kw">use</span> <span class="ident">concurrency_manager</span>::<span class="ident">ConcurrencyManager</span>;
 <span class="kw">use</span> <span class="ident">configuration</span>::<span class="ident">Configuration</span>;
 <span class="kw">use</span> <span class="ident">engine_rocks</span>::<span class="ident">raw</span>::<span class="ident">DB</span>;
-<span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">name_to_cf</span>, <span class="ident">CfName</span>, <span class="ident">IterOptions</span>, <span class="ident">SstCompressionType</span>, <span class="ident">DATA_KEY_PREFIX_LEN</span>};
+<span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">name_to_cf</span>, <span class="ident">CfName</span>, <span class="ident">SstCompressionType</span>};
 <span class="kw">use</span> <span class="ident">external_storage</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">file_system</span>::{<span class="ident">IOType</span>, <span class="ident">WithIOType</span>};
 <span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">channel</span>::<span class="ident">mpsc</span>::<span class="kw-2">*</span>;
@@ -1594,7 +1593,7 @@
 <span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">coprocessor</span>::<span class="ident">RegionInfoProvider</span>;
 <span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">store</span>::<span class="ident">util</span>::<span class="ident">find_peer</span>;
 <span class="kw">use</span> <span class="ident">tikv</span>::<span class="ident">config</span>::<span class="ident">BackupConfig</span>;
-<span class="kw">use</span> <span class="ident">tikv</span>::<span class="ident">storage</span>::<span class="ident">kv</span>::{<span class="ident">Engine</span>, <span class="ident">ScanMode</span>, <span class="ident">SnapContext</span>, <span class="ident">Snapshot</span>};
+<span class="kw">use</span> <span class="ident">tikv</span>::<span class="ident">storage</span>::<span class="ident">kv</span>::{<span class="ident">CursorBuilder</span>, <span class="ident">Engine</span>, <span class="ident">ScanMode</span>, <span class="ident">SnapContext</span>};
 <span class="kw">use</span> <span class="ident">tikv</span>::<span class="ident">storage</span>::<span class="ident">mvcc</span>::<span class="ident">Error</span> <span class="kw">as</span> <span class="ident">MvccError</span>;
 <span class="kw">use</span> <span class="ident">tikv</span>::<span class="ident">storage</span>::<span class="ident">txn</span>::{
     <span class="ident">EntryBatch</span>, <span class="ident">Error</span> <span class="kw">as</span> <span class="ident">TxnError</span>, <span class="ident">SnapshotStore</span>, <span class="ident">TxnEntryScanner</span>, <span class="ident">TxnEntryStore</span>,
@@ -1909,11 +1908,10 @@
         <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">statistics</span> <span class="op">=</span> <span class="ident">Statistics</span>::<span class="ident">default</span>();
         <span class="kw">let</span> <span class="ident">cfstatistics</span> <span class="op">=</span> <span class="ident">statistics</span>.<span class="ident">mut_cf_statistics</span>(<span class="self">self</span>.<span class="ident">cf</span>);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">option</span> <span class="op">=</span> <span class="ident">IterOptions</span>::<span class="ident">default</span>();
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">end</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">end_key</span>.<span class="ident">clone</span>() {
-            <span class="ident">option</span>.<span class="ident">set_upper_bound</span>(<span class="ident">end</span>.<span class="ident">as_encoded</span>(), <span class="ident">DATA_KEY_PREFIX_LEN</span>);
-        }
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cursor</span> <span class="op">=</span> <span class="ident">snapshot</span>.<span class="ident">iter_cf</span>(<span class="self">self</span>.<span class="ident">cf</span>, <span class="ident">option</span>, <span class="ident">ScanMode</span>::<span class="ident">Forward</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cursor</span> <span class="op">=</span> <span class="ident">CursorBuilder</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">snapshot</span>, <span class="self">self</span>.<span class="ident">cf</span>)
+            .<span class="ident">range</span>(<span class="prelude-val">None</span>, <span class="self">self</span>.<span class="ident">end_key</span>.<span class="ident">clone</span>())
+            .<span class="ident">scan_mode</span>(<span class="ident">ScanMode</span>::<span class="ident">Forward</span>)
+            .<span class="ident">build</span>()<span class="question-mark">?</span>;
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">begin</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">start_key</span>.<span class="ident">clone</span>() {
             <span class="kw">if</span> <span class="op">!</span><span class="ident">cursor</span>.<span class="ident">seek</span>(<span class="kw-2">&amp;</span><span class="ident">begin</span>, <span class="ident">cfstatistics</span>)<span class="question-mark">?</span> {
                 <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">statistics</span>);

@@ -539,28 +539,23 @@
 <span id="536">536</span>
 <span id="537">537</span>
 <span id="538">538</span>
-<span id="539">539</span>
-<span id="540">540</span>
-<span id="541">541</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">cell</span>::<span class="ident">RefCell</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">ops</span>::{<span class="ident">Bound</span>, <span class="ident">Deref</span>};
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">ops</span>::<span class="ident">Deref</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::{<span class="ident">Arc</span>, <span class="ident">RwLock</span>};
 
 <span class="kw">use</span> <span class="ident">collections</span>::<span class="ident">HashMap</span>;
 <span class="kw">use</span> <span class="ident">engine_rocks</span>::<span class="ident">RocksEngine</span>;
-<span class="kw">use</span> <span class="ident">engine_traits</span>::{
-    <span class="ident">IterOptions</span>, <span class="ident">KvEngine</span>, <span class="ident">ReadOptions</span>, <span class="ident">CF_DEFAULT</span>, <span class="ident">CF_WRITE</span>, <span class="ident">DATA_KEY_PREFIX_LEN</span>,
-};
+<span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">KvEngine</span>, <span class="ident">ReadOptions</span>, <span class="ident">CF_DEFAULT</span>, <span class="ident">CF_WRITE</span>};
 <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">metapb</span>::{<span class="ident">Peer</span>, <span class="ident">Region</span>};
 <span class="kw">use</span> <span class="ident">raft</span>::<span class="ident">StateRole</span>;
 <span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">coprocessor</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">store</span>::<span class="ident">fsm</span>::<span class="ident">ObserveID</span>;
 <span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">store</span>::<span class="ident">RegionSnapshot</span>;
 <span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">Error</span> <span class="kw">as</span> <span class="ident">RaftStoreError</span>;
-<span class="kw">use</span> <span class="ident">tikv</span>::<span class="ident">storage</span>::{<span class="ident">Cursor</span>, <span class="ident">ScanMode</span>, <span class="ident">Snapshot</span> <span class="kw">as</span> <span class="ident">EngineSnapshot</span>, <span class="ident">Statistics</span>};
+<span class="kw">use</span> <span class="ident">tikv</span>::<span class="ident">storage</span>::{<span class="ident">Cursor</span>, <span class="ident">CursorBuilder</span>, <span class="ident">ScanMode</span>, <span class="ident">Snapshot</span> <span class="kw">as</span> <span class="ident">EngineSnapshot</span>, <span class="ident">Statistics</span>};
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">time</span>::<span class="ident">Instant</span>;
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">worker</span>::<span class="ident">Scheduler</span>;
 <span class="kw">use</span> <span class="ident">txn_types</span>::{<span class="ident">Key</span>, <span class="ident">MutationType</span>, <span class="ident">OldValue</span>, <span class="ident">TimeStamp</span>, <span class="ident">Value</span>, <span class="ident">WriteRef</span>, <span class="ident">WriteType</span>};
@@ -781,16 +776,15 @@
     }
 
     <span class="kw">fn</span> <span class="ident">new_write_cursor</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">key</span>: <span class="kw-2">&amp;</span><span class="ident">Key</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Cursor</span><span class="op">&lt;</span><span class="ident">S</span>::<span class="ident">Iter</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">iter_opts</span> <span class="op">=</span> <span class="ident">IterOptions</span>::<span class="ident">default</span>();
         <span class="kw">let</span> <span class="ident">ts</span> <span class="op">=</span> <span class="ident">Key</span>::<span class="ident">decode_ts_from</span>(<span class="ident">key</span>.<span class="ident">as_encoded</span>()).<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">upper</span> <span class="op">=</span> <span class="ident">Key</span>::<span class="ident">from_encoded_slice</span>(<span class="ident">Key</span>::<span class="ident">truncate_ts_for</span>(<span class="ident">key</span>.<span class="ident">as_encoded</span>()).<span class="ident">unwrap</span>())
             .<span class="ident">append_ts</span>(<span class="ident">TimeStamp</span>::<span class="ident">zero</span>());
-        <span class="ident">iter_opts</span>.<span class="ident">set_fill_cache</span>(<span class="bool-val">false</span>);
-        <span class="ident">iter_opts</span>.<span class="ident">set_hint_max_ts</span>(<span class="ident">Bound</span>::<span class="ident">Included</span>(<span class="ident">ts</span>.<span class="ident">into_inner</span>()));
-        <span class="ident">iter_opts</span>.<span class="ident">set_lower_bound</span>(<span class="ident">key</span>.<span class="ident">as_encoded</span>(), <span class="ident">DATA_KEY_PREFIX_LEN</span>);
-        <span class="ident">iter_opts</span>.<span class="ident">set_upper_bound</span>(<span class="ident">upper</span>.<span class="ident">as_encoded</span>(), <span class="ident">DATA_KEY_PREFIX_LEN</span>);
-        <span class="self">self</span>.<span class="ident">snapshot</span>
-            .<span class="ident">iter_cf</span>(<span class="ident">CF_WRITE</span>, <span class="ident">iter_opts</span>, <span class="ident">ScanMode</span>::<span class="ident">Mixed</span>)
+        <span class="ident">CursorBuilder</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">snapshot</span>, <span class="ident">CF_WRITE</span>)
+            .<span class="ident">fill_cache</span>(<span class="bool-val">false</span>)
+            .<span class="ident">scan_mode</span>(<span class="ident">ScanMode</span>::<span class="ident">Mixed</span>)
+            .<span class="ident">range</span>(<span class="prelude-val">Some</span>(<span class="ident">key</span>.<span class="ident">clone</span>()), <span class="prelude-val">Some</span>(<span class="ident">upper</span>))
+            .<span class="ident">hint_max_ts</span>(<span class="prelude-val">Some</span>(<span class="ident">ts</span>))
+            .<span class="ident">build</span>()
             .<span class="ident">unwrap</span>()
     }
 
