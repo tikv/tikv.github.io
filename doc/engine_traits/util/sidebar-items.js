@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["check_key_in_range","Check if key in range [`start_key`, `end_key`)."]]});
+initSidebarItems({"fn":[["append_expire_ts",""],["check_key_in_range","Check if key in range [`start_key`, `end_key`)."],["get_expire_ts",""],["strip_expire_ts",""],["truncate_expire_ts",""]]});

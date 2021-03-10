@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["BAD_PADDING",""],["IO",""],["KEY_LENGTH",""],["KEY_NOT_FOUND",""]],"struct":[["ALL_ERROR_CODES",""]]});
+initSidebarItems({"constant":[["BAD_PADDING",""],["IO",""],["KEY_LENGTH",""],["KEY_NOT_FOUND",""],["VALUE_LENGTH",""]],"struct":[["ALL_ERROR_CODES",""]]});
