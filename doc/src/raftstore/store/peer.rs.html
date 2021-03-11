@@ -4160,6 +4160,10 @@
 <span id="4157">4157</span>
 <span id="4158">4158</span>
 <span id="4159">4159</span>
+<span id="4160">4160</span>
+<span id="4161">4161</span>
+<span id="4162">4162</span>
+<span id="4163">4163</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -4220,7 +4224,7 @@
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">Either</span>;
 
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">cmd_resp</span>;
-<span class="kw">use</span> <span class="kw">super</span>::<span class="ident">local_metrics</span>::{<span class="ident">RaftMessageMetrics</span>, <span class="ident">RaftReadyMetrics</span>};
+<span class="kw">use</span> <span class="kw">super</span>::<span class="ident">local_metrics</span>::{<span class="ident">RaftReadyMetrics</span>, <span class="ident">RaftSendMessageMetrics</span>};
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">metrics</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">peer_storage</span>::{
     <span class="ident">write_peer_state</span>, <span class="ident">ApplySnapResult</span>, <span class="ident">CheckApplyingSnapStatus</span>, <span class="ident">InvokeContext</span>, <span class="ident">PeerStorage</span>,
@@ -5193,31 +5197,33 @@
     }
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">send</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">I</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">trans</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">T</span>, <span class="ident">msgs</span>: <span class="ident">I</span>, <span class="ident">metrics</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">RaftMessageMetrics</span>)
+    <span class="kw">fn</span> <span class="ident">send</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">I</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">trans</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">T</span>, <span class="ident">msgs</span>: <span class="ident">I</span>, <span class="ident">metrics</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">RaftSendMessageMetrics</span>)
     <span class="kw">where</span>
         <span class="ident">T</span>: <span class="ident">Transport</span>,
         <span class="ident">I</span>: <span class="ident">IntoIterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">eraftpb</span>::<span class="ident">Message</span><span class="op">&gt;</span>,
     {
         <span class="kw">for</span> <span class="ident">msg</span> <span class="kw">in</span> <span class="ident">msgs</span> {
             <span class="kw">let</span> <span class="ident">msg_type</span> <span class="op">=</span> <span class="ident">msg</span>.<span class="ident">get_msg_type</span>();
+            <span class="kw">let</span> <span class="ident">snapshot_index</span> <span class="op">=</span> <span class="ident">msg</span>.<span class="ident">get_request_snapshot</span>();
+            <span class="kw">let</span> <span class="ident">i</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">send_raft_message</span>(<span class="ident">msg</span>, <span class="ident">trans</span>) <span class="kw">as</span> <span class="ident">usize</span>;
             <span class="kw">match</span> <span class="ident">msg_type</span> {
-                <span class="ident">MessageType</span>::<span class="ident">MsgAppend</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">metrics</span>.<span class="ident">append</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>,
+                <span class="ident">MessageType</span>::<span class="ident">MsgAppend</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">metrics</span>.<span class="ident">append</span>[<span class="ident">i</span>] <span class="op">+</span><span class="op">=</span> <span class="number">1</span>,
                 <span class="ident">MessageType</span>::<span class="ident">MsgAppendResponse</span> <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="kw">if</span> <span class="ident">msg</span>.<span class="ident">get_request_snapshot</span>() <span class="op">!</span><span class="op">=</span> <span class="ident">raft</span>::<span class="ident">INVALID_INDEX</span> {
-                        <span class="ident">metrics</span>.<span class="ident">request_snapshot</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+                    <span class="kw">if</span> <span class="ident">snapshot_index</span> <span class="op">!</span><span class="op">=</span> <span class="ident">raft</span>::<span class="ident">INVALID_INDEX</span> {
+                        <span class="ident">metrics</span>.<span class="ident">request_snapshot</span>[<span class="ident">i</span>] <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
                     }
-                    <span class="ident">metrics</span>.<span class="ident">append_resp</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+                    <span class="ident">metrics</span>.<span class="ident">append_resp</span>[<span class="ident">i</span>] <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
                 }
-                <span class="ident">MessageType</span>::<span class="ident">MsgRequestPreVote</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">metrics</span>.<span class="ident">prevote</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>,
-                <span class="ident">MessageType</span>::<span class="ident">MsgRequestPreVoteResponse</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">metrics</span>.<span class="ident">prevote_resp</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>,
-                <span class="ident">MessageType</span>::<span class="ident">MsgRequestVote</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">metrics</span>.<span class="ident">vote</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>,
-                <span class="ident">MessageType</span>::<span class="ident">MsgRequestVoteResponse</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">metrics</span>.<span class="ident">vote_resp</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>,
-                <span class="ident">MessageType</span>::<span class="ident">MsgSnapshot</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">metrics</span>.<span class="ident">snapshot</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>,
-                <span class="ident">MessageType</span>::<span class="ident">MsgHeartbeat</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">metrics</span>.<span class="ident">heartbeat</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>,
-                <span class="ident">MessageType</span>::<span class="ident">MsgHeartbeatResponse</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">metrics</span>.<span class="ident">heartbeat_resp</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>,
-                <span class="ident">MessageType</span>::<span class="ident">MsgTransferLeader</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">metrics</span>.<span class="ident">transfer_leader</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>,
-                <span class="ident">MessageType</span>::<span class="ident">MsgReadIndex</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">metrics</span>.<span class="ident">read_index</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>,
-                <span class="ident">MessageType</span>::<span class="ident">MsgReadIndexResp</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">metrics</span>.<span class="ident">read_index_resp</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>,
+                <span class="ident">MessageType</span>::<span class="ident">MsgRequestPreVote</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">metrics</span>.<span class="ident">prevote</span>[<span class="ident">i</span>] <span class="op">+</span><span class="op">=</span> <span class="number">1</span>,
+                <span class="ident">MessageType</span>::<span class="ident">MsgRequestPreVoteResponse</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">metrics</span>.<span class="ident">prevote_resp</span>[<span class="ident">i</span>] <span class="op">+</span><span class="op">=</span> <span class="number">1</span>,
+                <span class="ident">MessageType</span>::<span class="ident">MsgRequestVote</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">metrics</span>.<span class="ident">vote</span>[<span class="ident">i</span>] <span class="op">+</span><span class="op">=</span> <span class="number">1</span>,
+                <span class="ident">MessageType</span>::<span class="ident">MsgRequestVoteResponse</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">metrics</span>.<span class="ident">vote_resp</span>[<span class="ident">i</span>] <span class="op">+</span><span class="op">=</span> <span class="number">1</span>,
+                <span class="ident">MessageType</span>::<span class="ident">MsgSnapshot</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">metrics</span>.<span class="ident">snapshot</span>[<span class="ident">i</span>] <span class="op">+</span><span class="op">=</span> <span class="number">1</span>,
+                <span class="ident">MessageType</span>::<span class="ident">MsgHeartbeat</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">metrics</span>.<span class="ident">heartbeat</span>[<span class="ident">i</span>] <span class="op">+</span><span class="op">=</span> <span class="number">1</span>,
+                <span class="ident">MessageType</span>::<span class="ident">MsgHeartbeatResponse</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">metrics</span>.<span class="ident">heartbeat_resp</span>[<span class="ident">i</span>] <span class="op">+</span><span class="op">=</span> <span class="number">1</span>,
+                <span class="ident">MessageType</span>::<span class="ident">MsgTransferLeader</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">metrics</span>.<span class="ident">transfer_leader</span>[<span class="ident">i</span>] <span class="op">+</span><span class="op">=</span> <span class="number">1</span>,
+                <span class="ident">MessageType</span>::<span class="ident">MsgReadIndex</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">metrics</span>.<span class="ident">read_index</span>[<span class="ident">i</span>] <span class="op">+</span><span class="op">=</span> <span class="number">1</span>,
+                <span class="ident">MessageType</span>::<span class="ident">MsgReadIndexResp</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">metrics</span>.<span class="ident">read_index_resp</span>[<span class="ident">i</span>] <span class="op">+</span><span class="op">=</span> <span class="number">1</span>,
                 <span class="ident">MessageType</span>::<span class="ident">MsgTimeoutNow</span> <span class="op">=</span><span class="op">&gt;</span> {
                     <span class="comment">// After a leader transfer procedure is triggered, the lease for</span>
                     <span class="comment">// the old leader may be expired earlier than usual, since a new leader</span>
@@ -5227,7 +5233,7 @@
                     <span class="comment">// to suspect.</span>
                     <span class="self">self</span>.<span class="ident">leader_lease</span>.<span class="ident">suspect</span>(<span class="ident">monotonic_raw_now</span>());
 
-                    <span class="ident">metrics</span>.<span class="ident">timeout_now</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+                    <span class="ident">metrics</span>.<span class="ident">timeout_now</span>[<span class="ident">i</span>] <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
                 }
                 <span class="comment">// We do not care about these message types for metrics.</span>
                 <span class="comment">// Explicitly declare them so when we add new message types we are forced to</span>
@@ -5239,7 +5245,6 @@
                 <span class="op">|</span> <span class="ident">MessageType</span>::<span class="ident">MsgSnapStatus</span>
                 <span class="op">|</span> <span class="ident">MessageType</span>::<span class="ident">MsgCheckQuorum</span> <span class="op">=</span><span class="op">&gt;</span> {}
             }
-            <span class="self">self</span>.<span class="ident">send_raft_message</span>(<span class="ident">msg</span>, <span class="ident">trans</span>);
         }
     }
 
@@ -5875,7 +5880,7 @@
                 <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;raft_before_follower_send&quot;</span>);
             }
             <span class="kw">for</span> <span class="ident">vec_msg</span> <span class="kw">in</span> <span class="ident">ready</span>.<span class="ident">take_messages</span>() {
-                <span class="self">self</span>.<span class="ident">send</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>.<span class="ident">trans</span>, <span class="ident">vec_msg</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>.<span class="ident">raft_metrics</span>.<span class="ident">message</span>);
+                <span class="self">self</span>.<span class="ident">send</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>.<span class="ident">trans</span>, <span class="ident">vec_msg</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>.<span class="ident">raft_metrics</span>.<span class="ident">send_message</span>);
             }
         }
 
@@ -6081,7 +6086,7 @@
                 <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;raft_before_follower_send&quot;</span>);
             }
             <span class="kw">for</span> <span class="ident">vec_msg</span> <span class="kw">in</span> <span class="ident">light_rd</span>.<span class="ident">take_messages</span>() {
-                <span class="self">self</span>.<span class="ident">send</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>.<span class="ident">trans</span>, <span class="ident">vec_msg</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>.<span class="ident">raft_metrics</span>.<span class="ident">message</span>);
+                <span class="self">self</span>.<span class="ident">send</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>.<span class="ident">trans</span>, <span class="ident">vec_msg</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>.<span class="ident">raft_metrics</span>.<span class="ident">send_message</span>);
             }
         }
 
@@ -7562,7 +7567,7 @@
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">send_raft_message</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Transport</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">msg</span>: <span class="ident">eraftpb</span>::<span class="ident">Message</span>, <span class="ident">trans</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">T</span>) {
+    <span class="kw">fn</span> <span class="ident">send_raft_message</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Transport</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">msg</span>: <span class="ident">eraftpb</span>::<span class="ident">Message</span>, <span class="ident">trans</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">T</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">send_msg</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">prepare_raft_message</span>();
 
         <span class="kw">let</span> <span class="ident">to_peer</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">get_peer_from_cache</span>(<span class="ident">msg</span>.<span class="ident">get_to</span>()) {
@@ -7574,7 +7579,7 @@
                     <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">peer</span>.<span class="ident">get_id</span>(),
                     <span class="string">&quot;to_peer&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">msg</span>.<span class="ident">get_to</span>(),
                 );
-                <span class="kw">return</span>;
+                <span class="kw">return</span> <span class="bool-val">false</span>;
             }
         };
 
@@ -7608,7 +7613,8 @@
         <span class="ident">send_msg</span>.<span class="ident">set_message</span>(<span class="ident">msg</span>);
 
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">trans</span>.<span class="ident">send</span>(<span class="ident">send_msg</span>) {
-            <span class="macro">warn</span><span class="macro">!</span>(
+            <span class="comment">// We use metrics to observe failure on production.</span>
+            <span class="macro">debug</span><span class="macro">!</span>(
                 <span class="string">&quot;failed to send msg to other peer&quot;</span>;
                 <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">region_id</span>,
                 <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">peer</span>.<span class="ident">get_id</span>(),
@@ -7626,7 +7632,9 @@
                 <span class="self">self</span>.<span class="ident">raft_group</span>
                     .<span class="ident">report_snapshot</span>(<span class="ident">to_peer_id</span>, <span class="ident">SnapshotStatus</span>::<span class="ident">Failure</span>);
             }
+            <span class="kw">return</span> <span class="bool-val">false</span>;
         }
+        <span class="bool-val">true</span>
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">bcast_wake_up_message</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Transport</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">PollContext</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">T</span><span class="op">&gt;</span>) {

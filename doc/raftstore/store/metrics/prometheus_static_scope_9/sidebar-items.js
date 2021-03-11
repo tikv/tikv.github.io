@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["MessageCounterVec",""],["MessageCounterVecDelegator",""],["MessageCounterVecInner",""]]});
+initSidebarItems({"struct":[["MessageCounterVec",""],["MessageCounterVec2Delegator",""],["MessageCounterVec2Inner",""],["MessageCounterVecDelegator",""],["MessageCounterVecInner",""]]});

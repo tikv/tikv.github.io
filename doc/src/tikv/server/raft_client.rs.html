@@ -936,6 +936,16 @@
 <span id="933">933</span>
 <span id="934">934</span>
 <span id="935">935</span>
+<span id="936">936</span>
+<span id="937">937</span>
+<span id="938">938</span>
+<span id="939">939</span>
+<span id="940">940</span>
+<span id="941">941</span>
+<span id="942">942</span>
+<span id="943">943</span>
+<span id="944">944</span>
+<span id="945">945</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1090,8 +1100,6 @@
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
         <span class="ident">sender</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ClientCStreamSender</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">OutputMessage</span><span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">grpcio</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span>;
-    <span class="doccomment">/// Clears all messages and invoke hook before dropping.</span>
-    <span class="kw">fn</span> <span class="ident">clear</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">hook</span>: <span class="kw">impl</span> <span class="ident">FnMut</span>(<span class="kw-2">&amp;</span><span class="ident">RaftMessage</span>));
 }
 
 <span class="doccomment">/// A buffer for BatchRaftMessage.</span>
@@ -1159,19 +1167,6 @@
         }
         <span class="ident">res</span>
     }
-
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">clear</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="kw-2">mut</span> <span class="ident">hook</span>: <span class="kw">impl</span> <span class="ident">FnMut</span>(<span class="kw-2">&amp;</span><span class="ident">RaftMessage</span>)) {
-        <span class="kw">for</span> <span class="ident">msg</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">batch</span>.<span class="ident">get_msgs</span>() {
-            <span class="ident">hook</span>(<span class="ident">msg</span>);
-        }
-        <span class="self">self</span>.<span class="ident">batch</span>.<span class="ident">mut_msgs</span>().<span class="ident">clear</span>();
-
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">msg</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">overflowing</span> {
-            <span class="ident">hook</span>(<span class="ident">msg</span>);
-        }
-        <span class="self">self</span>.<span class="ident">overflowing</span>.<span class="ident">take</span>();
-    }
 }
 
 <span class="doccomment">/// A buffer for non-batch RaftMessage.</span>
@@ -1215,14 +1210,6 @@
         } <span class="kw">else</span> {
             <span class="prelude-val">Ok</span>(())
         }
-    }
-
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">clear</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="kw-2">mut</span> <span class="ident">hook</span>: <span class="kw">impl</span> <span class="ident">FnMut</span>(<span class="kw-2">&amp;</span><span class="ident">RaftMessage</span>)) {
-        <span class="kw">for</span> <span class="ident">msg</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">batch</span> {
-            <span class="ident">hook</span>(<span class="ident">msg</span>);
-        }
-        <span class="self">self</span>.<span class="ident">batch</span>.<span class="ident">clear</span>();
     }
 }
 
@@ -1521,6 +1508,9 @@
             <span class="kw">let</span> <span class="ident">msg</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">queue</span>.<span class="ident">try_pop</span>().<span class="ident">unwrap</span>();
             <span class="ident">report_unreachable</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">builder</span>.<span class="ident">router</span>, <span class="kw-2">&amp;</span><span class="ident">msg</span>)
         }
+        <span class="ident">REPORT_FAILURE_MSG_COUNTER</span>
+            .<span class="ident">with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="string">&quot;unreachable&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">store_id</span>.<span class="ident">to_string</span>()])
+            .<span class="ident">inc_by</span>(<span class="ident">len</span> <span class="kw">as</span> <span class="ident">i64</span>);
     }
 
     <span class="kw">fn</span> <span class="ident">connect</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">addr</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">TikvClient</span> {
@@ -1689,6 +1679,8 @@
     <span class="doccomment">/// it will be marked to true. And all dirty queues are expected to be</span>
     <span class="doccomment">/// notified during flushing.</span>
     <span class="ident">dirty</span>: <span class="ident">bool</span>,
+    <span class="doccomment">/// Mark if the connection is full.</span>
+    <span class="ident">full</span>: <span class="ident">bool</span>,
 }
 
 <span class="doccomment">/// A raft client that can manages connections correctly.</span>
@@ -1707,6 +1699,7 @@
     <span class="ident">pool</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">ConnectionPool</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">cache</span>: <span class="ident">LruCache</span><span class="op">&lt;</span>(<span class="ident">u64</span>, <span class="ident">usize</span>), <span class="ident">CachedQueue</span><span class="op">&gt;</span>,
     <span class="ident">need_flush</span>: <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">u64</span>, <span class="ident">usize</span>)<span class="op">&gt;</span>,
+    <span class="ident">full_stores</span>: <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">u64</span>, <span class="ident">usize</span>)<span class="op">&gt;</span>,
     <span class="ident">future_pool</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">ThreadPool</span><span class="op">&lt;</span><span class="ident">TaskCell</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">builder</span>: <span class="ident">ConnectionBuilder</span><span class="op">&lt;</span><span class="ident">S</span>, <span class="ident">R</span><span class="op">&gt;</span>,
 }
@@ -1726,6 +1719,7 @@
             <span class="ident">pool</span>: <span class="ident">Arc</span>::<span class="ident">default</span>(),
             <span class="ident">cache</span>: <span class="ident">LruCache</span>::<span class="ident">with_capacity_and_sample</span>(<span class="number">0</span>, <span class="number">7</span>),
             <span class="ident">need_flush</span>: <span class="macro">vec</span><span class="macro">!</span>[],
+            <span class="ident">full_stores</span>: <span class="macro">vec</span><span class="macro">!</span>[],
             <span class="ident">future_pool</span>,
             <span class="ident">builder</span>,
         }
@@ -1767,6 +1761,7 @@
             <span class="ident">CachedQueue</span> {
                 <span class="ident">queue</span>: <span class="ident">s</span>,
                 <span class="ident">dirty</span>: <span class="bool-val">false</span>,
+                <span class="ident">full</span>: <span class="bool-val">false</span>,
             },
         );
         <span class="bool-val">true</span>
@@ -1814,6 +1809,10 @@
                     <span class="prelude-val">Err</span>(<span class="ident">DiscardReason</span>::<span class="ident">Full</span>) <span class="op">=</span><span class="op">&gt;</span> {
                         <span class="ident">s</span>.<span class="ident">queue</span>.<span class="ident">notify</span>();
                         <span class="ident">s</span>.<span class="ident">dirty</span> <span class="op">=</span> <span class="bool-val">false</span>;
+                        <span class="kw">if</span> <span class="op">!</span><span class="ident">s</span>.<span class="ident">full</span> {
+                            <span class="ident">s</span>.<span class="ident">full</span> <span class="op">=</span> <span class="bool-val">true</span>;
+                            <span class="self">self</span>.<span class="ident">full_stores</span>.<span class="ident">push</span>((<span class="ident">store_id</span>, <span class="ident">conn_id</span>));
+                        }
                         <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">DiscardReason</span>::<span class="ident">Full</span>);
                     }
                     <span class="prelude-val">Err</span>(<span class="ident">DiscardReason</span>::<span class="ident">Disconnected</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">break</span>,
@@ -1829,11 +1828,31 @@
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">need_flush</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="op">!</span><span class="self">self</span>.<span class="ident">need_flush</span>.<span class="ident">is_empty</span>()
+        <span class="op">!</span><span class="self">self</span>.<span class="ident">need_flush</span>.<span class="ident">is_empty</span>() <span class="op">|</span><span class="op">|</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">full_stores</span>.<span class="ident">is_empty</span>()
+    }
+
+    <span class="kw">fn</span> <span class="ident">flush_full_metrics</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">full_stores</span>.<span class="ident">is_empty</span>() {
+            <span class="kw">return</span>;
+        }
+
+        <span class="kw">for</span> <span class="ident">id</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">full_stores</span> {
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">s</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">cache</span>.<span class="ident">get_mut</span>(<span class="ident">id</span>) {
+                <span class="ident">s</span>.<span class="ident">full</span> <span class="op">=</span> <span class="bool-val">false</span>;
+            }
+            <span class="ident">REPORT_FAILURE_MSG_COUNTER</span>
+                .<span class="ident">with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="string">&quot;full&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">id</span>.<span class="number">0</span>.<span class="ident">to_string</span>()])
+                .<span class="ident">inc</span>();
+        }
+        <span class="self">self</span>.<span class="ident">full_stores</span>.<span class="ident">clear</span>();
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">full_stores</span>.<span class="ident">capacity</span>() <span class="op">&gt;</span> <span class="number">2048</span> {
+            <span class="self">self</span>.<span class="ident">full_stores</span>.<span class="ident">shrink_to</span>(<span class="number">512</span>);
+        }
     }
 
     <span class="doccomment">/// Flushes all buffered messages.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">flush</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
+        <span class="self">self</span>.<span class="ident">flush_full_metrics</span>();
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">need_flush</span>.<span class="ident">is_empty</span>() {
             <span class="kw">return</span>;
         }
@@ -1867,6 +1886,7 @@
             <span class="ident">pool</span>: <span class="self">self</span>.<span class="ident">pool</span>.<span class="ident">clone</span>(),
             <span class="ident">cache</span>: <span class="ident">LruCache</span>::<span class="ident">with_capacity_and_sample</span>(<span class="number">0</span>, <span class="number">7</span>),
             <span class="ident">need_flush</span>: <span class="macro">vec</span><span class="macro">!</span>[],
+            <span class="ident">full_stores</span>: <span class="macro">vec</span><span class="macro">!</span>[],
             <span class="ident">future_pool</span>: <span class="self">self</span>.<span class="ident">future_pool</span>.<span class="ident">clone</span>(),
             <span class="ident">builder</span>: <span class="self">self</span>.<span class="ident">builder</span>.<span class="ident">clone</span>(),
         }
