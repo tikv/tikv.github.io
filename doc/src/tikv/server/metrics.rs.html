@@ -428,6 +428,27 @@
 <span id="425">425</span>
 <span id="426">426</span>
 <span id="427">427</span>
+<span id="428">428</span>
+<span id="429">429</span>
+<span id="430">430</span>
+<span id="431">431</span>
+<span id="432">432</span>
+<span id="433">433</span>
+<span id="434">434</span>
+<span id="435">435</span>
+<span id="436">436</span>
+<span id="437">437</span>
+<span id="438">438</span>
+<span id="439">439</span>
+<span id="440">440</span>
+<span id="441">441</span>
+<span id="442">442</span>
+<span id="443">443</span>
+<span id="444">444</span>
+<span id="445">445</span>
+<span id="446">446</span>
+<span id="447">447</span>
+<span id="448">448</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -484,6 +505,9 @@
         <span class="ident">mvcc_get_by_start_ts</span>,
         <span class="ident">split_region</span>,
         <span class="ident">read_index</span>,
+        <span class="ident">raw_get_key_ttl</span>,
+        <span class="ident">check_leader</span>,
+        <span class="ident">batch_commands</span>,
     }
 
     <span class="kw">pub</span> <span class="ident">label_enum</span> <span class="ident">GcCommandKind</span> {
@@ -528,6 +552,11 @@
         <span class="ident">seek_for_prev_tombstone</span>,
     }
 
+    <span class="kw">pub</span> <span class="ident">label_enum</span> <span class="ident">WhetherSuccess</span> {
+        <span class="ident">success</span>,
+        <span class="ident">fail</span>,
+    }
+
     <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">GcCommandCounterVec</span>: <span class="ident">LocalIntCounter</span> {
         <span class="string">&quot;type&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">GcCommandKind</span>,
     }
@@ -550,6 +579,11 @@
 
     <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">GrpcMsgFailCounterVec</span>: <span class="ident">LocalIntCounter</span> {
         <span class="string">&quot;type&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">GrpcTypeKind</span>,
+    }
+
+    <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">GrpcProxyMsgCounterVec</span>: <span class="ident">LocalIntCounter</span> {
+        <span class="string">&quot;type&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">GrpcTypeKind</span>,
+        <span class="string">&quot;success&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">WhetherSuccess</span>,
     }
 
     <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">GcKeysCounterVec</span>: <span class="ident">LocalIntCounter</span> {
@@ -623,6 +657,12 @@
         <span class="kw-2">&amp;</span>[<span class="string">&quot;type&quot;</span>]
     )
     .<span class="ident">unwrap</span>();
+    <span class="kw">pub</span> <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">GRPC_PROXY_MSG_COUNTER_VEC</span>: <span class="ident">IntCounterVec</span> <span class="op">=</span> <span class="macro">register_int_counter_vec</span><span class="macro">!</span>(
+        <span class="string">&quot;tikv_grpc_proxy_msg_total&quot;</span>,
+        <span class="string">&quot;Total number of handle grpc proxy message&quot;</span>,
+        <span class="kw-2">&amp;</span>[<span class="string">&quot;type&quot;</span>, <span class="string">&quot;success&quot;</span>]
+    )
+    .<span class="ident">unwrap</span>();
     <span class="kw">pub</span> <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">GC_KEYS_COUNTER_VEC</span>: <span class="ident">IntCounterVec</span> <span class="op">=</span> <span class="macro">register_int_counter_vec</span><span class="macro">!</span>(
         <span class="string">&quot;tikv_gcworker_gc_keys&quot;</span>,
         <span class="string">&quot;Counter of keys affected during gc&quot;</span>,
@@ -661,6 +701,8 @@
         <span class="macro">auto_flush_from</span><span class="macro">!</span>(<span class="ident">RESOLVE_STORE_COUNTER</span>, <span class="ident">ResolveStoreCounterVec</span>);
     <span class="kw">pub</span> <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">GRPC_MSG_FAIL_COUNTER</span>: <span class="ident">GrpcMsgFailCounterVec</span> <span class="op">=</span>
         <span class="macro">auto_flush_from</span><span class="macro">!</span>(<span class="ident">GRPC_MSG_FAIL_COUNTER_VEC</span>, <span class="ident">GrpcMsgFailCounterVec</span>);
+    <span class="kw">pub</span> <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">GRPC_PROXY_MSG_COUNTER</span>: <span class="ident">GrpcProxyMsgCounterVec</span> <span class="op">=</span>
+        <span class="macro">auto_flush_from</span><span class="macro">!</span>(<span class="ident">GRPC_PROXY_MSG_COUNTER_VEC</span>, <span class="ident">GrpcProxyMsgCounterVec</span>);
     <span class="kw">pub</span> <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">GC_KEYS_COUNTER_STATIC</span>: <span class="ident">GcKeysCounterVec</span> <span class="op">=</span>
         <span class="macro">auto_flush_from</span><span class="macro">!</span>(<span class="ident">GC_KEYS_COUNTER_VEC</span>, <span class="ident">GcKeysCounterVec</span>);
 }

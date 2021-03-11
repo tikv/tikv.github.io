@@ -1875,6 +1875,19 @@
 <span id="1872">1872</span>
 <span id="1873">1873</span>
 <span id="1874">1874</span>
+<span id="1875">1875</span>
+<span id="1876">1876</span>
+<span id="1877">1877</span>
+<span id="1878">1878</span>
+<span id="1879">1879</span>
+<span id="1880">1880</span>
+<span id="1881">1881</span>
+<span id="1882">1882</span>
+<span id="1883">1883</span>
+<span id="1884">1884</span>
+<span id="1885">1885</span>
+<span id="1886">1886</span>
+<span id="1887">1887</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2017 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1888,6 +1901,7 @@
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">server</span>::<span class="ident">metrics</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">server</span>::<span class="ident">snap</span>::<span class="ident">Task</span> <span class="kw">as</span> <span class="ident">SnapTask</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">server</span>::<span class="ident">Error</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">server</span>::<span class="ident">Proxy</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">server</span>::<span class="prelude-ty">Result</span> <span class="kw">as</span> <span class="ident">ServerResult</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::{
     <span class="ident">errors</span>::{
@@ -1898,6 +1912,7 @@
     <span class="ident">lock_manager</span>::<span class="ident">LockManager</span>,
     <span class="ident">SecondaryLocksStatus</span>, <span class="ident">Storage</span>, <span class="ident">TxnStatus</span>,
 };
+<span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">forward_duplex</span>, <span class="ident">forward_unary</span>};
 <span class="kw">use</span> <span class="ident">engine_rocks</span>::<span class="ident">RocksEngine</span>;
 <span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">compat</span>::<span class="ident">Future01CompatExt</span>;
 <span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">future</span>::{<span class="self">self</span>, <span class="ident">Future</span>, <span class="ident">FutureExt</span>, <span class="ident">TryFutureExt</span>};
@@ -1943,6 +1958,8 @@
     <span class="ident">grpc_thread_load</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">ThreadLoad</span><span class="op">&gt;</span>,
 
     <span class="ident">readpool_normal_thread_load</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">ThreadLoad</span><span class="op">&gt;</span>,
+
+    <span class="ident">proxy</span>: <span class="ident">Proxy</span>,
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span>
@@ -1961,6 +1978,7 @@
             <span class="ident">enable_req_batch</span>: <span class="self">self</span>.<span class="ident">enable_req_batch</span>,
             <span class="ident">grpc_thread_load</span>: <span class="self">self</span>.<span class="ident">grpc_thread_load</span>.<span class="ident">clone</span>(),
             <span class="ident">readpool_normal_thread_load</span>: <span class="self">self</span>.<span class="ident">readpool_normal_thread_load</span>.<span class="ident">clone</span>(),
+            <span class="ident">proxy</span>: <span class="self">self</span>.<span class="ident">proxy</span>.<span class="ident">clone</span>(),
         }
     }
 }
@@ -1976,6 +1994,7 @@
         <span class="ident">grpc_thread_load</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">ThreadLoad</span><span class="op">&gt;</span>,
         <span class="ident">readpool_normal_thread_load</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">ThreadLoad</span><span class="op">&gt;</span>,
         <span class="ident">enable_req_batch</span>: <span class="ident">bool</span>,
+        <span class="ident">proxy</span>: <span class="ident">Proxy</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="ident">Service</span> {
             <span class="ident">gc_worker</span>,
@@ -1986,6 +2005,7 @@
             <span class="ident">grpc_thread_load</span>,
             <span class="ident">readpool_normal_thread_load</span>,
             <span class="ident">enable_req_batch</span>,
+            <span class="ident">proxy</span>,
         }
     }
 }
@@ -1993,6 +2013,7 @@
 <span class="macro">macro_rules</span><span class="macro">!</span> <span class="ident">handle_request</span> {
     (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">fn_name</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">future_name</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">req_ty</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">resp_ty</span>: <span class="ident">ident</span>) <span class="op">=</span><span class="op">&gt;</span> {
         <span class="kw">fn</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">fn_name</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">ctx</span>: <span class="ident">RpcContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>, <span class="ident">req</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">req_ty</span>, <span class="ident">sink</span>: <span class="ident">UnarySink</span><span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">resp_ty</span><span class="op">&gt;</span>) {
+            <span class="macro">forward_unary</span><span class="macro">!</span>(<span class="self">self</span>.<span class="ident">proxy</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">fn_name</span>, <span class="ident">ctx</span>, <span class="ident">req</span>, <span class="ident">sink</span>);
             <span class="kw">let</span> <span class="ident">begin_instant</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now_coarse</span>();
 
             <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">future_name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">storage</span>, <span class="ident">req</span>);
@@ -2156,6 +2177,7 @@
     }
 
     <span class="kw">fn</span> <span class="ident">coprocessor</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">ctx</span>: <span class="ident">RpcContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>, <span class="ident">req</span>: <span class="ident">Request</span>, <span class="ident">sink</span>: <span class="ident">UnarySink</span><span class="op">&lt;</span><span class="ident">Response</span><span class="op">&gt;</span>) {
+        <span class="macro">forward_unary</span><span class="macro">!</span>(<span class="self">self</span>.<span class="ident">proxy</span>, <span class="ident">coprocessor</span>, <span class="ident">ctx</span>, <span class="ident">req</span>, <span class="ident">sink</span>);
         <span class="kw">let</span> <span class="ident">begin_instant</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now_coarse</span>();
         <span class="kw">let</span> <span class="ident">future</span> <span class="op">=</span> <span class="ident">future_cop</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">cop</span>, <span class="prelude-val">Some</span>(<span class="ident">ctx</span>.<span class="ident">peer</span>()), <span class="ident">req</span>);
         <span class="kw">let</span> <span class="ident">task</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
@@ -2519,6 +2541,7 @@
         <span class="kw-2">mut</span> <span class="ident">req</span>: <span class="ident">SplitRegionRequest</span>,
         <span class="ident">sink</span>: <span class="ident">UnarySink</span><span class="op">&lt;</span><span class="ident">SplitRegionResponse</span><span class="op">&gt;</span>,
     ) {
+        <span class="macro">forward_unary</span><span class="macro">!</span>(<span class="self">self</span>.<span class="ident">proxy</span>, <span class="ident">split_region</span>, <span class="ident">ctx</span>, <span class="ident">req</span>, <span class="ident">sink</span>);
         <span class="kw">let</span> <span class="ident">begin_instant</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now_coarse</span>();
 
         <span class="kw">let</span> <span class="ident">region_id</span> <span class="op">=</span> <span class="ident">req</span>.<span class="ident">get_context</span>().<span class="ident">get_region_id</span>();
@@ -2604,6 +2627,7 @@
         <span class="ident">req</span>: <span class="ident">ReadIndexRequest</span>,
         <span class="ident">sink</span>: <span class="ident">UnarySink</span><span class="op">&lt;</span><span class="ident">ReadIndexResponse</span><span class="op">&gt;</span>,
     ) {
+        <span class="macro">forward_unary</span><span class="macro">!</span>(<span class="self">self</span>.<span class="ident">proxy</span>, <span class="ident">read_index</span>, <span class="ident">ctx</span>, <span class="ident">req</span>, <span class="ident">sink</span>);
         <span class="kw">let</span> <span class="ident">begin_instant</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now_coarse</span>();
 
         <span class="kw">let</span> <span class="ident">region_id</span> <span class="op">=</span> <span class="ident">req</span>.<span class="ident">get_context</span>().<span class="ident">get_region_id</span>();
@@ -2698,6 +2722,7 @@
         <span class="ident">stream</span>: <span class="ident">RequestStream</span><span class="op">&lt;</span><span class="ident">BatchCommandsRequest</span><span class="op">&gt;</span>,
         <span class="kw-2">mut</span> <span class="ident">sink</span>: <span class="ident">DuplexSink</span><span class="op">&lt;</span><span class="ident">BatchCommandsResponse</span><span class="op">&gt;</span>,
     ) {
+        <span class="macro">forward_duplex</span><span class="macro">!</span>(<span class="self">self</span>.<span class="ident">proxy</span>, <span class="ident">batch_commands</span>, <span class="ident">ctx</span>, <span class="ident">stream</span>, <span class="ident">sink</span>);
         <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">unbounded</span>(<span class="ident">GRPC_MSG_NOTIFY_SIZE</span>);
 
         <span class="kw">let</span> <span class="ident">ctx</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">ctx</span>);
@@ -2852,9 +2877,10 @@
     <span class="kw">fn</span> <span class="ident">raw_get_key_ttl</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
         <span class="ident">ctx</span>: <span class="ident">grpcio</span>::<span class="ident">RpcContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>,
-        <span class="kw">_</span>: <span class="ident">kvproto</span>::<span class="ident">kvrpcpb</span>::<span class="ident">RawGetKeyTtlRequest</span>,
+        <span class="ident">req</span>: <span class="ident">kvproto</span>::<span class="ident">kvrpcpb</span>::<span class="ident">RawGetKeyTtlRequest</span>,
         <span class="ident">sink</span>: <span class="ident">grpcio</span>::<span class="ident">UnarySink</span><span class="op">&lt;</span><span class="ident">kvproto</span>::<span class="ident">kvrpcpb</span>::<span class="ident">RawGetKeyTtlResponse</span><span class="op">&gt;</span>,
     ) {
+        <span class="macro">forward_unary</span><span class="macro">!</span>(<span class="self">self</span>.<span class="ident">proxy</span>, <span class="ident">raw_get_key_ttl</span>, <span class="ident">ctx</span>, <span class="ident">req</span>, <span class="ident">sink</span>);
         <span class="ident">ctx</span>.<span class="ident">spawn</span>(
             <span class="ident">sink</span>.<span class="ident">fail</span>(<span class="ident">RpcStatus</span>::<span class="ident">new</span>(<span class="ident">RpcStatusCode</span>::<span class="ident">UNIMPLEMENTED</span>, <span class="prelude-val">None</span>))
                 .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> ()),

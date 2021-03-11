@@ -410,6 +410,15 @@
 <span id="407">407</span>
 <span id="408">408</span>
 <span id="409">409</span>
+<span id="410">410</span>
+<span id="411">411</span>
+<span id="412">412</span>
+<span id="413">413</span>
+<span id="414">414</span>
+<span id="415">415</span>
+<span id="416">416</span>
+<span id="417">417</span>
+<span id="418">418</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -517,6 +526,8 @@
     <span class="kw">pub</span> <span class="ident">background_thread_count</span>: <span class="ident">usize</span>,
     <span class="comment">// If handle time is larger than the threshold, it will print slow log in end point.</span>
     <span class="kw">pub</span> <span class="ident">end_point_slow_log_threshold</span>: <span class="ident">ReadableDuration</span>,
+    <span class="doccomment">/// Max connections per address for forwarding request.</span>
+    <span class="kw">pub</span> <span class="ident">forward_max_connections_per_address</span>: <span class="ident">usize</span>,
 
     <span class="comment">// Test only.</span>
     <span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span>
@@ -591,6 +602,7 @@
             <span class="ident">raft_client_backoff_step</span>: <span class="ident">ReadableDuration</span>::<span class="ident">secs</span>(<span class="number">1</span>),
             <span class="ident">background_thread_count</span>,
             <span class="ident">end_point_slow_log_threshold</span>: <span class="ident">ReadableDuration</span>::<span class="ident">secs</span>(<span class="number">1</span>),
+            <span class="ident">forward_max_connections_per_address</span>: <span class="number">2</span>,
         }
     }
 }
@@ -676,13 +688,19 @@
 
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">grpc_stream_initial_window_size</span>.<span class="number">0</span> <span class="op">&gt;</span> <span class="ident">i32</span>::<span class="ident">MAX</span> <span class="kw">as</span> <span class="ident">u64</span> {
             <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(
-                <span class="string">&quot;server.grpc_stream_initial_window_size is too large.&quot;</span>
+                <span class="string">&quot;server.grpc-stream-initial-window-size is too large.&quot;</span>
             ));
         }
 
         <span class="kw">for</span> (<span class="ident">k</span>, <span class="ident">v</span>) <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">labels</span> {
             <span class="ident">validate_label_key</span>(<span class="ident">k</span>)<span class="question-mark">?</span>;
             <span class="ident">validate_label_value</span>(<span class="ident">v</span>)<span class="question-mark">?</span>;
+        }
+
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">forward_max_connections_per_address</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(
+                <span class="string">&quot;server.forward-max-connections-per-address can&#39;t be 0.&quot;</span>
+            ));
         }
 
         <span class="prelude-val">Ok</span>(())
