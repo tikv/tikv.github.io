@@ -832,6 +832,7 @@
 <span id="829">829</span>
 <span id="830">830</span>
 <span id="831">831</span>
+<span id="832">832</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2017 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -860,7 +861,7 @@
 <span class="kw">use</span> <span class="ident">yatp</span>::<span class="ident">ThreadPool</span>;
 
 <span class="kw">use</span> <span class="kw">super</span>::<span class="ident">metrics</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">super</span>::<span class="ident">util</span>::{<span class="ident">check_resp_header</span>, <span class="ident">sync_request</span>, <span class="ident">validate_endpoints</span>, <span class="ident">LeaderClient</span>};
+<span class="kw">use</span> <span class="kw">super</span>::<span class="ident">util</span>::{<span class="ident">check_resp_header</span>, <span class="ident">sync_request</span>, <span class="ident">LeaderClient</span>, <span class="ident">PdConnector</span>};
 <span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">Config</span>, <span class="ident">FeatureGate</span>, <span class="ident">PdFuture</span>, <span class="ident">UnixSecs</span>};
 <span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">Error</span>, <span class="ident">PdClient</span>, <span class="ident">RegionInfo</span>, <span class="ident">RegionStat</span>, <span class="prelude-ty">Result</span>, <span class="ident">REQUEST_TIMEOUT</span>};
 
@@ -906,8 +907,9 @@
                 .<span class="ident">max_thread_count</span>(<span class="number">1</span>)
                 .<span class="ident">build_future_pool</span>(),
         );
+        <span class="kw">let</span> <span class="ident">pd_connector</span> <span class="op">=</span> <span class="ident">PdConnector</span>::<span class="ident">new</span>(<span class="ident">env</span>.<span class="ident">clone</span>(), <span class="ident">security_mgr</span>.<span class="ident">clone</span>());
         <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">retries</span> {
-            <span class="kw">match</span> <span class="ident">validate_endpoints</span>(<span class="ident">Arc</span>::<span class="ident">clone</span>(<span class="kw-2">&amp;</span><span class="ident">env</span>), <span class="ident">cfg</span>, <span class="ident">security_mgr</span>.<span class="ident">clone</span>()).<span class="kw">await</span> {
+            <span class="kw">match</span> <span class="ident">pd_connector</span>.<span class="ident">validate_endpoints</span>(<span class="ident">cfg</span>).<span class="kw">await</span> {
                 <span class="prelude-val">Ok</span>((<span class="ident">client</span>, <span class="ident">members</span>)) <span class="op">=</span><span class="op">&gt;</span> {
                     <span class="kw">let</span> <span class="ident">rpc_client</span> <span class="op">=</span> <span class="ident">RpcClient</span> {
                         <span class="ident">cluster_id</span>: <span class="ident">members</span>.<span class="ident">get_header</span>().<span class="ident">get_cluster_id</span>(),
@@ -938,7 +940,7 @@
 
                             <span class="kw">match</span> <span class="ident">client</span>.<span class="ident">upgrade</span>() {
                                 <span class="prelude-val">Some</span>(<span class="ident">cli</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                                    <span class="kw">let</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">cli</span>.<span class="ident">reconnect</span>().<span class="kw">await</span>;
+                                    <span class="kw">let</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">cli</span>.<span class="ident">reconnect</span>(<span class="bool-val">false</span>).<span class="kw">await</span>;
                                     <span class="kw">if</span> <span class="ident">req</span>.<span class="ident">is_err</span>() {
                                         <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;update PD information failed&quot;</span>);
                                         <span class="comment">// will update later anyway</span>
@@ -985,7 +987,7 @@
 
     <span class="doccomment">/// Re-establishes connection with PD leader in synchronized fashion.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">reconnect</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="ident">block_on</span>(<span class="self">self</span>.<span class="ident">leader_client</span>.<span class="ident">reconnect</span>())
+        <span class="ident">block_on</span>(<span class="self">self</span>.<span class="ident">leader_client</span>.<span class="ident">reconnect</span>(<span class="bool-val">true</span>))
     }
 
     <span class="doccomment">/// Creates a new call option with default request timeout.</span>
