@@ -92,6 +92,7 @@
 <span id="89">89</span>
 <span id="90">90</span>
 <span id="91">91</span>
+<span id="92">92</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -100,16 +101,15 @@
 <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">config</span>::<span class="ident">VersionTrack</span>;
 
 <span class="kw">const</span> <span class="ident">DEFAULT_DETECT_TIMES</span>: <span class="ident">u64</span> <span class="op">=</span> <span class="number">10</span>;
-<span class="kw">const</span> <span class="ident">DEFAULT_SAMPLE_THRESHOLD</span>: <span class="ident">i32</span> <span class="op">=</span> <span class="number">100</span>;
+<span class="kw">const</span> <span class="ident">DEFAULT_SAMPLE_THRESHOLD</span>: <span class="ident">u64</span> <span class="op">=</span> <span class="number">100</span>;
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">DEFAULT_SAMPLE_NUM</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">20</span>;
 <span class="kw">const</span> <span class="ident">DEFAULT_QPS_THRESHOLD</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">3000</span>;
+<span class="kw">const</span> <span class="ident">DEFAULT_BYTE_THRESHOLD</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">30</span> <span class="op">*</span> <span class="number">1024</span> <span class="op">*</span> <span class="number">1024</span>;
 
 <span class="comment">// We get balance score by abs(sample.left-sample.right)/(sample.right+sample.left). It will be used to measure left and right balance</span>
 <span class="kw">const</span> <span class="ident">DEFAULT_SPLIT_BALANCE_SCORE</span>: <span class="ident">f64</span> <span class="op">=</span> <span class="number">0.25</span>;
 <span class="comment">// We get contained score by sample.contained/(sample.right+sample.left+sample.contained). It will be used to avoid to split regions requested by range.</span>
 <span class="kw">const</span> <span class="ident">DEFAULT_SPLIT_CONTAINED_SCORE</span>: <span class="ident">f64</span> <span class="op">=</span> <span class="number">0.5</span>;
-<span class="kw">const</span> <span class="ident">DEFAULT_SIZE_THRESHOLD</span>: <span class="ident">u64</span> <span class="op">=</span> <span class="number">4</span> <span class="op">*</span> <span class="number">1024</span> <span class="op">*</span> <span class="number">1024</span>;
-<span class="kw">const</span> <span class="ident">DEFAULT_KEY_THRESHOLD</span>: <span class="ident">u64</span> <span class="op">=</span> <span class="number">40960</span>;
 
 <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">default</span>)]</span>
 <span class="attribute">#[<span class="ident">serde</span>(<span class="ident">rename_all</span> <span class="op">=</span> <span class="string">&quot;kebab-case&quot;</span>)]</span>
@@ -120,9 +120,8 @@
     <span class="kw">pub</span> <span class="ident">split_contained_score</span>: <span class="ident">f64</span>,
     <span class="kw">pub</span> <span class="ident">detect_times</span>: <span class="ident">u64</span>,
     <span class="kw">pub</span> <span class="ident">sample_num</span>: <span class="ident">usize</span>,
-    <span class="kw">pub</span> <span class="ident">sample_threshold</span>: <span class="ident">i32</span>,
-    <span class="kw">pub</span> <span class="ident">size_threshold</span>: <span class="ident">u64</span>,
-    <span class="kw">pub</span> <span class="ident">key_threshold</span>: <span class="ident">u64</span>,
+    <span class="kw">pub</span> <span class="ident">sample_threshold</span>: <span class="ident">u64</span>,
+    <span class="kw">pub</span> <span class="ident">byte_threshold</span>: <span class="ident">usize</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">SplitConfig</span> {
@@ -134,8 +133,7 @@
             <span class="ident">detect_times</span>: <span class="ident">DEFAULT_DETECT_TIMES</span>,
             <span class="ident">sample_num</span>: <span class="ident">DEFAULT_SAMPLE_NUM</span>,
             <span class="ident">sample_threshold</span>: <span class="ident">DEFAULT_SAMPLE_THRESHOLD</span>,
-            <span class="ident">size_threshold</span>: <span class="ident">DEFAULT_SIZE_THRESHOLD</span>,
-            <span class="ident">key_threshold</span>: <span class="ident">DEFAULT_KEY_THRESHOLD</span>,
+            <span class="ident">byte_threshold</span>: <span class="ident">DEFAULT_BYTE_THRESHOLD</span>,
         }
     }
 }
@@ -151,7 +149,11 @@
                 (<span class="string">&quot;split_balance_score or split_contained_score should be between 0 and 1.&quot;</span>).<span class="ident">into</span>(),
             );
         }
-
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">sample_num</span> <span class="op">&gt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">qps_threshold</span> {
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(
+                (<span class="string">&quot;sample_num should be less than qps_threshold for load-base-split.&quot;</span>).<span class="ident">into</span>(),
+            );
+        }
         <span class="prelude-val">Ok</span>(())
     }
 }
@@ -170,7 +172,7 @@
                 .<span class="ident">update</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">cfg</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">SplitConfig</span><span class="op">|</span> <span class="ident">cfg</span>.<span class="ident">update</span>(<span class="ident">change</span>));
         }
         <span class="macro">info</span><span class="macro">!</span>(
-            <span class="string">&quot;split hub config changed&quot;</span>;
+            <span class="string">&quot;load base split config changed&quot;</span>;
             <span class="string">&quot;change&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">change</span>,
         );
         <span class="prelude-val">Ok</span>(())
