@@ -1,1 +1,1 @@
-initSidebarItems({"trait":[["Mutable",""],["WriteBatch",""],["WriteBatchExt",""]]});
+initSidebarItems({"trait":[["Mutable","A trait implemented by WriteBatch"],["WriteBatch","Batches of multiple writes that are committed atomically"],["WriteBatchExt","Engines that can create write batches"]]});

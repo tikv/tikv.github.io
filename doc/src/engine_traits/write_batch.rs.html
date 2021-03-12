@@ -1,98 +1,227 @@
 <!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `components/engine_traits/src/write_batch.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>write_batch.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
 <link rel="alternate icon" type="image/png" href="../../favicon-16x16.png">
 <link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../engine_traits/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
-                <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1"> 1</span>
-<span id="2"> 2</span>
-<span id="3"> 3</span>
-<span id="4"> 4</span>
-<span id="5"> 5</span>
-<span id="6"> 6</span>
-<span id="7"> 7</span>
-<span id="8"> 8</span>
-<span id="9"> 9</span>
-<span id="10">10</span>
-<span id="11">11</span>
-<span id="12">12</span>
-<span id="13">13</span>
-<span id="14">14</span>
-<span id="15">15</span>
-<span id="16">16</span>
-<span id="17">17</span>
-<span id="18">18</span>
-<span id="19">19</span>
-<span id="20">20</span>
-<span id="21">21</span>
-<span id="22">22</span>
-<span id="23">23</span>
-<span id="24">24</span>
-<span id="25">25</span>
-<span id="26">26</span>
-<span id="27">27</span>
-<span id="28">28</span>
-<span id="29">29</span>
-<span id="30">30</span>
-<span id="31">31</span>
-<span id="32">32</span>
-<span id="33">33</span>
-<span id="34">34</span>
-<span id="35">35</span>
-<span id="36">36</span>
-<span id="37">37</span>
-<span id="38">38</span>
-<span id="39">39</span>
-<span id="40">40</span>
-<span id="41">41</span>
-<span id="42">42</span>
-<span id="43">43</span>
-<span id="44">44</span>
-<span id="45">45</span>
-<span id="46">46</span>
-<span id="47">47</span>
-<span id="48">48</span>
-<span id="49">49</span>
-<span id="50">50</span>
-<span id="51">51</span>
-<span id="52">52</span>
-<span id="53">53</span>
-<span id="54">54</span>
+                <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<span id="2">  2</span>
+<span id="3">  3</span>
+<span id="4">  4</span>
+<span id="5">  5</span>
+<span id="6">  6</span>
+<span id="7">  7</span>
+<span id="8">  8</span>
+<span id="9">  9</span>
+<span id="10"> 10</span>
+<span id="11"> 11</span>
+<span id="12"> 12</span>
+<span id="13"> 13</span>
+<span id="14"> 14</span>
+<span id="15"> 15</span>
+<span id="16"> 16</span>
+<span id="17"> 17</span>
+<span id="18"> 18</span>
+<span id="19"> 19</span>
+<span id="20"> 20</span>
+<span id="21"> 21</span>
+<span id="22"> 22</span>
+<span id="23"> 23</span>
+<span id="24"> 24</span>
+<span id="25"> 25</span>
+<span id="26"> 26</span>
+<span id="27"> 27</span>
+<span id="28"> 28</span>
+<span id="29"> 29</span>
+<span id="30"> 30</span>
+<span id="31"> 31</span>
+<span id="32"> 32</span>
+<span id="33"> 33</span>
+<span id="34"> 34</span>
+<span id="35"> 35</span>
+<span id="36"> 36</span>
+<span id="37"> 37</span>
+<span id="38"> 38</span>
+<span id="39"> 39</span>
+<span id="40"> 40</span>
+<span id="41"> 41</span>
+<span id="42"> 42</span>
+<span id="43"> 43</span>
+<span id="44"> 44</span>
+<span id="45"> 45</span>
+<span id="46"> 46</span>
+<span id="47"> 47</span>
+<span id="48"> 48</span>
+<span id="49"> 49</span>
+<span id="50"> 50</span>
+<span id="51"> 51</span>
+<span id="52"> 52</span>
+<span id="53"> 53</span>
+<span id="54"> 54</span>
+<span id="55"> 55</span>
+<span id="56"> 56</span>
+<span id="57"> 57</span>
+<span id="58"> 58</span>
+<span id="59"> 59</span>
+<span id="60"> 60</span>
+<span id="61"> 61</span>
+<span id="62"> 62</span>
+<span id="63"> 63</span>
+<span id="64"> 64</span>
+<span id="65"> 65</span>
+<span id="66"> 66</span>
+<span id="67"> 67</span>
+<span id="68"> 68</span>
+<span id="69"> 69</span>
+<span id="70"> 70</span>
+<span id="71"> 71</span>
+<span id="72"> 72</span>
+<span id="73"> 73</span>
+<span id="74"> 74</span>
+<span id="75"> 75</span>
+<span id="76"> 76</span>
+<span id="77"> 77</span>
+<span id="78"> 78</span>
+<span id="79"> 79</span>
+<span id="80"> 80</span>
+<span id="81"> 81</span>
+<span id="82"> 82</span>
+<span id="83"> 83</span>
+<span id="84"> 84</span>
+<span id="85"> 85</span>
+<span id="86"> 86</span>
+<span id="87"> 87</span>
+<span id="88"> 88</span>
+<span id="89"> 89</span>
+<span id="90"> 90</span>
+<span id="91"> 91</span>
+<span id="92"> 92</span>
+<span id="93"> 93</span>
+<span id="94"> 94</span>
+<span id="95"> 95</span>
+<span id="96"> 96</span>
+<span id="97"> 97</span>
+<span id="98"> 98</span>
+<span id="99"> 99</span>
+<span id="100">100</span>
+<span id="101">101</span>
+<span id="102">102</span>
+<span id="103">103</span>
+<span id="104">104</span>
+<span id="105">105</span>
+<span id="106">106</span>
+<span id="107">107</span>
+<span id="108">108</span>
+<span id="109">109</span>
+<span id="110">110</span>
+<span id="111">111</span>
+<span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
+<span id="118">118</span>
+<span id="119">119</span>
+<span id="120">120</span>
+<span id="121">121</span>
+<span id="122">122</span>
+<span id="123">123</span>
+<span id="124">124</span>
+<span id="125">125</span>
+<span id="126">126</span>
+<span id="127">127</span>
+<span id="128">128</span>
+<span id="129">129</span>
+<span id="130">130</span>
+<span id="131">131</span>
+<span id="132">132</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">errors</span>::<span class="prelude-ty">Result</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">options</span>::<span class="ident">WriteOptions</span>;
 
+<span class="doccomment">/// Engines that can create write batches</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">WriteBatchExt</span>: <span class="ident">Sized</span> {
     <span class="kw">type</span> <span class="ident">WriteBatch</span>: <span class="ident">WriteBatch</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>;
     <span class="doccomment">/// `WriteBatchVec` is used for `multi_batch_write` of RocksEngine and other Engine could also</span>
     <span class="doccomment">/// implement another kind of WriteBatch according to their needs.</span>
     <span class="kw">type</span> <span class="ident">WriteBatchVec</span>: <span class="ident">WriteBatch</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>;
 
+    <span class="doccomment">/// The number of puts/deletes made to a write batch before the batch should</span>
+    <span class="doccomment">/// be committed with `write`. More entries than this will cause</span>
+    <span class="doccomment">/// `should_write_to_engine` to return true.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// In practice it seems that exceeding this number of entries is possible</span>
+    <span class="doccomment">/// and does not result in an error. It isn&#39;t clear the consequence of</span>
+    <span class="doccomment">/// exceeding this limit.</span>
     <span class="kw">const</span> <span class="ident">WRITE_BATCH_MAX_KEYS</span>: <span class="ident">usize</span>;
 
+    <span class="doccomment">/// Indicates whether the WriteBatchVec type can be created and works</span>
+    <span class="doccomment">/// as expected.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// If this returns false then creating a WriteBatchVec will panic.</span>
     <span class="kw">fn</span> <span class="ident">support_write_batch_vec</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span>;
 
     <span class="kw">fn</span> <span class="ident">write_batch</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span>::<span class="ident">WriteBatch</span>;
     <span class="kw">fn</span> <span class="ident">write_batch_with_cap</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">cap</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span>::<span class="ident">WriteBatch</span>;
 }
 
+<span class="doccomment">/// A trait implemented by WriteBatch</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// FIXME: This trait is misnamed, as it is implemented only by WriteBatch and</span>
+<span class="doccomment">/// is filled with WriteBatch-specific methods. Merge it into WriteBatch.</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Mutable</span>: <span class="ident">Send</span> {
+    <span class="doccomment">/// The data size of a write batch</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// This is necessarily engine-dependent. In RocksDB though it appears to</span>
+    <span class="doccomment">/// represent the byte length of all write commands in the batch, as</span>
+    <span class="doccomment">/// serialized in memory, prior to being written to disk.</span>
     <span class="kw">fn</span> <span class="ident">data_size</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span>;
+
+    <span class="doccomment">/// The number of commands in this batch</span>
     <span class="kw">fn</span> <span class="ident">count</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span>;
+
+    <span class="doccomment">/// Whether any commands have been issued to this batch</span>
     <span class="kw">fn</span> <span class="ident">is_empty</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span>;
+
+    <span class="doccomment">/// Whether the number of commands exceeds WRITE_BATCH_MAX_KEYS</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// If so, the `write` method should be called.</span>
     <span class="kw">fn</span> <span class="ident">should_write_to_engine</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span>;
 
+    <span class="doccomment">/// Clears the WriteBatch of all commands</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// It may be reused afterward as an empty batch.</span>
     <span class="kw">fn</span> <span class="ident">clear</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>);
+
+    <span class="doccomment">/// Push a save point onto the save point stack</span>
     <span class="kw">fn</span> <span class="ident">set_save_point</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>);
+
+    <span class="doccomment">/// Pop a save point from the save point stack</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// This has no effect on the commands already issued to the write batch</span>
     <span class="kw">fn</span> <span class="ident">pop_save_point</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span>;
+
+    <span class="doccomment">/// Revert all commands issued since the last save point</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Additionally pops the last save point from the save point stack.</span>
     <span class="kw">fn</span> <span class="ident">rollback_to_save_point</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span>;
 
+    <span class="doccomment">/// Write a key/value in the default column family</span>
     <span class="kw">fn</span> <span class="ident">put</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">value</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span>;
+
+    <span class="doccomment">/// Write a key/value in a given column family</span>
     <span class="kw">fn</span> <span class="ident">put_cf</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">cf</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">value</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span>;
 
+    <span class="doccomment">/// Delete a key/value in the default column family</span>
     <span class="kw">fn</span> <span class="ident">delete</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span>;
+
+    <span class="doccomment">/// Delete a key/value in a given column family</span>
     <span class="kw">fn</span> <span class="ident">delete_cf</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">cf</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span>;
 
+    <span class="doccomment">/// Delete a range of key/values in the default column family</span>
     <span class="kw">fn</span> <span class="ident">delete_range</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">begin_key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">end_key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span>;
+
+    <span class="doccomment">/// Delete a range of key/values in a given column family</span>
     <span class="kw">fn</span> <span class="ident">delete_range_cf</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">cf</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">begin_key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">end_key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span>;
 
     <span class="kw">fn</span> <span class="ident">put_msg</span><span class="op">&lt;</span><span class="ident">M</span>: <span class="ident">protobuf</span>::<span class="ident">Message</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">m</span>: <span class="kw-2">&amp;</span><span class="ident">M</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
@@ -103,9 +232,36 @@
     }
 }
 
+<span class="doccomment">/// Batches of multiple writes that are committed atomically</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Each write batch consists of a series of commands: put, delete</span>
+<span class="doccomment">/// delete_range, and their column-family-specific equivalents.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Because write batches are atomic, once written to disk all their effects are</span>
+<span class="doccomment">/// visible as if all other writes in the system were written either before or</span>
+<span class="doccomment">/// after the batch. This includes range deletes.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// The exact strategy used by WriteBatch is up to the implementation.</span>
+<span class="doccomment">/// RocksDB though _seems_ to serialize the writes to an in-memory buffer,</span>
+<span class="doccomment">/// and then write the whole serialized batch to disk at once.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Write batches may be reused after being written. In that case they write</span>
+<span class="doccomment">/// exactly the same data as previously, Replacing any keys that may have</span>
+<span class="doccomment">/// changed in between the two batch writes.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Commands issued to write batches can be rolled back prior to being committed</span>
+<span class="doccomment">/// by use of _save points_. At any point in the life of a write batch a save</span>
+<span class="doccomment">/// point can be recorded. Any number of save points can be recorded to a stack.</span>
+<span class="doccomment">/// Calling `rollback_to_save_point` reverts all commands issued since the last</span>
+<span class="doccomment">/// save point, and pops the save point from the stack.</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">WriteBatch</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">WriteBatchExt</span> <span class="op">+</span> <span class="ident">Sized</span><span class="op">&gt;</span>: <span class="ident">Mutable</span> {
+    <span class="doccomment">/// Create a WriteBatch with a given command capacity</span>
     <span class="kw">fn</span> <span class="ident">with_capacity</span>(<span class="ident">e</span>: <span class="kw-2">&amp;</span><span class="ident">E</span>, <span class="ident">cap</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span>;
+
+    <span class="doccomment">/// Commit the WriteBatch to disk with the given options</span>
     <span class="kw">fn</span> <span class="ident">write_opt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">opts</span>: <span class="kw-2">&amp;</span><span class="ident">WriteOptions</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span>;
+
+    <span class="doccomment">/// Commit the WriteBatch to disk atomically</span>
     <span class="kw">fn</span> <span class="ident">write</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">write_opt</span>(<span class="kw-2">&amp;</span><span class="ident">WriteOptions</span>::<span class="ident">default</span>())
     }
