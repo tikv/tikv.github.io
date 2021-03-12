@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["GrpcProxyMsgCounterVec",""],["GrpcProxyMsgCounterVec2Delegator",""],["GrpcProxyMsgCounterVec2Inner",""],["GrpcProxyMsgCounterVecDelegator",""],["GrpcProxyMsgCounterVecInner",""]]});
+initSidebarItems({"struct":[["GrpcMsgFailCounterVec",""],["GrpcMsgFailCounterVecDelegator",""],["GrpcMsgFailCounterVecInner",""]]});

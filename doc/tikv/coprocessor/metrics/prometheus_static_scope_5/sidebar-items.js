@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["CoprAcquireSemaphoreTypeCounterVec",""]]});
+initSidebarItems({"struct":[["MemLockCheckHistogramVec",""],["MemLockCheckHistogramVecDelegator",""],["MemLockCheckHistogramVecInner",""]]});

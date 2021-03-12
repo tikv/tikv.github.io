@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["GrpcMsgFailCounterVec",""],["GrpcMsgFailCounterVecDelegator",""],["GrpcMsgFailCounterVecInner",""]]});
+initSidebarItems({"struct":[["ResolveStoreCounterVec",""],["ResolveStoreCounterVecDelegator",""],["ResolveStoreCounterVecInner",""]]});

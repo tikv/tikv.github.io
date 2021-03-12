@@ -761,6 +761,15 @@
 <span id="758">758</span>
 <span id="759">759</span>
 <span id="760">760</span>
+<span id="761">761</span>
+<span id="762">762</span>
+<span id="763">763</span>
+<span id="764">764</span>
+<span id="765">765</span>
+<span id="766">766</span>
+<span id="767">767</span>
+<span id="768">768</span>
+<span id="769">769</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1419,6 +1428,8 @@
         <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">msg</span>.<span class="ident">get_entries</span>().<span class="ident">len</span>(), <span class="number">1</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rctx</span> <span class="op">=</span> <span class="ident">ReadIndexContext</span>::<span class="ident">parse</span>(<span class="ident">msg</span>.<span class="ident">get_entries</span>()[<span class="number">0</span>].<span class="ident">get_data</span>()).<span class="ident">unwrap</span>();
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">mut</span> <span class="ident">request</span>) <span class="op">=</span> <span class="ident">rctx</span>.<span class="ident">request</span>.<span class="ident">take</span>() {
+            <span class="kw">let</span> <span class="ident">begin_instant</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now</span>();
+
             <span class="kw">let</span> <span class="ident">start_ts</span> <span class="op">=</span> <span class="ident">request</span>.<span class="ident">get_start_ts</span>().<span class="ident">into</span>();
             <span class="self">self</span>.<span class="ident">concurrency_manager</span>.<span class="ident">update_max_ts</span>(<span class="ident">start_ts</span>);
             <span class="kw">for</span> <span class="ident">range</span> <span class="kw">in</span> <span class="ident">request</span>.<span class="ident">mut_key_ranges</span>().<span class="ident">iter_mut</span>() {
@@ -1445,6 +1456,13 @@
                 );
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">txn_types</span>::<span class="ident">Error</span>(<span class="kw">box</span> <span class="ident">txn_types</span>::<span class="ident">ErrorInner</span>::<span class="ident">KeyIsLocked</span>(<span class="ident">lock</span>))) <span class="op">=</span> <span class="ident">res</span> {
                     <span class="ident">rctx</span>.<span class="ident">locked</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">lock</span>);
+                    <span class="ident">REPLICA_READ_LOCK_CHECK_HISTOGRAM_VEC_STATIC</span>
+                        .<span class="ident">locked</span>
+                        .<span class="ident">observe</span>(<span class="ident">begin_instant</span>.<span class="ident">elapsed</span>().<span class="ident">as_secs_f64</span>());
+                } <span class="kw">else</span> {
+                    <span class="ident">REPLICA_READ_LOCK_CHECK_HISTOGRAM_VEC_STATIC</span>
+                        .<span class="ident">unlocked</span>
+                        .<span class="ident">observe</span>(<span class="ident">begin_instant</span>.<span class="ident">elapsed</span>().<span class="ident">as_secs_f64</span>());
                 }
             }
             <span class="ident">msg</span>.<span class="ident">mut_entries</span>()[<span class="number">0</span>].<span class="ident">set_data</span>(<span class="ident">rctx</span>.<span class="ident">to_bytes</span>());

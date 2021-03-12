@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["GrpcMsgHistogramVec",""],["GrpcMsgHistogramVecDelegator",""],["GrpcMsgHistogramVecInner",""]]});
+initSidebarItems({"struct":[["GcKeysCounterVec",""],["GcKeysCounterVec2Delegator",""],["GcKeysCounterVec2Inner",""],["GcKeysCounterVecDelegator",""],["GcKeysCounterVecInner",""]]});

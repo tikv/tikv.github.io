@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["RequestBatchSizeHistogramVec",""]]});
+initSidebarItems({"struct":[["ReplicaReadLockCheckHistogramVec",""],["ReplicaReadLockCheckHistogramVecDelegator",""],["ReplicaReadLockCheckHistogramVecInner",""]]});

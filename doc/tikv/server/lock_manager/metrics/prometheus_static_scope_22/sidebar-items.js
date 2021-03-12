@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["WaitTableStatusGauge",""]]});
+initSidebarItems({"struct":[["LocalTaskCounter",""],["LocalTaskCounterDelegator",""],["LocalTaskCounterInner",""]]});
