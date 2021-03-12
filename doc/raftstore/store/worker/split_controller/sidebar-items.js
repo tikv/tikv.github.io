@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["TOP_N",""]],"fn":[["prefix_sum",""],["sample",""]],"struct":[["AutoSplitController",""],["ReadStats",""],["Recorder",""],["RegionInfo",""],["Sample",""],["SplitInfo",""]]});
+initSidebarItems({"constant":[["MAX_RETRY_TIME",""],["TOP_N",""]],"fn":[["prefix_sum",""],["sample",""]],"struct":[["AutoSplitController",""],["ReadStats",""],["Recorder",""],["RegionInfo",""],["Sample",""],["SplitInfo",""]]});

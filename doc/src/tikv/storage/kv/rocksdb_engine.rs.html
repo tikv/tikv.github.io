@@ -651,6 +651,15 @@
 <span id="648">648</span>
 <span id="649">649</span>
 <span id="650">650</span>
+<span id="651">651</span>
+<span id="652">652</span>
+<span id="653">653</span>
+<span id="654">654</span>
+<span id="655">655</span>
+<span id="656">656</span>
+<span id="657">657</span>
+<span id="658">658</span>
+<span id="659">659</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -827,6 +836,7 @@
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">TestEngineBuilder</span> {
     <span class="ident">path</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">PathBuf</span><span class="op">&gt;</span>,
     <span class="ident">cfs</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">CfName</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">enable_ttl</span>: <span class="ident">bool</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">TestEngineBuilder</span> {
@@ -834,6 +844,7 @@
         <span class="self">Self</span> {
             <span class="ident">path</span>: <span class="prelude-val">None</span>,
             <span class="ident">cfs</span>: <span class="prelude-val">None</span>,
+            <span class="ident">enable_ttl</span>: <span class="bool-val">false</span>,
         }
     }
 
@@ -853,6 +864,11 @@
         <span class="self">self</span>
     }
 
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">ttl</span>(<span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">b</span>: <span class="ident">bool</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+        <span class="self">self</span>.<span class="ident">enable_ttl</span> <span class="op">=</span> <span class="ident">b</span>;
+        <span class="self">self</span>
+    }
+
     <span class="doccomment">/// Build a `RocksEngine`.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">build</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">cfg_rocksdb</span> <span class="op">=</span> <span class="kw">crate</span>::<span class="ident">config</span>::<span class="ident">DbConfig</span>::<span class="ident">default</span>();
@@ -864,14 +880,16 @@
             <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">TEMP_DIR</span>.<span class="ident">to_owned</span>(),
             <span class="prelude-val">Some</span>(<span class="ident">p</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">p</span>.<span class="ident">to_str</span>().<span class="ident">unwrap</span>().<span class="ident">to_owned</span>(),
         };
+        <span class="kw">let</span> <span class="ident">enable_ttl</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">enable_ttl</span>;
         <span class="kw">let</span> <span class="ident">cfs</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">cfs</span>.<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">ALL_CFS</span>.<span class="ident">to_vec</span>());
         <span class="kw">let</span> <span class="ident">cache</span> <span class="op">=</span> <span class="ident">BlockCacheConfig</span>::<span class="ident">default</span>().<span class="ident">build_shared_cache</span>();
         <span class="kw">let</span> <span class="ident">cfs_opts</span> <span class="op">=</span> <span class="ident">cfs</span>
             .<span class="ident">iter</span>()
             .<span class="ident">map</span>(<span class="op">|</span><span class="ident">cf</span><span class="op">|</span> <span class="kw">match</span> <span class="kw-2">*</span><span class="ident">cf</span> {
-                <span class="ident">CF_DEFAULT</span> <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="ident">CFOptions</span>::<span class="ident">new</span>(<span class="ident">CF_DEFAULT</span>, <span class="ident">cfg_rocksdb</span>.<span class="ident">defaultcf</span>.<span class="ident">build_opt</span>(<span class="kw-2">&amp;</span><span class="ident">cache</span>, <span class="prelude-val">None</span>))
-                }
+                <span class="ident">CF_DEFAULT</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">CFOptions</span>::<span class="ident">new</span>(
+                    <span class="ident">CF_DEFAULT</span>,
+                    <span class="ident">cfg_rocksdb</span>.<span class="ident">defaultcf</span>.<span class="ident">build_opt</span>(<span class="kw-2">&amp;</span><span class="ident">cache</span>, <span class="prelude-val">None</span>, <span class="ident">enable_ttl</span>),
+                ),
                 <span class="ident">CF_LOCK</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">CFOptions</span>::<span class="ident">new</span>(<span class="ident">CF_LOCK</span>, <span class="ident">cfg_rocksdb</span>.<span class="ident">lockcf</span>.<span class="ident">build_opt</span>(<span class="kw-2">&amp;</span><span class="ident">cache</span>)),
                 <span class="ident">CF_WRITE</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">CFOptions</span>::<span class="ident">new</span>(<span class="ident">CF_WRITE</span>, <span class="ident">cfg_rocksdb</span>.<span class="ident">writecf</span>.<span class="ident">build_opt</span>(<span class="kw-2">&amp;</span><span class="ident">cache</span>, <span class="prelude-val">None</span>)),
                 <span class="ident">CF_RAFT</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">CFOptions</span>::<span class="ident">new</span>(<span class="ident">CF_RAFT</span>, <span class="ident">cfg_rocksdb</span>.<span class="ident">raftcf</span>.<span class="ident">build_opt</span>(<span class="kw-2">&amp;</span><span class="ident">cache</span>)),

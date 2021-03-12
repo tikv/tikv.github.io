@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["PROP_MAX_EXPIRE_TS",""],["PROP_MIN_EXPIRE_TS",""]],"struct":[["RocksTtlProperties",""],["TtlPropertiesCollector","Can only be used for default CF."],["TtlPropertiesCollectorFactory",""]]});

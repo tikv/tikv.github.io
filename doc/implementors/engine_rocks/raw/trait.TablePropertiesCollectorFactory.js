@@ -1,3 +1,3 @@
 (function() {var implementors = {};
-implementors["engine_rocks"] = [{"text":"impl TablePropertiesCollectorFactory for RangePropertiesCollectorFactory","synthetic":false,"types":[]},{"text":"impl TablePropertiesCollectorFactory for MvccPropertiesCollectorFactory","synthetic":false,"types":[]}];
+implementors["engine_rocks"] = [{"text":"impl TablePropertiesCollectorFactory for RangePropertiesCollectorFactory","synthetic":false,"types":[]},{"text":"impl TablePropertiesCollectorFactory for MvccPropertiesCollectorFactory","synthetic":false,"types":[]},{"text":"impl TablePropertiesCollectorFactory for TtlPropertiesCollectorFactory","synthetic":false,"types":[]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
