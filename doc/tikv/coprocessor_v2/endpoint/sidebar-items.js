@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Endpoint","A pool to build and run Coprocessor request handlers."]]});
