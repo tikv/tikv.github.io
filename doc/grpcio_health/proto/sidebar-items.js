@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["HealthCheckResponseServingStatus",""],["ServingStatus",""]],"fn":[["create_health",""],["file_descriptor_proto",""]],"struct":[["HealthCheckRequest","Generated files are compatible only with the same version of protobuf runtime."],["HealthCheckResponse",""],["HealthClient",""]],"trait":[["Health",""]]});

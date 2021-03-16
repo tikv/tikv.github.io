@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["ServingStatus",""]],"fn":[["create_health",""]],"mod":[["proto",""]],"struct":[["HealthClient",""],["HealthService","Simple implementation for `Health` service."]]});
