@@ -56,6 +56,7 @@ implementors["smallvec"] = [{"text":"impl&lt;'a, T:&nbsp;'a + Array&gt; Drop for
 implementors["spin"] = [{"text":"impl&lt;'a, T:&nbsp;?Sized&gt; Drop for MutexGuard&lt;'a, T&gt;","synthetic":false,"types":[]},{"text":"impl&lt;'rwlock, T:&nbsp;?Sized&gt; Drop for RwLockReadGuard&lt;'rwlock, T&gt;","synthetic":false,"types":[]},{"text":"impl&lt;'rwlock, T:&nbsp;?Sized&gt; Drop for RwLockUpgradeableGuard&lt;'rwlock, T&gt;","synthetic":false,"types":[]},{"text":"impl&lt;'rwlock, T:&nbsp;?Sized&gt; Drop for RwLockWriteGuard&lt;'rwlock, T&gt;","synthetic":false,"types":[]}];
 implementors["sst_importer"] = [{"text":"impl Drop for ImportFile","synthetic":false,"types":[]}];
 implementors["str_stack"] = [{"text":"impl&lt;'a&gt; Drop for Writer&lt;'a&gt;","synthetic":false,"types":[]}];
+implementors["syn"] = [{"text":"impl&lt;'a&gt; Drop for ParseBuffer&lt;'a&gt;","synthetic":false,"types":[]}];
 implementors["sysinfo"] = [{"text":"impl Drop for Process","synthetic":false,"types":[]}];
 implementors["take_mut"] = [{"text":"impl&lt;'c, 'm, T:&nbsp;'m, F:&nbsp;FnOnce() -&gt; T&gt; Drop for Hole&lt;'c, 'm, T, F&gt;","synthetic":false,"types":[]}];
 implementors["tempfile"] = [{"text":"impl Drop for TempDir","synthetic":false,"types":[]},{"text":"impl Drop for TempPath","synthetic":false,"types":[]}];

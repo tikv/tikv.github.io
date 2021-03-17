@@ -37,6 +37,7 @@ implementors["ordered_float"] = [{"text":"impl Error for FloatIsNan","synthetic"
 implementors["pd_client"] = [{"text":"impl Error for Error","synthetic":false,"types":[]}];
 implementors["pnet_base"] = [{"text":"impl Error for ParseMacAddrErr","synthetic":false,"types":[]}];
 implementors["pprof"] = [{"text":"impl Error for Error","synthetic":false,"types":[]}];
+implementors["proc_macro2"] = [{"text":"impl Error for LexError","synthetic":false,"types":[]}];
 implementors["procfs"] = [{"text":"impl Error for ProcError","synthetic":false,"types":[]}];
 implementors["prometheus"] = [{"text":"impl Error for Error","synthetic":false,"types":[]}];
 implementors["prost"] = [{"text":"impl Error for DecodeError","synthetic":false,"types":[]},{"text":"impl Error for EncodeError","synthetic":false,"types":[]}];
@@ -65,7 +66,9 @@ implementors["serde_json"] = [{"text":"impl Error for Error","synthetic":false,"
 implementors["serde_urlencoded"] = [{"text":"impl Error for Error","synthetic":false,"types":[]}];
 implementors["slog"] = [{"text":"impl&lt;D&gt; Error for MutexDrainError&lt;D&gt; <span class=\"where fmt-newline\">where<br>&nbsp;&nbsp;&nbsp;&nbsp;D: Drain,<br>&nbsp;&nbsp;&nbsp;&nbsp;D::Err: Debug + Display + Error,&nbsp;</span>","synthetic":false,"types":[]},{"text":"impl Error for Error","synthetic":false,"types":[]}];
 implementors["sst_importer"] = [{"text":"impl Error for Error","synthetic":false,"types":[]}];
+implementors["strum"] = [{"text":"impl Error for ParseError","synthetic":false,"types":[]}];
 implementors["symbolic_common"] = [{"text":"impl Error for UnknownArchError","synthetic":false,"types":[]},{"text":"impl Error for UnknownLanguageError","synthetic":false,"types":[]}];
+implementors["syn"] = [{"text":"impl Error for Error","synthetic":false,"types":[]}];
 implementors["tame_gcs"] = [{"text":"impl Error for Error","synthetic":false,"types":[]},{"text":"impl Error for HttpError","synthetic":false,"types":[]},{"text":"impl Error for HttpStatusError","synthetic":false,"types":[]},{"text":"impl Error for IoError","synthetic":false,"types":[]},{"text":"impl Error for JsonError","synthetic":false,"types":[]},{"text":"impl Error for ApiError","synthetic":false,"types":[]}];
 implementors["tame_oauth"] = [{"text":"impl Error for Error","synthetic":false,"types":[]}];
 implementors["tempfile"] = [{"text":"impl Error for PathPersistError","synthetic":false,"types":[]},{"text":"impl Error for PersistError","synthetic":false,"types":[]}];
