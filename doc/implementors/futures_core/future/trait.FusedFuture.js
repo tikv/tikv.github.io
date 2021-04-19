@@ -1,4 +1,4 @@
 (function() {var implementors = {};
-implementors["async_speed_limit"] = [{"text":"impl&lt;C:&nbsp;Clock, R:&nbsp;Unpin&gt; FusedFuture for Consume&lt;C, R&gt;","synthetic":false,"types":[]}];
+implementors["async_speed_limit"] = [{"text":"impl&lt;C:&nbsp;<a class=\"trait\" href=\"async_speed_limit/clock/trait.Clock.html\" title=\"trait async_speed_limit::clock::Clock\">Clock</a>, R:&nbsp;<a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/marker/trait.Unpin.html\" title=\"trait core::marker::Unpin\">Unpin</a>&gt; <a class=\"trait\" href=\"futures_core/future/trait.FusedFuture.html\" title=\"trait futures_core::future::FusedFuture\">FusedFuture</a> for <a class=\"struct\" href=\"async_speed_limit/limiter/struct.Consume.html\" title=\"struct async_speed_limit::limiter::Consume\">Consume</a>&lt;C, R&gt;","synthetic":false,"types":["async_speed_limit::limiter::Consume"]}];
 implementors["futures_core"] = [];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

@@ -1,7 +1,7 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `components/test_storage/src/sync_storage.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>sync_storage.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `components/test_storage/src/sync_storage.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>sync_storage.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><script src="../../crates.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
 <link rel="alternate icon" type="image/png" href="../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../test_storage/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
-                <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../test_storage/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
+                <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
 <span id="2">  2</span>
 <span id="3">  3</span>
 <span id="4">  4</span>
@@ -379,18 +379,18 @@
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
-<span class="kw">use</span> <span class="ident">collections</span>::<span class="ident">HashMap</span>;
-<span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">executor</span>::<span class="ident">block_on</span>;
-<span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">kvrpcpb</span>::{<span class="ident">Context</span>, <span class="ident">GetRequest</span>, <span class="ident">LockInfo</span>};
-<span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">coprocessor</span>::<span class="ident">RegionInfoProvider</span>;
-<span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">router</span>::<span class="ident">RaftStoreBlackHole</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::{<span class="ident">atomic</span>::<span class="ident">AtomicU64</span>, <span class="ident">Arc</span>};
-<span class="kw">use</span> <span class="ident">tikv</span>::<span class="ident">server</span>::<span class="ident">gc_worker</span>::{<span class="ident">AutoGcConfig</span>, <span class="ident">GcConfig</span>, <span class="ident">GcSafePointProvider</span>, <span class="ident">GcWorker</span>};
-<span class="kw">use</span> <span class="ident">tikv</span>::<span class="ident">storage</span>::<span class="ident">config</span>::<span class="ident">Config</span>;
-<span class="kw">use</span> <span class="ident">tikv</span>::<span class="ident">storage</span>::<span class="ident">kv</span>::<span class="ident">RocksEngine</span>;
-<span class="kw">use</span> <span class="ident">tikv</span>::<span class="ident">storage</span>::<span class="ident">lock_manager</span>::<span class="ident">DummyLockManager</span>;
-<span class="kw">use</span> <span class="ident">tikv</span>::<span class="ident">storage</span>::{
-    <span class="ident">txn</span>::<span class="ident">commands</span>, <span class="ident">Engine</span>, <span class="ident">PerfStatisticsDelta</span>, <span class="ident">PrewriteResult</span>, <span class="prelude-ty">Result</span>, <span class="ident">Statistics</span>, <span class="ident">Storage</span>,
+<span class="kw">use</span> <span class="ident">collections::HashMap</span>;
+<span class="kw">use</span> <span class="ident">futures::executor::block_on</span>;
+<span class="kw">use</span> <span class="ident">kvproto::kvrpcpb</span>::{<span class="ident">Context</span>, <span class="ident">GetRequest</span>, <span class="ident">LockInfo</span>};
+<span class="kw">use</span> <span class="ident">raftstore::coprocessor::RegionInfoProvider</span>;
+<span class="kw">use</span> <span class="ident">raftstore::router::RaftStoreBlackHole</span>;
+<span class="kw">use</span> <span class="ident">std::sync</span>::{<span class="ident">atomic::AtomicU64</span>, <span class="ident">Arc</span>};
+<span class="kw">use</span> <span class="ident">tikv::server::gc_worker</span>::{<span class="ident">AutoGcConfig</span>, <span class="ident">GcConfig</span>, <span class="ident">GcSafePointProvider</span>, <span class="ident">GcWorker</span>};
+<span class="kw">use</span> <span class="ident">tikv::storage::config::Config</span>;
+<span class="kw">use</span> <span class="ident">tikv::storage::kv::RocksEngine</span>;
+<span class="kw">use</span> <span class="ident">tikv::storage::lock_manager::DummyLockManager</span>;
+<span class="kw">use</span> <span class="ident">tikv::storage</span>::{
+    <span class="ident">txn::commands</span>, <span class="ident">Engine</span>, <span class="ident">PerfStatisticsDelta</span>, <span class="ident">PrewriteResult</span>, <span class="prelude-ty">Result</span>, <span class="ident">Statistics</span>, <span class="ident">Storage</span>,
     <span class="ident">TestEngineBuilder</span>, <span class="ident">TestStorageBuilder</span>, <span class="ident">TxnStatus</span>,
 };
 <span class="kw">use</span> <span class="ident">txn_types</span>::{<span class="ident">Key</span>, <span class="ident">KvPair</span>, <span class="ident">Mutation</span>, <span class="ident">TimeStamp</span>, <span class="ident">Value</span>};
@@ -407,7 +407,7 @@
 <span class="kw">impl</span> <span class="ident">SyncTestStorageBuilder</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="self">Self</span> {
-            <span class="ident">engine</span>: <span class="ident">TestEngineBuilder</span>::<span class="ident">new</span>().<span class="ident">build</span>().<span class="ident">unwrap</span>(),
+            <span class="ident">engine</span>: <span class="ident">TestEngineBuilder::new</span>().<span class="ident">build</span>().<span class="ident">unwrap</span>(),
             <span class="ident">config</span>: <span class="prelude-val">None</span>,
             <span class="ident">gc_config</span>: <span class="prelude-val">None</span>,
         }
@@ -435,15 +435,15 @@
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">build</span>(<span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">SyncTestStorage</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">builder</span> <span class="op">=</span>
-            <span class="ident">TestStorageBuilder</span>::<span class="ident">from_engine_and_lock_mgr</span>(<span class="self">self</span>.<span class="ident">engine</span>.<span class="ident">clone</span>(), <span class="ident">DummyLockManager</span> {});
+            <span class="ident">TestStorageBuilder::from_engine_and_lock_mgr</span>(<span class="self">self</span>.<span class="ident">engine</span>.<span class="ident">clone</span>(), <span class="ident">DummyLockManager</span> {});
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">config</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">take</span>() {
             <span class="ident">builder</span> <span class="op">=</span> <span class="ident">builder</span>.<span class="ident">config</span>(<span class="ident">config</span>);
         }
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">gc_worker</span> <span class="op">=</span> <span class="ident">GcWorker</span>::<span class="ident">new</span>(
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">gc_worker</span> <span class="op">=</span> <span class="ident">GcWorker::new</span>(
             <span class="self">self</span>.<span class="ident">engine</span>,
             <span class="ident">RaftStoreBlackHole</span>,
             <span class="self">self</span>.<span class="ident">gc_config</span>.<span class="ident">unwrap_or_default</span>(),
-            <span class="ident">Default</span>::<span class="ident">default</span>(),
+            <span class="ident">Default::default</span>(),
         );
         <span class="ident">gc_worker</span>.<span class="ident">start</span>()<span class="question-mark">?</span>;
 
@@ -464,12 +464,12 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">Engine</span><span class="op">&gt;</span> <span class="ident">SyncTestStorage</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start_auto_gc</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">GcSafePointProvider</span>, <span class="ident">R</span>: <span class="ident">RegionInfoProvider</span><span class="op">&gt;</span>(
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start_auto_gc</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">GcSafePointProvider</span>, <span class="ident">R</span>: <span class="ident">RegionInfoProvider</span> <span class="op">+</span> <span class="ident">Clone</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
         <span class="ident">cfg</span>: <span class="ident">AutoGcConfig</span><span class="op">&lt;</span><span class="ident">S</span>, <span class="ident">R</span><span class="op">&gt;</span>,
     ) {
         <span class="self">self</span>.<span class="ident">gc_worker</span>
-            .<span class="ident">start_auto_gc</span>(<span class="ident">cfg</span>, <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">AtomicU64</span>::<span class="ident">new</span>(<span class="number">0</span>)))
+            .<span class="ident">start_auto_gc</span>(<span class="ident">cfg</span>, <span class="ident">Arc::new</span>(<span class="ident">AtomicU64::new</span>(<span class="number">0</span>)))
             .<span class="ident">unwrap</span>();
     }
 
@@ -500,7 +500,7 @@
         <span class="ident">block_on</span>(<span class="self">self</span>.<span class="ident">store</span>.<span class="ident">batch_get</span>(<span class="ident">ctx</span>, <span class="ident">keys</span>.<span class="ident">to_owned</span>(), <span class="ident">start_ts</span>.<span class="ident">into</span>()))
     }
 
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy</span>::<span class="ident">type_complexity</span>)]</span>
+    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::type_complexity</span>)]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">batch_get_command</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">ctx</span>: <span class="ident">Context</span>,
@@ -511,7 +511,7 @@
             .<span class="ident">to_owned</span>()
             .<span class="ident">into_iter</span>()
             .<span class="ident">map</span>(<span class="op">|</span><span class="ident">key</span><span class="op">|</span> {
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">GetRequest</span>::<span class="ident">default</span>();
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">GetRequest::default</span>();
                 <span class="ident">req</span>.<span class="ident">set_context</span>(<span class="ident">ctx</span>.<span class="ident">clone</span>());
                 <span class="ident">req</span>.<span class="ident">set_key</span>(<span class="ident">key</span>.<span class="ident">to_owned</span>());
                 <span class="ident">req</span>.<span class="ident">set_version</span>(<span class="ident">start_ts</span>);
@@ -519,7 +519,7 @@
             })
             .<span class="ident">collect</span>();
         <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">block_on</span>(<span class="self">self</span>.<span class="ident">store</span>.<span class="ident">batch_get_command</span>(<span class="ident">requests</span>))<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">values</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[];
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">values</span> <span class="op">=</span> <span class="macro">vec!</span>[];
 
         <span class="kw">for</span> <span class="ident">value</span> <span class="kw">in</span> <span class="ident">resp</span>.<span class="ident">into_iter</span>() {
             <span class="ident">values</span>.<span class="ident">push</span>(<span class="ident">value</span><span class="question-mark">?</span>);
@@ -576,8 +576,8 @@
         <span class="ident">primary</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
         <span class="ident">start_ts</span>: <span class="kw">impl</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">TimeStamp</span><span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">PrewriteResult</span><span class="op">&gt;</span> {
-        <span class="macro">wait_op</span><span class="macro">!</span>(<span class="op">|</span><span class="ident">cb</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">store</span>.<span class="ident">sched_txn_command</span>(
-            <span class="ident">commands</span>::<span class="ident">Prewrite</span>::<span class="ident">with_context</span>(<span class="ident">mutations</span>, <span class="ident">primary</span>, <span class="ident">start_ts</span>.<span class="ident">into</span>(), <span class="ident">ctx</span>),
+        <span class="macro">wait_op!</span>(<span class="op">|</span><span class="ident">cb</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">store</span>.<span class="ident">sched_txn_command</span>(
+            <span class="ident">commands::Prewrite::with_context</span>(<span class="ident">mutations</span>, <span class="ident">primary</span>, <span class="ident">start_ts</span>.<span class="ident">into</span>(), <span class="ident">ctx</span>),
             <span class="ident">cb</span>,
         ))
         .<span class="ident">unwrap</span>()
@@ -590,8 +590,8 @@
         <span class="ident">start_ts</span>: <span class="kw">impl</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">TimeStamp</span><span class="op">&gt;</span>,
         <span class="ident">commit_ts</span>: <span class="kw">impl</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">TimeStamp</span><span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">TxnStatus</span><span class="op">&gt;</span> {
-        <span class="macro">wait_op</span><span class="macro">!</span>(<span class="op">|</span><span class="ident">cb</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">store</span>.<span class="ident">sched_txn_command</span>(
-            <span class="ident">commands</span>::<span class="ident">Commit</span>::<span class="ident">new</span>(<span class="ident">keys</span>, <span class="ident">start_ts</span>.<span class="ident">into</span>(), <span class="ident">commit_ts</span>.<span class="ident">into</span>(), <span class="ident">ctx</span>),
+        <span class="macro">wait_op!</span>(<span class="op">|</span><span class="ident">cb</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">store</span>.<span class="ident">sched_txn_command</span>(
+            <span class="ident">commands::Commit::new</span>(<span class="ident">keys</span>, <span class="ident">start_ts</span>.<span class="ident">into</span>(), <span class="ident">commit_ts</span>.<span class="ident">into</span>(), <span class="ident">ctx</span>),
             <span class="ident">cb</span>,
         ))
         .<span class="ident">unwrap</span>()
@@ -604,8 +604,8 @@
         <span class="ident">start_ts</span>: <span class="kw">impl</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">TimeStamp</span><span class="op">&gt;</span>,
         <span class="ident">current_ts</span>: <span class="kw">impl</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">TimeStamp</span><span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="macro">wait_op</span><span class="macro">!</span>(<span class="op">|</span><span class="ident">cb</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">store</span>.<span class="ident">sched_txn_command</span>(
-            <span class="ident">commands</span>::<span class="ident">Cleanup</span>::<span class="ident">new</span>(<span class="ident">key</span>, <span class="ident">start_ts</span>.<span class="ident">into</span>(), <span class="ident">current_ts</span>.<span class="ident">into</span>(), <span class="ident">ctx</span>),
+        <span class="macro">wait_op!</span>(<span class="op">|</span><span class="ident">cb</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">store</span>.<span class="ident">sched_txn_command</span>(
+            <span class="ident">commands::Cleanup::new</span>(<span class="ident">key</span>, <span class="ident">start_ts</span>.<span class="ident">into</span>(), <span class="ident">current_ts</span>.<span class="ident">into</span>(), <span class="ident">ctx</span>),
             <span class="ident">cb</span>,
         ))
         .<span class="ident">unwrap</span>()
@@ -617,9 +617,9 @@
         <span class="ident">keys</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Key</span><span class="op">&gt;</span>,
         <span class="ident">start_ts</span>: <span class="kw">impl</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">TimeStamp</span><span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="macro">wait_op</span><span class="macro">!</span>(<span class="op">|</span><span class="ident">cb</span><span class="op">|</span> <span class="self">self</span>
+        <span class="macro">wait_op!</span>(<span class="op">|</span><span class="ident">cb</span><span class="op">|</span> <span class="self">self</span>
             .<span class="ident">store</span>
-            .<span class="ident">sched_txn_command</span>(<span class="ident">commands</span>::<span class="ident">Rollback</span>::<span class="ident">new</span>(<span class="ident">keys</span>, <span class="ident">start_ts</span>.<span class="ident">into</span>(), <span class="ident">ctx</span>), <span class="ident">cb</span>))
+            .<span class="ident">sched_txn_command</span>(<span class="ident">commands::Rollback::new</span>(<span class="ident">keys</span>, <span class="ident">start_ts</span>.<span class="ident">into</span>(), <span class="ident">ctx</span>), <span class="ident">cb</span>))
         .<span class="ident">unwrap</span>()
     }
 
@@ -643,13 +643,13 @@
         <span class="ident">start_ts</span>: <span class="kw">impl</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">TimeStamp</span><span class="op">&gt;</span>,
         <span class="ident">commit_ts</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw">impl</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">TimeStamp</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">txn_status</span> <span class="op">=</span> <span class="ident">HashMap</span>::<span class="ident">default</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">txn_status</span> <span class="op">=</span> <span class="ident">HashMap::default</span>();
         <span class="ident">txn_status</span>.<span class="ident">insert</span>(
             <span class="ident">start_ts</span>.<span class="ident">into</span>(),
-            <span class="ident">commit_ts</span>.<span class="ident">map</span>(<span class="ident">Into</span>::<span class="ident">into</span>).<span class="ident">unwrap_or_else</span>(<span class="ident">TimeStamp</span>::<span class="ident">zero</span>),
+            <span class="ident">commit_ts</span>.<span class="ident">map</span>(<span class="ident">Into::into</span>).<span class="ident">unwrap_or_else</span>(<span class="ident">TimeStamp::zero</span>),
         );
-        <span class="macro">wait_op</span><span class="macro">!</span>(<span class="op">|</span><span class="ident">cb</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">store</span>.<span class="ident">sched_txn_command</span>(
-            <span class="ident">commands</span>::<span class="ident">ResolveLockReadPhase</span>::<span class="ident">new</span>(<span class="ident">txn_status</span>, <span class="prelude-val">None</span>, <span class="ident">ctx</span>),
+        <span class="macro">wait_op!</span>(<span class="op">|</span><span class="ident">cb</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">store</span>.<span class="ident">sched_txn_command</span>(
+            <span class="ident">commands::ResolveLockReadPhase::new</span>(<span class="ident">txn_status</span>, <span class="prelude-val">None</span>, <span class="ident">ctx</span>),
             <span class="ident">cb</span>,
         ))
         .<span class="ident">unwrap</span>()
@@ -661,15 +661,15 @@
         <span class="ident">txns</span>: <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">TimeStamp</span>, <span class="ident">TimeStamp</span>)<span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">txn_status</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">TimeStamp</span>, <span class="ident">TimeStamp</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">txns</span>.<span class="ident">into_iter</span>().<span class="ident">collect</span>();
-        <span class="macro">wait_op</span><span class="macro">!</span>(<span class="op">|</span><span class="ident">cb</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">store</span>.<span class="ident">sched_txn_command</span>(
-            <span class="ident">commands</span>::<span class="ident">ResolveLockReadPhase</span>::<span class="ident">new</span>(<span class="ident">txn_status</span>, <span class="prelude-val">None</span>, <span class="ident">ctx</span>),
+        <span class="macro">wait_op!</span>(<span class="op">|</span><span class="ident">cb</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">store</span>.<span class="ident">sched_txn_command</span>(
+            <span class="ident">commands::ResolveLockReadPhase::new</span>(<span class="ident">txn_status</span>, <span class="prelude-val">None</span>, <span class="ident">ctx</span>),
             <span class="ident">cb</span>,
         ))
         .<span class="ident">unwrap</span>()
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">gc</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw">_</span>: <span class="ident">Context</span>, <span class="ident">safe_point</span>: <span class="kw">impl</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">TimeStamp</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="macro">wait_op</span><span class="macro">!</span>(<span class="op">|</span><span class="ident">cb</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">gc_worker</span>.<span class="ident">gc</span>(<span class="ident">safe_point</span>.<span class="ident">into</span>(), <span class="ident">cb</span>)).<span class="ident">unwrap</span>()
+        <span class="macro">wait_op!</span>(<span class="op">|</span><span class="ident">cb</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">gc_worker</span>.<span class="ident">gc</span>(<span class="ident">safe_point</span>.<span class="ident">into</span>(), <span class="ident">cb</span>)).<span class="ident">unwrap</span>()
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">raw_get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ctx</span>: <span class="ident">Context</span>, <span class="ident">cf</span>: <span class="ident">String</span>, <span class="ident">key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> {
@@ -677,11 +677,11 @@
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">raw_put</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ctx</span>: <span class="ident">Context</span>, <span class="ident">cf</span>: <span class="ident">String</span>, <span class="ident">key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>, <span class="ident">value</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="macro">wait_op</span><span class="macro">!</span>(<span class="op">|</span><span class="ident">cb</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">store</span>.<span class="ident">raw_put</span>(<span class="ident">ctx</span>, <span class="ident">cf</span>, <span class="ident">key</span>, <span class="ident">value</span>, <span class="number">0</span>, <span class="ident">cb</span>)).<span class="ident">unwrap</span>()
+        <span class="macro">wait_op!</span>(<span class="op">|</span><span class="ident">cb</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">store</span>.<span class="ident">raw_put</span>(<span class="ident">ctx</span>, <span class="ident">cf</span>, <span class="ident">key</span>, <span class="ident">value</span>, <span class="number">0</span>, <span class="ident">cb</span>)).<span class="ident">unwrap</span>()
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">raw_delete</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ctx</span>: <span class="ident">Context</span>, <span class="ident">cf</span>: <span class="ident">String</span>, <span class="ident">key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="macro">wait_op</span><span class="macro">!</span>(<span class="op">|</span><span class="ident">cb</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">store</span>.<span class="ident">raw_delete</span>(<span class="ident">ctx</span>, <span class="ident">cf</span>, <span class="ident">key</span>, <span class="ident">cb</span>)).<span class="ident">unwrap</span>()
+        <span class="macro">wait_op!</span>(<span class="op">|</span><span class="ident">cb</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">store</span>.<span class="ident">raw_delete</span>(<span class="ident">ctx</span>, <span class="ident">cf</span>, <span class="ident">key</span>, <span class="ident">cb</span>)).<span class="ident">unwrap</span>()
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">raw_scan</span>(
@@ -712,7 +712,7 @@
         )
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">raw_compare_and_set_atomic</span>(
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">raw_compare_and_swap_atomic</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">ctx</span>: <span class="ident">Context</span>,
         <span class="ident">cf</span>: <span class="ident">String</span>,
@@ -721,7 +721,7 @@
         <span class="ident">value</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
         <span class="ident">ttl</span>: <span class="ident">u64</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span>, <span class="ident">bool</span>)<span class="op">&gt;</span> {
-        <span class="macro">wait_op</span><span class="macro">!</span>(<span class="op">|</span><span class="ident">cb</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">store</span>.<span class="ident">raw_compare_and_set_atomic</span>(
+        <span class="macro">wait_op!</span>(<span class="op">|</span><span class="ident">cb</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">store</span>.<span class="ident">raw_compare_and_swap_atomic</span>(
             <span class="ident">ctx</span>,
             <span class="ident">cf</span>,
             <span class="ident">key</span>,
@@ -740,7 +740,7 @@
         <span class="ident">pairs</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">KvPair</span><span class="op">&gt;</span>,
         <span class="ident">ttl</span>: <span class="ident">u64</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="macro">wait_op</span><span class="macro">!</span>(<span class="op">|</span><span class="ident">cb</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">store</span>.<span class="ident">raw_batch_put_atomic</span>(<span class="ident">ctx</span>, <span class="ident">cf</span>, <span class="ident">pairs</span>, <span class="ident">ttl</span>, <span class="ident">cb</span>)).<span class="ident">unwrap</span>()
+        <span class="macro">wait_op!</span>(<span class="op">|</span><span class="ident">cb</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">store</span>.<span class="ident">raw_batch_put_atomic</span>(<span class="ident">ctx</span>, <span class="ident">cf</span>, <span class="ident">pairs</span>, <span class="ident">ttl</span>, <span class="ident">cb</span>)).<span class="ident">unwrap</span>()
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">raw_batch_delete_atomic</span>(
@@ -749,9 +749,9 @@
         <span class="ident">cf</span>: <span class="ident">String</span>,
         <span class="ident">keys</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="macro">wait_op</span><span class="macro">!</span>(<span class="op">|</span><span class="ident">cb</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">store</span>.<span class="ident">raw_batch_delete_atomic</span>(<span class="ident">ctx</span>, <span class="ident">cf</span>, <span class="ident">keys</span>, <span class="ident">cb</span>)).<span class="ident">unwrap</span>()
+        <span class="macro">wait_op!</span>(<span class="op">|</span><span class="ident">cb</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">store</span>.<span class="ident">raw_batch_delete_atomic</span>(<span class="ident">ctx</span>, <span class="ident">cf</span>, <span class="ident">keys</span>, <span class="ident">cb</span>)).<span class="ident">unwrap</span>()
     }
 }
 </pre></div>
-</section><section id="search" class="content hidden"></section><section class="footer"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="test_storage"></div>
-    <script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script><script defer src="../../search-index.js"></script></body></html>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="test_storage" data-search-js="../../search-index.js"></div>
+    <script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script></body></html>

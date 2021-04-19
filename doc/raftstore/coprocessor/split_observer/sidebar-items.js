@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["SplitObserver","`SplitObserver` adjusts the split key so that it won't separate the data of a row into two region. It adjusts the key according to the key format of `TiDB`."]],"type":[["Result",""]]});
+initSidebarItems({"struct":[["SplitObserver","`SplitObserver` adjusts the split key so that it won’t separate the data of a row into two region. It adjusts the key according to the key format of `TiDB`."]],"type":[["Result",""]]});

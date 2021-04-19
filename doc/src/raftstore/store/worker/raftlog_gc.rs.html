@@ -1,7 +1,7 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `components/raftstore/src/store/worker/raftlog_gc.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>raftlog_gc.rs - source</title><link rel="stylesheet" type="text/css" href="../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `components/raftstore/src/store/worker/raftlog_gc.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>raftlog_gc.rs - source</title><link rel="stylesheet" type="text/css" href="../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../../storage.js"></script><script src="../../../../crates.js"></script><noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg">
 <link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../../raftstore/index.html'><div class='logo-container rust-logo'><img src='../../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><script src="../../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
-                <a id="settings-menu" href="../../../../settings.html"><img src="../../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../../../raftstore/index.html'><div class='logo-container rust-logo'><img src='../../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
+                <a id="settings-menu" href="../../../../settings.html"><img src="../../../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
 <span id="2">  2</span>
 <span id="3">  3</span>
 <span id="4">  4</span>
@@ -256,22 +256,26 @@
 <span id="253">253</span>
 <span id="254">254</span>
 <span id="255">255</span>
+<span id="256">256</span>
+<span id="257">257</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">error</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">fmt</span>::{<span class="self">self</span>, <span class="ident">Display</span>, <span class="ident">Formatter</span>};
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">mpsc</span>::<span class="ident">Sender</span>;
+<span class="kw">use</span> <span class="ident">std::error</span>;
+<span class="kw">use</span> <span class="ident">std::fmt</span>::{<span class="self">self</span>, <span class="ident">Display</span>, <span class="ident">Formatter</span>};
+<span class="kw">use</span> <span class="ident">std::sync::mpsc::Sender</span>;
 
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::{<span class="ident">CasualMessage</span>, <span class="ident">CasualRouter</span>};
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::store</span>::{<span class="ident">CasualMessage</span>, <span class="ident">CasualRouter</span>};
 
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">Engines</span>, <span class="ident">KvEngine</span>, <span class="ident">RaftEngine</span>};
 <span class="kw">use</span> <span class="ident">file_system</span>::{<span class="ident">IOType</span>, <span class="ident">WithIOType</span>};
-<span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">time</span>::<span class="ident">Duration</span>;
-<span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">worker</span>::{<span class="ident">Runnable</span>, <span class="ident">RunnableWithTimer</span>};
+<span class="kw">use</span> <span class="ident">quick_error::quick_error</span>;
+<span class="kw">use</span> <span class="ident">tikv_util::time::Duration</span>;
+<span class="kw">use</span> <span class="ident">tikv_util::worker</span>::{<span class="ident">Runnable</span>, <span class="ident">RunnableWithTimer</span>};
+<span class="kw">use</span> <span class="ident">tikv_util</span>::{<span class="ident">box_try</span>, <span class="ident">debug</span>, <span class="ident">error</span>, <span class="ident">warn</span>};
 
 <span class="kw">const</span> <span class="ident">MAX_GC_REGION_BATCH</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">128</span>;
-<span class="kw">const</span> <span class="ident">COMPACT_LOG_INTERVAL</span>: <span class="ident">Duration</span> <span class="op">=</span> <span class="ident">Duration</span>::<span class="ident">from_secs</span>(<span class="number">60</span>);
+<span class="kw">const</span> <span class="ident">COMPACT_LOG_INTERVAL</span>: <span class="ident">Duration</span> <span class="op">=</span> <span class="ident">Duration::from_secs</span>(<span class="number">60</span>);
 
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Task</span> {
     <span class="ident">Gc</span> {
@@ -284,7 +288,7 @@
 
 <span class="kw">impl</span> <span class="ident">Task</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">gc</span>(<span class="ident">region_id</span>: <span class="ident">u64</span>, <span class="ident">start</span>: <span class="ident">u64</span>, <span class="ident">end</span>: <span class="ident">u64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="ident">Task</span>::<span class="ident">Gc</span> {
+        <span class="ident">Task::Gc</span> {
             <span class="ident">region_id</span>,
             <span class="ident">start_idx</span>: <span class="ident">start</span>,
             <span class="ident">end_idx</span>: <span class="ident">end</span>,
@@ -293,26 +297,26 @@
 }
 
 <span class="kw">impl</span> <span class="ident">Display</span> <span class="kw">for</span> <span class="ident">Task</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="prelude-ty">Result</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt::Result</span> {
         <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">Task</span>::<span class="ident">Gc</span> {
+            <span class="ident">Task::Gc</span> {
                 <span class="ident">region_id</span>,
                 <span class="ident">start_idx</span>,
                 <span class="ident">end_idx</span>,
-            } <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write</span><span class="macro">!</span>(
+            } <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write!</span>(
                 <span class="ident">f</span>,
                 <span class="string">&quot;GC Raft Logs [region: {}, from: {}, to: {}]&quot;</span>,
                 <span class="ident">region_id</span>, <span class="ident">start_idx</span>, <span class="ident">end_idx</span>
             ),
-            <span class="ident">Task</span>::<span class="ident">Purge</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;Purge Expired Files&quot;</span>,),
+            <span class="ident">Task::Purge</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;Purge Expired Files&quot;</span>,),
         }
     }
 }
 
-<span class="macro">quick_error</span><span class="macro">!</span> {
+<span class="macro">quick_error!</span> {
     <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
     <span class="kw">enum</span> <span class="ident">Error</span> {
-        <span class="ident">Other</span>(<span class="ident">err</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">error</span>::<span class="ident">Error</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span>) {
+        <span class="ident">Other</span>(<span class="ident">err</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">error::Error</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span>) {
             <span class="ident">from</span>()
             <span class="ident">cause</span>(<span class="ident">err</span>.<span class="ident">as_ref</span>())
             <span class="ident">display</span>(<span class="string">&quot;raftlog gc failed {:?}&quot;</span>, <span class="ident">err</span>)
@@ -332,7 +336,7 @@
         <span class="ident">Runner</span> {
             <span class="ident">ch</span>,
             <span class="ident">engines</span>,
-            <span class="ident">tasks</span>: <span class="macro">vec</span><span class="macro">!</span>[],
+            <span class="ident">tasks</span>: <span class="macro">vec!</span>[],
             <span class="ident">gc_entries</span>: <span class="prelude-val">None</span>,
         }
     }
@@ -344,7 +348,7 @@
         <span class="ident">start_idx</span>: <span class="ident">u64</span>,
         <span class="ident">end_idx</span>: <span class="ident">u64</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">deleted</span> <span class="op">=</span> <span class="macro">box_try</span><span class="macro">!</span>(<span class="self">self</span>.<span class="ident">engines</span>.<span class="ident">raft</span>.<span class="ident">gc</span>(<span class="ident">region_id</span>, <span class="ident">start_idx</span>, <span class="ident">end_idx</span>));
+        <span class="kw">let</span> <span class="ident">deleted</span> <span class="op">=</span> <span class="macro">box_try!</span>(<span class="self">self</span>.<span class="ident">engines</span>.<span class="ident">raft</span>.<span class="ident">gc</span>(<span class="ident">region_id</span>, <span class="ident">start_idx</span>, <span class="ident">end_idx</span>));
         <span class="prelude-val">Ok</span>(<span class="ident">deleted</span>)
     }
 
@@ -357,38 +361,38 @@
     <span class="kw">fn</span> <span class="ident">flush</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
         <span class="comment">// Sync wal of kv_db to make sure the data before apply_index has been persisted to disk.</span>
         <span class="self">self</span>.<span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">sync</span>().<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
-            <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;failed to sync kv_engine in raft_log_gc: {:?}&quot;</span>, <span class="ident">e</span>);
+            <span class="macro">panic!</span>(<span class="string">&quot;failed to sync kv_engine in raft_log_gc: {:?}&quot;</span>, <span class="ident">e</span>);
         });
-        <span class="kw">let</span> <span class="ident">tasks</span> <span class="op">=</span> <span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">replace</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">tasks</span>, <span class="macro">vec</span><span class="macro">!</span>[]);
+        <span class="kw">let</span> <span class="ident">tasks</span> <span class="op">=</span> <span class="ident">std::mem::take</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">tasks</span>);
         <span class="kw">for</span> <span class="ident">t</span> <span class="kw">in</span> <span class="ident">tasks</span> {
             <span class="kw">match</span> <span class="ident">t</span> {
-                <span class="ident">Task</span>::<span class="ident">Gc</span> {
+                <span class="ident">Task::Gc</span> {
                     <span class="ident">region_id</span>,
                     <span class="ident">start_idx</span>,
                     <span class="ident">end_idx</span>,
                 } <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;gc raft log&quot;</span>; <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>, <span class="string">&quot;end_index&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">end_idx</span>);
+                    <span class="macro">debug!</span>(<span class="string">&quot;gc raft log&quot;</span>; <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>, <span class="string">&quot;end_index&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">end_idx</span>);
                     <span class="kw">match</span> <span class="self">self</span>.<span class="ident">gc_raft_log</span>(<span class="ident">region_id</span>, <span class="ident">start_idx</span>, <span class="ident">end_idx</span>) {
                         <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                            <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;failed to gc&quot;</span>; <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>, <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>);
+                            <span class="macro">error!</span>(<span class="string">&quot;failed to gc&quot;</span>; <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>, <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>);
                             <span class="self">self</span>.<span class="ident">report_collected</span>(<span class="number">0</span>);
                         }
                         <span class="prelude-val">Ok</span>(<span class="ident">n</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                            <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;gc log entries&quot;</span>; <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>, <span class="string">&quot;entry_count&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">n</span>);
+                            <span class="macro">debug!</span>(<span class="string">&quot;gc log entries&quot;</span>; <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>, <span class="string">&quot;entry_count&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">n</span>);
                             <span class="self">self</span>.<span class="ident">report_collected</span>(<span class="ident">n</span>);
                         }
                     }
                 }
-                <span class="ident">Task</span>::<span class="ident">Purge</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="ident">Task::Purge</span> <span class="op">=</span><span class="op">&gt;</span> {
                     <span class="kw">let</span> <span class="ident">regions</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">engines</span>.<span class="ident">raft</span>.<span class="ident">purge_expired_files</span>() {
                         <span class="prelude-val">Ok</span>(<span class="ident">regions</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">regions</span>,
                         <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                            <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;purge expired files&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>);
+                            <span class="macro">warn!</span>(<span class="string">&quot;purge expired files&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>);
                             <span class="kw">return</span>;
                         }
                     };
                     <span class="kw">for</span> <span class="ident">region_id</span> <span class="kw">in</span> <span class="ident">regions</span> {
-                        <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">ch</span>.<span class="ident">send</span>(<span class="ident">region_id</span>, <span class="ident">CasualMessage</span>::<span class="ident">ForceCompactRaftLogs</span>);
+                        <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">ch</span>.<span class="ident">send</span>(<span class="ident">region_id</span>, <span class="ident">CasualMessage::ForceCompactRaftLogs</span>);
                     }
                 }
             }
@@ -405,7 +409,7 @@
     <span class="kw">type</span> <span class="ident">Task</span> <span class="op">=</span> <span class="ident">Task</span>;
 
     <span class="kw">fn</span> <span class="ident">run</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">task</span>: <span class="ident">Task</span>) {
-        <span class="kw">let</span> <span class="ident">_io_type_guard</span> <span class="op">=</span> <span class="ident">WithIOType</span>::<span class="ident">new</span>(<span class="ident">IOType</span>::<span class="ident">ForegroundWrite</span>);
+        <span class="kw">let</span> <span class="ident">_io_type_guard</span> <span class="op">=</span> <span class="ident">WithIOType::new</span>(<span class="ident">IOType::ForegroundWrite</span>);
         <span class="self">self</span>.<span class="ident">tasks</span>.<span class="ident">push</span>(<span class="ident">task</span>);
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">tasks</span>.<span class="ident">len</span>() <span class="op">&lt;</span> <span class="ident">MAX_GC_REGION_BATCH</span> {
             <span class="kw">return</span>;
@@ -437,52 +441,52 @@
 <span class="kw">mod</span> <span class="ident">tests</span> {
     <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
     <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">KvEngine</span>, <span class="ident">Mutable</span>, <span class="ident">WriteBatch</span>, <span class="ident">WriteBatchExt</span>, <span class="ident">ALL_CFS</span>, <span class="ident">CF_DEFAULT</span>};
-    <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">mpsc</span>;
-    <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">time</span>::<span class="ident">Duration</span>;
-    <span class="kw">use</span> <span class="ident">tempfile</span>::<span class="ident">Builder</span>;
+    <span class="kw">use</span> <span class="ident">std::sync::mpsc</span>;
+    <span class="kw">use</span> <span class="ident">std::time::Duration</span>;
+    <span class="kw">use</span> <span class="ident">tempfile::Builder</span>;
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_gc_raft_log</span>() {
-        <span class="kw">let</span> <span class="ident">dir</span> <span class="op">=</span> <span class="ident">Builder</span>::<span class="ident">new</span>().<span class="ident">prefix</span>(<span class="string">&quot;gc-raft-log-test&quot;</span>).<span class="ident">tempdir</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">dir</span> <span class="op">=</span> <span class="ident">Builder::new</span>().<span class="ident">prefix</span>(<span class="string">&quot;gc-raft-log-test&quot;</span>).<span class="ident">tempdir</span>().<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">path_raft</span> <span class="op">=</span> <span class="ident">dir</span>.<span class="ident">path</span>().<span class="ident">join</span>(<span class="string">&quot;raft&quot;</span>);
         <span class="kw">let</span> <span class="ident">path_kv</span> <span class="op">=</span> <span class="ident">dir</span>.<span class="ident">path</span>().<span class="ident">join</span>(<span class="string">&quot;kv&quot;</span>);
         <span class="kw">let</span> <span class="ident">raft_db</span> <span class="op">=</span>
-            <span class="ident">engine_test</span>::<span class="ident">raft</span>::<span class="ident">new_engine</span>(<span class="ident">path_kv</span>.<span class="ident">to_str</span>().<span class="ident">unwrap</span>(), <span class="prelude-val">None</span>, <span class="ident">CF_DEFAULT</span>, <span class="prelude-val">None</span>)
+            <span class="ident">engine_test::raft::new_engine</span>(<span class="ident">path_kv</span>.<span class="ident">to_str</span>().<span class="ident">unwrap</span>(), <span class="prelude-val">None</span>, <span class="ident">CF_DEFAULT</span>, <span class="prelude-val">None</span>)
                 .<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">kv_db</span> <span class="op">=</span>
-            <span class="ident">engine_test</span>::<span class="ident">kv</span>::<span class="ident">new_engine</span>(<span class="ident">path_raft</span>.<span class="ident">to_str</span>().<span class="ident">unwrap</span>(), <span class="prelude-val">None</span>, <span class="ident">ALL_CFS</span>, <span class="prelude-val">None</span>).<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">engines</span> <span class="op">=</span> <span class="ident">Engines</span>::<span class="ident">new</span>(<span class="ident">kv_db</span>, <span class="ident">raft_db</span>.<span class="ident">clone</span>());
+            <span class="ident">engine_test::kv::new_engine</span>(<span class="ident">path_raft</span>.<span class="ident">to_str</span>().<span class="ident">unwrap</span>(), <span class="prelude-val">None</span>, <span class="ident">ALL_CFS</span>, <span class="prelude-val">None</span>).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">engines</span> <span class="op">=</span> <span class="ident">Engines::new</span>(<span class="ident">kv_db</span>, <span class="ident">raft_db</span>.<span class="ident">clone</span>());
 
-        <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">mpsc</span>::<span class="ident">channel</span>();
-        <span class="kw">let</span> (<span class="ident">r</span>, <span class="kw">_</span>) <span class="op">=</span> <span class="ident">mpsc</span>::<span class="ident">sync_channel</span>(<span class="number">1</span>);
+        <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">mpsc::channel</span>();
+        <span class="kw">let</span> (<span class="ident">r</span>, <span class="kw">_</span>) <span class="op">=</span> <span class="ident">mpsc::sync_channel</span>(<span class="number">1</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">runner</span> <span class="op">=</span> <span class="ident">Runner</span> {
             <span class="ident">gc_entries</span>: <span class="prelude-val">Some</span>(<span class="ident">tx</span>),
             <span class="ident">engines</span>,
             <span class="ident">ch</span>: <span class="ident">r</span>,
-            <span class="ident">tasks</span>: <span class="macro">vec</span><span class="macro">!</span>[],
+            <span class="ident">tasks</span>: <span class="macro">vec!</span>[],
         };
 
         <span class="comment">// generate raft logs</span>
         <span class="kw">let</span> <span class="ident">region_id</span> <span class="op">=</span> <span class="number">1</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">raft_wb</span> <span class="op">=</span> <span class="ident">raft_db</span>.<span class="ident">write_batch</span>();
         <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="number">100</span> {
-            <span class="kw">let</span> <span class="ident">k</span> <span class="op">=</span> <span class="ident">keys</span>::<span class="ident">raft_log_key</span>(<span class="ident">region_id</span>, <span class="ident">i</span>);
+            <span class="kw">let</span> <span class="ident">k</span> <span class="op">=</span> <span class="ident">keys::raft_log_key</span>(<span class="ident">region_id</span>, <span class="ident">i</span>);
             <span class="ident">raft_wb</span>.<span class="ident">put</span>(<span class="kw-2">&amp;</span><span class="ident">k</span>, <span class="string">b&quot;entry&quot;</span>).<span class="ident">unwrap</span>();
         }
         <span class="ident">raft_wb</span>.<span class="ident">write</span>().<span class="ident">unwrap</span>();
 
-        <span class="kw">let</span> <span class="ident">tbls</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
-            (<span class="ident">Task</span>::<span class="ident">gc</span>(<span class="ident">region_id</span>, <span class="number">0</span>, <span class="number">10</span>), <span class="number">10</span>, (<span class="number">0</span>, <span class="number">10</span>), (<span class="number">10</span>, <span class="number">100</span>)),
-            (<span class="ident">Task</span>::<span class="ident">gc</span>(<span class="ident">region_id</span>, <span class="number">0</span>, <span class="number">50</span>), <span class="number">40</span>, (<span class="number">0</span>, <span class="number">50</span>), (<span class="number">50</span>, <span class="number">100</span>)),
-            (<span class="ident">Task</span>::<span class="ident">gc</span>(<span class="ident">region_id</span>, <span class="number">50</span>, <span class="number">50</span>), <span class="number">0</span>, (<span class="number">0</span>, <span class="number">50</span>), (<span class="number">50</span>, <span class="number">100</span>)),
-            (<span class="ident">Task</span>::<span class="ident">gc</span>(<span class="ident">region_id</span>, <span class="number">50</span>, <span class="number">60</span>), <span class="number">10</span>, (<span class="number">0</span>, <span class="number">60</span>), (<span class="number">60</span>, <span class="number">100</span>)),
+        <span class="kw">let</span> <span class="ident">tbls</span> <span class="op">=</span> <span class="macro">vec!</span>[
+            (<span class="ident">Task::gc</span>(<span class="ident">region_id</span>, <span class="number">0</span>, <span class="number">10</span>), <span class="number">10</span>, (<span class="number">0</span>, <span class="number">10</span>), (<span class="number">10</span>, <span class="number">100</span>)),
+            (<span class="ident">Task::gc</span>(<span class="ident">region_id</span>, <span class="number">0</span>, <span class="number">50</span>), <span class="number">40</span>, (<span class="number">0</span>, <span class="number">50</span>), (<span class="number">50</span>, <span class="number">100</span>)),
+            (<span class="ident">Task::gc</span>(<span class="ident">region_id</span>, <span class="number">50</span>, <span class="number">50</span>), <span class="number">0</span>, (<span class="number">0</span>, <span class="number">50</span>), (<span class="number">50</span>, <span class="number">100</span>)),
+            (<span class="ident">Task::gc</span>(<span class="ident">region_id</span>, <span class="number">50</span>, <span class="number">60</span>), <span class="number">10</span>, (<span class="number">0</span>, <span class="number">60</span>), (<span class="number">60</span>, <span class="number">100</span>)),
         ];
 
         <span class="kw">for</span> (<span class="ident">task</span>, <span class="ident">expected_collectd</span>, <span class="ident">not_exist_range</span>, <span class="ident">exist_range</span>) <span class="kw">in</span> <span class="ident">tbls</span> {
             <span class="ident">runner</span>.<span class="ident">run</span>(<span class="ident">task</span>);
             <span class="ident">runner</span>.<span class="ident">flush</span>();
-            <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">rx</span>.<span class="ident">recv_timeout</span>(<span class="ident">Duration</span>::<span class="ident">from_secs</span>(<span class="number">3</span>)).<span class="ident">unwrap</span>();
-            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">res</span>, <span class="ident">expected_collectd</span>);
+            <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">rx</span>.<span class="ident">recv_timeout</span>(<span class="ident">Duration::from_secs</span>(<span class="number">3</span>)).<span class="ident">unwrap</span>();
+            <span class="macro">assert_eq!</span>(<span class="ident">res</span>, <span class="ident">expected_collectd</span>);
             <span class="ident">raft_log_must_not_exist</span>(<span class="kw-2">&amp;</span><span class="ident">raft_db</span>, <span class="number">1</span>, <span class="ident">not_exist_range</span>.<span class="number">0</span>, <span class="ident">not_exist_range</span>.<span class="number">1</span>);
             <span class="ident">raft_log_must_exist</span>(<span class="kw-2">&amp;</span><span class="ident">raft_db</span>, <span class="number">1</span>, <span class="ident">exist_range</span>.<span class="number">0</span>, <span class="ident">exist_range</span>.<span class="number">1</span>);
         }
@@ -495,8 +499,8 @@
         <span class="ident">end_idx</span>: <span class="ident">u64</span>,
     ) {
         <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="ident">start_idx</span>..<span class="ident">end_idx</span> {
-            <span class="kw">let</span> <span class="ident">k</span> <span class="op">=</span> <span class="ident">keys</span>::<span class="ident">raft_log_key</span>(<span class="ident">region_id</span>, <span class="ident">i</span>);
-            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">raft_engine</span>.<span class="ident">get_value</span>(<span class="kw-2">&amp;</span><span class="ident">k</span>).<span class="ident">unwrap</span>().<span class="ident">is_none</span>());
+            <span class="kw">let</span> <span class="ident">k</span> <span class="op">=</span> <span class="ident">keys::raft_log_key</span>(<span class="ident">region_id</span>, <span class="ident">i</span>);
+            <span class="macro">assert!</span>(<span class="ident">raft_engine</span>.<span class="ident">get_value</span>(<span class="kw-2">&amp;</span><span class="ident">k</span>).<span class="ident">unwrap</span>().<span class="ident">is_none</span>());
         }
     }
 
@@ -507,11 +511,11 @@
         <span class="ident">end_idx</span>: <span class="ident">u64</span>,
     ) {
         <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="ident">start_idx</span>..<span class="ident">end_idx</span> {
-            <span class="kw">let</span> <span class="ident">k</span> <span class="op">=</span> <span class="ident">keys</span>::<span class="ident">raft_log_key</span>(<span class="ident">region_id</span>, <span class="ident">i</span>);
-            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">raft_engine</span>.<span class="ident">get_value</span>(<span class="kw-2">&amp;</span><span class="ident">k</span>).<span class="ident">unwrap</span>().<span class="ident">is_some</span>());
+            <span class="kw">let</span> <span class="ident">k</span> <span class="op">=</span> <span class="ident">keys::raft_log_key</span>(<span class="ident">region_id</span>, <span class="ident">i</span>);
+            <span class="macro">assert!</span>(<span class="ident">raft_engine</span>.<span class="ident">get_value</span>(<span class="kw-2">&amp;</span><span class="ident">k</span>).<span class="ident">unwrap</span>().<span class="ident">is_some</span>());
         }
     }
 }
 </pre></div>
-</section><section id="search" class="content hidden"></section><section class="footer"></section><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="raftstore"></div>
-    <script src="../../../../main.js"></script><script src="../../../../source-script.js"></script><script src="../../../../source-files.js"></script><script defer src="../../../../search-index.js"></script></body></html>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="raftstore" data-search-js="../../../../search-index.js"></div>
+    <script src="../../../../main.js"></script><script src="../../../../source-script.js"></script><script src="../../../../source-files.js"></script></body></html>

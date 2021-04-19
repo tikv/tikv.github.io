@@ -1,3 +1,3 @@
 (function() {var implementors = {};
-implementors["fuzz"] = [{"text":"impl StructOptInternal for Cli","synthetic":false,"types":[]}];
+implementors["fuzz"] = [{"text":"impl <a class=\"trait\" href=\"structopt/trait.StructOptInternal.html\" title=\"trait structopt::StructOptInternal\">StructOptInternal</a> for <a class=\"enum\" href=\"fuzz/enum.Cli.html\" title=\"enum fuzz::Cli\">Cli</a>","synthetic":false,"types":["fuzz::Cli"]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

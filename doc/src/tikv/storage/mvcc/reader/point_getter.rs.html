@@ -1,7 +1,7 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/storage/mvcc/reader/point_getter.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>point_getter.rs - source</title><link rel="stylesheet" type="text/css" href="../../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../../../favicon.svg">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/storage/mvcc/reader/point_getter.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>point_getter.rs - source</title><link rel="stylesheet" type="text/css" href="../../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../../../storage.js"></script><script src="../../../../../crates.js"></script><noscript><link rel="stylesheet" href="../../../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../../../favicon.svg">
 <link rel="alternate icon" type="image/png" href="../../../../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../../../tikv/index.html'><div class='logo-container rust-logo'><img src='../../../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><script src="../../../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
-                <a id="settings-menu" href="../../../../../settings.html"><img src="../../../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">   1</span>
+<link rel="alternate icon" type="image/png" href="../../../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../../../../tikv/index.html'><div class='logo-container rust-logo'><img src='../../../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
+                <a id="settings-menu" href="../../../../../settings.html"><img src="../../../../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">   1</span>
 <span id="2">   2</span>
 <span id="3">   3</span>
 <span id="4">   4</span>
@@ -1013,18 +1013,17 @@
 <span id="1010">1010</span>
 <span id="1011">1011</span>
 <span id="1012">1012</span>
-<span id="1013">1013</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
-<span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">kvrpcpb</span>::<span class="ident">IsolationLevel</span>;
+<span class="kw">use</span> <span class="ident">kvproto::kvrpcpb::IsolationLevel</span>;
 
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">CF_DEFAULT</span>, <span class="ident">CF_LOCK</span>, <span class="ident">CF_WRITE</span>};
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">borrow</span>::<span class="ident">Cow</span>;
+<span class="kw">use</span> <span class="ident">std::borrow::Cow</span>;
 <span class="kw">use</span> <span class="ident">txn_types</span>::{<span class="ident">Key</span>, <span class="ident">Lock</span>, <span class="ident">TimeStamp</span>, <span class="ident">TsSet</span>, <span class="ident">Value</span>, <span class="ident">WriteRef</span>, <span class="ident">WriteType</span>};
 
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">kv</span>::{<span class="ident">Cursor</span>, <span class="ident">CursorBuilder</span>, <span class="ident">ScanMode</span>, <span class="ident">Snapshot</span>, <span class="ident">Statistics</span>};
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">mvcc</span>::{<span class="ident">default_not_found_error</span>, <span class="ident">NewerTsCheckState</span>, <span class="prelude-ty">Result</span>};
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::storage::kv</span>::{<span class="ident">Cursor</span>, <span class="ident">CursorBuilder</span>, <span class="ident">ScanMode</span>, <span class="ident">Snapshot</span>, <span class="ident">Statistics</span>};
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::storage::mvcc</span>::{<span class="ident">default_not_found_error</span>, <span class="ident">NewerTsCheckState</span>, <span class="prelude-ty">Result</span>};
 
 <span class="doccomment">/// `PointGetter` factory.</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">PointGetterBuilder</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">Snapshot</span><span class="op">&gt;</span> {
@@ -1046,9 +1045,9 @@
             <span class="ident">multi</span>: <span class="bool-val">true</span>,
             <span class="ident">fill_cache</span>: <span class="bool-val">true</span>,
             <span class="ident">omit_value</span>: <span class="bool-val">false</span>,
-            <span class="ident">isolation_level</span>: <span class="ident">IsolationLevel</span>::<span class="ident">Si</span>,
+            <span class="ident">isolation_level</span>: <span class="ident">IsolationLevel::Si</span>,
             <span class="ident">ts</span>,
-            <span class="ident">bypass_locks</span>: <span class="ident">Default</span>::<span class="ident">default</span>(),
+            <span class="ident">bypass_locks</span>: <span class="ident">Default::default</span>(),
             <span class="ident">check_has_newer_ts_data</span>: <span class="bool-val">false</span>,
         }
     }
@@ -1114,13 +1113,13 @@
     <span class="doccomment">/// Build `PointGetter` from the current configuration.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">build</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">PointGetter</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="comment">// If we only want to get single value, we can use prefix seek.</span>
-        <span class="kw">let</span> <span class="ident">write_cursor</span> <span class="op">=</span> <span class="ident">CursorBuilder</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">snapshot</span>, <span class="ident">CF_WRITE</span>)
+        <span class="kw">let</span> <span class="ident">write_cursor</span> <span class="op">=</span> <span class="ident">CursorBuilder::new</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">snapshot</span>, <span class="ident">CF_WRITE</span>)
             .<span class="ident">fill_cache</span>(<span class="self">self</span>.<span class="ident">fill_cache</span>)
             .<span class="ident">prefix_seek</span>(<span class="bool-val">true</span>)
             .<span class="ident">scan_mode</span>(<span class="kw">if</span> <span class="self">self</span>.<span class="ident">multi</span> {
-                <span class="ident">ScanMode</span>::<span class="ident">Mixed</span>
+                <span class="ident">ScanMode::Mixed</span>
             } <span class="kw">else</span> {
-                <span class="ident">ScanMode</span>::<span class="ident">Forward</span>
+                <span class="ident">ScanMode::Forward</span>
             })
             .<span class="ident">build</span>()<span class="question-mark">?</span>;
 
@@ -1132,12 +1131,12 @@
             <span class="ident">ts</span>: <span class="self">self</span>.<span class="ident">ts</span>,
             <span class="ident">bypass_locks</span>: <span class="self">self</span>.<span class="ident">bypass_locks</span>,
             <span class="ident">met_newer_ts_data</span>: <span class="kw">if</span> <span class="self">self</span>.<span class="ident">check_has_newer_ts_data</span> {
-                <span class="ident">NewerTsCheckState</span>::<span class="ident">NotMetYet</span>
+                <span class="ident">NewerTsCheckState::NotMetYet</span>
             } <span class="kw">else</span> {
-                <span class="ident">NewerTsCheckState</span>::<span class="ident">Unknown</span>
+                <span class="ident">NewerTsCheckState::Unknown</span>
             },
 
-            <span class="ident">statistics</span>: <span class="ident">Statistics</span>::<span class="ident">default</span>(),
+            <span class="ident">statistics</span>: <span class="ident">Statistics::default</span>(),
 
             <span class="ident">write_cursor</span>,
 
@@ -1161,7 +1160,7 @@
 
     <span class="ident">statistics</span>: <span class="ident">Statistics</span>,
 
-    <span class="ident">write_cursor</span>: <span class="ident">Cursor</span><span class="op">&lt;</span><span class="ident">S</span>::<span class="ident">Iter</span><span class="op">&gt;</span>,
+    <span class="ident">write_cursor</span>: <span class="ident">Cursor</span><span class="op">&lt;</span><span class="ident">S::Iter</span><span class="op">&gt;</span>,
 
     <span class="doccomment">/// Indicating whether or not this structure can serve more requests. It is meaningful only</span>
     <span class="doccomment">/// when `multi == false`, to protect from producing undefined values when trying to get</span>
@@ -1173,7 +1172,7 @@
     <span class="doccomment">/// Take out and reset the statistics collected so far.</span>
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">take_statistics</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Statistics</span> {
-        <span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">take</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">statistics</span>)
+        <span class="ident">std::mem::take</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">statistics</span>)
     }
 
     <span class="doccomment">/// Whether we met newer ts data.</span>
@@ -1197,11 +1196,11 @@
         }
 
         <span class="kw">match</span> <span class="self">self</span>.<span class="ident">isolation_level</span> {
-            <span class="ident">IsolationLevel</span>::<span class="ident">Si</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">IsolationLevel::Si</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="comment">// Check for locks that signal concurrent writes in Si.</span>
                 <span class="self">self</span>.<span class="ident">load_and_check_lock</span>(<span class="ident">user_key</span>)<span class="question-mark">?</span>;
             }
-            <span class="ident">IsolationLevel</span>::<span class="ident">Rc</span> <span class="op">=</span><span class="op">&gt;</span> {}
+            <span class="ident">IsolationLevel::Rc</span> <span class="op">=</span><span class="op">&gt;</span> {}
         }
 
         <span class="self">self</span>.<span class="ident">load_data</span>(<span class="ident">user_key</span>)
@@ -1218,12 +1217,12 @@
         <span class="kw">let</span> <span class="ident">lock_value</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">snapshot</span>.<span class="ident">get_cf</span>(<span class="ident">CF_LOCK</span>, <span class="ident">user_key</span>)<span class="question-mark">?</span>;
 
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">lock_value</span>) <span class="op">=</span> <span class="ident">lock_value</span> {
-            <span class="kw">let</span> <span class="ident">lock</span> <span class="op">=</span> <span class="ident">Lock</span>::<span class="ident">parse</span>(<span class="ident">lock_value</span>)<span class="question-mark">?</span>;
-            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">met_newer_ts_data</span> <span class="op">=</span><span class="op">=</span> <span class="ident">NewerTsCheckState</span>::<span class="ident">NotMetYet</span> {
-                <span class="self">self</span>.<span class="ident">met_newer_ts_data</span> <span class="op">=</span> <span class="ident">NewerTsCheckState</span>::<span class="ident">Met</span>;
+            <span class="kw">let</span> <span class="ident">lock</span> <span class="op">=</span> <span class="ident">Lock::parse</span>(<span class="ident">lock_value</span>)<span class="question-mark">?</span>;
+            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">met_newer_ts_data</span> <span class="op">=</span><span class="op">=</span> <span class="ident">NewerTsCheckState::NotMetYet</span> {
+                <span class="self">self</span>.<span class="ident">met_newer_ts_data</span> <span class="op">=</span> <span class="ident">NewerTsCheckState::Met</span>;
             }
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span>
-                <span class="ident">Lock</span>::<span class="ident">check_ts_conflict</span>(<span class="ident">Cow</span>::<span class="ident">Owned</span>(<span class="ident">lock</span>), <span class="ident">user_key</span>, <span class="self">self</span>.<span class="ident">ts</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">bypass_locks</span>)
+                <span class="ident">Lock::check_ts_conflict</span>(<span class="ident">Cow::Owned</span>(<span class="ident">lock</span>), <span class="ident">user_key</span>, <span class="self">self</span>.<span class="ident">ts</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">bypass_locks</span>)
             {
                 <span class="self">self</span>.<span class="ident">statistics</span>.<span class="ident">lock</span>.<span class="ident">processed_keys</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
                 <span class="prelude-val">Err</span>(<span class="ident">e</span>.<span class="ident">into</span>())
@@ -1243,8 +1242,8 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">use_near_seek</span> <span class="op">=</span> <span class="bool-val">false</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">seek_key</span> <span class="op">=</span> <span class="ident">user_key</span>.<span class="ident">clone</span>();
 
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">met_newer_ts_data</span> <span class="op">=</span><span class="op">=</span> <span class="ident">NewerTsCheckState</span>::<span class="ident">NotMetYet</span> {
-            <span class="ident">seek_key</span> <span class="op">=</span> <span class="ident">seek_key</span>.<span class="ident">append_ts</span>(<span class="ident">TimeStamp</span>::<span class="ident">max</span>());
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">met_newer_ts_data</span> <span class="op">=</span><span class="op">=</span> <span class="ident">NewerTsCheckState::NotMetYet</span> {
+            <span class="ident">seek_key</span> <span class="op">=</span> <span class="ident">seek_key</span>.<span class="ident">append_ts</span>(<span class="ident">TimeStamp::max</span>());
             <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>
                 .<span class="ident">write_cursor</span>
                 .<span class="ident">seek</span>(<span class="kw-2">&amp;</span><span class="ident">seek_key</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">statistics</span>.<span class="ident">write</span>)<span class="question-mark">?</span>
@@ -1255,11 +1254,11 @@
             <span class="ident">use_near_seek</span> <span class="op">=</span> <span class="bool-val">true</span>;
 
             <span class="kw">let</span> <span class="ident">cursor_key</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">write_cursor</span>.<span class="ident">key</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">statistics</span>.<span class="ident">write</span>);
-            <span class="kw">if</span> <span class="op">!</span><span class="ident">Key</span>::<span class="ident">is_user_key_eq</span>(<span class="ident">cursor_key</span>, <span class="ident">user_key</span>.<span class="ident">as_encoded</span>().<span class="ident">as_slice</span>()) {
+            <span class="kw">if</span> <span class="op">!</span><span class="ident">Key::is_user_key_eq</span>(<span class="ident">cursor_key</span>, <span class="ident">user_key</span>.<span class="ident">as_encoded</span>().<span class="ident">as_slice</span>()) {
                 <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>);
             }
-            <span class="kw">if</span> <span class="ident">Key</span>::<span class="ident">decode_ts_from</span>(<span class="ident">cursor_key</span>)<span class="question-mark">?</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">ts</span> {
-                <span class="self">self</span>.<span class="ident">met_newer_ts_data</span> <span class="op">=</span> <span class="ident">NewerTsCheckState</span>::<span class="ident">Met</span>;
+            <span class="kw">if</span> <span class="ident">Key::decode_ts_from</span>(<span class="ident">cursor_key</span>)<span class="question-mark">?</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">ts</span> {
+                <span class="self">self</span>.<span class="ident">met_newer_ts_data</span> <span class="op">=</span> <span class="ident">NewerTsCheckState::Met</span>;
             }
         }
 
@@ -1287,23 +1286,23 @@
             <span class="comment">// We may seek to another key. In this case, it means we cannot find the specified key.</span>
             {
                 <span class="kw">let</span> <span class="ident">cursor_key</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">write_cursor</span>.<span class="ident">key</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">statistics</span>.<span class="ident">write</span>);
-                <span class="kw">if</span> <span class="op">!</span><span class="ident">Key</span>::<span class="ident">is_user_key_eq</span>(<span class="ident">cursor_key</span>, <span class="ident">user_key</span>.<span class="ident">as_encoded</span>().<span class="ident">as_slice</span>()) {
+                <span class="kw">if</span> <span class="op">!</span><span class="ident">Key::is_user_key_eq</span>(<span class="ident">cursor_key</span>, <span class="ident">user_key</span>.<span class="ident">as_encoded</span>().<span class="ident">as_slice</span>()) {
                     <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>);
                 }
             }
 
-            <span class="kw">let</span> <span class="ident">write</span> <span class="op">=</span> <span class="ident">WriteRef</span>::<span class="ident">parse</span>(<span class="self">self</span>.<span class="ident">write_cursor</span>.<span class="ident">value</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">statistics</span>.<span class="ident">write</span>))<span class="question-mark">?</span>;
+            <span class="kw">let</span> <span class="ident">write</span> <span class="op">=</span> <span class="ident">WriteRef::parse</span>(<span class="self">self</span>.<span class="ident">write_cursor</span>.<span class="ident">value</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">statistics</span>.<span class="ident">write</span>))<span class="question-mark">?</span>;
 
             <span class="kw">if</span> <span class="op">!</span><span class="ident">write</span>.<span class="ident">check_gc_fence_as_latest_version</span>(<span class="self">self</span>.<span class="ident">ts</span>) {
                 <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>);
             }
 
             <span class="kw">match</span> <span class="ident">write</span>.<span class="ident">write_type</span> {
-                <span class="ident">WriteType</span>::<span class="ident">Put</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="ident">WriteType::Put</span> <span class="op">=</span><span class="op">&gt;</span> {
                     <span class="self">self</span>.<span class="ident">statistics</span>.<span class="ident">write</span>.<span class="ident">processed_keys</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
 
                     <span class="kw">if</span> <span class="self">self</span>.<span class="ident">omit_value</span> {
-                        <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="macro">vec</span><span class="macro">!</span>[]));
+                        <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="macro">vec!</span>[]));
                     }
                     <span class="kw">match</span> <span class="ident">write</span>.<span class="ident">short_value</span> {
                         <span class="prelude-val">Some</span>(<span class="ident">value</span>) <span class="op">=</span><span class="op">&gt;</span> {
@@ -1316,10 +1315,10 @@
                         }
                     }
                 }
-                <span class="ident">WriteType</span>::<span class="ident">Delete</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="ident">WriteType::Delete</span> <span class="op">=</span><span class="op">&gt;</span> {
                     <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>);
                 }
-                <span class="ident">WriteType</span>::<span class="ident">Lock</span> <span class="op">|</span> <span class="ident">WriteType</span>::<span class="ident">Rollback</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="ident">WriteType::Lock</span> <span class="op">|</span> <span class="ident">WriteType::Rollback</span> <span class="op">=</span><span class="op">&gt;</span> {
                     <span class="comment">// Continue iterate next `write`.</span>
                 }
             }
@@ -1340,7 +1339,6 @@
         <span class="ident">write_start_ts</span>: <span class="ident">TimeStamp</span>,
         <span class="ident">user_key</span>: <span class="kw-2">&amp;</span><span class="ident">Key</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span> {
-        <span class="comment">// TODO: Not necessary to receive a `Write`.</span>
         <span class="self">self</span>.<span class="ident">statistics</span>.<span class="ident">data</span>.<span class="ident">get</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
         <span class="comment">// TODO: We can avoid this clone.</span>
         <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="self">self</span>
@@ -1363,41 +1361,41 @@
 <span class="kw">mod</span> <span class="ident">tests</span> {
     <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 
-    <span class="kw">use</span> <span class="ident">txn_types</span>::<span class="ident">SHORT_VALUE_MAX_LEN</span>;
+    <span class="kw">use</span> <span class="ident">txn_types::SHORT_VALUE_MAX_LEN</span>;
 
-    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">kv</span>::{
+    <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::storage::kv</span>::{
         <span class="ident">CfStatistics</span>, <span class="ident">Engine</span>, <span class="ident">PerfStatisticsInstant</span>, <span class="ident">RocksEngine</span>, <span class="ident">TestEngineBuilder</span>,
     };
-    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::<span class="ident">txn</span>::<span class="ident">tests</span>::{
+    <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::storage::txn::tests</span>::{
         <span class="ident">must_acquire_pessimistic_lock</span>, <span class="ident">must_cleanup_with_gc_fence</span>, <span class="ident">must_commit</span>, <span class="ident">must_gc</span>,
         <span class="ident">must_pessimistic_prewrite_delete</span>, <span class="ident">must_prewrite_delete</span>, <span class="ident">must_prewrite_lock</span>,
         <span class="ident">must_prewrite_put</span>, <span class="ident">must_rollback</span>,
     };
 
-    <span class="kw">fn</span> <span class="ident">new_multi_point_getter</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">Engine</span><span class="op">&gt;</span>(<span class="ident">engine</span>: <span class="kw-2">&amp;</span><span class="ident">E</span>, <span class="ident">ts</span>: <span class="ident">TimeStamp</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PointGetter</span><span class="op">&lt;</span><span class="ident">E</span>::<span class="ident">Snap</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="ident">Default</span>::<span class="ident">default</span>()).<span class="ident">unwrap</span>();
-        <span class="ident">PointGetterBuilder</span>::<span class="ident">new</span>(<span class="ident">snapshot</span>, <span class="ident">ts</span>)
-            .<span class="ident">isolation_level</span>(<span class="ident">IsolationLevel</span>::<span class="ident">Si</span>)
+    <span class="kw">fn</span> <span class="ident">new_multi_point_getter</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">Engine</span><span class="op">&gt;</span>(<span class="ident">engine</span>: <span class="kw-2">&amp;</span><span class="ident">E</span>, <span class="ident">ts</span>: <span class="ident">TimeStamp</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PointGetter</span><span class="op">&lt;</span><span class="ident">E::Snap</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="ident">Default::default</span>()).<span class="ident">unwrap</span>();
+        <span class="ident">PointGetterBuilder::new</span>(<span class="ident">snapshot</span>, <span class="ident">ts</span>)
+            .<span class="ident">isolation_level</span>(<span class="ident">IsolationLevel::Si</span>)
             .<span class="ident">build</span>()
             .<span class="ident">unwrap</span>()
     }
 
-    <span class="kw">fn</span> <span class="ident">new_single_point_getter</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">Engine</span><span class="op">&gt;</span>(<span class="ident">engine</span>: <span class="kw-2">&amp;</span><span class="ident">E</span>, <span class="ident">ts</span>: <span class="ident">TimeStamp</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PointGetter</span><span class="op">&lt;</span><span class="ident">E</span>::<span class="ident">Snap</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="ident">Default</span>::<span class="ident">default</span>()).<span class="ident">unwrap</span>();
-        <span class="ident">PointGetterBuilder</span>::<span class="ident">new</span>(<span class="ident">snapshot</span>, <span class="ident">ts</span>)
-            .<span class="ident">isolation_level</span>(<span class="ident">IsolationLevel</span>::<span class="ident">Si</span>)
+    <span class="kw">fn</span> <span class="ident">new_single_point_getter</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">Engine</span><span class="op">&gt;</span>(<span class="ident">engine</span>: <span class="kw-2">&amp;</span><span class="ident">E</span>, <span class="ident">ts</span>: <span class="ident">TimeStamp</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PointGetter</span><span class="op">&lt;</span><span class="ident">E::Snap</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="ident">Default::default</span>()).<span class="ident">unwrap</span>();
+        <span class="ident">PointGetterBuilder::new</span>(<span class="ident">snapshot</span>, <span class="ident">ts</span>)
+            .<span class="ident">isolation_level</span>(<span class="ident">IsolationLevel::Si</span>)
             .<span class="ident">multi</span>(<span class="bool-val">false</span>)
             .<span class="ident">build</span>()
             .<span class="ident">unwrap</span>()
     }
 
     <span class="kw">fn</span> <span class="ident">must_get_key</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">Snapshot</span><span class="op">&gt;</span>(<span class="ident">point_getter</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">PointGetter</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>, <span class="ident">key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) {
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">point_getter</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">Key</span>::<span class="ident">from_raw</span>(<span class="ident">key</span>)).<span class="ident">unwrap</span>().<span class="ident">is_some</span>());
+        <span class="macro">assert!</span>(<span class="ident">point_getter</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">Key::from_raw</span>(<span class="ident">key</span>)).<span class="ident">unwrap</span>().<span class="ident">is_some</span>());
     }
 
     <span class="kw">fn</span> <span class="ident">must_get_value</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">Snapshot</span><span class="op">&gt;</span>(<span class="ident">point_getter</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">PointGetter</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>, <span class="ident">key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">prefix</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) {
-        <span class="kw">let</span> <span class="ident">val</span> <span class="op">=</span> <span class="ident">point_getter</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">Key</span>::<span class="ident">from_raw</span>(<span class="ident">key</span>)).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>();
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">val</span>.<span class="ident">starts_with</span>(<span class="ident">prefix</span>));
+        <span class="kw">let</span> <span class="ident">val</span> <span class="op">=</span> <span class="ident">point_getter</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">Key::from_raw</span>(<span class="ident">key</span>)).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>();
+        <span class="macro">assert!</span>(<span class="ident">val</span>.<span class="ident">starts_with</span>(<span class="ident">prefix</span>));
     }
 
     <span class="kw">fn</span> <span class="ident">must_met_newer_ts_data</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">Engine</span><span class="op">&gt;</span>(
@@ -1407,52 +1405,52 @@
         <span class="ident">value</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>],
         <span class="ident">expected_met_newer_ts_data</span>: <span class="ident">bool</span>,
     ) {
-        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="ident">Default</span>::<span class="ident">default</span>()).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="ident">Default::default</span>()).<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">ts</span> <span class="op">=</span> <span class="ident">getter_ts</span>.<span class="ident">into</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">point_getter</span> <span class="op">=</span> <span class="ident">PointGetterBuilder</span>::<span class="ident">new</span>(<span class="ident">snapshot</span>.<span class="ident">clone</span>(), <span class="ident">ts</span>)
-            .<span class="ident">isolation_level</span>(<span class="ident">IsolationLevel</span>::<span class="ident">Si</span>)
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">point_getter</span> <span class="op">=</span> <span class="ident">PointGetterBuilder::new</span>(<span class="ident">snapshot</span>.<span class="ident">clone</span>(), <span class="ident">ts</span>)
+            .<span class="ident">isolation_level</span>(<span class="ident">IsolationLevel::Si</span>)
             .<span class="ident">check_has_newer_ts_data</span>(<span class="bool-val">true</span>)
             .<span class="ident">build</span>()
             .<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">val</span> <span class="op">=</span> <span class="ident">point_getter</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">Key</span>::<span class="ident">from_raw</span>(<span class="ident">key</span>)).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>();
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">val</span>, <span class="ident">value</span>);
+        <span class="kw">let</span> <span class="ident">val</span> <span class="op">=</span> <span class="ident">point_getter</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">Key::from_raw</span>(<span class="ident">key</span>)).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>();
+        <span class="macro">assert_eq!</span>(<span class="ident">val</span>, <span class="ident">value</span>);
         <span class="kw">let</span> <span class="ident">expected</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">expected_met_newer_ts_data</span> {
-            <span class="ident">NewerTsCheckState</span>::<span class="ident">Met</span>
+            <span class="ident">NewerTsCheckState::Met</span>
         } <span class="kw">else</span> {
-            <span class="ident">NewerTsCheckState</span>::<span class="ident">NotMetYet</span>
+            <span class="ident">NewerTsCheckState::NotMetYet</span>
         };
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">expected</span>, <span class="ident">point_getter</span>.<span class="ident">met_newer_ts_data</span>());
+        <span class="macro">assert_eq!</span>(<span class="ident">expected</span>, <span class="ident">point_getter</span>.<span class="ident">met_newer_ts_data</span>());
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">point_getter</span> <span class="op">=</span> <span class="ident">PointGetterBuilder</span>::<span class="ident">new</span>(<span class="ident">snapshot</span>, <span class="ident">ts</span>)
-            .<span class="ident">isolation_level</span>(<span class="ident">IsolationLevel</span>::<span class="ident">Si</span>)
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">point_getter</span> <span class="op">=</span> <span class="ident">PointGetterBuilder::new</span>(<span class="ident">snapshot</span>, <span class="ident">ts</span>)
+            .<span class="ident">isolation_level</span>(<span class="ident">IsolationLevel::Si</span>)
             .<span class="ident">check_has_newer_ts_data</span>(<span class="bool-val">false</span>)
             .<span class="ident">build</span>()
             .<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">val</span> <span class="op">=</span> <span class="ident">point_getter</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">Key</span>::<span class="ident">from_raw</span>(<span class="ident">key</span>)).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>();
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">val</span>, <span class="ident">value</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">NewerTsCheckState</span>::<span class="ident">Unknown</span>, <span class="ident">point_getter</span>.<span class="ident">met_newer_ts_data</span>());
+        <span class="kw">let</span> <span class="ident">val</span> <span class="op">=</span> <span class="ident">point_getter</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">Key::from_raw</span>(<span class="ident">key</span>)).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>();
+        <span class="macro">assert_eq!</span>(<span class="ident">val</span>, <span class="ident">value</span>);
+        <span class="macro">assert_eq!</span>(<span class="ident">NewerTsCheckState::Unknown</span>, <span class="ident">point_getter</span>.<span class="ident">met_newer_ts_data</span>());
     }
 
     <span class="kw">fn</span> <span class="ident">must_get_none</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">Snapshot</span><span class="op">&gt;</span>(<span class="ident">point_getter</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">PointGetter</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>, <span class="ident">key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) {
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">point_getter</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">Key</span>::<span class="ident">from_raw</span>(<span class="ident">key</span>)).<span class="ident">unwrap</span>().<span class="ident">is_none</span>());
+        <span class="macro">assert!</span>(<span class="ident">point_getter</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">Key::from_raw</span>(<span class="ident">key</span>)).<span class="ident">unwrap</span>().<span class="ident">is_none</span>());
     }
 
     <span class="kw">fn</span> <span class="ident">must_get_err</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">Snapshot</span><span class="op">&gt;</span>(<span class="ident">point_getter</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">PointGetter</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>, <span class="ident">key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) {
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">point_getter</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">Key</span>::<span class="ident">from_raw</span>(<span class="ident">key</span>)).<span class="ident">is_err</span>());
+        <span class="macro">assert!</span>(<span class="ident">point_getter</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">Key::from_raw</span>(<span class="ident">key</span>)).<span class="ident">is_err</span>());
     }
 
     <span class="kw">fn</span> <span class="ident">assert_seek_next_prev</span>(<span class="ident">stat</span>: <span class="kw-2">&amp;</span><span class="ident">CfStatistics</span>, <span class="ident">seek</span>: <span class="ident">usize</span>, <span class="ident">next</span>: <span class="ident">usize</span>, <span class="ident">prev</span>: <span class="ident">usize</span>) {
-        <span class="macro">assert_eq</span><span class="macro">!</span>(
+        <span class="macro">assert_eq!</span>(
             <span class="ident">stat</span>.<span class="ident">seek</span>, <span class="ident">seek</span>,
             <span class="string">&quot;expect seek to be {}, got {}&quot;</span>,
             <span class="ident">seek</span>, <span class="ident">stat</span>.<span class="ident">seek</span>
         );
-        <span class="macro">assert_eq</span><span class="macro">!</span>(
+        <span class="macro">assert_eq!</span>(
             <span class="ident">stat</span>.<span class="ident">next</span>, <span class="ident">next</span>,
             <span class="string">&quot;expect next to be {}, got {}&quot;</span>,
             <span class="ident">next</span>, <span class="ident">stat</span>.<span class="ident">next</span>
         );
-        <span class="macro">assert_eq</span><span class="macro">!</span>(
+        <span class="macro">assert_eq!</span>(
             <span class="ident">stat</span>.<span class="ident">prev</span>, <span class="ident">prev</span>,
             <span class="string">&quot;expect prev to be {}, got {}&quot;</span>,
             <span class="ident">prev</span>, <span class="ident">stat</span>.<span class="ident">prev</span>
@@ -1474,11 +1472,11 @@
     <span class="doccomment">/// PUT     zz       -&gt; zvzv....    (commit at 103)</span>
     <span class="kw">fn</span> <span class="ident">new_sample_engine</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">RocksEngine</span> {
         <span class="kw">let</span> <span class="ident">suffix</span> <span class="op">=</span> <span class="string">&quot;v&quot;</span>.<span class="ident">repeat</span>(<span class="ident">SHORT_VALUE_MAX_LEN</span> <span class="op">+</span> <span class="number">1</span>);
-        <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span> <span class="ident">TestEngineBuilder</span>::<span class="ident">new</span>().<span class="ident">build</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span> <span class="ident">TestEngineBuilder::new</span>().<span class="ident">build</span>().<span class="ident">unwrap</span>();
         <span class="ident">must_prewrite_put</span>(
             <span class="kw-2">&amp;</span><span class="ident">engine</span>,
             <span class="string">b&quot;foo1&quot;</span>,
-            <span class="kw-2">&amp;</span><span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;foo1{}&quot;</span>, <span class="ident">suffix</span>).<span class="ident">into_bytes</span>(),
+            <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;foo1{}&quot;</span>, <span class="ident">suffix</span>).<span class="ident">into_bytes</span>(),
             <span class="string">b&quot;foo1&quot;</span>,
             <span class="number">2</span>,
         );
@@ -1486,14 +1484,14 @@
         <span class="ident">must_prewrite_put</span>(
             <span class="kw-2">&amp;</span><span class="ident">engine</span>,
             <span class="string">b&quot;foo2&quot;</span>,
-            <span class="kw-2">&amp;</span><span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;foo2{}&quot;</span>, <span class="ident">suffix</span>).<span class="ident">into_bytes</span>(),
+            <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;foo2{}&quot;</span>, <span class="ident">suffix</span>).<span class="ident">into_bytes</span>(),
             <span class="string">b&quot;foo2&quot;</span>,
             <span class="number">4</span>,
         );
         <span class="ident">must_prewrite_put</span>(
             <span class="kw-2">&amp;</span><span class="ident">engine</span>,
             <span class="string">b&quot;bar&quot;</span>,
-            <span class="kw-2">&amp;</span><span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;bar{}&quot;</span>, <span class="ident">suffix</span>).<span class="ident">into_bytes</span>(),
+            <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;bar{}&quot;</span>, <span class="ident">suffix</span>).<span class="ident">into_bytes</span>(),
             <span class="string">b&quot;foo2&quot;</span>,
             <span class="number">4</span>,
         );
@@ -1504,7 +1502,7 @@
         <span class="ident">must_prewrite_put</span>(
             <span class="kw-2">&amp;</span><span class="ident">engine</span>,
             <span class="string">b&quot;box&quot;</span>,
-            <span class="kw-2">&amp;</span><span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;box{}&quot;</span>, <span class="ident">suffix</span>).<span class="ident">into_bytes</span>(),
+            <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;box{}&quot;</span>, <span class="ident">suffix</span>).<span class="ident">into_bytes</span>(),
             <span class="string">b&quot;box&quot;</span>,
             <span class="number">8</span>,
         );
@@ -1522,7 +1520,7 @@
         <span class="ident">must_prewrite_put</span>(
             <span class="kw-2">&amp;</span><span class="ident">engine</span>,
             <span class="string">b&quot;zz&quot;</span>,
-            <span class="kw-2">&amp;</span><span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;zz{}&quot;</span>, <span class="ident">suffix</span>).<span class="ident">into_bytes</span>(),
+            <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;zz{}&quot;</span>, <span class="ident">suffix</span>).<span class="ident">into_bytes</span>(),
             <span class="string">b&quot;zz&quot;</span>,
             <span class="number">102</span>,
         );
@@ -1538,11 +1536,11 @@
     <span class="doccomment">/// PUT     foo2    -&gt; foo2vv...    (start at 4)</span>
     <span class="kw">fn</span> <span class="ident">new_sample_engine_2</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">RocksEngine</span> {
         <span class="kw">let</span> <span class="ident">suffix</span> <span class="op">=</span> <span class="string">&quot;v&quot;</span>.<span class="ident">repeat</span>(<span class="ident">SHORT_VALUE_MAX_LEN</span> <span class="op">+</span> <span class="number">1</span>);
-        <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span> <span class="ident">TestEngineBuilder</span>::<span class="ident">new</span>().<span class="ident">build</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span> <span class="ident">TestEngineBuilder::new</span>().<span class="ident">build</span>().<span class="ident">unwrap</span>();
         <span class="ident">must_prewrite_put</span>(
             <span class="kw-2">&amp;</span><span class="ident">engine</span>,
             <span class="string">b&quot;foo1&quot;</span>,
-            <span class="kw-2">&amp;</span><span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;foo1{}&quot;</span>, <span class="ident">suffix</span>).<span class="ident">into_bytes</span>(),
+            <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;foo1{}&quot;</span>, <span class="ident">suffix</span>).<span class="ident">into_bytes</span>(),
             <span class="string">b&quot;foo1&quot;</span>,
             <span class="number">2</span>,
         );
@@ -1553,7 +1551,7 @@
         <span class="ident">must_prewrite_put</span>(
             <span class="kw-2">&amp;</span><span class="ident">engine</span>,
             <span class="string">b&quot;foo2&quot;</span>,
-            <span class="kw-2">&amp;</span><span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;foo2{}&quot;</span>, <span class="ident">suffix</span>).<span class="ident">into_bytes</span>(),
+            <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;foo2{}&quot;</span>, <span class="ident">suffix</span>).<span class="ident">into_bytes</span>(),
             <span class="string">b&quot;foo2&quot;</span>,
             <span class="number">4</span>,
         );
@@ -1609,7 +1607,7 @@
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_multi_tombstone</span>() {
-        <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span> <span class="ident">TestEngineBuilder</span>::<span class="ident">new</span>().<span class="ident">build</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span> <span class="ident">TestEngineBuilder::new</span>().<span class="ident">build</span>().<span class="ident">unwrap</span>();
 
         <span class="ident">must_prewrite_put</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="string">b&quot;foo&quot;</span>, <span class="string">b&quot;bar&quot;</span>, <span class="string">b&quot;foo&quot;</span>, <span class="number">10</span>);
         <span class="ident">must_prewrite_put</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="string">b&quot;foo1&quot;</span>, <span class="string">b&quot;bar1&quot;</span>, <span class="string">b&quot;foo&quot;</span>, <span class="number">10</span>);
@@ -1629,46 +1627,46 @@
         <span class="ident">must_gc</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="string">b&quot;foo2&quot;</span>, <span class="number">50</span>);
         <span class="ident">must_gc</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="string">b&quot;foo3&quot;</span>, <span class="number">50</span>);
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">getter</span> <span class="op">=</span> <span class="ident">new_multi_point_getter</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">TimeStamp</span>::<span class="ident">max</span>());
-        <span class="kw">let</span> <span class="ident">perf_statistics</span> <span class="op">=</span> <span class="ident">PerfStatisticsInstant</span>::<span class="ident">new</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">getter</span> <span class="op">=</span> <span class="ident">new_multi_point_getter</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">TimeStamp::max</span>());
+        <span class="kw">let</span> <span class="ident">perf_statistics</span> <span class="op">=</span> <span class="ident">PerfStatisticsInstant::new</span>();
         <span class="ident">must_get_value</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">getter</span>, <span class="string">b&quot;foo&quot;</span>, <span class="string">b&quot;bar&quot;</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">perf_statistics</span>.<span class="ident">delta</span>().<span class="number">0</span>.<span class="ident">internal_delete_skipped_count</span>, <span class="number">0</span>);
+        <span class="macro">assert_eq!</span>(<span class="ident">perf_statistics</span>.<span class="ident">delta</span>().<span class="number">0</span>.<span class="ident">internal_delete_skipped_count</span>, <span class="number">0</span>);
 
-        <span class="kw">let</span> <span class="ident">perf_statistics</span> <span class="op">=</span> <span class="ident">PerfStatisticsInstant</span>::<span class="ident">new</span>();
+        <span class="kw">let</span> <span class="ident">perf_statistics</span> <span class="op">=</span> <span class="ident">PerfStatisticsInstant::new</span>();
         <span class="ident">must_get_none</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">getter</span>, <span class="string">b&quot;foo1&quot;</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">perf_statistics</span>.<span class="ident">delta</span>().<span class="number">0</span>.<span class="ident">internal_delete_skipped_count</span>, <span class="number">2</span>);
+        <span class="macro">assert_eq!</span>(<span class="ident">perf_statistics</span>.<span class="ident">delta</span>().<span class="number">0</span>.<span class="ident">internal_delete_skipped_count</span>, <span class="number">2</span>);
 
-        <span class="kw">let</span> <span class="ident">perf_statistics</span> <span class="op">=</span> <span class="ident">PerfStatisticsInstant</span>::<span class="ident">new</span>();
+        <span class="kw">let</span> <span class="ident">perf_statistics</span> <span class="op">=</span> <span class="ident">PerfStatisticsInstant::new</span>();
         <span class="ident">must_get_none</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">getter</span>, <span class="string">b&quot;foo2&quot;</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">perf_statistics</span>.<span class="ident">delta</span>().<span class="number">0</span>.<span class="ident">internal_delete_skipped_count</span>, <span class="number">2</span>);
+        <span class="macro">assert_eq!</span>(<span class="ident">perf_statistics</span>.<span class="ident">delta</span>().<span class="number">0</span>.<span class="ident">internal_delete_skipped_count</span>, <span class="number">2</span>);
 
-        <span class="kw">let</span> <span class="ident">perf_statistics</span> <span class="op">=</span> <span class="ident">PerfStatisticsInstant</span>::<span class="ident">new</span>();
+        <span class="kw">let</span> <span class="ident">perf_statistics</span> <span class="op">=</span> <span class="ident">PerfStatisticsInstant::new</span>();
         <span class="ident">must_get_value</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">getter</span>, <span class="string">b&quot;foo3&quot;</span>, <span class="string">b&quot;bar3&quot;</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">perf_statistics</span>.<span class="ident">delta</span>().<span class="number">0</span>.<span class="ident">internal_delete_skipped_count</span>, <span class="number">0</span>);
+        <span class="macro">assert_eq!</span>(<span class="ident">perf_statistics</span>.<span class="ident">delta</span>().<span class="number">0</span>.<span class="ident">internal_delete_skipped_count</span>, <span class="number">0</span>);
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_multi_with_iter_lower_bound</span>() {
-        <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span> <span class="ident">TestEngineBuilder</span>::<span class="ident">new</span>().<span class="ident">build</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span> <span class="ident">TestEngineBuilder::new</span>().<span class="ident">build</span>().<span class="ident">unwrap</span>();
         <span class="ident">must_prewrite_put</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="string">b&quot;foo&quot;</span>, <span class="string">b&quot;bar&quot;</span>, <span class="string">b&quot;foo&quot;</span>, <span class="number">10</span>);
         <span class="ident">must_commit</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="string">b&quot;foo&quot;</span>, <span class="number">10</span>, <span class="number">20</span>);
 
-        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="ident">Default</span>::<span class="ident">default</span>()).<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">write_cursor</span> <span class="op">=</span> <span class="ident">CursorBuilder</span>::<span class="ident">new</span>(<span class="kw-2">&amp;</span><span class="ident">snapshot</span>, <span class="ident">CF_WRITE</span>)
+        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="ident">Default::default</span>()).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">write_cursor</span> <span class="op">=</span> <span class="ident">CursorBuilder::new</span>(<span class="kw-2">&amp;</span><span class="ident">snapshot</span>, <span class="ident">CF_WRITE</span>)
             .<span class="ident">prefix_seek</span>(<span class="bool-val">true</span>)
-            .<span class="ident">scan_mode</span>(<span class="ident">ScanMode</span>::<span class="ident">Mixed</span>)
-            .<span class="ident">range</span>(<span class="prelude-val">Some</span>(<span class="ident">Key</span>::<span class="ident">from_raw</span>(<span class="string">b&quot;a&quot;</span>)), <span class="prelude-val">None</span>)
+            .<span class="ident">scan_mode</span>(<span class="ident">ScanMode::Mixed</span>)
+            .<span class="ident">range</span>(<span class="prelude-val">Some</span>(<span class="ident">Key::from_raw</span>(<span class="string">b&quot;a&quot;</span>)), <span class="prelude-val">None</span>)
             .<span class="ident">build</span>()
             .<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">getter</span> <span class="op">=</span> <span class="ident">PointGetter</span> {
             <span class="ident">snapshot</span>,
             <span class="ident">multi</span>: <span class="bool-val">true</span>,
             <span class="ident">omit_value</span>: <span class="bool-val">false</span>,
-            <span class="ident">isolation_level</span>: <span class="ident">IsolationLevel</span>::<span class="ident">Si</span>,
-            <span class="ident">ts</span>: <span class="ident">TimeStamp</span>::<span class="ident">new</span>(<span class="number">30</span>),
-            <span class="ident">bypass_locks</span>: <span class="ident">Default</span>::<span class="ident">default</span>(),
-            <span class="ident">met_newer_ts_data</span>: <span class="ident">NewerTsCheckState</span>::<span class="ident">NotMetYet</span>,
-            <span class="ident">statistics</span>: <span class="ident">Statistics</span>::<span class="ident">default</span>(),
+            <span class="ident">isolation_level</span>: <span class="ident">IsolationLevel::Si</span>,
+            <span class="ident">ts</span>: <span class="ident">TimeStamp::new</span>(<span class="number">30</span>),
+            <span class="ident">bypass_locks</span>: <span class="ident">Default::default</span>(),
+            <span class="ident">met_newer_ts_data</span>: <span class="ident">NewerTsCheckState::NotMetYet</span>,
+            <span class="ident">statistics</span>: <span class="ident">Statistics::default</span>(),
             <span class="ident">write_cursor</span>,
             <span class="ident">drained</span>: <span class="bool-val">false</span>,
         };
@@ -1809,10 +1807,10 @@
     <span class="kw">fn</span> <span class="ident">test_omit_value</span>() {
         <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span> <span class="ident">new_sample_engine_2</span>();
 
-        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="ident">Default</span>::<span class="ident">default</span>()).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="ident">Default::default</span>()).<span class="ident">unwrap</span>();
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">getter</span> <span class="op">=</span> <span class="ident">PointGetterBuilder</span>::<span class="ident">new</span>(<span class="ident">snapshot</span>.<span class="ident">clone</span>(), <span class="number">4</span>.<span class="ident">into</span>())
-            .<span class="ident">isolation_level</span>(<span class="ident">IsolationLevel</span>::<span class="ident">Si</span>)
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">getter</span> <span class="op">=</span> <span class="ident">PointGetterBuilder::new</span>(<span class="ident">snapshot</span>.<span class="ident">clone</span>(), <span class="number">4</span>.<span class="ident">into</span>())
+            .<span class="ident">isolation_level</span>(<span class="ident">IsolationLevel::Si</span>)
             .<span class="ident">omit_value</span>(<span class="bool-val">true</span>)
             .<span class="ident">build</span>()
             .<span class="ident">unwrap</span>();
@@ -1825,8 +1823,8 @@
         <span class="kw">where</span>
             <span class="ident">S</span>: <span class="ident">Snapshot</span>,
         {
-            <span class="ident">PointGetterBuilder</span>::<span class="ident">new</span>(<span class="ident">snapshot</span>, <span class="ident">ts</span>)
-                .<span class="ident">isolation_level</span>(<span class="ident">IsolationLevel</span>::<span class="ident">Si</span>)
+            <span class="ident">PointGetterBuilder::new</span>(<span class="ident">snapshot</span>, <span class="ident">ts</span>)
+                .<span class="ident">isolation_level</span>(<span class="ident">IsolationLevel::Si</span>)
                 .<span class="ident">omit_value</span>(<span class="bool-val">true</span>)
                 .<span class="ident">multi</span>(<span class="bool-val">false</span>)
                 .<span class="ident">build</span>()
@@ -1848,26 +1846,26 @@
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_get_latest_value</span>() {
-        <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span> <span class="ident">TestEngineBuilder</span>::<span class="ident">new</span>().<span class="ident">build</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span> <span class="ident">TestEngineBuilder::new</span>().<span class="ident">build</span>().<span class="ident">unwrap</span>();
 
         <span class="kw">let</span> (<span class="ident">key</span>, <span class="ident">val</span>) <span class="op">=</span> (<span class="string">b&quot;foo&quot;</span>, <span class="string">b&quot;bar&quot;</span>);
         <span class="ident">must_prewrite_put</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">key</span>, <span class="ident">val</span>, <span class="ident">key</span>, <span class="number">10</span>);
         <span class="ident">must_commit</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">key</span>, <span class="number">10</span>, <span class="number">20</span>);
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">getter</span> <span class="op">=</span> <span class="ident">new_single_point_getter</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">TimeStamp</span>::<span class="ident">max</span>());
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">getter</span> <span class="op">=</span> <span class="ident">new_single_point_getter</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">TimeStamp::max</span>());
         <span class="ident">must_get_value</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">getter</span>, <span class="ident">key</span>, <span class="ident">val</span>);
 
         <span class="comment">// Ignore the primary lock if read with max ts.</span>
         <span class="ident">must_prewrite_delete</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">key</span>, <span class="ident">key</span>, <span class="number">30</span>);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">getter</span> <span class="op">=</span> <span class="ident">new_single_point_getter</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">TimeStamp</span>::<span class="ident">max</span>());
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">getter</span> <span class="op">=</span> <span class="ident">new_single_point_getter</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">TimeStamp::max</span>());
         <span class="ident">must_get_value</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">getter</span>, <span class="ident">key</span>, <span class="ident">val</span>);
-        <span class="ident">must_rollback</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">key</span>, <span class="number">30</span>);
+        <span class="ident">must_rollback</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">key</span>, <span class="number">30</span>, <span class="bool-val">false</span>);
 
         <span class="comment">// Should not ignore the secondary lock even though reading the latest version</span>
         <span class="ident">must_prewrite_delete</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">key</span>, <span class="string">b&quot;bar&quot;</span>, <span class="number">40</span>);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">getter</span> <span class="op">=</span> <span class="ident">new_single_point_getter</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">TimeStamp</span>::<span class="ident">max</span>());
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">getter</span> <span class="op">=</span> <span class="ident">new_single_point_getter</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">TimeStamp::max</span>());
         <span class="ident">must_get_err</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">getter</span>, <span class="ident">key</span>);
-        <span class="ident">must_rollback</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">key</span>, <span class="number">40</span>);
+        <span class="ident">must_rollback</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">key</span>, <span class="number">40</span>, <span class="bool-val">false</span>);
 
         <span class="comment">// Should get the latest committed value if there is a primary lock with a ts less than</span>
         <span class="comment">// the latest Write&#39;s commit_ts.</span>
@@ -1875,13 +1873,13 @@
         <span class="comment">// write.start_ts(10) &lt; primary_lock.start_ts(15) &lt; write.commit_ts(20)</span>
         <span class="ident">must_acquire_pessimistic_lock</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">key</span>, <span class="ident">key</span>, <span class="number">15</span>, <span class="number">50</span>);
         <span class="ident">must_pessimistic_prewrite_delete</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">key</span>, <span class="ident">key</span>, <span class="number">15</span>, <span class="number">50</span>, <span class="bool-val">true</span>);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">getter</span> <span class="op">=</span> <span class="ident">new_single_point_getter</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">TimeStamp</span>::<span class="ident">max</span>());
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">getter</span> <span class="op">=</span> <span class="ident">new_single_point_getter</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">TimeStamp::max</span>());
         <span class="ident">must_get_value</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">getter</span>, <span class="ident">key</span>, <span class="ident">val</span>);
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_get_bypass_locks</span>() {
-        <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span> <span class="ident">TestEngineBuilder</span>::<span class="ident">new</span>().<span class="ident">build</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span> <span class="ident">TestEngineBuilder::new</span>().<span class="ident">build</span>().<span class="ident">unwrap</span>();
 
         <span class="kw">let</span> (<span class="ident">key</span>, <span class="ident">val</span>) <span class="op">=</span> (<span class="string">b&quot;foo&quot;</span>, <span class="string">b&quot;bar&quot;</span>);
         <span class="ident">must_prewrite_put</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">key</span>, <span class="ident">val</span>, <span class="ident">key</span>, <span class="number">10</span>);
@@ -1889,18 +1887,18 @@
 
         <span class="ident">must_prewrite_delete</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">key</span>, <span class="ident">key</span>, <span class="number">30</span>);
 
-        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="ident">Default</span>::<span class="ident">default</span>()).<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">getter</span> <span class="op">=</span> <span class="ident">PointGetterBuilder</span>::<span class="ident">new</span>(<span class="ident">snapshot</span>, <span class="number">60</span>.<span class="ident">into</span>())
-            .<span class="ident">isolation_level</span>(<span class="ident">IsolationLevel</span>::<span class="ident">Si</span>)
-            .<span class="ident">bypass_locks</span>(<span class="ident">TsSet</span>::<span class="ident">from_u64s</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="number">30</span>, <span class="number">40</span>, <span class="number">50</span>]))
+        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="ident">Default::default</span>()).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">getter</span> <span class="op">=</span> <span class="ident">PointGetterBuilder::new</span>(<span class="ident">snapshot</span>, <span class="number">60</span>.<span class="ident">into</span>())
+            .<span class="ident">isolation_level</span>(<span class="ident">IsolationLevel::Si</span>)
+            .<span class="ident">bypass_locks</span>(<span class="ident">TsSet::from_u64s</span>(<span class="macro">vec!</span>[<span class="number">30</span>, <span class="number">40</span>, <span class="number">50</span>]))
             .<span class="ident">build</span>()
             .<span class="ident">unwrap</span>();
         <span class="ident">must_get_value</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">getter</span>, <span class="ident">key</span>, <span class="ident">val</span>);
 
-        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="ident">Default</span>::<span class="ident">default</span>()).<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">getter</span> <span class="op">=</span> <span class="ident">PointGetterBuilder</span>::<span class="ident">new</span>(<span class="ident">snapshot</span>, <span class="number">60</span>.<span class="ident">into</span>())
-            .<span class="ident">isolation_level</span>(<span class="ident">IsolationLevel</span>::<span class="ident">Si</span>)
-            .<span class="ident">bypass_locks</span>(<span class="ident">TsSet</span>::<span class="ident">from_u64s</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="number">31</span>, <span class="number">29</span>]))
+        <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">engine</span>.<span class="ident">snapshot</span>(<span class="ident">Default::default</span>()).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">getter</span> <span class="op">=</span> <span class="ident">PointGetterBuilder::new</span>(<span class="ident">snapshot</span>, <span class="number">60</span>.<span class="ident">into</span>())
+            .<span class="ident">isolation_level</span>(<span class="ident">IsolationLevel::Si</span>)
+            .<span class="ident">bypass_locks</span>(<span class="ident">TsSet::from_u64s</span>(<span class="macro">vec!</span>[<span class="number">31</span>, <span class="number">29</span>]))
             .<span class="ident">build</span>()
             .<span class="ident">unwrap</span>();
         <span class="ident">must_get_err</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">getter</span>, <span class="ident">key</span>);
@@ -1908,7 +1906,7 @@
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_met_newer_ts_data</span>() {
-        <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span> <span class="ident">TestEngineBuilder</span>::<span class="ident">new</span>().<span class="ident">build</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span> <span class="ident">TestEngineBuilder::new</span>().<span class="ident">build</span>().<span class="ident">unwrap</span>();
 
         <span class="kw">let</span> (<span class="ident">key</span>, <span class="ident">val1</span>) <span class="op">=</span> (<span class="string">b&quot;foo&quot;</span>, <span class="string">b&quot;bar1&quot;</span>);
         <span class="ident">must_prewrite_put</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">key</span>, <span class="ident">val1</span>, <span class="ident">key</span>, <span class="number">10</span>);
@@ -1931,7 +1929,7 @@
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_point_get_check_gc_fence</span>() {
-        <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span> <span class="ident">TestEngineBuilder</span>::<span class="ident">new</span>().<span class="ident">build</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span> <span class="ident">TestEngineBuilder::new</span>().<span class="ident">build</span>().<span class="ident">unwrap</span>();
 
         <span class="comment">// PUT,      Read</span>
         <span class="comment">//  `--------------^</span>
@@ -2003,7 +2001,7 @@
         <span class="ident">must_commit</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="string">b&quot;k9&quot;</span>, <span class="number">25</span>, <span class="number">26</span>);
         <span class="ident">must_cleanup_with_gc_fence</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="string">b&quot;k9&quot;</span>, <span class="number">20</span>, <span class="number">0</span>, <span class="number">27</span>, <span class="bool-val">true</span>);
 
-        <span class="kw">let</span> <span class="ident">expected_results</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
+        <span class="kw">let</span> <span class="ident">expected_results</span> <span class="op">=</span> <span class="macro">vec!</span>[
             (<span class="string">b&quot;k1&quot;</span>, <span class="prelude-val">Some</span>(<span class="string">b&quot;v1&quot;</span>)),
             (<span class="string">b&quot;k2&quot;</span>, <span class="prelude-val">None</span>),
             (<span class="string">b&quot;k3&quot;</span>, <span class="prelude-val">None</span>),
@@ -2017,17 +2015,17 @@
 
         <span class="kw">for</span> (<span class="ident">k</span>, <span class="ident">v</span>) <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">expected_results</span> {
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">single_getter</span> <span class="op">=</span> <span class="ident">new_single_point_getter</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="number">40</span>.<span class="ident">into</span>());
-            <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">single_getter</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">Key</span>::<span class="ident">from_raw</span>(<span class="kw-2">*</span><span class="ident">k</span>)).<span class="ident">unwrap</span>();
-            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">value</span>, <span class="ident">v</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="ident">v</span>.<span class="ident">to_vec</span>()));
+            <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">single_getter</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">Key::from_raw</span>(<span class="kw-2">*</span><span class="ident">k</span>)).<span class="ident">unwrap</span>();
+            <span class="macro">assert_eq!</span>(<span class="ident">value</span>, <span class="ident">v</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="ident">v</span>.<span class="ident">to_vec</span>()));
         }
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">multi_getter</span> <span class="op">=</span> <span class="ident">new_multi_point_getter</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="number">40</span>.<span class="ident">into</span>());
         <span class="kw">for</span> (<span class="ident">k</span>, <span class="ident">v</span>) <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">expected_results</span> {
-            <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">multi_getter</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">Key</span>::<span class="ident">from_raw</span>(<span class="kw-2">*</span><span class="ident">k</span>)).<span class="ident">unwrap</span>();
-            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">value</span>, <span class="ident">v</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="ident">v</span>.<span class="ident">to_vec</span>()));
+            <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">multi_getter</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">Key::from_raw</span>(<span class="kw-2">*</span><span class="ident">k</span>)).<span class="ident">unwrap</span>();
+            <span class="macro">assert_eq!</span>(<span class="ident">value</span>, <span class="ident">v</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="ident">v</span>.<span class="ident">to_vec</span>()));
         }
     }
 }
 </pre></div>
-</section><section id="search" class="content hidden"></section><section class="footer"></section><div id="rustdoc-vars" data-root-path="../../../../../" data-current-crate="tikv"></div>
-    <script src="../../../../../main.js"></script><script src="../../../../../source-script.js"></script><script src="../../../../../source-files.js"></script><script defer src="../../../../../search-index.js"></script></body></html>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><div id="rustdoc-vars" data-root-path="../../../../../" data-current-crate="tikv" data-search-js="../../../../../search-index.js"></div>
+    <script src="../../../../../main.js"></script><script src="../../../../../source-script.js"></script><script src="../../../../../source-files.js"></script></body></html>

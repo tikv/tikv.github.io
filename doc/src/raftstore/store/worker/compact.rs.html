@@ -1,7 +1,7 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `components/raftstore/src/store/worker/compact.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>compact.rs - source</title><link rel="stylesheet" type="text/css" href="../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `components/raftstore/src/store/worker/compact.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>compact.rs - source</title><link rel="stylesheet" type="text/css" href="../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../../storage.js"></script><script src="../../../../crates.js"></script><noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg">
 <link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../../raftstore/index.html'><div class='logo-container rust-logo'><img src='../../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><script src="../../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
-                <a id="settings-menu" href="../../../../settings.html"><img src="../../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../../../raftstore/index.html'><div class='logo-container rust-logo'><img src='../../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
+                <a id="settings-menu" href="../../../../settings.html"><img src="../../../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
 <span id="2">  2</span>
 <span id="3">  3</span>
 <span id="4">  4</span>
@@ -417,19 +417,26 @@
 <span id="414">414</span>
 <span id="415">415</span>
 <span id="416">416</span>
+<span id="417">417</span>
+<span id="418">418</span>
+<span id="419">419</span>
+<span id="420">420</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">collections</span>::<span class="ident">VecDeque</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">error</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">fmt</span>::{<span class="self">self</span>, <span class="ident">Display</span>, <span class="ident">Formatter</span>};
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">time</span>::<span class="ident">Instant</span>;
+<span class="kw">use</span> <span class="ident">std::collections::VecDeque</span>;
+<span class="kw">use</span> <span class="ident">std::error</span>;
+<span class="kw">use</span> <span class="ident">std::fmt</span>::{<span class="self">self</span>, <span class="ident">Display</span>, <span class="ident">Formatter</span>};
+<span class="kw">use</span> <span class="ident">std::time::Instant</span>;
 
-<span class="kw">use</span> <span class="ident">engine_traits</span>::<span class="ident">KvEngine</span>;
-<span class="kw">use</span> <span class="ident">engine_traits</span>::<span class="ident">CF_WRITE</span>;
-<span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">worker</span>::<span class="ident">Runnable</span>;
+<span class="kw">use</span> <span class="ident">engine_traits::KvEngine</span>;
+<span class="kw">use</span> <span class="ident">engine_traits::CF_WRITE</span>;
+<span class="kw">use</span> <span class="ident">fail::fail_point</span>;
+<span class="kw">use</span> <span class="ident">quick_error::quick_error</span>;
+<span class="kw">use</span> <span class="ident">tikv_util::worker::Runnable</span>;
+<span class="kw">use</span> <span class="ident">tikv_util</span>::{<span class="ident">box_try</span>, <span class="ident">error</span>, <span class="ident">info</span>, <span class="ident">warn</span>};
 
-<span class="kw">use</span> <span class="kw">super</span>::<span class="ident">metrics</span>::<span class="ident">COMPACT_RANGE_CF</span>;
+<span class="kw">use</span> <span class="kw">super</span><span class="ident">::metrics::COMPACT_RANGE_CF</span>;
 
 <span class="kw">type</span> <span class="ident">Key</span> <span class="op">=</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>;
 
@@ -449,9 +456,9 @@
 }
 
 <span class="kw">impl</span> <span class="ident">Display</span> <span class="kw">for</span> <span class="ident">Task</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="prelude-ty">Result</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt::Result</span> {
         <span class="kw">match</span> <span class="kw-2">*</span><span class="self">self</span> {
-            <span class="ident">Task</span>::<span class="ident">Compact</span> {
+            <span class="ident">Task::Compact</span> {
                 <span class="kw-2">ref</span> <span class="ident">cf_name</span>,
                 <span class="kw-2">ref</span> <span class="ident">start_key</span>,
                 <span class="kw-2">ref</span> <span class="ident">end_key</span>,
@@ -460,14 +467,14 @@
                 .<span class="ident">field</span>(<span class="string">&quot;cf_name&quot;</span>, <span class="ident">cf_name</span>)
                 .<span class="ident">field</span>(
                     <span class="string">&quot;start_key&quot;</span>,
-                    <span class="kw-2">&amp;</span><span class="ident">start_key</span>.<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">k</span><span class="op">|</span> <span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>(<span class="ident">k</span>)),
+                    <span class="kw-2">&amp;</span><span class="ident">start_key</span>.<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">k</span><span class="op">|</span> <span class="ident">log_wrappers::Value::key</span>(<span class="ident">k</span>)),
                 )
                 .<span class="ident">field</span>(
                     <span class="string">&quot;end_key&quot;</span>,
-                    <span class="kw-2">&amp;</span><span class="ident">end_key</span>.<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">k</span><span class="op">|</span> <span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>(<span class="ident">k</span>)),
+                    <span class="kw-2">&amp;</span><span class="ident">end_key</span>.<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">k</span><span class="op">|</span> <span class="ident">log_wrappers::Value::key</span>(<span class="ident">k</span>)),
                 )
                 .<span class="ident">finish</span>(),
-            <span class="ident">Task</span>::<span class="ident">CheckAndCompact</span> {
+            <span class="ident">Task::CheckAndCompact</span> {
                 <span class="kw-2">ref</span> <span class="ident">cf_names</span>,
                 <span class="kw-2">ref</span> <span class="ident">ranges</span>,
                 <span class="ident">tombstones_num_threshold</span>,
@@ -478,8 +485,8 @@
                 .<span class="ident">field</span>(
                     <span class="string">&quot;ranges&quot;</span>,
                     <span class="kw-2">&amp;</span>(
-                        <span class="ident">ranges</span>.<span class="ident">first</span>().<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">k</span><span class="op">|</span> <span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>(<span class="ident">k</span>)),
-                        <span class="ident">ranges</span>.<span class="ident">last</span>().<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">k</span><span class="op">|</span> <span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>(<span class="ident">k</span>)),
+                        <span class="ident">ranges</span>.<span class="ident">first</span>().<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">k</span><span class="op">|</span> <span class="ident">log_wrappers::Value::key</span>(<span class="ident">k</span>)),
+                        <span class="ident">ranges</span>.<span class="ident">last</span>().<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">k</span><span class="op">|</span> <span class="ident">log_wrappers::Value::key</span>(<span class="ident">k</span>)),
                     ),
                 )
                 .<span class="ident">field</span>(<span class="string">&quot;tombstones_num_threshold&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">tombstones_num_threshold</span>)
@@ -492,10 +499,10 @@
     }
 }
 
-<span class="macro">quick_error</span><span class="macro">!</span> {
+<span class="macro">quick_error!</span> {
     <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
     <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Error</span> {
-        <span class="ident">Other</span>(<span class="ident">err</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">error</span>::<span class="ident">Error</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span>) {
+        <span class="ident">Other</span>(<span class="ident">err</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">error::Error</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span>) {
             <span class="ident">from</span>()
             <span class="ident">cause</span>(<span class="ident">err</span>.<span class="ident">as_ref</span>())
             <span class="ident">display</span>(<span class="string">&quot;compact failed {:?}&quot;</span>, <span class="ident">err</span>)
@@ -522,18 +529,19 @@
         <span class="ident">start_key</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span>[<span class="ident">u8</span>]<span class="op">&gt;</span>,
         <span class="ident">end_key</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span>[<span class="ident">u8</span>]<span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">timer</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now</span>();
+        <span class="kw">let</span> <span class="ident">timer</span> <span class="op">=</span> <span class="ident">Instant::now</span>();
         <span class="kw">let</span> <span class="ident">compact_range_timer</span> <span class="op">=</span> <span class="ident">COMPACT_RANGE_CF</span>
             .<span class="ident">with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="ident">cf_name</span>])
             .<span class="ident">start_coarse_timer</span>();
-        <span class="macro">box_try</span><span class="macro">!</span>(<span class="self">self</span>
-            .<span class="ident">engine</span>
-            .<span class="ident">compact_range</span>(<span class="ident">cf_name</span>, <span class="ident">start_key</span>, <span class="ident">end_key</span>, <span class="bool-val">false</span>, <span class="number">1</span> <span class="comment">/* threads */</span>,));
+        <span class="macro">box_try!</span>(
+            <span class="self">self</span>.<span class="ident">engine</span>
+                .<span class="ident">compact_range</span>(<span class="ident">cf_name</span>, <span class="ident">start_key</span>, <span class="ident">end_key</span>, <span class="bool-val">false</span>, <span class="number">1</span> <span class="comment">/* threads */</span>,)
+        );
         <span class="ident">compact_range_timer</span>.<span class="ident">observe_duration</span>();
-        <span class="macro">info</span><span class="macro">!</span>(
+        <span class="macro">info!</span>(
             <span class="string">&quot;compact range finished&quot;</span>;
-            <span class="string">&quot;range_start&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">start_key</span>.<span class="ident">map</span>(::<span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>),
-            <span class="string">&quot;range_end&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">end_key</span>.<span class="ident">map</span>(::<span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>),
+            <span class="string">&quot;range_start&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">start_key</span>.<span class="ident">map</span>(<span class="ident">::log_wrappers::Value::key</span>),
+            <span class="string">&quot;range_end&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">end_key</span>.<span class="ident">map</span>(<span class="ident">::log_wrappers::Value::key</span>),
             <span class="string">&quot;cf&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">cf_name</span>,
             <span class="string">&quot;time_takes&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">timer</span>.<span class="ident">elapsed</span>(),
         );
@@ -549,7 +557,7 @@
 
     <span class="kw">fn</span> <span class="ident">run</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">task</span>: <span class="ident">Task</span>) {
         <span class="kw">match</span> <span class="ident">task</span> {
-            <span class="ident">Task</span>::<span class="ident">Compact</span> {
+            <span class="ident">Task::Compact</span> {
                 <span class="ident">cf_name</span>,
                 <span class="ident">start_key</span>,
                 <span class="ident">end_key</span>,
@@ -557,10 +565,10 @@
                 <span class="kw">let</span> <span class="ident">cf</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">cf_name</span>;
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">compact_range_cf</span>(<span class="ident">cf</span>, <span class="ident">start_key</span>.<span class="ident">as_deref</span>(), <span class="ident">end_key</span>.<span class="ident">as_deref</span>())
                 {
-                    <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;execute compact range failed&quot;</span>; <span class="string">&quot;cf&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">cf</span>, <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>);
+                    <span class="macro">error!</span>(<span class="string">&quot;execute compact range failed&quot;</span>; <span class="string">&quot;cf&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">cf</span>, <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>);
                 }
             }
-            <span class="ident">Task</span>::<span class="ident">CheckAndCompact</span> {
+            <span class="ident">Task::CheckAndCompact</span> {
                 <span class="ident">cf_names</span>,
                 <span class="ident">ranges</span>,
                 <span class="ident">tombstones_num_threshold</span>,
@@ -575,19 +583,19 @@
                     <span class="kw">for</span> (<span class="ident">start</span>, <span class="ident">end</span>) <span class="kw">in</span> <span class="ident">ranges</span>.<span class="ident">drain</span>(..) {
                         <span class="kw">for</span> <span class="ident">cf</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">cf_names</span> {
                             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">compact_range_cf</span>(<span class="ident">cf</span>, <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">start</span>), <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">end</span>)) {
-                                <span class="macro">error</span><span class="macro">!</span>(
+                                <span class="macro">error!</span>(
                                     <span class="string">&quot;compact range failed&quot;</span>;
-                                    <span class="string">&quot;range_start&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>(<span class="kw-2">&amp;</span><span class="ident">start</span>),
-                                    <span class="string">&quot;range_end&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>(<span class="kw-2">&amp;</span><span class="ident">end</span>),
+                                    <span class="string">&quot;range_start&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">log_wrappers::Value::key</span>(<span class="kw-2">&amp;</span><span class="ident">start</span>),
+                                    <span class="string">&quot;range_end&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">log_wrappers::Value::key</span>(<span class="kw-2">&amp;</span><span class="ident">end</span>),
                                     <span class="string">&quot;cf&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">cf</span>,
                                     <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>,
                                 );
                             }
                         }
-                        <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;raftstore::compact::CheckAndCompact:AfterCompact&quot;</span>);
+                        <span class="macro">fail_point!</span>(<span class="string">&quot;raftstore::compact::CheckAndCompact:AfterCompact&quot;</span>);
                     }
                 }
-                <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;check ranges need reclaim failed&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>),
+                <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">warn!</span>(<span class="string">&quot;check ranges need reclaim failed&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>),
             },
         }
     }
@@ -618,13 +626,13 @@
     <span class="comment">// Check the SST properties for each range, and TiKV will compact a range if the range</span>
     <span class="comment">// contains too many RocksDB tombstones. TiKV will merge multiple neighboring ranges</span>
     <span class="comment">// that need compacting into a single range.</span>
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ranges_need_compact</span> <span class="op">=</span> <span class="ident">VecDeque</span>::<span class="ident">new</span>();
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ranges_need_compact</span> <span class="op">=</span> <span class="ident">VecDeque::new</span>();
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">compact_start</span> <span class="op">=</span> <span class="prelude-val">None</span>;
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">compact_end</span> <span class="op">=</span> <span class="prelude-val">None</span>;
     <span class="kw">for</span> <span class="ident">range</span> <span class="kw">in</span> <span class="ident">ranges</span>.<span class="ident">windows</span>(<span class="number">2</span>) {
         <span class="comment">// Get total entries and total versions in this range and checks if it needs to be compacted.</span>
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="ident">num_ent</span>, <span class="ident">num_ver</span>)) <span class="op">=</span>
-            <span class="macro">box_try</span><span class="macro">!</span>(<span class="ident">engine</span>.<span class="ident">get_range_entries_and_versions</span>(<span class="ident">CF_WRITE</span>, <span class="kw-2">&amp;</span><span class="ident">range</span>[<span class="number">0</span>], <span class="kw-2">&amp;</span><span class="ident">range</span>[<span class="number">1</span>]))
+            <span class="macro">box_try!</span>(<span class="ident">engine</span>.<span class="ident">get_range_entries_and_versions</span>(<span class="ident">CF_WRITE</span>, <span class="kw-2">&amp;</span><span class="ident">range</span>[<span class="number">0</span>], <span class="kw-2">&amp;</span><span class="ident">range</span>[<span class="number">1</span>]))
         {
             <span class="kw">if</span> <span class="ident">need_compact</span>(
                 <span class="ident">num_ent</span>,
@@ -644,7 +652,7 @@
 
         <span class="comment">// Current range doesn&#39;t need compacting, save previous range that need compacting.</span>
         <span class="kw">if</span> <span class="ident">compact_start</span>.<span class="ident">is_some</span>() {
-            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">compact_end</span>.<span class="ident">is_some</span>());
+            <span class="macro">assert!</span>(<span class="ident">compact_end</span>.<span class="ident">is_some</span>());
         }
         <span class="kw">if</span> <span class="kw">let</span> (<span class="prelude-val">Some</span>(<span class="ident">cs</span>), <span class="prelude-val">Some</span>(<span class="ident">ce</span>)) <span class="op">=</span> (<span class="ident">compact_start</span>, <span class="ident">compact_end</span>) {
             <span class="ident">ranges_need_compact</span>.<span class="ident">push_back</span>((<span class="ident">cs</span>, <span class="ident">ce</span>));
@@ -655,7 +663,7 @@
 
     <span class="comment">// Save the last range that needs to be compacted.</span>
     <span class="kw">if</span> <span class="ident">compact_start</span>.<span class="ident">is_some</span>() {
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">compact_end</span>.<span class="ident">is_some</span>());
+        <span class="macro">assert!</span>(<span class="ident">compact_end</span>.<span class="ident">is_some</span>());
     }
     <span class="kw">if</span> <span class="kw">let</span> (<span class="prelude-val">Some</span>(<span class="ident">cs</span>), <span class="prelude-val">Some</span>(<span class="ident">ce</span>)) <span class="op">=</span> (<span class="ident">compact_start</span>, <span class="ident">compact_end</span>) {
         <span class="ident">ranges_need_compact</span>.<span class="ident">push_back</span>((<span class="ident">cs</span>, <span class="ident">ce</span>));
@@ -666,35 +674,35 @@
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
 <span class="kw">mod</span> <span class="ident">tests</span> {
-    <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">thread</span>::<span class="ident">sleep</span>;
-    <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">time</span>::<span class="ident">Duration</span>;
+    <span class="kw">use</span> <span class="ident">std::thread::sleep</span>;
+    <span class="kw">use</span> <span class="ident">std::time::Duration</span>;
 
-    <span class="kw">use</span> <span class="ident">engine_test</span>::<span class="ident">ctor</span>::{<span class="ident">CFOptions</span>, <span class="ident">ColumnFamilyOptions</span>, <span class="ident">DBOptions</span>};
-    <span class="kw">use</span> <span class="ident">engine_test</span>::<span class="ident">kv</span>::<span class="ident">KvTestEngine</span>;
-    <span class="kw">use</span> <span class="ident">engine_test</span>::<span class="ident">kv</span>::{<span class="ident">new_engine</span>, <span class="ident">new_engine_opt</span>};
+    <span class="kw">use</span> <span class="ident">engine_test::ctor</span>::{<span class="ident">CFOptions</span>, <span class="ident">ColumnFamilyOptions</span>, <span class="ident">DBOptions</span>};
+    <span class="kw">use</span> <span class="ident">engine_test::kv::KvTestEngine</span>;
+    <span class="kw">use</span> <span class="ident">engine_test::kv</span>::{<span class="ident">new_engine</span>, <span class="ident">new_engine_opt</span>};
     <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">MiscExt</span>, <span class="ident">Mutable</span>, <span class="ident">SyncMutable</span>, <span class="ident">WriteBatch</span>, <span class="ident">WriteBatchExt</span>};
     <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">CF_DEFAULT</span>, <span class="ident">CF_LOCK</span>, <span class="ident">CF_RAFT</span>, <span class="ident">CF_WRITE</span>};
-    <span class="kw">use</span> <span class="ident">tempfile</span>::<span class="ident">Builder</span>;
+    <span class="kw">use</span> <span class="ident">tempfile::Builder</span>;
 
-    <span class="kw">use</span> <span class="ident">keys</span>::<span class="ident">data_key</span>;
+    <span class="kw">use</span> <span class="ident">keys::data_key</span>;
     <span class="kw">use</span> <span class="ident">txn_types</span>::{<span class="ident">Key</span>, <span class="ident">TimeStamp</span>, <span class="ident">Write</span>, <span class="ident">WriteType</span>};
 
     <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_compact_range</span>() {
-        <span class="kw">let</span> <span class="ident">path</span> <span class="op">=</span> <span class="ident">Builder</span>::<span class="ident">new</span>()
+        <span class="kw">let</span> <span class="ident">path</span> <span class="op">=</span> <span class="ident">Builder::new</span>()
             .<span class="ident">prefix</span>(<span class="string">&quot;compact-range-test&quot;</span>)
             .<span class="ident">tempdir</span>()
             .<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">db</span> <span class="op">=</span> <span class="ident">new_engine</span>(<span class="ident">path</span>.<span class="ident">path</span>().<span class="ident">to_str</span>().<span class="ident">unwrap</span>(), <span class="prelude-val">None</span>, <span class="kw-2">&amp;</span>[<span class="ident">CF_DEFAULT</span>], <span class="prelude-val">None</span>).<span class="ident">unwrap</span>();
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">runner</span> <span class="op">=</span> <span class="ident">Runner</span>::<span class="ident">new</span>(<span class="ident">db</span>.<span class="ident">clone</span>());
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">runner</span> <span class="op">=</span> <span class="ident">Runner::new</span>(<span class="ident">db</span>.<span class="ident">clone</span>());
 
         <span class="comment">// Generate the first SST file.</span>
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">wb</span> <span class="op">=</span> <span class="ident">db</span>.<span class="ident">write_batch</span>();
         <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="number">1000</span> {
-            <span class="kw">let</span> <span class="ident">k</span> <span class="op">=</span> <span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;key_{}&quot;</span>, <span class="ident">i</span>);
+            <span class="kw">let</span> <span class="ident">k</span> <span class="op">=</span> <span class="macro">format!</span>(<span class="string">&quot;key_{}&quot;</span>, <span class="ident">i</span>);
             <span class="ident">wb</span>.<span class="ident">put_cf</span>(<span class="ident">CF_DEFAULT</span>, <span class="ident">k</span>.<span class="ident">as_bytes</span>(), <span class="string">b&quot;whatever content&quot;</span>)
                 .<span class="ident">unwrap</span>();
         }
@@ -704,7 +712,7 @@
         <span class="comment">// Generate another SST file has the same content with first SST file.</span>
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">wb</span> <span class="op">=</span> <span class="ident">db</span>.<span class="ident">write_batch</span>();
         <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="number">1000</span> {
-            <span class="kw">let</span> <span class="ident">k</span> <span class="op">=</span> <span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;key_{}&quot;</span>, <span class="ident">i</span>);
+            <span class="kw">let</span> <span class="ident">k</span> <span class="op">=</span> <span class="macro">format!</span>(<span class="string">&quot;key_{}&quot;</span>, <span class="ident">i</span>);
             <span class="ident">wb</span>.<span class="ident">put_cf</span>(<span class="ident">CF_DEFAULT</span>, <span class="ident">k</span>.<span class="ident">as_bytes</span>(), <span class="string">b&quot;whatever content&quot;</span>)
                 .<span class="ident">unwrap</span>();
         }
@@ -715,58 +723,58 @@
         <span class="kw">let</span> <span class="ident">old_sst_files_size</span> <span class="op">=</span> <span class="ident">db</span>.<span class="ident">get_total_sst_files_size_cf</span>(<span class="ident">CF_DEFAULT</span>).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>();
 
         <span class="comment">// Schedule compact range task.</span>
-        <span class="ident">runner</span>.<span class="ident">run</span>(<span class="ident">Task</span>::<span class="ident">Compact</span> {
-            <span class="ident">cf_name</span>: <span class="ident">String</span>::<span class="ident">from</span>(<span class="ident">CF_DEFAULT</span>),
+        <span class="ident">runner</span>.<span class="ident">run</span>(<span class="ident">Task::Compact</span> {
+            <span class="ident">cf_name</span>: <span class="ident">String::from</span>(<span class="ident">CF_DEFAULT</span>),
             <span class="ident">start_key</span>: <span class="prelude-val">None</span>,
             <span class="ident">end_key</span>: <span class="prelude-val">None</span>,
         });
-        <span class="ident">sleep</span>(<span class="ident">Duration</span>::<span class="ident">from_secs</span>(<span class="number">5</span>));
+        <span class="ident">sleep</span>(<span class="ident">Duration::from_secs</span>(<span class="number">5</span>));
 
         <span class="comment">// Get the total SST files size after compact range.</span>
         <span class="kw">let</span> <span class="ident">new_sst_files_size</span> <span class="op">=</span> <span class="ident">db</span>.<span class="ident">get_total_sst_files_size_cf</span>(<span class="ident">CF_DEFAULT</span>).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>();
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">old_sst_files_size</span> <span class="op">&gt;</span> <span class="ident">new_sst_files_size</span>);
+        <span class="macro">assert!</span>(<span class="ident">old_sst_files_size</span> <span class="op">&gt;</span> <span class="ident">new_sst_files_size</span>);
     }
 
     <span class="kw">fn</span> <span class="ident">mvcc_put</span>(<span class="ident">db</span>: <span class="kw-2">&amp;</span><span class="ident">KvTestEngine</span>, <span class="ident">k</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">v</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">start_ts</span>: <span class="ident">TimeStamp</span>, <span class="ident">commit_ts</span>: <span class="ident">TimeStamp</span>) {
-        <span class="kw">let</span> <span class="ident">k</span> <span class="op">=</span> <span class="ident">Key</span>::<span class="ident">from_encoded</span>(<span class="ident">data_key</span>(<span class="ident">k</span>)).<span class="ident">append_ts</span>(<span class="ident">commit_ts</span>);
-        <span class="kw">let</span> <span class="ident">w</span> <span class="op">=</span> <span class="ident">Write</span>::<span class="ident">new</span>(<span class="ident">WriteType</span>::<span class="ident">Put</span>, <span class="ident">start_ts</span>, <span class="prelude-val">Some</span>(<span class="ident">v</span>.<span class="ident">to_vec</span>()));
+        <span class="kw">let</span> <span class="ident">k</span> <span class="op">=</span> <span class="ident">Key::from_encoded</span>(<span class="ident">data_key</span>(<span class="ident">k</span>)).<span class="ident">append_ts</span>(<span class="ident">commit_ts</span>);
+        <span class="kw">let</span> <span class="ident">w</span> <span class="op">=</span> <span class="ident">Write::new</span>(<span class="ident">WriteType::Put</span>, <span class="ident">start_ts</span>, <span class="prelude-val">Some</span>(<span class="ident">v</span>.<span class="ident">to_vec</span>()));
         <span class="ident">db</span>.<span class="ident">put_cf</span>(<span class="ident">CF_WRITE</span>, <span class="ident">k</span>.<span class="ident">as_encoded</span>(), <span class="kw-2">&amp;</span><span class="ident">w</span>.<span class="ident">as_ref</span>().<span class="ident">to_bytes</span>())
             .<span class="ident">unwrap</span>();
     }
 
     <span class="kw">fn</span> <span class="ident">delete</span>(<span class="ident">db</span>: <span class="kw-2">&amp;</span><span class="ident">KvTestEngine</span>, <span class="ident">k</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">commit_ts</span>: <span class="ident">TimeStamp</span>) {
-        <span class="kw">let</span> <span class="ident">k</span> <span class="op">=</span> <span class="ident">Key</span>::<span class="ident">from_encoded</span>(<span class="ident">data_key</span>(<span class="ident">k</span>)).<span class="ident">append_ts</span>(<span class="ident">commit_ts</span>);
+        <span class="kw">let</span> <span class="ident">k</span> <span class="op">=</span> <span class="ident">Key::from_encoded</span>(<span class="ident">data_key</span>(<span class="ident">k</span>)).<span class="ident">append_ts</span>(<span class="ident">commit_ts</span>);
         <span class="ident">db</span>.<span class="ident">delete_cf</span>(<span class="ident">CF_WRITE</span>, <span class="ident">k</span>.<span class="ident">as_encoded</span>()).<span class="ident">unwrap</span>();
     }
 
     <span class="kw">fn</span> <span class="ident">open_db</span>(<span class="ident">path</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">KvTestEngine</span> {
-        <span class="kw">let</span> <span class="ident">db_opts</span> <span class="op">=</span> <span class="ident">DBOptions</span>::<span class="ident">new</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cf_opts</span> <span class="op">=</span> <span class="ident">ColumnFamilyOptions</span>::<span class="ident">new</span>();
+        <span class="kw">let</span> <span class="ident">db_opts</span> <span class="op">=</span> <span class="ident">DBOptions::new</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cf_opts</span> <span class="op">=</span> <span class="ident">ColumnFamilyOptions::new</span>();
         <span class="ident">cf_opts</span>.<span class="ident">set_level_zero_file_num_compaction_trigger</span>(<span class="number">8</span>);
-        <span class="kw">let</span> <span class="ident">cfs_opts</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
-            <span class="ident">CFOptions</span>::<span class="ident">new</span>(<span class="ident">CF_DEFAULT</span>, <span class="ident">ColumnFamilyOptions</span>::<span class="ident">new</span>()),
-            <span class="ident">CFOptions</span>::<span class="ident">new</span>(<span class="ident">CF_RAFT</span>, <span class="ident">ColumnFamilyOptions</span>::<span class="ident">new</span>()),
-            <span class="ident">CFOptions</span>::<span class="ident">new</span>(<span class="ident">CF_LOCK</span>, <span class="ident">ColumnFamilyOptions</span>::<span class="ident">new</span>()),
-            <span class="ident">CFOptions</span>::<span class="ident">new</span>(<span class="ident">CF_WRITE</span>, <span class="ident">cf_opts</span>),
+        <span class="kw">let</span> <span class="ident">cfs_opts</span> <span class="op">=</span> <span class="macro">vec!</span>[
+            <span class="ident">CFOptions::new</span>(<span class="ident">CF_DEFAULT</span>, <span class="ident">ColumnFamilyOptions::new</span>()),
+            <span class="ident">CFOptions::new</span>(<span class="ident">CF_RAFT</span>, <span class="ident">ColumnFamilyOptions::new</span>()),
+            <span class="ident">CFOptions::new</span>(<span class="ident">CF_LOCK</span>, <span class="ident">ColumnFamilyOptions::new</span>()),
+            <span class="ident">CFOptions::new</span>(<span class="ident">CF_WRITE</span>, <span class="ident">cf_opts</span>),
         ];
         <span class="ident">new_engine_opt</span>(<span class="ident">path</span>, <span class="ident">db_opts</span>, <span class="ident">cfs_opts</span>).<span class="ident">unwrap</span>()
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_check_space_redundancy</span>() {
-        <span class="kw">let</span> <span class="ident">tmp_dir</span> <span class="op">=</span> <span class="ident">Builder</span>::<span class="ident">new</span>().<span class="ident">prefix</span>(<span class="string">&quot;test&quot;</span>).<span class="ident">tempdir</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">tmp_dir</span> <span class="op">=</span> <span class="ident">Builder::new</span>().<span class="ident">prefix</span>(<span class="string">&quot;test&quot;</span>).<span class="ident">tempdir</span>().<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span> <span class="ident">open_db</span>(<span class="ident">tmp_dir</span>.<span class="ident">path</span>().<span class="ident">to_str</span>().<span class="ident">unwrap</span>());
 
         <span class="comment">// mvcc_put 0..5</span>
         <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="number">5</span> {
-            <span class="kw">let</span> (<span class="ident">k</span>, <span class="ident">v</span>) <span class="op">=</span> (<span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;k{}&quot;</span>, <span class="ident">i</span>), <span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;value{}&quot;</span>, <span class="ident">i</span>));
+            <span class="kw">let</span> (<span class="ident">k</span>, <span class="ident">v</span>) <span class="op">=</span> (<span class="macro">format!</span>(<span class="string">&quot;k{}&quot;</span>, <span class="ident">i</span>), <span class="macro">format!</span>(<span class="string">&quot;value{}&quot;</span>, <span class="ident">i</span>));
             <span class="ident">mvcc_put</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">k</span>.<span class="ident">as_bytes</span>(), <span class="ident">v</span>.<span class="ident">as_bytes</span>(), <span class="number">1</span>.<span class="ident">into</span>(), <span class="number">2</span>.<span class="ident">into</span>());
         }
         <span class="ident">engine</span>.<span class="ident">flush_cf</span>(<span class="ident">CF_WRITE</span>, <span class="bool-val">true</span>).<span class="ident">unwrap</span>();
 
         <span class="comment">// gc 0..5</span>
         <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="number">5</span> {
-            <span class="kw">let</span> <span class="ident">k</span> <span class="op">=</span> <span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;k{}&quot;</span>, <span class="ident">i</span>);
+            <span class="kw">let</span> <span class="ident">k</span> <span class="op">=</span> <span class="macro">format!</span>(<span class="string">&quot;k{}&quot;</span>, <span class="ident">i</span>);
             <span class="ident">delete</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">k</span>.<span class="ident">as_bytes</span>(), <span class="number">2</span>.<span class="ident">into</span>());
         }
         <span class="ident">engine</span>.<span class="ident">flush_cf</span>(<span class="ident">CF_WRITE</span>, <span class="bool-val">true</span>).<span class="ident">unwrap</span>();
@@ -776,12 +784,12 @@
             .<span class="ident">get_range_entries_and_versions</span>(<span class="ident">CF_WRITE</span>, <span class="kw-2">&amp;</span><span class="ident">start</span>, <span class="kw-2">&amp;</span><span class="ident">end</span>)
             .<span class="ident">unwrap</span>()
             .<span class="ident">unwrap</span>();
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">entries</span>, <span class="number">10</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">version</span>, <span class="number">5</span>);
+        <span class="macro">assert_eq!</span>(<span class="ident">entries</span>, <span class="number">10</span>);
+        <span class="macro">assert_eq!</span>(<span class="ident">version</span>, <span class="number">5</span>);
 
         <span class="comment">// mvcc_put 5..10</span>
         <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">5</span>..<span class="number">10</span> {
-            <span class="kw">let</span> (<span class="ident">k</span>, <span class="ident">v</span>) <span class="op">=</span> (<span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;k{}&quot;</span>, <span class="ident">i</span>), <span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;value{}&quot;</span>, <span class="ident">i</span>));
+            <span class="kw">let</span> (<span class="ident">k</span>, <span class="ident">v</span>) <span class="op">=</span> (<span class="macro">format!</span>(<span class="string">&quot;k{}&quot;</span>, <span class="ident">i</span>), <span class="macro">format!</span>(<span class="string">&quot;value{}&quot;</span>, <span class="ident">i</span>));
             <span class="ident">mvcc_put</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">k</span>.<span class="ident">as_bytes</span>(), <span class="ident">v</span>.<span class="ident">as_bytes</span>(), <span class="number">1</span>.<span class="ident">into</span>(), <span class="number">2</span>.<span class="ident">into</span>());
         }
         <span class="ident">engine</span>.<span class="ident">flush_cf</span>(<span class="ident">CF_WRITE</span>, <span class="bool-val">true</span>).<span class="ident">unwrap</span>();
@@ -791,24 +799,24 @@
             .<span class="ident">get_range_entries_and_versions</span>(<span class="ident">CF_WRITE</span>, <span class="kw-2">&amp;</span><span class="ident">s</span>, <span class="kw-2">&amp;</span><span class="ident">e</span>)
             .<span class="ident">unwrap</span>()
             .<span class="ident">unwrap</span>();
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">entries</span>, <span class="number">5</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">version</span>, <span class="number">5</span>);
+        <span class="macro">assert_eq!</span>(<span class="ident">entries</span>, <span class="number">5</span>);
+        <span class="macro">assert_eq!</span>(<span class="ident">version</span>, <span class="number">5</span>);
 
         <span class="kw">let</span> <span class="ident">ranges_need_to_compact</span> <span class="op">=</span> <span class="ident">collect_ranges_need_compact</span>(
             <span class="kw-2">&amp;</span><span class="ident">engine</span>,
-            <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">data_key</span>(<span class="string">b&quot;k0&quot;</span>), <span class="ident">data_key</span>(<span class="string">b&quot;k5&quot;</span>), <span class="ident">data_key</span>(<span class="string">b&quot;k9&quot;</span>)],
+            <span class="macro">vec!</span>[<span class="ident">data_key</span>(<span class="string">b&quot;k0&quot;</span>), <span class="ident">data_key</span>(<span class="string">b&quot;k5&quot;</span>), <span class="ident">data_key</span>(<span class="string">b&quot;k9&quot;</span>)],
             <span class="number">1</span>,
             <span class="number">50</span>,
         )
         .<span class="ident">unwrap</span>();
         <span class="kw">let</span> (<span class="ident">s</span>, <span class="ident">e</span>) <span class="op">=</span> (<span class="ident">data_key</span>(<span class="string">b&quot;k0&quot;</span>), <span class="ident">data_key</span>(<span class="string">b&quot;k5&quot;</span>));
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">expected_ranges</span> <span class="op">=</span> <span class="ident">VecDeque</span>::<span class="ident">new</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">expected_ranges</span> <span class="op">=</span> <span class="ident">VecDeque::new</span>();
         <span class="ident">expected_ranges</span>.<span class="ident">push_back</span>((<span class="ident">s</span>, <span class="ident">e</span>));
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">ranges_need_to_compact</span>, <span class="ident">expected_ranges</span>);
+        <span class="macro">assert_eq!</span>(<span class="ident">ranges_need_to_compact</span>, <span class="ident">expected_ranges</span>);
 
         <span class="comment">// gc 5..10</span>
         <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">5</span>..<span class="number">10</span> {
-            <span class="kw">let</span> <span class="ident">k</span> <span class="op">=</span> <span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;k{}&quot;</span>, <span class="ident">i</span>);
+            <span class="kw">let</span> <span class="ident">k</span> <span class="op">=</span> <span class="macro">format!</span>(<span class="string">&quot;k{}&quot;</span>, <span class="ident">i</span>);
             <span class="ident">delete</span>(<span class="kw-2">&amp;</span><span class="ident">engine</span>, <span class="ident">k</span>.<span class="ident">as_bytes</span>(), <span class="number">2</span>.<span class="ident">into</span>());
         }
         <span class="ident">engine</span>.<span class="ident">flush_cf</span>(<span class="ident">CF_WRITE</span>, <span class="bool-val">true</span>).<span class="ident">unwrap</span>();
@@ -818,22 +826,22 @@
             .<span class="ident">get_range_entries_and_versions</span>(<span class="ident">CF_WRITE</span>, <span class="kw-2">&amp;</span><span class="ident">s</span>, <span class="kw-2">&amp;</span><span class="ident">e</span>)
             .<span class="ident">unwrap</span>()
             .<span class="ident">unwrap</span>();
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">entries</span>, <span class="number">10</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">version</span>, <span class="number">5</span>);
+        <span class="macro">assert_eq!</span>(<span class="ident">entries</span>, <span class="number">10</span>);
+        <span class="macro">assert_eq!</span>(<span class="ident">version</span>, <span class="number">5</span>);
 
         <span class="kw">let</span> <span class="ident">ranges_need_to_compact</span> <span class="op">=</span> <span class="ident">collect_ranges_need_compact</span>(
             <span class="kw-2">&amp;</span><span class="ident">engine</span>,
-            <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">data_key</span>(<span class="string">b&quot;k0&quot;</span>), <span class="ident">data_key</span>(<span class="string">b&quot;k5&quot;</span>), <span class="ident">data_key</span>(<span class="string">b&quot;k9&quot;</span>)],
+            <span class="macro">vec!</span>[<span class="ident">data_key</span>(<span class="string">b&quot;k0&quot;</span>), <span class="ident">data_key</span>(<span class="string">b&quot;k5&quot;</span>), <span class="ident">data_key</span>(<span class="string">b&quot;k9&quot;</span>)],
             <span class="number">1</span>,
             <span class="number">50</span>,
         )
         .<span class="ident">unwrap</span>();
         <span class="kw">let</span> (<span class="ident">s</span>, <span class="ident">e</span>) <span class="op">=</span> (<span class="ident">data_key</span>(<span class="string">b&quot;k0&quot;</span>), <span class="ident">data_key</span>(<span class="string">b&quot;k9&quot;</span>));
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">expected_ranges</span> <span class="op">=</span> <span class="ident">VecDeque</span>::<span class="ident">new</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">expected_ranges</span> <span class="op">=</span> <span class="ident">VecDeque::new</span>();
         <span class="ident">expected_ranges</span>.<span class="ident">push_back</span>((<span class="ident">s</span>, <span class="ident">e</span>));
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">ranges_need_to_compact</span>, <span class="ident">expected_ranges</span>);
+        <span class="macro">assert_eq!</span>(<span class="ident">ranges_need_to_compact</span>, <span class="ident">expected_ranges</span>);
     }
 }
 </pre></div>
-</section><section id="search" class="content hidden"></section><section class="footer"></section><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="raftstore"></div>
-    <script src="../../../../main.js"></script><script src="../../../../source-script.js"></script><script src="../../../../source-files.js"></script><script defer src="../../../../search-index.js"></script></body></html>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="raftstore" data-search-js="../../../../search-index.js"></div>
+    <script src="../../../../main.js"></script><script src="../../../../source-script.js"></script><script src="../../../../source-files.js"></script></body></html>

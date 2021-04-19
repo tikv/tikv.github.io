@@ -1,4 +1,4 @@
 (function() {var implementors = {};
-implementors["engine_panic"] = [{"text":"impl PerfContext for PanicPerfContext","synthetic":false,"types":[]}];
-implementors["engine_rocks"] = [{"text":"impl PerfContext for RocksPerfContext","synthetic":false,"types":[]}];
+implementors["engine_panic"] = [{"text":"impl <a class=\"trait\" href=\"engine_traits/perf_context/trait.PerfContext.html\" title=\"trait engine_traits::perf_context::PerfContext\">PerfContext</a> for <a class=\"struct\" href=\"engine_panic/perf_context/struct.PanicPerfContext.html\" title=\"struct engine_panic::perf_context::PanicPerfContext\">PanicPerfContext</a>","synthetic":false,"types":["engine_panic::perf_context::PanicPerfContext"]}];
+implementors["engine_rocks"] = [{"text":"impl <a class=\"trait\" href=\"engine_traits/perf_context/trait.PerfContext.html\" title=\"trait engine_traits::perf_context::PerfContext\">PerfContext</a> for <a class=\"struct\" href=\"engine_rocks/perf_context/struct.RocksPerfContext.html\" title=\"struct engine_rocks::perf_context::RocksPerfContext\">RocksPerfContext</a>","synthetic":false,"types":["engine_rocks::perf_context::RocksPerfContext"]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

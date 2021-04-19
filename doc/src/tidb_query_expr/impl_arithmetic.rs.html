@@ -1,7 +1,7 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `components/tidb_query_expr/src/impl_arithmetic.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>impl_arithmetic.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `components/tidb_query_expr/src/impl_arithmetic.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>impl_arithmetic.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><script src="../../crates.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
 <link rel="alternate icon" type="image/png" href="../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../tidb_query_expr/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
-                <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">   1</span>
+<link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../tidb_query_expr/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
+                <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">   1</span>
 <span id="2">   2</span>
 <span id="3">   3</span>
 <span id="4">   4</span>
@@ -1306,43 +1306,45 @@
 <span id="1303">1303</span>
 <span id="1304">1304</span>
 <span id="1305">1305</span>
+<span id="1306">1306</span>
+<span id="1307">1307</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
-<span class="kw">use</span> <span class="ident">num_traits</span>::<span class="ident">identities</span>::<span class="ident">Zero</span>;
-<span class="kw">use</span> <span class="ident">tidb_query_codegen</span>::<span class="ident">rpn_fn</span>;
+<span class="kw">use</span> <span class="ident">num_traits::identities::Zero</span>;
+<span class="kw">use</span> <span class="ident">tidb_query_codegen::rpn_fn</span>;
 
-<span class="kw">use</span> <span class="ident">tidb_query_common</span>::<span class="prelude-ty">Result</span>;
-<span class="kw">use</span> <span class="ident">tidb_query_datatype</span>::<span class="ident">codec</span>::<span class="ident">data_type</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident">tidb_query_datatype</span>::<span class="ident">codec</span>::{<span class="self">self</span>, <span class="ident">div_i64</span>, <span class="ident">div_i64_with_u64</span>, <span class="ident">div_u64_with_i64</span>, <span class="ident">Error</span>};
-<span class="kw">use</span> <span class="ident">tidb_query_datatype</span>::<span class="ident">expr</span>::<span class="ident">EvalContext</span>;
+<span class="kw">use</span> <span class="ident">tidb_query_common::Result</span>;
+<span class="kw">use</span> <span class="ident">tidb_query_datatype::codec::data_type</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident">tidb_query_datatype::codec</span>::{<span class="self">self</span>, <span class="ident">div_i64</span>, <span class="ident">div_i64_with_u64</span>, <span class="ident">div_u64_with_i64</span>, <span class="ident">Error</span>};
+<span class="kw">use</span> <span class="ident">tidb_query_datatype::expr::EvalContext</span>;
 
 <span class="attribute">#[<span class="ident">rpn_fn</span>]</span>
 <span class="attribute">#[<span class="ident">inline</span>]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">arithmetic</span><span class="op">&lt;</span><span class="ident">A</span>: <span class="ident">ArithmeticOp</span><span class="op">&gt;</span>(<span class="ident">lhs</span>: <span class="kw-2">&amp;</span><span class="ident">A</span>::<span class="ident">T</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="ident">A</span>::<span class="ident">T</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">A</span>::<span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-    <span class="ident">A</span>::<span class="ident">calc</span>(<span class="ident">lhs</span>, <span class="ident">rhs</span>)
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">arithmetic</span><span class="op">&lt;</span><span class="ident">A</span>: <span class="ident">ArithmeticOp</span><span class="op">&gt;</span>(<span class="ident">lhs</span>: <span class="kw-2">&amp;</span><span class="ident">A::T</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="ident">A::T</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">A::T</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    <span class="ident">A::calc</span>(<span class="ident">lhs</span>, <span class="ident">rhs</span>)
 }
 
 <span class="attribute">#[<span class="ident">rpn_fn</span>(<span class="ident">capture</span> <span class="op">=</span> [<span class="ident">ctx</span>]</span>)]
 <span class="attribute">#[<span class="ident">inline</span>]</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">arithmetic_with_ctx</span><span class="op">&lt;</span><span class="ident">A</span>: <span class="ident">ArithmeticOpWithCtx</span><span class="op">&gt;</span>(
     <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">EvalContext</span>,
-    <span class="ident">lhs</span>: <span class="kw-2">&amp;</span><span class="ident">A</span>::<span class="ident">T</span>,
-    <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="ident">A</span>::<span class="ident">T</span>,
-) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">A</span>::<span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-    <span class="ident">A</span>::<span class="ident">calc</span>(<span class="ident">ctx</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>)
+    <span class="ident">lhs</span>: <span class="kw-2">&amp;</span><span class="ident">A::T</span>,
+    <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="ident">A::T</span>,
+) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">A::T</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    <span class="ident">A::calc</span>(<span class="ident">ctx</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>)
 }
 
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">ArithmeticOp</span> {
     <span class="kw">type</span> <span class="ident">T</span>: <span class="ident">Evaluable</span> <span class="op">+</span> <span class="ident">EvaluableRet</span>;
 
-    <span class="kw">fn</span> <span class="ident">calc</span>(<span class="ident">lhs</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>::<span class="ident">T</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>::<span class="ident">T</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>;
+    <span class="kw">fn</span> <span class="ident">calc</span>(<span class="ident">lhs</span>: <span class="kw-2">&amp;</span><span class="self">Self</span><span class="ident">::T</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="self">Self</span><span class="ident">::T</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="ident">::T</span><span class="op">&gt;</span><span class="op">&gt;</span>;
 }
 
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">ArithmeticOpWithCtx</span> {
     <span class="kw">type</span> <span class="ident">T</span>: <span class="ident">Evaluable</span> <span class="op">+</span> <span class="ident">EvaluableRet</span>;
 
-    <span class="kw">fn</span> <span class="ident">calc</span>(<span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">EvalContext</span>, <span class="ident">lhs</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>::<span class="ident">T</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>::<span class="ident">T</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>;
+    <span class="kw">fn</span> <span class="ident">calc</span>(<span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">EvalContext</span>, <span class="ident">lhs</span>: <span class="kw-2">&amp;</span><span class="self">Self</span><span class="ident">::T</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="self">Self</span><span class="ident">::T</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="ident">::T</span><span class="op">&gt;</span><span class="op">&gt;</span>;
 }
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
@@ -1353,7 +1355,7 @@
 
     <span class="kw">fn</span> <span class="ident">calc</span>(<span class="ident">lhs</span>: <span class="kw-2">&amp;</span><span class="ident">Int</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="ident">Int</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Int</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="ident">lhs</span>.<span class="ident">checked_add</span>(<span class="kw-2">*</span><span class="ident">rhs</span>)
-            .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">Error</span>::<span class="ident">overflow</span>(<span class="string">&quot;BIGINT&quot;</span>, <span class="kw-2">&amp;</span><span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;({} + {})&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>)).<span class="ident">into</span>())
+            .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">Error::overflow</span>(<span class="string">&quot;BIGINT&quot;</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;({} + {})&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>)).<span class="ident">into</span>())
             .<span class="ident">map</span>(<span class="prelude-val">Some</span>)
     }
 }
@@ -1371,7 +1373,7 @@
             (<span class="kw-2">*</span><span class="ident">rhs</span> <span class="kw">as</span> <span class="ident">u64</span>).<span class="ident">checked_sub</span>(<span class="ident">lhs</span>.<span class="ident">overflowing_neg</span>().<span class="number">0</span> <span class="kw">as</span> <span class="ident">u64</span>)
         };
         <span class="ident">res</span>.<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> {
-            <span class="ident">Error</span>::<span class="ident">overflow</span>(<span class="string">&quot;BIGINT UNSIGNED&quot;</span>, <span class="kw-2">&amp;</span><span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;({} + {})&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>)).<span class="ident">into</span>()
+            <span class="ident">Error::overflow</span>(<span class="string">&quot;BIGINT UNSIGNED&quot;</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;({} + {})&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>)).<span class="ident">into</span>()
         })
         .<span class="ident">map</span>(<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="prelude-val">Some</span>(<span class="ident">v</span> <span class="kw">as</span> <span class="ident">i64</span>))
     }
@@ -1384,7 +1386,7 @@
     <span class="kw">type</span> <span class="ident">T</span> <span class="op">=</span> <span class="ident">Int</span>;
 
     <span class="kw">fn</span> <span class="ident">calc</span>(<span class="ident">lhs</span>: <span class="kw-2">&amp;</span><span class="ident">Int</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="ident">Int</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Int</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="ident">IntUintPlus</span>::<span class="ident">calc</span>(<span class="ident">rhs</span>, <span class="ident">lhs</span>)
+        <span class="ident">IntUintPlus::calc</span>(<span class="ident">rhs</span>, <span class="ident">lhs</span>)
     }
 }
 
@@ -1398,7 +1400,7 @@
         (<span class="kw-2">*</span><span class="ident">lhs</span> <span class="kw">as</span> <span class="ident">u64</span>)
             .<span class="ident">checked_add</span>(<span class="kw-2">*</span><span class="ident">rhs</span> <span class="kw">as</span> <span class="ident">u64</span>)
             .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> {
-                <span class="ident">Error</span>::<span class="ident">overflow</span>(<span class="string">&quot;BIGINT UNSIGNED&quot;</span>, <span class="kw-2">&amp;</span><span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;({} + {})&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>)).<span class="ident">into</span>()
+                <span class="ident">Error::overflow</span>(<span class="string">&quot;BIGINT UNSIGNED&quot;</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;({} + {})&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>)).<span class="ident">into</span>()
             })
             .<span class="ident">map</span>(<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="prelude-val">Some</span>(<span class="ident">v</span> <span class="kw">as</span> <span class="ident">i64</span>))
     }
@@ -1411,10 +1413,10 @@
     <span class="kw">type</span> <span class="ident">T</span> <span class="op">=</span> <span class="ident">Real</span>;
 
     <span class="kw">fn</span> <span class="ident">calc</span>(<span class="ident">lhs</span>: <span class="kw-2">&amp;</span><span class="ident">Real</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="ident">Real</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Real</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> (<span class="kw-2">*</span><span class="kw-2">*</span><span class="ident">lhs</span> <span class="op">&gt;</span> <span class="number">0f64</span> <span class="op">&amp;&amp;</span> <span class="kw-2">*</span><span class="kw-2">*</span><span class="ident">rhs</span> <span class="op">&gt;</span> (<span class="ident">std</span>::<span class="ident">f64</span>::<span class="ident">MAX</span> <span class="op">-</span> <span class="kw-2">*</span><span class="kw-2">*</span><span class="ident">lhs</span>))
-            <span class="op">|</span><span class="op">|</span> (<span class="kw-2">*</span><span class="kw-2">*</span><span class="ident">lhs</span> <span class="op">&lt;</span> <span class="number">0f64</span> <span class="op">&amp;&amp;</span> <span class="kw-2">*</span><span class="kw-2">*</span><span class="ident">rhs</span> <span class="op">&lt;</span> (<span class="op">-</span><span class="ident">std</span>::<span class="ident">f64</span>::<span class="ident">MAX</span> <span class="op">-</span> <span class="kw-2">*</span><span class="kw-2">*</span><span class="ident">lhs</span>))
+        <span class="kw">if</span> (<span class="kw-2">*</span><span class="kw-2">*</span><span class="ident">lhs</span> <span class="op">&gt;</span> <span class="number">0f64</span> <span class="op">&amp;&amp;</span> <span class="kw-2">*</span><span class="kw-2">*</span><span class="ident">rhs</span> <span class="op">&gt;</span> (<span class="ident">std::f64::MAX</span> <span class="op">-</span> <span class="kw-2">*</span><span class="kw-2">*</span><span class="ident">lhs</span>))
+            <span class="op">|</span><span class="op">|</span> (<span class="kw-2">*</span><span class="kw-2">*</span><span class="ident">lhs</span> <span class="op">&lt;</span> <span class="number">0f64</span> <span class="op">&amp;&amp;</span> <span class="kw-2">*</span><span class="kw-2">*</span><span class="ident">rhs</span> <span class="op">&lt;</span> (<span class="op">-</span><span class="ident">std::f64::MAX</span> <span class="op">-</span> <span class="kw-2">*</span><span class="kw-2">*</span><span class="ident">lhs</span>))
         {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">overflow</span>(<span class="string">&quot;DOUBLE&quot;</span>, <span class="kw-2">&amp;</span><span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;({} + {})&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>)).<span class="ident">into</span>());
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error::overflow</span>(<span class="string">&quot;DOUBLE&quot;</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;({} + {})&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>)).<span class="ident">into</span>());
         }
         <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="kw-2">*</span><span class="ident">lhs</span> <span class="op">+</span> <span class="kw-2">*</span><span class="ident">rhs</span>))
     }
@@ -1427,7 +1429,7 @@
     <span class="kw">type</span> <span class="ident">T</span> <span class="op">=</span> <span class="ident">Decimal</span>;
 
     <span class="kw">fn</span> <span class="ident">calc</span>(<span class="ident">lhs</span>: <span class="kw-2">&amp;</span><span class="ident">Decimal</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="ident">Decimal</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Decimal</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">res</span>: <span class="ident">codec</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Decimal</span><span class="op">&gt;</span> <span class="op">=</span> (<span class="ident">lhs</span> <span class="op">+</span> <span class="ident">rhs</span>).<span class="ident">into</span>();
+        <span class="kw">let</span> <span class="ident">res</span>: <span class="ident">codec::Result</span><span class="op">&lt;</span><span class="ident">Decimal</span><span class="op">&gt;</span> <span class="op">=</span> (<span class="ident">lhs</span> <span class="op">+</span> <span class="ident">rhs</span>).<span class="ident">into</span>();
         <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">res</span><span class="question-mark">?</span>))
     }
 }
@@ -1440,7 +1442,7 @@
 
     <span class="kw">fn</span> <span class="ident">calc</span>(<span class="ident">lhs</span>: <span class="kw-2">&amp;</span><span class="ident">Int</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="ident">Int</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Int</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="ident">lhs</span>.<span class="ident">checked_sub</span>(<span class="kw-2">*</span><span class="ident">rhs</span>)
-            .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">Error</span>::<span class="ident">overflow</span>(<span class="string">&quot;BIGINT&quot;</span>, <span class="kw-2">&amp;</span><span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;({} - {})&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>)).<span class="ident">into</span>())
+            .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">Error::overflow</span>(<span class="string">&quot;BIGINT&quot;</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;({} - {})&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>)).<span class="ident">into</span>())
             .<span class="ident">map</span>(<span class="prelude-val">Some</span>)
     }
 }
@@ -1455,10 +1457,10 @@
         <span class="kw">if</span> <span class="kw-2">*</span><span class="ident">lhs</span> <span class="op">&gt;</span><span class="op">=</span> <span class="number">0</span> {
             (<span class="kw-2">*</span><span class="ident">lhs</span> <span class="kw">as</span> <span class="ident">u64</span>)
                 .<span class="ident">checked_sub</span>(<span class="kw-2">*</span><span class="ident">rhs</span> <span class="kw">as</span> <span class="ident">u64</span>)
-                .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">Error</span>::<span class="ident">overflow</span>(<span class="string">&quot;BIGINT&quot;</span>, <span class="kw-2">&amp;</span><span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;({} - {})&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>)).<span class="ident">into</span>())
+                .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">Error::overflow</span>(<span class="string">&quot;BIGINT&quot;</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;({} - {})&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>)).<span class="ident">into</span>())
                 .<span class="ident">map</span>(<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="prelude-val">Some</span>(<span class="ident">v</span> <span class="kw">as</span> <span class="ident">i64</span>))
         } <span class="kw">else</span> {
-            <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">overflow</span>(<span class="string">&quot;BIGINT&quot;</span>, <span class="kw-2">&amp;</span><span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;({} - {})&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>)).<span class="ident">into</span>())
+            <span class="prelude-val">Err</span>(<span class="ident">Error::overflow</span>(<span class="string">&quot;BIGINT&quot;</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;({} - {})&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>)).<span class="ident">into</span>())
         }
     }
 }
@@ -1475,7 +1477,7 @@
         } <span class="kw">else</span> {
             (<span class="kw-2">*</span><span class="ident">lhs</span> <span class="kw">as</span> <span class="ident">u64</span>).<span class="ident">checked_add</span>(<span class="ident">rhs</span>.<span class="ident">overflowing_neg</span>().<span class="number">0</span> <span class="kw">as</span> <span class="ident">u64</span>)
         };
-        <span class="ident">res</span>.<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">Error</span>::<span class="ident">overflow</span>(<span class="string">&quot;BIGINT&quot;</span>, <span class="kw-2">&amp;</span><span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;({} - {})&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>)).<span class="ident">into</span>())
+        <span class="ident">res</span>.<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">Error::overflow</span>(<span class="string">&quot;BIGINT&quot;</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;({} - {})&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>)).<span class="ident">into</span>())
             .<span class="ident">map</span>(<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="prelude-val">Some</span>(<span class="ident">v</span> <span class="kw">as</span> <span class="ident">i64</span>))
     }
 }
@@ -1490,7 +1492,7 @@
         (<span class="kw-2">*</span><span class="ident">lhs</span> <span class="kw">as</span> <span class="ident">u64</span>)
             .<span class="ident">checked_sub</span>(<span class="kw-2">*</span><span class="ident">rhs</span> <span class="kw">as</span> <span class="ident">u64</span>)
             .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> {
-                <span class="ident">Error</span>::<span class="ident">overflow</span>(<span class="string">&quot;BIGINT UNSIGNED&quot;</span>, <span class="kw-2">&amp;</span><span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;({} - {})&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>)).<span class="ident">into</span>()
+                <span class="ident">Error::overflow</span>(<span class="string">&quot;BIGINT UNSIGNED&quot;</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;({} - {})&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>)).<span class="ident">into</span>()
             })
             .<span class="ident">map</span>(<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="prelude-val">Some</span>(<span class="ident">v</span> <span class="kw">as</span> <span class="ident">i64</span>))
     }
@@ -1505,7 +1507,7 @@
     <span class="kw">fn</span> <span class="ident">calc</span>(<span class="ident">lhs</span>: <span class="kw-2">&amp;</span><span class="ident">Real</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="ident">Real</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Real</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">lhs</span> <span class="op">-</span> <span class="kw-2">*</span><span class="ident">rhs</span>;
         <span class="kw">if</span> <span class="ident">res</span>.<span class="ident">is_infinite</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">overflow</span>(<span class="string">&quot;DOUBLE&quot;</span>, <span class="kw-2">&amp;</span><span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;({} - {})&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>)).<span class="ident">into</span>());
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error::overflow</span>(<span class="string">&quot;DOUBLE&quot;</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;({} - {})&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>)).<span class="ident">into</span>());
         }
         <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">res</span>))
     }
@@ -1518,7 +1520,7 @@
     <span class="kw">type</span> <span class="ident">T</span> <span class="op">=</span> <span class="ident">Decimal</span>;
 
     <span class="kw">fn</span> <span class="ident">calc</span>(<span class="ident">lhs</span>: <span class="kw-2">&amp;</span><span class="ident">Decimal</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="ident">Decimal</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Decimal</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">res</span>: <span class="ident">codec</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Decimal</span><span class="op">&gt;</span> <span class="op">=</span> (<span class="ident">lhs</span> <span class="op">-</span> <span class="ident">rhs</span>).<span class="ident">into</span>();
+        <span class="kw">let</span> <span class="ident">res</span>: <span class="ident">codec::Result</span><span class="op">&lt;</span><span class="ident">Decimal</span><span class="op">&gt;</span> <span class="op">=</span> (<span class="ident">lhs</span> <span class="op">-</span> <span class="ident">rhs</span>).<span class="ident">into</span>();
         <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">res</span><span class="question-mark">?</span>))
     }
 }
@@ -1589,7 +1591,7 @@
     <span class="kw">type</span> <span class="ident">T</span> <span class="op">=</span> <span class="ident">Real</span>;
 
     <span class="kw">fn</span> <span class="ident">calc</span>(<span class="ident">lhs</span>: <span class="kw-2">&amp;</span><span class="ident">Real</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="ident">Real</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Real</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> (<span class="kw-2">*</span><span class="ident">rhs</span>).<span class="ident">into_inner</span>() <span class="op">=</span><span class="op">=</span> <span class="number">0f64</span> {
+        <span class="kw">if</span> <span class="ident">rhs</span>.<span class="ident">into_inner</span>() <span class="op">=</span><span class="op">=</span> <span class="number">0f64</span> {
             <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>);
         }
         <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="kw-2">*</span><span class="ident">lhs</span> <span class="op">%</span> <span class="kw-2">*</span><span class="ident">rhs</span>))
@@ -1607,7 +1609,7 @@
             <span class="ident">value</span>
                 .<span class="ident">into_result_with_overflow_err</span>(
                     <span class="ident">ctx</span>,
-                    <span class="ident">Error</span>::<span class="ident">overflow</span>(<span class="string">&quot;DECIMAL&quot;</span>, <span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;({} % {})&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>)),
+                    <span class="ident">Error::overflow</span>(<span class="string">&quot;DECIMAL&quot;</span>, <span class="macro">format!</span>(<span class="string">&quot;({} % {})&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>)),
                 )
                 .<span class="ident">map</span>(<span class="prelude-val">Some</span>)
         } <span class="kw">else</span> {
@@ -1623,7 +1625,7 @@
     <span class="kw">type</span> <span class="ident">T</span> <span class="op">=</span> <span class="ident">Decimal</span>;
 
     <span class="kw">fn</span> <span class="ident">calc</span>(<span class="ident">lhs</span>: <span class="kw-2">&amp;</span><span class="ident">Decimal</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="ident">Decimal</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Decimal</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">res</span>: <span class="ident">codec</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Decimal</span><span class="op">&gt;</span> <span class="op">=</span> (<span class="ident">lhs</span> <span class="op">*</span> <span class="ident">rhs</span>).<span class="ident">into</span>();
+        <span class="kw">let</span> <span class="ident">res</span>: <span class="ident">codec::Result</span><span class="op">&lt;</span><span class="ident">Decimal</span><span class="op">&gt;</span> <span class="op">=</span> (<span class="ident">lhs</span> <span class="op">*</span> <span class="ident">rhs</span>).<span class="ident">into</span>();
         <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">res</span><span class="question-mark">?</span>))
     }
 }
@@ -1636,7 +1638,7 @@
     <span class="kw">fn</span> <span class="ident">calc</span>(<span class="ident">lhs</span>: <span class="kw-2">&amp;</span><span class="ident">Real</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="ident">Real</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Real</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">lhs</span> <span class="op">*</span> <span class="kw-2">*</span><span class="ident">rhs</span>;
         <span class="kw">if</span> <span class="ident">res</span>.<span class="ident">is_infinite</span>() {
-            <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">overflow</span>(<span class="string">&quot;REAL&quot;</span>, <span class="kw-2">&amp;</span><span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;({} * {})&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>)).<span class="ident">into</span>())
+            <span class="prelude-val">Err</span>(<span class="ident">Error::overflow</span>(<span class="string">&quot;REAL&quot;</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;({} * {})&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>)).<span class="ident">into</span>())
         } <span class="kw">else</span> {
             <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">res</span>))
         }
@@ -1650,7 +1652,7 @@
     <span class="kw">type</span> <span class="ident">T</span> <span class="op">=</span> <span class="ident">Int</span>;
     <span class="kw">fn</span> <span class="ident">calc</span>(<span class="ident">lhs</span>: <span class="kw-2">&amp;</span><span class="ident">Int</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="ident">Int</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Int</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="ident">lhs</span>.<span class="ident">checked_mul</span>(<span class="kw-2">*</span><span class="ident">rhs</span>)
-            .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">Error</span>::<span class="ident">overflow</span>(<span class="string">&quot;BIGINT&quot;</span>, <span class="kw-2">&amp;</span><span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;({} * {})&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>)).<span class="ident">into</span>())
+            .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">Error::overflow</span>(<span class="string">&quot;BIGINT&quot;</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;({} * {})&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>)).<span class="ident">into</span>())
             .<span class="ident">map</span>(<span class="prelude-val">Some</span>)
     }
 }
@@ -1666,7 +1668,7 @@
         } <span class="kw">else</span> {
             <span class="prelude-val">None</span>
         }
-        .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">Error</span>::<span class="ident">overflow</span>(<span class="string">&quot;BIGINT UNSIGNED&quot;</span>, <span class="kw-2">&amp;</span><span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;({} * {})&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>)).<span class="ident">into</span>())
+        .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">Error::overflow</span>(<span class="string">&quot;BIGINT UNSIGNED&quot;</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;({} * {})&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>)).<span class="ident">into</span>())
         .<span class="ident">map</span>(<span class="prelude-val">Some</span>)
     }
 }
@@ -1677,7 +1679,7 @@
 <span class="kw">impl</span> <span class="ident">ArithmeticOp</span> <span class="kw">for</span> <span class="ident">UintIntMultiply</span> {
     <span class="kw">type</span> <span class="ident">T</span> <span class="op">=</span> <span class="ident">Int</span>;
     <span class="kw">fn</span> <span class="ident">calc</span>(<span class="ident">lhs</span>: <span class="kw-2">&amp;</span><span class="ident">Int</span>, <span class="ident">rhs</span>: <span class="kw-2">&amp;</span><span class="ident">Int</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Int</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="ident">IntUintMultiply</span>::<span class="ident">calc</span>(<span class="ident">rhs</span>, <span class="ident">lhs</span>)
+        <span class="ident">IntUintMultiply::calc</span>(<span class="ident">rhs</span>, <span class="ident">lhs</span>)
     }
 }
 
@@ -1690,7 +1692,7 @@
         (<span class="kw-2">*</span><span class="ident">lhs</span> <span class="kw">as</span> <span class="ident">u64</span>)
             .<span class="ident">checked_mul</span>(<span class="kw-2">*</span><span class="ident">rhs</span> <span class="kw">as</span> <span class="ident">u64</span>)
             .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> {
-                <span class="ident">Error</span>::<span class="ident">overflow</span>(<span class="string">&quot;BIGINT UNSIGNED&quot;</span>, <span class="kw-2">&amp;</span><span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;({} * {})&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>)).<span class="ident">into</span>()
+                <span class="ident">Error::overflow</span>(<span class="string">&quot;BIGINT UNSIGNED&quot;</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;({} * {})&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>)).<span class="ident">into</span>()
             })
             .<span class="ident">map</span>(<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="prelude-val">Some</span>(<span class="ident">v</span> <span class="kw">as</span> <span class="ident">i64</span>))
     }
@@ -1764,7 +1766,7 @@
             <span class="ident">result</span>
                 .<span class="ident">into_result_with_overflow_err</span>(
                     <span class="ident">ctx</span>,
-                    <span class="ident">Error</span>::<span class="ident">overflow</span>(<span class="string">&quot;BIGINT&quot;</span>, <span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;({} / {})&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>)),
+                    <span class="ident">Error::overflow</span>(<span class="string">&quot;BIGINT&quot;</span>, <span class="macro">format!</span>(<span class="string">&quot;({} / {})&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>)),
                 )
                 .<span class="ident">map</span>(<span class="prelude-val">Some</span>)<span class="question-mark">?</span>
         })
@@ -1783,7 +1785,7 @@
             <span class="ident">value</span>
                 .<span class="ident">into_result_with_overflow_err</span>(
                     <span class="ident">ctx</span>,
-                    <span class="ident">Error</span>::<span class="ident">overflow</span>(<span class="string">&quot;DECIMAL&quot;</span>, <span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;({} / {})&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>)),
+                    <span class="ident">Error::overflow</span>(<span class="string">&quot;DECIMAL&quot;</span>, <span class="macro">format!</span>(<span class="string">&quot;({} / {})&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>)),
                 )
                 .<span class="ident">map</span>(<span class="prelude-val">Some</span>)
         } <span class="kw">else</span> {
@@ -1804,7 +1806,7 @@
         } <span class="kw">else</span> {
             <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">lhs</span> <span class="op">/</span> <span class="kw-2">*</span><span class="ident">rhs</span>;
             <span class="kw">if</span> <span class="ident">result</span>.<span class="ident">is_infinite</span>() {
-                <span class="ident">ctx</span>.<span class="ident">handle_overflow_err</span>(<span class="ident">Error</span>::<span class="ident">overflow</span>(<span class="string">&quot;DOUBLE&quot;</span>, <span class="kw-2">&amp;</span><span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;{} / {}&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>)))
+                <span class="ident">ctx</span>.<span class="ident">handle_overflow_err</span>(<span class="ident">Error::overflow</span>(<span class="string">&quot;DOUBLE&quot;</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{} / {}&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>)))
                     .<span class="ident">map</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="prelude-val">None</span>)<span class="question-mark">?</span>
             } <span class="kw">else</span> {
                 <span class="prelude-val">Some</span>(<span class="ident">result</span>)
@@ -1817,127 +1819,127 @@
 <span class="kw">mod</span> <span class="ident">tests</span> {
     <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 
-    <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">str</span>::<span class="ident">FromStr</span>;
+    <span class="kw">use</span> <span class="ident">std::str::FromStr</span>;
 
-    <span class="kw">use</span> <span class="ident">tidb_query_datatype</span>::<span class="ident">builder</span>::<span class="ident">FieldTypeBuilder</span>;
+    <span class="kw">use</span> <span class="ident">tidb_query_datatype::builder::FieldTypeBuilder</span>;
     <span class="kw">use</span> <span class="ident">tidb_query_datatype</span>::{<span class="ident">FieldTypeFlag</span>, <span class="ident">FieldTypeTp</span>};
-    <span class="kw">use</span> <span class="ident">tipb</span>::<span class="ident">ScalarFuncSig</span>;
+    <span class="kw">use</span> <span class="ident">tipb::ScalarFuncSig</span>;
 
-    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">test_util</span>::<span class="ident">RpnFnScalarEvaluator</span>;
-    <span class="kw">use</span> <span class="ident">tidb_query_datatype</span>::<span class="ident">codec</span>::<span class="ident">error</span>::<span class="ident">ERR_DIVISION_BY_ZERO</span>;
-    <span class="kw">use</span> <span class="ident">tidb_query_datatype</span>::<span class="ident">expr</span>::{<span class="ident">EvalConfig</span>, <span class="ident">Flag</span>, <span class="ident">SqlMode</span>};
+    <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::test_util::RpnFnScalarEvaluator</span>;
+    <span class="kw">use</span> <span class="ident">tidb_query_datatype::codec::error::ERR_DIVISION_BY_ZERO</span>;
+    <span class="kw">use</span> <span class="ident">tidb_query_datatype::expr</span>::{<span class="ident">EvalConfig</span>, <span class="ident">Flag</span>, <span class="ident">SqlMode</span>};
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_plus_int</span>() {
-        <span class="kw">let</span> <span class="ident">test_cases</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
+        <span class="kw">let</span> <span class="ident">test_cases</span> <span class="op">=</span> <span class="macro">vec!</span>[
             (<span class="prelude-val">None</span>, <span class="bool-val">false</span>, <span class="prelude-val">Some</span>(<span class="number">1</span>), <span class="bool-val">false</span>, <span class="prelude-val">None</span>),
             (<span class="prelude-val">Some</span>(<span class="number">1</span>), <span class="bool-val">false</span>, <span class="prelude-val">None</span>, <span class="bool-val">false</span>, <span class="prelude-val">None</span>),
             (<span class="prelude-val">Some</span>(<span class="number">17</span>), <span class="bool-val">false</span>, <span class="prelude-val">Some</span>(<span class="number">25</span>), <span class="bool-val">false</span>, <span class="prelude-val">Some</span>(<span class="number">42</span>)),
             (
-                <span class="prelude-val">Some</span>(<span class="ident">std</span>::<span class="ident">i64</span>::<span class="ident">MIN</span>),
+                <span class="prelude-val">Some</span>(<span class="ident">std::i64::MIN</span>),
                 <span class="bool-val">false</span>,
-                <span class="prelude-val">Some</span>((<span class="ident">std</span>::<span class="ident">i64</span>::<span class="ident">MAX</span> <span class="kw">as</span> <span class="ident">u64</span> <span class="op">+</span> <span class="number">1</span>) <span class="kw">as</span> <span class="ident">i64</span>),
+                <span class="prelude-val">Some</span>((<span class="ident">std::i64::MAX</span> <span class="kw">as</span> <span class="ident">u64</span> <span class="op">+</span> <span class="number">1</span>) <span class="kw">as</span> <span class="ident">i64</span>),
                 <span class="bool-val">true</span>,
                 <span class="prelude-val">Some</span>(<span class="number">0</span>),
             ),
         ];
         <span class="kw">for</span> (<span class="ident">lhs</span>, <span class="ident">lhs_is_unsigned</span>, <span class="ident">rhs</span>, <span class="ident">rhs_is_unsigned</span>, <span class="ident">expected</span>) <span class="kw">in</span> <span class="ident">test_cases</span> {
-            <span class="kw">let</span> <span class="ident">lhs_field_type</span> <span class="op">=</span> <span class="ident">FieldTypeBuilder</span>::<span class="ident">new</span>()
-                .<span class="ident">tp</span>(<span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>)
+            <span class="kw">let</span> <span class="ident">lhs_field_type</span> <span class="op">=</span> <span class="ident">FieldTypeBuilder::new</span>()
+                .<span class="ident">tp</span>(<span class="ident">FieldTypeTp::LongLong</span>)
                 .<span class="ident">flag</span>(<span class="kw">if</span> <span class="ident">lhs_is_unsigned</span> {
-                    <span class="ident">FieldTypeFlag</span>::<span class="ident">UNSIGNED</span>
+                    <span class="ident">FieldTypeFlag::UNSIGNED</span>
                 } <span class="kw">else</span> {
-                    <span class="ident">FieldTypeFlag</span>::<span class="ident">empty</span>()
+                    <span class="ident">FieldTypeFlag::empty</span>()
                 })
                 .<span class="ident">build</span>();
-            <span class="kw">let</span> <span class="ident">rhs_field_type</span> <span class="op">=</span> <span class="ident">FieldTypeBuilder</span>::<span class="ident">new</span>()
-                .<span class="ident">tp</span>(<span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>)
+            <span class="kw">let</span> <span class="ident">rhs_field_type</span> <span class="op">=</span> <span class="ident">FieldTypeBuilder::new</span>()
+                .<span class="ident">tp</span>(<span class="ident">FieldTypeTp::LongLong</span>)
                 .<span class="ident">flag</span>(<span class="kw">if</span> <span class="ident">rhs_is_unsigned</span> {
-                    <span class="ident">FieldTypeFlag</span>::<span class="ident">UNSIGNED</span>
+                    <span class="ident">FieldTypeFlag::UNSIGNED</span>
                 } <span class="kw">else</span> {
-                    <span class="ident">FieldTypeFlag</span>::<span class="ident">empty</span>()
+                    <span class="ident">FieldTypeFlag::empty</span>()
                 })
                 .<span class="ident">build</span>();
-            <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">RpnFnScalarEvaluator</span>::<span class="ident">new</span>()
+            <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">RpnFnScalarEvaluator::new</span>()
                 .<span class="ident">push_param_with_field_type</span>(<span class="ident">lhs</span>, <span class="ident">lhs_field_type</span>)
                 .<span class="ident">push_param_with_field_type</span>(<span class="ident">rhs</span>, <span class="ident">rhs_field_type</span>)
-                .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig</span>::<span class="ident">PlusInt</span>)
+                .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig::PlusInt</span>)
                 .<span class="ident">unwrap</span>();
-            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">output</span>, <span class="ident">expected</span>, <span class="string">&quot;lhs={:?}, rhs={:?}&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>);
+            <span class="macro">assert_eq!</span>(<span class="ident">output</span>, <span class="ident">expected</span>, <span class="string">&quot;lhs={:?}, rhs={:?}&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>);
         }
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_plus_real</span>() {
-        <span class="kw">let</span> <span class="ident">test_cases</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
+        <span class="kw">let</span> <span class="ident">test_cases</span> <span class="op">=</span> <span class="macro">vec!</span>[
             (
-                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">1.01001</span>).<span class="ident">ok</span>(),
-                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="op">-</span><span class="number">0.01</span>).<span class="ident">ok</span>(),
-                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">1.00001</span>).<span class="ident">ok</span>(),
+                <span class="ident">Real::new</span>(<span class="number">1.01001</span>).<span class="ident">ok</span>(),
+                <span class="ident">Real::new</span>(<span class="op">-</span><span class="number">0.01</span>).<span class="ident">ok</span>(),
+                <span class="ident">Real::new</span>(<span class="number">1.00001</span>).<span class="ident">ok</span>(),
                 <span class="bool-val">false</span>,
             ),
-            (<span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">1e308</span>).<span class="ident">ok</span>(), <span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">1e308</span>).<span class="ident">ok</span>(), <span class="prelude-val">None</span>, <span class="bool-val">true</span>),
+            (<span class="ident">Real::new</span>(<span class="number">1e308</span>).<span class="ident">ok</span>(), <span class="ident">Real::new</span>(<span class="number">1e308</span>).<span class="ident">ok</span>(), <span class="prelude-val">None</span>, <span class="bool-val">true</span>),
             (
-                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="ident">std</span>::<span class="ident">f64</span>::<span class="ident">MAX</span> <span class="op">-</span> <span class="number">1f64</span>).<span class="ident">ok</span>(),
-                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">2f64</span>).<span class="ident">ok</span>(),
+                <span class="ident">Real::new</span>(<span class="ident">std::f64::MAX</span> <span class="op">-</span> <span class="number">1f64</span>).<span class="ident">ok</span>(),
+                <span class="ident">Real::new</span>(<span class="number">2f64</span>).<span class="ident">ok</span>(),
                 <span class="prelude-val">None</span>,
                 <span class="bool-val">true</span>,
             ),
         ];
         <span class="kw">for</span> (<span class="ident">lhs</span>, <span class="ident">rhs</span>, <span class="ident">expected</span>, <span class="ident">is_err</span>) <span class="kw">in</span> <span class="ident">test_cases</span> {
-            <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">RpnFnScalarEvaluator</span>::<span class="ident">new</span>()
+            <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">RpnFnScalarEvaluator::new</span>()
                 .<span class="ident">push_param</span>(<span class="ident">lhs</span>)
                 .<span class="ident">push_param</span>(<span class="ident">rhs</span>)
-                .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig</span>::<span class="ident">PlusReal</span>);
+                .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig::PlusReal</span>);
             <span class="kw">if</span> <span class="ident">is_err</span> {
-                <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">output</span>.<span class="ident">is_err</span>())
+                <span class="macro">assert!</span>(<span class="ident">output</span>.<span class="ident">is_err</span>())
             } <span class="kw">else</span> {
                 <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">output</span>.<span class="ident">unwrap</span>();
-                <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">output</span>, <span class="ident">expected</span>, <span class="string">&quot;lhs={:?}, rhs={:?}&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>);
+                <span class="macro">assert_eq!</span>(<span class="ident">output</span>, <span class="ident">expected</span>, <span class="string">&quot;lhs={:?}, rhs={:?}&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>);
             }
         }
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_plus_decimal</span>() {
-        <span class="kw">let</span> <span class="ident">test_cases</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[(<span class="string">&quot;1.1&quot;</span>, <span class="string">&quot;2.2&quot;</span>, <span class="string">&quot;3.3&quot;</span>)];
+        <span class="kw">let</span> <span class="ident">test_cases</span> <span class="op">=</span> <span class="macro">vec!</span>[(<span class="string">&quot;1.1&quot;</span>, <span class="string">&quot;2.2&quot;</span>, <span class="string">&quot;3.3&quot;</span>)];
         <span class="kw">for</span> (<span class="ident">lhs</span>, <span class="ident">rhs</span>, <span class="ident">expected</span>) <span class="kw">in</span> <span class="ident">test_cases</span> {
             <span class="kw">let</span> <span class="ident">expected</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Decimal</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">expected</span>.<span class="ident">parse</span>().<span class="ident">ok</span>();
-            <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">RpnFnScalarEvaluator</span>::<span class="ident">new</span>()
+            <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">RpnFnScalarEvaluator::new</span>()
                 .<span class="ident">push_param</span>(<span class="ident">lhs</span>.<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">Decimal</span><span class="op">&gt;</span>().<span class="ident">ok</span>())
                 .<span class="ident">push_param</span>(<span class="ident">rhs</span>.<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">Decimal</span><span class="op">&gt;</span>().<span class="ident">ok</span>())
-                .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig</span>::<span class="ident">PlusDecimal</span>)
+                .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig::PlusDecimal</span>)
                 .<span class="ident">unwrap</span>();
-            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">output</span>, <span class="ident">expected</span>, <span class="string">&quot;lhs={:?}, rhs={:?}&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>);
+            <span class="macro">assert_eq!</span>(<span class="ident">output</span>, <span class="ident">expected</span>, <span class="string">&quot;lhs={:?}, rhs={:?}&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>);
         }
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_minus_int</span>() {
-        <span class="kw">let</span> <span class="ident">test_cases</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
+        <span class="kw">let</span> <span class="ident">test_cases</span> <span class="op">=</span> <span class="macro">vec!</span>[
             (<span class="prelude-val">None</span>, <span class="bool-val">false</span>, <span class="prelude-val">Some</span>(<span class="number">1</span>), <span class="bool-val">false</span>, <span class="prelude-val">None</span>, <span class="bool-val">false</span>),
             (<span class="prelude-val">Some</span>(<span class="number">1</span>), <span class="bool-val">false</span>, <span class="prelude-val">None</span>, <span class="bool-val">false</span>, <span class="prelude-val">None</span>, <span class="bool-val">false</span>),
             (<span class="prelude-val">Some</span>(<span class="number">12</span>), <span class="bool-val">false</span>, <span class="prelude-val">Some</span>(<span class="number">1</span>), <span class="bool-val">false</span>, <span class="prelude-val">Some</span>(<span class="number">11</span>), <span class="bool-val">false</span>),
             (
                 <span class="prelude-val">Some</span>(<span class="number">0</span>),
                 <span class="bool-val">true</span>,
-                <span class="prelude-val">Some</span>(<span class="ident">std</span>::<span class="ident">i64</span>::<span class="ident">MIN</span>),
+                <span class="prelude-val">Some</span>(<span class="ident">std::i64::MIN</span>),
                 <span class="bool-val">false</span>,
-                <span class="prelude-val">Some</span>((<span class="ident">std</span>::<span class="ident">i64</span>::<span class="ident">MAX</span> <span class="kw">as</span> <span class="ident">u64</span> <span class="op">+</span> <span class="number">1</span>) <span class="kw">as</span> <span class="ident">i64</span>),
+                <span class="prelude-val">Some</span>((<span class="ident">std::i64::MAX</span> <span class="kw">as</span> <span class="ident">u64</span> <span class="op">+</span> <span class="number">1</span>) <span class="kw">as</span> <span class="ident">i64</span>),
                 <span class="bool-val">false</span>,
             ),
             (
-                <span class="prelude-val">Some</span>(<span class="ident">std</span>::<span class="ident">i64</span>::<span class="ident">MIN</span>),
+                <span class="prelude-val">Some</span>(<span class="ident">std::i64::MIN</span>),
                 <span class="bool-val">false</span>,
-                <span class="prelude-val">Some</span>(<span class="ident">std</span>::<span class="ident">i64</span>::<span class="ident">MAX</span>),
+                <span class="prelude-val">Some</span>(<span class="ident">std::i64::MAX</span>),
                 <span class="bool-val">false</span>,
                 <span class="prelude-val">None</span>,
                 <span class="bool-val">true</span>,
             ),
             (
-                <span class="prelude-val">Some</span>(<span class="ident">std</span>::<span class="ident">i64</span>::<span class="ident">MAX</span>),
+                <span class="prelude-val">Some</span>(<span class="ident">std::i64::MAX</span>),
                 <span class="bool-val">false</span>,
-                <span class="prelude-val">Some</span>(<span class="ident">std</span>::<span class="ident">i64</span>::<span class="ident">MIN</span>),
+                <span class="prelude-val">Some</span>(<span class="ident">std::i64::MIN</span>),
                 <span class="bool-val">false</span>,
                 <span class="prelude-val">None</span>,
                 <span class="bool-val">true</span>,
@@ -1946,82 +1948,82 @@
             (<span class="prelude-val">Some</span>(<span class="number">1</span>), <span class="bool-val">true</span>, <span class="prelude-val">Some</span>(<span class="number">2</span>), <span class="bool-val">false</span>, <span class="prelude-val">None</span>, <span class="bool-val">true</span>),
         ];
         <span class="kw">for</span> (<span class="ident">lhs</span>, <span class="ident">lhs_is_unsigned</span>, <span class="ident">rhs</span>, <span class="ident">rhs_is_unsigned</span>, <span class="ident">expected</span>, <span class="ident">is_err</span>) <span class="kw">in</span> <span class="ident">test_cases</span> {
-            <span class="kw">let</span> <span class="ident">lhs_field_type</span> <span class="op">=</span> <span class="ident">FieldTypeBuilder</span>::<span class="ident">new</span>()
-                .<span class="ident">tp</span>(<span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>)
+            <span class="kw">let</span> <span class="ident">lhs_field_type</span> <span class="op">=</span> <span class="ident">FieldTypeBuilder::new</span>()
+                .<span class="ident">tp</span>(<span class="ident">FieldTypeTp::LongLong</span>)
                 .<span class="ident">flag</span>(<span class="kw">if</span> <span class="ident">lhs_is_unsigned</span> {
-                    <span class="ident">FieldTypeFlag</span>::<span class="ident">UNSIGNED</span>
+                    <span class="ident">FieldTypeFlag::UNSIGNED</span>
                 } <span class="kw">else</span> {
-                    <span class="ident">FieldTypeFlag</span>::<span class="ident">empty</span>()
+                    <span class="ident">FieldTypeFlag::empty</span>()
                 })
                 .<span class="ident">build</span>();
-            <span class="kw">let</span> <span class="ident">rhs_field_type</span> <span class="op">=</span> <span class="ident">FieldTypeBuilder</span>::<span class="ident">new</span>()
-                .<span class="ident">tp</span>(<span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>)
+            <span class="kw">let</span> <span class="ident">rhs_field_type</span> <span class="op">=</span> <span class="ident">FieldTypeBuilder::new</span>()
+                .<span class="ident">tp</span>(<span class="ident">FieldTypeTp::LongLong</span>)
                 .<span class="ident">flag</span>(<span class="kw">if</span> <span class="ident">rhs_is_unsigned</span> {
-                    <span class="ident">FieldTypeFlag</span>::<span class="ident">UNSIGNED</span>
+                    <span class="ident">FieldTypeFlag::UNSIGNED</span>
                 } <span class="kw">else</span> {
-                    <span class="ident">FieldTypeFlag</span>::<span class="ident">empty</span>()
+                    <span class="ident">FieldTypeFlag::empty</span>()
                 })
                 .<span class="ident">build</span>();
-            <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">RpnFnScalarEvaluator</span>::<span class="ident">new</span>()
+            <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">RpnFnScalarEvaluator::new</span>()
                 .<span class="ident">push_param_with_field_type</span>(<span class="ident">lhs</span>, <span class="ident">lhs_field_type</span>)
                 .<span class="ident">push_param_with_field_type</span>(<span class="ident">rhs</span>, <span class="ident">rhs_field_type</span>)
-                .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig</span>::<span class="ident">MinusInt</span>);
+                .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig::MinusInt</span>);
             <span class="kw">if</span> <span class="ident">is_err</span> {
-                <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">output</span>.<span class="ident">is_err</span>())
+                <span class="macro">assert!</span>(<span class="ident">output</span>.<span class="ident">is_err</span>())
             } <span class="kw">else</span> {
                 <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">output</span>.<span class="ident">unwrap</span>();
-                <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">output</span>, <span class="ident">expected</span>, <span class="string">&quot;lhs={:?}, rhs={:?}&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>);
+                <span class="macro">assert_eq!</span>(<span class="ident">output</span>, <span class="ident">expected</span>, <span class="string">&quot;lhs={:?}, rhs={:?}&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>);
             }
         }
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_minus_real</span>() {
-        <span class="kw">let</span> <span class="ident">test_cases</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
+        <span class="kw">let</span> <span class="ident">test_cases</span> <span class="op">=</span> <span class="macro">vec!</span>[
             (
-                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">1.01001</span>).<span class="ident">ok</span>(),
-                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="op">-</span><span class="number">0.01</span>).<span class="ident">ok</span>(),
-                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">1.02001</span>).<span class="ident">ok</span>(),
+                <span class="ident">Real::new</span>(<span class="number">1.01001</span>).<span class="ident">ok</span>(),
+                <span class="ident">Real::new</span>(<span class="op">-</span><span class="number">0.01</span>).<span class="ident">ok</span>(),
+                <span class="ident">Real::new</span>(<span class="number">1.02001</span>).<span class="ident">ok</span>(),
                 <span class="bool-val">false</span>,
             ),
             (
-                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="ident">std</span>::<span class="ident">f64</span>::<span class="ident">MIN</span>).<span class="ident">ok</span>(),
-                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="ident">std</span>::<span class="ident">f64</span>::<span class="ident">MAX</span>).<span class="ident">ok</span>(),
+                <span class="ident">Real::new</span>(<span class="ident">std::f64::MIN</span>).<span class="ident">ok</span>(),
+                <span class="ident">Real::new</span>(<span class="ident">std::f64::MAX</span>).<span class="ident">ok</span>(),
                 <span class="prelude-val">None</span>,
                 <span class="bool-val">true</span>,
             ),
         ];
         <span class="kw">for</span> (<span class="ident">lhs</span>, <span class="ident">rhs</span>, <span class="ident">expected</span>, <span class="ident">is_err</span>) <span class="kw">in</span> <span class="ident">test_cases</span> {
-            <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">RpnFnScalarEvaluator</span>::<span class="ident">new</span>()
+            <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">RpnFnScalarEvaluator::new</span>()
                 .<span class="ident">push_param</span>(<span class="ident">lhs</span>)
                 .<span class="ident">push_param</span>(<span class="ident">rhs</span>)
-                .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig</span>::<span class="ident">MinusReal</span>);
+                .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig::MinusReal</span>);
             <span class="kw">if</span> <span class="ident">is_err</span> {
-                <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">output</span>.<span class="ident">is_err</span>())
+                <span class="macro">assert!</span>(<span class="ident">output</span>.<span class="ident">is_err</span>())
             } <span class="kw">else</span> {
                 <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">output</span>.<span class="ident">unwrap</span>();
-                <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">output</span>, <span class="ident">expected</span>, <span class="string">&quot;lhs={:?}, rhs={:?}&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>);
+                <span class="macro">assert_eq!</span>(<span class="ident">output</span>, <span class="ident">expected</span>, <span class="string">&quot;lhs={:?}, rhs={:?}&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>);
             }
         }
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_minus_decimal</span>() {
-        <span class="kw">let</span> <span class="ident">test_cases</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[(<span class="string">&quot;1.1&quot;</span>, <span class="string">&quot;2.2&quot;</span>, <span class="string">&quot;-1.1&quot;</span>)];
+        <span class="kw">let</span> <span class="ident">test_cases</span> <span class="op">=</span> <span class="macro">vec!</span>[(<span class="string">&quot;1.1&quot;</span>, <span class="string">&quot;2.2&quot;</span>, <span class="string">&quot;-1.1&quot;</span>)];
         <span class="kw">for</span> (<span class="ident">lhs</span>, <span class="ident">rhs</span>, <span class="ident">expected</span>) <span class="kw">in</span> <span class="ident">test_cases</span> {
             <span class="kw">let</span> <span class="ident">expected</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Decimal</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">expected</span>.<span class="ident">parse</span>().<span class="ident">ok</span>();
-            <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">RpnFnScalarEvaluator</span>::<span class="ident">new</span>()
+            <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">RpnFnScalarEvaluator::new</span>()
                 .<span class="ident">push_param</span>(<span class="ident">lhs</span>.<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">Decimal</span><span class="op">&gt;</span>().<span class="ident">ok</span>())
                 .<span class="ident">push_param</span>(<span class="ident">rhs</span>.<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">Decimal</span><span class="op">&gt;</span>().<span class="ident">ok</span>())
-                .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig</span>::<span class="ident">MinusDecimal</span>)
+                .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig::MinusDecimal</span>)
                 .<span class="ident">unwrap</span>();
-            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">output</span>, <span class="ident">expected</span>, <span class="string">&quot;lhs={:?}, rhs={:?}&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>);
+            <span class="macro">assert_eq!</span>(<span class="ident">output</span>, <span class="ident">expected</span>, <span class="string">&quot;lhs={:?}, rhs={:?}&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>);
         }
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_mod_int</span>() {
-        <span class="kw">let</span> <span class="ident">tests</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
+        <span class="kw">let</span> <span class="ident">tests</span> <span class="op">=</span> <span class="macro">vec!</span>[
             (<span class="prelude-val">Some</span>(<span class="number">13</span>), <span class="prelude-val">Some</span>(<span class="number">11</span>), <span class="prelude-val">Some</span>(<span class="number">2</span>)),
             (<span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">13</span>), <span class="prelude-val">Some</span>(<span class="number">11</span>), <span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">2</span>)),
             (<span class="prelude-val">Some</span>(<span class="number">13</span>), <span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">11</span>), <span class="prelude-val">Some</span>(<span class="number">2</span>)),
@@ -2034,109 +2036,109 @@
             (<span class="prelude-val">Some</span>(<span class="number">11</span>), <span class="prelude-val">Some</span>(<span class="number">0</span>), <span class="prelude-val">None</span>),
             (<span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">11</span>), <span class="prelude-val">Some</span>(<span class="number">0</span>), <span class="prelude-val">None</span>),
             (
-                <span class="prelude-val">Some</span>(<span class="ident">std</span>::<span class="ident">i64</span>::<span class="ident">MAX</span>),
-                <span class="prelude-val">Some</span>(<span class="ident">std</span>::<span class="ident">i64</span>::<span class="ident">MIN</span>),
-                <span class="prelude-val">Some</span>(<span class="ident">std</span>::<span class="ident">i64</span>::<span class="ident">MAX</span>),
+                <span class="prelude-val">Some</span>(<span class="ident">std::i64::MAX</span>),
+                <span class="prelude-val">Some</span>(<span class="ident">std::i64::MIN</span>),
+                <span class="prelude-val">Some</span>(<span class="ident">std::i64::MAX</span>),
             ),
-            (<span class="prelude-val">Some</span>(<span class="ident">std</span>::<span class="ident">i64</span>::<span class="ident">MIN</span>), <span class="prelude-val">Some</span>(<span class="ident">std</span>::<span class="ident">i64</span>::<span class="ident">MAX</span>), <span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">1</span>)),
+            (<span class="prelude-val">Some</span>(<span class="ident">std::i64::MIN</span>), <span class="prelude-val">Some</span>(<span class="ident">std::i64::MAX</span>), <span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">1</span>)),
         ];
 
         <span class="kw">for</span> (<span class="ident">lhs</span>, <span class="ident">rhs</span>, <span class="ident">expected</span>) <span class="kw">in</span> <span class="ident">tests</span> {
-            <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">RpnFnScalarEvaluator</span>::<span class="ident">new</span>()
+            <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">RpnFnScalarEvaluator::new</span>()
                 .<span class="ident">push_param</span>(<span class="ident">lhs</span>)
                 .<span class="ident">push_param</span>(<span class="ident">rhs</span>)
-                .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig</span>::<span class="ident">ModInt</span>)
+                .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig::ModInt</span>)
                 .<span class="ident">unwrap</span>();
-            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">output</span>, <span class="ident">expected</span>, <span class="string">&quot;lhs={:?}, rhs={:?}&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>);
+            <span class="macro">assert_eq!</span>(<span class="ident">output</span>, <span class="ident">expected</span>, <span class="string">&quot;lhs={:?}, rhs={:?}&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>);
         }
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_mod_int_unsigned</span>() {
-        <span class="kw">let</span> <span class="ident">tests</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
+        <span class="kw">let</span> <span class="ident">tests</span> <span class="op">=</span> <span class="macro">vec!</span>[
             (
-                <span class="prelude-val">Some</span>(<span class="ident">std</span>::<span class="ident">u64</span>::<span class="ident">MAX</span> <span class="kw">as</span> <span class="ident">i64</span>),
+                <span class="prelude-val">Some</span>(<span class="ident">std::u64::MAX</span> <span class="kw">as</span> <span class="ident">i64</span>),
                 <span class="bool-val">true</span>,
-                <span class="prelude-val">Some</span>(<span class="ident">std</span>::<span class="ident">i64</span>::<span class="ident">MIN</span>),
+                <span class="prelude-val">Some</span>(<span class="ident">std::i64::MIN</span>),
                 <span class="bool-val">false</span>,
-                <span class="prelude-val">Some</span>(<span class="ident">std</span>::<span class="ident">i64</span>::<span class="ident">MAX</span>),
+                <span class="prelude-val">Some</span>(<span class="ident">std::i64::MAX</span>),
             ),
             (
-                <span class="prelude-val">Some</span>(<span class="ident">std</span>::<span class="ident">i64</span>::<span class="ident">MIN</span>),
+                <span class="prelude-val">Some</span>(<span class="ident">std::i64::MIN</span>),
                 <span class="bool-val">false</span>,
-                <span class="prelude-val">Some</span>(<span class="ident">std</span>::<span class="ident">u64</span>::<span class="ident">MAX</span> <span class="kw">as</span> <span class="ident">i64</span>),
+                <span class="prelude-val">Some</span>(<span class="ident">std::u64::MAX</span> <span class="kw">as</span> <span class="ident">i64</span>),
                 <span class="bool-val">true</span>,
-                <span class="prelude-val">Some</span>(<span class="ident">std</span>::<span class="ident">i64</span>::<span class="ident">MIN</span>),
+                <span class="prelude-val">Some</span>(<span class="ident">std::i64::MIN</span>),
             ),
         ];
 
         <span class="kw">for</span> (<span class="ident">lhs</span>, <span class="ident">lhs_is_unsigned</span>, <span class="ident">rhs</span>, <span class="ident">rhs_is_unsigned</span>, <span class="ident">expected</span>) <span class="kw">in</span> <span class="ident">tests</span> {
-            <span class="kw">let</span> <span class="ident">lhs_field_type</span> <span class="op">=</span> <span class="ident">FieldTypeBuilder</span>::<span class="ident">new</span>()
-                .<span class="ident">tp</span>(<span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>)
+            <span class="kw">let</span> <span class="ident">lhs_field_type</span> <span class="op">=</span> <span class="ident">FieldTypeBuilder::new</span>()
+                .<span class="ident">tp</span>(<span class="ident">FieldTypeTp::LongLong</span>)
                 .<span class="ident">flag</span>(<span class="kw">if</span> <span class="ident">lhs_is_unsigned</span> {
-                    <span class="ident">FieldTypeFlag</span>::<span class="ident">UNSIGNED</span>
+                    <span class="ident">FieldTypeFlag::UNSIGNED</span>
                 } <span class="kw">else</span> {
-                    <span class="ident">FieldTypeFlag</span>::<span class="ident">empty</span>()
+                    <span class="ident">FieldTypeFlag::empty</span>()
                 })
                 .<span class="ident">build</span>();
-            <span class="kw">let</span> <span class="ident">rhs_field_type</span> <span class="op">=</span> <span class="ident">FieldTypeBuilder</span>::<span class="ident">new</span>()
-                .<span class="ident">tp</span>(<span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>)
+            <span class="kw">let</span> <span class="ident">rhs_field_type</span> <span class="op">=</span> <span class="ident">FieldTypeBuilder::new</span>()
+                .<span class="ident">tp</span>(<span class="ident">FieldTypeTp::LongLong</span>)
                 .<span class="ident">flag</span>(<span class="kw">if</span> <span class="ident">rhs_is_unsigned</span> {
-                    <span class="ident">FieldTypeFlag</span>::<span class="ident">UNSIGNED</span>
+                    <span class="ident">FieldTypeFlag::UNSIGNED</span>
                 } <span class="kw">else</span> {
-                    <span class="ident">FieldTypeFlag</span>::<span class="ident">empty</span>()
+                    <span class="ident">FieldTypeFlag::empty</span>()
                 })
                 .<span class="ident">build</span>();
-            <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">RpnFnScalarEvaluator</span>::<span class="ident">new</span>()
+            <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">RpnFnScalarEvaluator::new</span>()
                 .<span class="ident">push_param_with_field_type</span>(<span class="ident">lhs</span>, <span class="ident">lhs_field_type</span>)
                 .<span class="ident">push_param_with_field_type</span>(<span class="ident">rhs</span>, <span class="ident">rhs_field_type</span>)
-                .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig</span>::<span class="ident">ModInt</span>)
+                .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig::ModInt</span>)
                 .<span class="ident">unwrap</span>();
-            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">output</span>, <span class="ident">expected</span>, <span class="string">&quot;lhs={:?}, rhs={:?}&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>);
+            <span class="macro">assert_eq!</span>(<span class="ident">output</span>, <span class="ident">expected</span>, <span class="string">&quot;lhs={:?}, rhs={:?}&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>);
         }
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_mod_real</span>() {
-        <span class="kw">let</span> <span class="ident">tests</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
-            (<span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">1.0</span>).<span class="ident">ok</span>(), <span class="prelude-val">None</span>, <span class="prelude-val">None</span>),
-            (<span class="prelude-val">None</span>, <span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">1.0</span>).<span class="ident">ok</span>(), <span class="prelude-val">None</span>),
+        <span class="kw">let</span> <span class="ident">tests</span> <span class="op">=</span> <span class="macro">vec!</span>[
+            (<span class="ident">Real::new</span>(<span class="number">1.0</span>).<span class="ident">ok</span>(), <span class="prelude-val">None</span>, <span class="prelude-val">None</span>),
+            (<span class="prelude-val">None</span>, <span class="ident">Real::new</span>(<span class="number">1.0</span>).<span class="ident">ok</span>(), <span class="prelude-val">None</span>),
             (
-                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">1.0</span>).<span class="ident">ok</span>(),
-                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">1.1</span>).<span class="ident">ok</span>(),
-                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">1.0</span>).<span class="ident">ok</span>(),
+                <span class="ident">Real::new</span>(<span class="number">1.0</span>).<span class="ident">ok</span>(),
+                <span class="ident">Real::new</span>(<span class="number">1.1</span>).<span class="ident">ok</span>(),
+                <span class="ident">Real::new</span>(<span class="number">1.0</span>).<span class="ident">ok</span>(),
             ),
             (
-                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="op">-</span><span class="number">1.0</span>).<span class="ident">ok</span>(),
-                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">1.1</span>).<span class="ident">ok</span>(),
-                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="op">-</span><span class="number">1.0</span>).<span class="ident">ok</span>(),
+                <span class="ident">Real::new</span>(<span class="op">-</span><span class="number">1.0</span>).<span class="ident">ok</span>(),
+                <span class="ident">Real::new</span>(<span class="number">1.1</span>).<span class="ident">ok</span>(),
+                <span class="ident">Real::new</span>(<span class="op">-</span><span class="number">1.0</span>).<span class="ident">ok</span>(),
             ),
             (
-                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">1.0</span>).<span class="ident">ok</span>(),
-                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="op">-</span><span class="number">1.1</span>).<span class="ident">ok</span>(),
-                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">1.0</span>).<span class="ident">ok</span>(),
+                <span class="ident">Real::new</span>(<span class="number">1.0</span>).<span class="ident">ok</span>(),
+                <span class="ident">Real::new</span>(<span class="op">-</span><span class="number">1.1</span>).<span class="ident">ok</span>(),
+                <span class="ident">Real::new</span>(<span class="number">1.0</span>).<span class="ident">ok</span>(),
             ),
             (
-                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="op">-</span><span class="number">1.0</span>).<span class="ident">ok</span>(),
-                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="op">-</span><span class="number">1.1</span>).<span class="ident">ok</span>(),
-                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="op">-</span><span class="number">1.0</span>).<span class="ident">ok</span>(),
+                <span class="ident">Real::new</span>(<span class="op">-</span><span class="number">1.0</span>).<span class="ident">ok</span>(),
+                <span class="ident">Real::new</span>(<span class="op">-</span><span class="number">1.1</span>).<span class="ident">ok</span>(),
+                <span class="ident">Real::new</span>(<span class="op">-</span><span class="number">1.0</span>).<span class="ident">ok</span>(),
             ),
-            (<span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">1.0</span>).<span class="ident">ok</span>(), <span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">0.0</span>).<span class="ident">ok</span>(), <span class="prelude-val">None</span>),
+            (<span class="ident">Real::new</span>(<span class="number">1.0</span>).<span class="ident">ok</span>(), <span class="ident">Real::new</span>(<span class="number">0.0</span>).<span class="ident">ok</span>(), <span class="prelude-val">None</span>),
         ];
 
         <span class="kw">for</span> (<span class="ident">lhs</span>, <span class="ident">rhs</span>, <span class="ident">expected</span>) <span class="kw">in</span> <span class="ident">tests</span> {
-            <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">RpnFnScalarEvaluator</span>::<span class="ident">new</span>()
+            <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">RpnFnScalarEvaluator::new</span>()
                 .<span class="ident">push_param</span>(<span class="ident">lhs</span>)
                 .<span class="ident">push_param</span>(<span class="ident">rhs</span>)
-                .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig</span>::<span class="ident">ModReal</span>)
+                .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig::ModReal</span>)
                 .<span class="ident">unwrap</span>();
-            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">output</span>, <span class="ident">expected</span>, <span class="string">&quot;lhs={:?}, rhs={:?}&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>);
+            <span class="macro">assert_eq!</span>(<span class="ident">output</span>, <span class="ident">expected</span>, <span class="string">&quot;lhs={:?}, rhs={:?}&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>);
         }
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_mod_decimal</span>() {
-        <span class="kw">let</span> <span class="ident">tests</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
+        <span class="kw">let</span> <span class="ident">tests</span> <span class="op">=</span> <span class="macro">vec!</span>[
             (<span class="string">&quot;13&quot;</span>, <span class="string">&quot;11&quot;</span>, <span class="string">&quot;2&quot;</span>),
             (<span class="string">&quot;-13&quot;</span>, <span class="string">&quot;11&quot;</span>, <span class="string">&quot;-2&quot;</span>),
             (<span class="string">&quot;13&quot;</span>, <span class="string">&quot;-11&quot;</span>, <span class="string">&quot;2&quot;</span>),
@@ -2160,32 +2162,32 @@
 
         <span class="kw">for</span> (<span class="ident">lhs</span>, <span class="ident">rhs</span>, <span class="ident">expected</span>) <span class="kw">in</span> <span class="ident">tests</span> {
             <span class="kw">let</span> <span class="ident">expected</span> <span class="op">=</span> <span class="ident">expected</span>.<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">Decimal</span><span class="op">&gt;</span>().<span class="ident">ok</span>();
-            <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">RpnFnScalarEvaluator</span>::<span class="ident">new</span>()
+            <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">RpnFnScalarEvaluator::new</span>()
                 .<span class="ident">push_param</span>(<span class="ident">lhs</span>.<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">Decimal</span><span class="op">&gt;</span>().<span class="ident">ok</span>())
                 .<span class="ident">push_param</span>(<span class="ident">rhs</span>.<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">Decimal</span><span class="op">&gt;</span>().<span class="ident">ok</span>())
-                .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig</span>::<span class="ident">ModDecimal</span>)
+                .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig::ModDecimal</span>)
                 .<span class="ident">unwrap</span>();
-            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">output</span>, <span class="ident">expected</span>, <span class="string">&quot;lhs={:?}, rhs={:?}&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>);
+            <span class="macro">assert_eq!</span>(<span class="ident">output</span>, <span class="ident">expected</span>, <span class="string">&quot;lhs={:?}, rhs={:?}&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>);
         }
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_multiply_decimal</span>() {
-        <span class="kw">let</span> <span class="ident">test_cases</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[(<span class="string">&quot;1.1&quot;</span>, <span class="string">&quot;2.2&quot;</span>, <span class="string">&quot;2.42&quot;</span>)];
+        <span class="kw">let</span> <span class="ident">test_cases</span> <span class="op">=</span> <span class="macro">vec!</span>[(<span class="string">&quot;1.1&quot;</span>, <span class="string">&quot;2.2&quot;</span>, <span class="string">&quot;2.42&quot;</span>)];
         <span class="kw">for</span> (<span class="ident">lhs</span>, <span class="ident">rhs</span>, <span class="ident">expected</span>) <span class="kw">in</span> <span class="ident">test_cases</span> {
             <span class="kw">let</span> <span class="ident">expected</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Decimal</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">expected</span>.<span class="ident">parse</span>().<span class="ident">ok</span>();
-            <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">RpnFnScalarEvaluator</span>::<span class="ident">new</span>()
+            <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">RpnFnScalarEvaluator::new</span>()
                 .<span class="ident">push_param</span>(<span class="ident">lhs</span>.<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">Decimal</span><span class="op">&gt;</span>().<span class="ident">ok</span>())
                 .<span class="ident">push_param</span>(<span class="ident">rhs</span>.<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">Decimal</span><span class="op">&gt;</span>().<span class="ident">ok</span>())
-                .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig</span>::<span class="ident">MultiplyDecimal</span>)
+                .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig::MultiplyDecimal</span>)
                 .<span class="ident">unwrap</span>();
-            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">output</span>, <span class="ident">expected</span>, <span class="string">&quot;lhs={:?}, rhs={:?}&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>);
+            <span class="macro">assert_eq!</span>(<span class="ident">output</span>, <span class="ident">expected</span>, <span class="string">&quot;lhs={:?}, rhs={:?}&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>);
         }
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_int_divide_int</span>() {
-        <span class="kw">let</span> <span class="ident">test_cases</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
+        <span class="kw">let</span> <span class="ident">test_cases</span> <span class="op">=</span> <span class="macro">vec!</span>[
             (<span class="number">13</span>, <span class="bool-val">false</span>, <span class="number">11</span>, <span class="bool-val">false</span>, <span class="prelude-val">Some</span>(<span class="number">1</span>)),
             (<span class="number">13</span>, <span class="bool-val">false</span>, <span class="op">-</span><span class="number">11</span>, <span class="bool-val">false</span>, <span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">1</span>)),
             (<span class="op">-</span><span class="number">13</span>, <span class="bool-val">false</span>, <span class="number">11</span>, <span class="bool-val">false</span>, <span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">1</span>)),
@@ -2198,84 +2200,84 @@
             (<span class="op">-</span><span class="number">11</span>, <span class="bool-val">false</span>, <span class="number">0</span>, <span class="bool-val">false</span>, <span class="prelude-val">None</span>),
             (<span class="op">-</span><span class="number">3</span>, <span class="bool-val">false</span>, <span class="number">5</span>, <span class="bool-val">true</span>, <span class="prelude-val">Some</span>(<span class="number">0</span>)),
             (<span class="number">3</span>, <span class="bool-val">false</span>, <span class="op">-</span><span class="number">5</span>, <span class="bool-val">false</span>, <span class="prelude-val">Some</span>(<span class="number">0</span>)),
-            (<span class="ident">std</span>::<span class="ident">i64</span>::<span class="ident">MIN</span> <span class="op">+</span> <span class="number">1</span>, <span class="bool-val">false</span>, <span class="op">-</span><span class="number">1</span>, <span class="bool-val">false</span>, <span class="prelude-val">Some</span>(<span class="ident">std</span>::<span class="ident">i64</span>::<span class="ident">MAX</span>)),
-            (<span class="ident">std</span>::<span class="ident">i64</span>::<span class="ident">MIN</span>, <span class="bool-val">false</span>, <span class="number">1</span>, <span class="bool-val">false</span>, <span class="prelude-val">Some</span>(<span class="ident">std</span>::<span class="ident">i64</span>::<span class="ident">MIN</span>)),
-            (<span class="ident">std</span>::<span class="ident">i64</span>::<span class="ident">MAX</span>, <span class="bool-val">false</span>, <span class="number">1</span>, <span class="bool-val">false</span>, <span class="prelude-val">Some</span>(<span class="ident">std</span>::<span class="ident">i64</span>::<span class="ident">MAX</span>)),
+            (<span class="ident">std::i64::MIN</span> <span class="op">+</span> <span class="number">1</span>, <span class="bool-val">false</span>, <span class="op">-</span><span class="number">1</span>, <span class="bool-val">false</span>, <span class="prelude-val">Some</span>(<span class="ident">std::i64::MAX</span>)),
+            (<span class="ident">std::i64::MIN</span>, <span class="bool-val">false</span>, <span class="number">1</span>, <span class="bool-val">false</span>, <span class="prelude-val">Some</span>(<span class="ident">std::i64::MIN</span>)),
+            (<span class="ident">std::i64::MAX</span>, <span class="bool-val">false</span>, <span class="number">1</span>, <span class="bool-val">false</span>, <span class="prelude-val">Some</span>(<span class="ident">std::i64::MAX</span>)),
             (
-                <span class="ident">std</span>::<span class="ident">u64</span>::<span class="ident">MAX</span> <span class="kw">as</span> <span class="ident">i64</span>,
+                <span class="ident">std::u64::MAX</span> <span class="kw">as</span> <span class="ident">i64</span>,
                 <span class="bool-val">true</span>,
                 <span class="number">1</span>,
                 <span class="bool-val">false</span>,
-                <span class="prelude-val">Some</span>(<span class="ident">std</span>::<span class="ident">u64</span>::<span class="ident">MAX</span> <span class="kw">as</span> <span class="ident">i64</span>),
+                <span class="prelude-val">Some</span>(<span class="ident">std::u64::MAX</span> <span class="kw">as</span> <span class="ident">i64</span>),
             ),
         ];
 
         <span class="kw">for</span> (<span class="ident">lhs</span>, <span class="ident">lhs_is_unsigned</span>, <span class="ident">rhs</span>, <span class="ident">rhs_is_unsigned</span>, <span class="ident">expected</span>) <span class="kw">in</span> <span class="ident">test_cases</span> {
-            <span class="kw">let</span> <span class="ident">lhs_field_type</span> <span class="op">=</span> <span class="ident">FieldTypeBuilder</span>::<span class="ident">new</span>()
-                .<span class="ident">tp</span>(<span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>)
+            <span class="kw">let</span> <span class="ident">lhs_field_type</span> <span class="op">=</span> <span class="ident">FieldTypeBuilder::new</span>()
+                .<span class="ident">tp</span>(<span class="ident">FieldTypeTp::LongLong</span>)
                 .<span class="ident">flag</span>(<span class="kw">if</span> <span class="ident">lhs_is_unsigned</span> {
-                    <span class="ident">FieldTypeFlag</span>::<span class="ident">UNSIGNED</span>
+                    <span class="ident">FieldTypeFlag::UNSIGNED</span>
                 } <span class="kw">else</span> {
-                    <span class="ident">FieldTypeFlag</span>::<span class="ident">empty</span>()
+                    <span class="ident">FieldTypeFlag::empty</span>()
                 })
                 .<span class="ident">build</span>();
-            <span class="kw">let</span> <span class="ident">rhs_field_type</span> <span class="op">=</span> <span class="ident">FieldTypeBuilder</span>::<span class="ident">new</span>()
-                .<span class="ident">tp</span>(<span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>)
+            <span class="kw">let</span> <span class="ident">rhs_field_type</span> <span class="op">=</span> <span class="ident">FieldTypeBuilder::new</span>()
+                .<span class="ident">tp</span>(<span class="ident">FieldTypeTp::LongLong</span>)
                 .<span class="ident">flag</span>(<span class="kw">if</span> <span class="ident">rhs_is_unsigned</span> {
-                    <span class="ident">FieldTypeFlag</span>::<span class="ident">UNSIGNED</span>
+                    <span class="ident">FieldTypeFlag::UNSIGNED</span>
                 } <span class="kw">else</span> {
-                    <span class="ident">FieldTypeFlag</span>::<span class="ident">empty</span>()
+                    <span class="ident">FieldTypeFlag::empty</span>()
                 })
                 .<span class="ident">build</span>();
 
-            <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">RpnFnScalarEvaluator</span>::<span class="ident">new</span>()
+            <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">RpnFnScalarEvaluator::new</span>()
                 .<span class="ident">push_param_with_field_type</span>(<span class="ident">lhs</span>, <span class="ident">lhs_field_type</span>)
                 .<span class="ident">push_param_with_field_type</span>(<span class="ident">rhs</span>, <span class="ident">rhs_field_type</span>)
-                .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig</span>::<span class="ident">IntDivideInt</span>)
+                .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig::IntDivideInt</span>)
                 .<span class="ident">unwrap</span>();
 
-            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">output</span>, <span class="ident">expected</span>, <span class="string">&quot;lhs={:?}, rhs={:?}&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>);
+            <span class="macro">assert_eq!</span>(<span class="ident">output</span>, <span class="ident">expected</span>, <span class="string">&quot;lhs={:?}, rhs={:?}&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>);
         }
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_int_divide_int_overflow</span>() {
-        <span class="kw">let</span> <span class="ident">test_cases</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
-            (<span class="ident">std</span>::<span class="ident">i64</span>::<span class="ident">MIN</span>, <span class="bool-val">false</span>, <span class="op">-</span><span class="number">1</span>, <span class="bool-val">false</span>),
+        <span class="kw">let</span> <span class="ident">test_cases</span> <span class="op">=</span> <span class="macro">vec!</span>[
+            (<span class="ident">std::i64::MIN</span>, <span class="bool-val">false</span>, <span class="op">-</span><span class="number">1</span>, <span class="bool-val">false</span>),
             (<span class="op">-</span><span class="number">1</span>, <span class="bool-val">false</span>, <span class="number">1</span>, <span class="bool-val">true</span>),
             (<span class="op">-</span><span class="number">2</span>, <span class="bool-val">false</span>, <span class="number">1</span>, <span class="bool-val">true</span>),
             (<span class="number">1</span>, <span class="bool-val">true</span>, <span class="op">-</span><span class="number">1</span>, <span class="bool-val">false</span>),
             (<span class="number">2</span>, <span class="bool-val">true</span>, <span class="op">-</span><span class="number">1</span>, <span class="bool-val">false</span>),
         ];
         <span class="kw">for</span> (<span class="ident">lhs</span>, <span class="ident">lhs_is_unsigned</span>, <span class="ident">rhs</span>, <span class="ident">rhs_is_unsigned</span>) <span class="kw">in</span> <span class="ident">test_cases</span> {
-            <span class="kw">let</span> <span class="ident">lhs_field_type</span> <span class="op">=</span> <span class="ident">FieldTypeBuilder</span>::<span class="ident">new</span>()
-                .<span class="ident">tp</span>(<span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>)
+            <span class="kw">let</span> <span class="ident">lhs_field_type</span> <span class="op">=</span> <span class="ident">FieldTypeBuilder::new</span>()
+                .<span class="ident">tp</span>(<span class="ident">FieldTypeTp::LongLong</span>)
                 .<span class="ident">flag</span>(<span class="kw">if</span> <span class="ident">lhs_is_unsigned</span> {
-                    <span class="ident">FieldTypeFlag</span>::<span class="ident">UNSIGNED</span>
+                    <span class="ident">FieldTypeFlag::UNSIGNED</span>
                 } <span class="kw">else</span> {
-                    <span class="ident">FieldTypeFlag</span>::<span class="ident">empty</span>()
+                    <span class="ident">FieldTypeFlag::empty</span>()
                 })
                 .<span class="ident">build</span>();
-            <span class="kw">let</span> <span class="ident">rhs_field_type</span> <span class="op">=</span> <span class="ident">FieldTypeBuilder</span>::<span class="ident">new</span>()
-                .<span class="ident">tp</span>(<span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>)
+            <span class="kw">let</span> <span class="ident">rhs_field_type</span> <span class="op">=</span> <span class="ident">FieldTypeBuilder::new</span>()
+                .<span class="ident">tp</span>(<span class="ident">FieldTypeTp::LongLong</span>)
                 .<span class="ident">flag</span>(<span class="kw">if</span> <span class="ident">rhs_is_unsigned</span> {
-                    <span class="ident">FieldTypeFlag</span>::<span class="ident">UNSIGNED</span>
+                    <span class="ident">FieldTypeFlag::UNSIGNED</span>
                 } <span class="kw">else</span> {
-                    <span class="ident">FieldTypeFlag</span>::<span class="ident">empty</span>()
+                    <span class="ident">FieldTypeFlag::empty</span>()
                 })
                 .<span class="ident">build</span>();
 
-            <span class="kw">let</span> <span class="ident">output</span>: <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Int</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">RpnFnScalarEvaluator</span>::<span class="ident">new</span>()
+            <span class="kw">let</span> <span class="ident">output</span>: <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Int</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">RpnFnScalarEvaluator::new</span>()
                 .<span class="ident">push_param_with_field_type</span>(<span class="ident">lhs</span>, <span class="ident">lhs_field_type</span>)
                 .<span class="ident">push_param_with_field_type</span>(<span class="ident">rhs</span>, <span class="ident">rhs_field_type</span>)
-                .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig</span>::<span class="ident">IntDivideInt</span>);
-            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">output</span>.<span class="ident">is_err</span>(), <span class="string">&quot;lhs={:?}, rhs={:?}&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>);
+                .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig::IntDivideInt</span>);
+            <span class="macro">assert!</span>(<span class="ident">output</span>.<span class="ident">is_err</span>(), <span class="string">&quot;lhs={:?}, rhs={:?}&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>);
         }
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_int_divide_decimal</span>() {
-        <span class="kw">let</span> <span class="ident">test_cases</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
+        <span class="kw">let</span> <span class="ident">test_cases</span> <span class="op">=</span> <span class="macro">vec!</span>[
             (<span class="prelude-val">Some</span>(<span class="string">&quot;11.01&quot;</span>), <span class="prelude-val">Some</span>(<span class="string">&quot;1.1&quot;</span>), <span class="prelude-val">Some</span>(<span class="number">10</span>)),
             (<span class="prelude-val">Some</span>(<span class="string">&quot;-11.01&quot;</span>), <span class="prelude-val">Some</span>(<span class="string">&quot;1.1&quot;</span>), <span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">10</span>)),
             (<span class="prelude-val">Some</span>(<span class="string">&quot;11.01&quot;</span>), <span class="prelude-val">Some</span>(<span class="string">&quot;-1.1&quot;</span>), <span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">10</span>)),
@@ -2288,62 +2290,62 @@
         ];
 
         <span class="kw">for</span> (<span class="ident">lhs</span>, <span class="ident">rhs</span>, <span class="ident">expected</span>) <span class="kw">in</span> <span class="ident">test_cases</span> {
-            <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">RpnFnScalarEvaluator</span>::<span class="ident">new</span>()
-                .<span class="ident">push_param</span>(<span class="ident">lhs</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">f</span><span class="op">|</span> <span class="ident">Decimal</span>::<span class="ident">from_bytes</span>(<span class="ident">f</span>.<span class="ident">as_bytes</span>()).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>()))
-                .<span class="ident">push_param</span>(<span class="ident">rhs</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">f</span><span class="op">|</span> <span class="ident">Decimal</span>::<span class="ident">from_bytes</span>(<span class="ident">f</span>.<span class="ident">as_bytes</span>()).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>()))
-                .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig</span>::<span class="ident">IntDivideDecimal</span>)
+            <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="ident">RpnFnScalarEvaluator::new</span>()
+                .<span class="ident">push_param</span>(<span class="ident">lhs</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">f</span><span class="op">|</span> <span class="ident">Decimal::from_bytes</span>(<span class="ident">f</span>.<span class="ident">as_bytes</span>()).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>()))
+                .<span class="ident">push_param</span>(<span class="ident">rhs</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">f</span><span class="op">|</span> <span class="ident">Decimal::from_bytes</span>(<span class="ident">f</span>.<span class="ident">as_bytes</span>()).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>()))
+                .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig::IntDivideDecimal</span>)
                 .<span class="ident">unwrap</span>();
 
-            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">output</span>, <span class="ident">expected</span>, <span class="string">&quot;lhs={:?}, rhs={:?}&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>);
+            <span class="macro">assert_eq!</span>(<span class="ident">output</span>, <span class="ident">expected</span>, <span class="string">&quot;lhs={:?}, rhs={:?}&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>);
         }
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_int_divide_decimal_overflow</span>() {
-        <span class="kw">let</span> <span class="ident">test_cases</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
-            (<span class="ident">Decimal</span>::<span class="ident">from</span>(<span class="ident">std</span>::<span class="ident">i64</span>::<span class="ident">MIN</span>), <span class="ident">Decimal</span>::<span class="ident">from</span>(<span class="op">-</span><span class="number">1</span>)),
+        <span class="kw">let</span> <span class="ident">test_cases</span> <span class="op">=</span> <span class="macro">vec!</span>[
+            (<span class="ident">Decimal::from</span>(<span class="ident">std::i64::MIN</span>), <span class="ident">Decimal::from</span>(<span class="op">-</span><span class="number">1</span>)),
             (
-                <span class="ident">Decimal</span>::<span class="ident">from</span>(<span class="ident">std</span>::<span class="ident">i64</span>::<span class="ident">MAX</span>),
-                <span class="ident">Decimal</span>::<span class="ident">from_bytes</span>(<span class="string">b&quot;0.1&quot;</span>).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>(),
+                <span class="ident">Decimal::from</span>(<span class="ident">std::i64::MAX</span>),
+                <span class="ident">Decimal::from_bytes</span>(<span class="string">b&quot;0.1&quot;</span>).<span class="ident">unwrap</span>().<span class="ident">unwrap</span>(),
             ),
         ];
 
         <span class="kw">for</span> (<span class="ident">lhs</span>, <span class="ident">rhs</span>) <span class="kw">in</span> <span class="ident">test_cases</span> {
-            <span class="kw">let</span> <span class="ident">output</span>: <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Int</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">RpnFnScalarEvaluator</span>::<span class="ident">new</span>()
+            <span class="kw">let</span> <span class="ident">output</span>: <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Int</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">RpnFnScalarEvaluator::new</span>()
                 .<span class="ident">push_param</span>(<span class="ident">lhs</span>)
                 .<span class="ident">push_param</span>(<span class="ident">rhs</span>)
-                .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig</span>::<span class="ident">IntDivideDecimal</span>);
+                .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig::IntDivideDecimal</span>);
 
-            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">output</span>.<span class="ident">is_err</span>(), <span class="string">&quot;lhs={:?}, rhs={:?}&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>);
+            <span class="macro">assert!</span>(<span class="ident">output</span>.<span class="ident">is_err</span>(), <span class="string">&quot;lhs={:?}, rhs={:?}&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>);
         }
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_real_multiply</span>() {
-        <span class="kw">let</span> <span class="ident">should_pass</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[(<span class="number">1.01001</span>, <span class="op">-</span><span class="number">0.01</span>, <span class="ident">Real</span>::<span class="ident">new</span>(<span class="op">-</span><span class="number">0.0101001</span>).<span class="ident">ok</span>())];
+        <span class="kw">let</span> <span class="ident">should_pass</span> <span class="op">=</span> <span class="macro">vec!</span>[(<span class="number">1.01001</span>, <span class="op">-</span><span class="number">0.01</span>, <span class="ident">Real::new</span>(<span class="op">-</span><span class="number">0.0101001</span>).<span class="ident">ok</span>())];
 
         <span class="kw">for</span> (<span class="ident">lhs</span>, <span class="ident">rhs</span>, <span class="ident">expected</span>) <span class="kw">in</span> <span class="ident">should_pass</span> {
-            <span class="macro">assert_eq</span><span class="macro">!</span>(
+            <span class="macro">assert_eq!</span>(
                 <span class="ident">expected</span>,
-                <span class="ident">RpnFnScalarEvaluator</span>::<span class="ident">new</span>()
+                <span class="ident">RpnFnScalarEvaluator::new</span>()
                     .<span class="ident">push_param</span>(<span class="ident">lhs</span>)
                     .<span class="ident">push_param</span>(<span class="ident">rhs</span>)
-                    .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig</span>::<span class="ident">MultiplyReal</span>)
+                    .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig::MultiplyReal</span>)
                     .<span class="ident">unwrap</span>()
             );
         }
 
-        <span class="kw">let</span> <span class="ident">should_fail</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
-            (<span class="ident">std</span>::<span class="ident">f64</span>::<span class="ident">MAX</span>, <span class="ident">std</span>::<span class="ident">f64</span>::<span class="ident">MAX</span>),
-            (<span class="ident">std</span>::<span class="ident">f64</span>::<span class="ident">MAX</span>, <span class="ident">std</span>::<span class="ident">f64</span>::<span class="ident">MIN</span>),
+        <span class="kw">let</span> <span class="ident">should_fail</span> <span class="op">=</span> <span class="macro">vec!</span>[
+            (<span class="ident">std::f64::MAX</span>, <span class="ident">std::f64::MAX</span>),
+            (<span class="ident">std::f64::MAX</span>, <span class="ident">std::f64::MIN</span>),
         ];
 
         <span class="kw">for</span> (<span class="ident">lhs</span>, <span class="ident">rhs</span>) <span class="kw">in</span> <span class="ident">should_fail</span> {
-            <span class="macro">assert</span><span class="macro">!</span>(
-                <span class="ident">RpnFnScalarEvaluator</span>::<span class="ident">new</span>()
+            <span class="macro">assert!</span>(
+                <span class="ident">RpnFnScalarEvaluator::new</span>()
                     .<span class="ident">push_param</span>(<span class="ident">lhs</span>)
                     .<span class="ident">push_param</span>(<span class="ident">rhs</span>)
-                    .<span class="ident">evaluate</span>::<span class="op">&lt;</span><span class="ident">Real</span><span class="op">&gt;</span>(<span class="ident">ScalarFuncSig</span>::<span class="ident">MultiplyReal</span>)
+                    .<span class="ident">evaluate</span>::<span class="op">&lt;</span><span class="ident">Real</span><span class="op">&gt;</span>(<span class="ident">ScalarFuncSig::MultiplyReal</span>)
                     .<span class="ident">is_err</span>(),
                 <span class="string">&quot;{} * {} should fail&quot;</span>,
                 <span class="ident">lhs</span>,
@@ -2354,29 +2356,29 @@
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_int_multiply</span>() {
-        <span class="kw">let</span> <span class="ident">should_pass</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
+        <span class="kw">let</span> <span class="ident">should_pass</span> <span class="op">=</span> <span class="macro">vec!</span>[
             (<span class="number">11</span>, <span class="number">17</span>, <span class="prelude-val">Some</span>(<span class="number">187</span>)),
             (<span class="op">-</span><span class="number">1</span>, <span class="op">-</span><span class="number">3</span>, <span class="prelude-val">Some</span>(<span class="number">3</span>)),
-            (<span class="number">1</span>, <span class="ident">std</span>::<span class="ident">i64</span>::<span class="ident">MIN</span>, <span class="prelude-val">Some</span>(<span class="ident">std</span>::<span class="ident">i64</span>::<span class="ident">MIN</span>)),
+            (<span class="number">1</span>, <span class="ident">std::i64::MIN</span>, <span class="prelude-val">Some</span>(<span class="ident">std::i64::MIN</span>)),
         ];
         <span class="kw">for</span> (<span class="ident">lhs</span>, <span class="ident">rhs</span>, <span class="ident">expected</span>) <span class="kw">in</span> <span class="ident">should_pass</span> {
-            <span class="macro">assert_eq</span><span class="macro">!</span>(
+            <span class="macro">assert_eq!</span>(
                 <span class="ident">expected</span>,
-                <span class="ident">RpnFnScalarEvaluator</span>::<span class="ident">new</span>()
-                    .<span class="ident">push_param_with_field_type</span>(<span class="ident">lhs</span>, <span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>)
-                    .<span class="ident">push_param_with_field_type</span>(<span class="ident">rhs</span>, <span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>)
-                    .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig</span>::<span class="ident">MultiplyInt</span>)
+                <span class="ident">RpnFnScalarEvaluator::new</span>()
+                    .<span class="ident">push_param_with_field_type</span>(<span class="ident">lhs</span>, <span class="ident">FieldTypeTp::LongLong</span>)
+                    .<span class="ident">push_param_with_field_type</span>(<span class="ident">rhs</span>, <span class="ident">FieldTypeTp::LongLong</span>)
+                    .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig::MultiplyInt</span>)
                     .<span class="ident">unwrap</span>()
             );
         }
 
-        <span class="kw">let</span> <span class="ident">should_fail</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[(<span class="ident">std</span>::<span class="ident">i64</span>::<span class="ident">MAX</span>, <span class="number">2</span>), (<span class="ident">std</span>::<span class="ident">i64</span>::<span class="ident">MIN</span>, <span class="op">-</span><span class="number">1</span>)];
+        <span class="kw">let</span> <span class="ident">should_fail</span> <span class="op">=</span> <span class="macro">vec!</span>[(<span class="ident">std::i64::MAX</span>, <span class="number">2</span>), (<span class="ident">std::i64::MIN</span>, <span class="op">-</span><span class="number">1</span>)];
         <span class="kw">for</span> (<span class="ident">lhs</span>, <span class="ident">rhs</span>) <span class="kw">in</span> <span class="ident">should_fail</span> {
-            <span class="macro">assert</span><span class="macro">!</span>(
-                <span class="ident">RpnFnScalarEvaluator</span>::<span class="ident">new</span>()
-                    .<span class="ident">push_param_with_field_type</span>(<span class="ident">lhs</span>, <span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>)
-                    .<span class="ident">push_param_with_field_type</span>(<span class="ident">rhs</span>, <span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>)
-                    .<span class="ident">evaluate</span>::<span class="op">&lt;</span><span class="ident">Int</span><span class="op">&gt;</span>(<span class="ident">ScalarFuncSig</span>::<span class="ident">MultiplyInt</span>)
+            <span class="macro">assert!</span>(
+                <span class="ident">RpnFnScalarEvaluator::new</span>()
+                    .<span class="ident">push_param_with_field_type</span>(<span class="ident">lhs</span>, <span class="ident">FieldTypeTp::LongLong</span>)
+                    .<span class="ident">push_param_with_field_type</span>(<span class="ident">rhs</span>, <span class="ident">FieldTypeTp::LongLong</span>)
+                    .<span class="ident">evaluate</span>::<span class="op">&lt;</span><span class="ident">Int</span><span class="op">&gt;</span>(<span class="ident">ScalarFuncSig::MultiplyInt</span>)
                     .<span class="ident">is_err</span>(),
                 <span class="string">&quot;{} * {} should fail&quot;</span>,
                 <span class="ident">lhs</span>,
@@ -2387,36 +2389,36 @@
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_int_uint_multiply</span>() {
-        <span class="kw">let</span> <span class="ident">should_pass</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[(<span class="ident">std</span>::<span class="ident">i64</span>::<span class="ident">MAX</span>, <span class="number">1</span>, <span class="prelude-val">Some</span>(<span class="ident">std</span>::<span class="ident">i64</span>::<span class="ident">MAX</span>)), (<span class="number">3</span>, <span class="number">7</span>, <span class="prelude-val">Some</span>(<span class="number">21</span>))];
+        <span class="kw">let</span> <span class="ident">should_pass</span> <span class="op">=</span> <span class="macro">vec!</span>[(<span class="ident">std::i64::MAX</span>, <span class="number">1</span>, <span class="prelude-val">Some</span>(<span class="ident">std::i64::MAX</span>)), (<span class="number">3</span>, <span class="number">7</span>, <span class="prelude-val">Some</span>(<span class="number">21</span>))];
 
         <span class="kw">for</span> (<span class="ident">lhs</span>, <span class="ident">rhs</span>, <span class="ident">expected</span>) <span class="kw">in</span> <span class="ident">should_pass</span> {
-            <span class="macro">assert_eq</span><span class="macro">!</span>(
+            <span class="macro">assert_eq!</span>(
                 <span class="ident">expected</span>,
-                <span class="ident">RpnFnScalarEvaluator</span>::<span class="ident">new</span>()
-                    .<span class="ident">push_param_with_field_type</span>(<span class="ident">lhs</span>, <span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>)
+                <span class="ident">RpnFnScalarEvaluator::new</span>()
+                    .<span class="ident">push_param_with_field_type</span>(<span class="ident">lhs</span>, <span class="ident">FieldTypeTp::LongLong</span>)
                     .<span class="ident">push_param_with_field_type</span>(
                         <span class="ident">rhs</span>,
-                        <span class="ident">FieldTypeBuilder</span>::<span class="ident">new</span>()
-                            .<span class="ident">tp</span>(<span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>)
-                            .<span class="ident">flag</span>(<span class="ident">FieldTypeFlag</span>::<span class="ident">UNSIGNED</span>)
+                        <span class="ident">FieldTypeBuilder::new</span>()
+                            .<span class="ident">tp</span>(<span class="ident">FieldTypeTp::LongLong</span>)
+                            .<span class="ident">flag</span>(<span class="ident">FieldTypeFlag::UNSIGNED</span>)
                     )
-                    .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig</span>::<span class="ident">MultiplyInt</span>)
+                    .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig::MultiplyInt</span>)
                     .<span class="ident">unwrap</span>()
             );
         }
 
-        <span class="kw">let</span> <span class="ident">should_fail</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[(<span class="op">-</span><span class="number">2</span>, <span class="number">1</span>), (<span class="ident">std</span>::<span class="ident">i64</span>::<span class="ident">MIN</span>, <span class="number">2</span>)];
+        <span class="kw">let</span> <span class="ident">should_fail</span> <span class="op">=</span> <span class="macro">vec!</span>[(<span class="op">-</span><span class="number">2</span>, <span class="number">1</span>), (<span class="ident">std::i64::MIN</span>, <span class="number">2</span>)];
         <span class="kw">for</span> (<span class="ident">lhs</span>, <span class="ident">rhs</span>) <span class="kw">in</span> <span class="ident">should_fail</span> {
-            <span class="macro">assert</span><span class="macro">!</span>(
-                <span class="ident">RpnFnScalarEvaluator</span>::<span class="ident">new</span>()
-                    .<span class="ident">push_param_with_field_type</span>(<span class="ident">lhs</span>, <span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>)
+            <span class="macro">assert!</span>(
+                <span class="ident">RpnFnScalarEvaluator::new</span>()
+                    .<span class="ident">push_param_with_field_type</span>(<span class="ident">lhs</span>, <span class="ident">FieldTypeTp::LongLong</span>)
                     .<span class="ident">push_param_with_field_type</span>(
                         <span class="ident">rhs</span>,
-                        <span class="ident">FieldTypeBuilder</span>::<span class="ident">new</span>()
-                            .<span class="ident">tp</span>(<span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>)
-                            .<span class="ident">flag</span>(<span class="ident">FieldTypeFlag</span>::<span class="ident">UNSIGNED</span>)
+                        <span class="ident">FieldTypeBuilder::new</span>()
+                            .<span class="ident">tp</span>(<span class="ident">FieldTypeTp::LongLong</span>)
+                            .<span class="ident">flag</span>(<span class="ident">FieldTypeFlag::UNSIGNED</span>)
                     )
-                    .<span class="ident">evaluate</span>::<span class="op">&lt;</span><span class="ident">Int</span><span class="op">&gt;</span>(<span class="ident">ScalarFuncSig</span>::<span class="ident">MultiplyInt</span>)
+                    .<span class="ident">evaluate</span>::<span class="op">&lt;</span><span class="ident">Int</span><span class="op">&gt;</span>(<span class="ident">ScalarFuncSig::MultiplyInt</span>)
                     .<span class="ident">is_err</span>(),
                 <span class="string">&quot;{} * {} should fail&quot;</span>,
                 <span class="ident">lhs</span>,
@@ -2427,50 +2429,50 @@
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_uint_uint_multiply</span>() {
-        <span class="kw">let</span> <span class="ident">should_pass</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
+        <span class="kw">let</span> <span class="ident">should_pass</span> <span class="op">=</span> <span class="macro">vec!</span>[
             (<span class="number">7</span>, <span class="number">11</span>, <span class="prelude-val">Some</span>(<span class="number">77</span>)),
             (<span class="number">1</span>, <span class="number">2</span>, <span class="prelude-val">Some</span>(<span class="number">2</span>)),
-            (<span class="ident">std</span>::<span class="ident">u64</span>::<span class="ident">MAX</span> <span class="kw">as</span> <span class="ident">i64</span>, <span class="number">1</span>, <span class="prelude-val">Some</span>(<span class="ident">std</span>::<span class="ident">u64</span>::<span class="ident">MAX</span> <span class="kw">as</span> <span class="ident">i64</span>)),
+            (<span class="ident">std::u64::MAX</span> <span class="kw">as</span> <span class="ident">i64</span>, <span class="number">1</span>, <span class="prelude-val">Some</span>(<span class="ident">std::u64::MAX</span> <span class="kw">as</span> <span class="ident">i64</span>)),
         ];
 
         <span class="kw">for</span> (<span class="ident">lhs</span>, <span class="ident">rhs</span>, <span class="ident">expected</span>) <span class="kw">in</span> <span class="ident">should_pass</span> {
-            <span class="macro">assert_eq</span><span class="macro">!</span>(
+            <span class="macro">assert_eq!</span>(
                 <span class="ident">expected</span>,
-                <span class="ident">RpnFnScalarEvaluator</span>::<span class="ident">new</span>()
+                <span class="ident">RpnFnScalarEvaluator::new</span>()
                     .<span class="ident">push_param_with_field_type</span>(
                         <span class="ident">lhs</span>,
-                        <span class="ident">FieldTypeBuilder</span>::<span class="ident">new</span>()
-                            .<span class="ident">tp</span>(<span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>)
-                            .<span class="ident">flag</span>(<span class="ident">FieldTypeFlag</span>::<span class="ident">UNSIGNED</span>)
+                        <span class="ident">FieldTypeBuilder::new</span>()
+                            .<span class="ident">tp</span>(<span class="ident">FieldTypeTp::LongLong</span>)
+                            .<span class="ident">flag</span>(<span class="ident">FieldTypeFlag::UNSIGNED</span>)
                     )
                     .<span class="ident">push_param_with_field_type</span>(
                         <span class="ident">rhs</span>,
-                        <span class="ident">FieldTypeBuilder</span>::<span class="ident">new</span>()
-                            .<span class="ident">tp</span>(<span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>)
-                            .<span class="ident">flag</span>(<span class="ident">FieldTypeFlag</span>::<span class="ident">UNSIGNED</span>)
+                        <span class="ident">FieldTypeBuilder::new</span>()
+                            .<span class="ident">tp</span>(<span class="ident">FieldTypeTp::LongLong</span>)
+                            .<span class="ident">flag</span>(<span class="ident">FieldTypeFlag::UNSIGNED</span>)
                     )
-                    .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig</span>::<span class="ident">MultiplyIntUnsigned</span>)
+                    .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig::MultiplyIntUnsigned</span>)
                     .<span class="ident">unwrap</span>()
             );
         }
 
-        <span class="kw">let</span> <span class="ident">should_fail</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[(<span class="ident">std</span>::<span class="ident">u64</span>::<span class="ident">MAX</span> <span class="kw">as</span> <span class="ident">i64</span>, <span class="number">2</span>)];
+        <span class="kw">let</span> <span class="ident">should_fail</span> <span class="op">=</span> <span class="macro">vec!</span>[(<span class="ident">std::u64::MAX</span> <span class="kw">as</span> <span class="ident">i64</span>, <span class="number">2</span>)];
         <span class="kw">for</span> (<span class="ident">lhs</span>, <span class="ident">rhs</span>) <span class="kw">in</span> <span class="ident">should_fail</span> {
-            <span class="macro">assert</span><span class="macro">!</span>(
-                <span class="ident">RpnFnScalarEvaluator</span>::<span class="ident">new</span>()
+            <span class="macro">assert!</span>(
+                <span class="ident">RpnFnScalarEvaluator::new</span>()
                     .<span class="ident">push_param_with_field_type</span>(
                         <span class="ident">lhs</span>,
-                        <span class="ident">FieldTypeBuilder</span>::<span class="ident">new</span>()
-                            .<span class="ident">tp</span>(<span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>)
-                            .<span class="ident">flag</span>(<span class="ident">FieldTypeFlag</span>::<span class="ident">UNSIGNED</span>)
+                        <span class="ident">FieldTypeBuilder::new</span>()
+                            .<span class="ident">tp</span>(<span class="ident">FieldTypeTp::LongLong</span>)
+                            .<span class="ident">flag</span>(<span class="ident">FieldTypeFlag::UNSIGNED</span>)
                     )
                     .<span class="ident">push_param_with_field_type</span>(
                         <span class="ident">rhs</span>,
-                        <span class="ident">FieldTypeBuilder</span>::<span class="ident">new</span>()
-                            .<span class="ident">tp</span>(<span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>)
-                            .<span class="ident">flag</span>(<span class="ident">FieldTypeFlag</span>::<span class="ident">UNSIGNED</span>)
+                        <span class="ident">FieldTypeBuilder::new</span>()
+                            .<span class="ident">tp</span>(<span class="ident">FieldTypeTp::LongLong</span>)
+                            .<span class="ident">flag</span>(<span class="ident">FieldTypeFlag::UNSIGNED</span>)
                     )
-                    .<span class="ident">evaluate</span>::<span class="op">&lt;</span><span class="ident">Int</span><span class="op">&gt;</span>(<span class="ident">ScalarFuncSig</span>::<span class="ident">MultiplyIntUnsigned</span>)
+                    .<span class="ident">evaluate</span>::<span class="op">&lt;</span><span class="ident">Int</span><span class="op">&gt;</span>(<span class="ident">ScalarFuncSig::MultiplyIntUnsigned</span>)
                     .<span class="ident">is_err</span>(),
                 <span class="string">&quot;{} * {} should fail&quot;</span>,
                 <span class="ident">lhs</span>,
@@ -2481,7 +2483,7 @@
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_decimal_divide</span>() {
-        <span class="kw">let</span> <span class="ident">cases</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
+        <span class="kw">let</span> <span class="ident">cases</span> <span class="op">=</span> <span class="macro">vec!</span>[
             (<span class="prelude-val">Some</span>(<span class="string">&quot;2.2&quot;</span>), <span class="prelude-val">Some</span>(<span class="string">&quot;1.1&quot;</span>), <span class="prelude-val">Some</span>(<span class="string">&quot;2.0&quot;</span>)),
             (<span class="prelude-val">Some</span>(<span class="string">&quot;2.33&quot;</span>), <span class="prelude-val">Some</span>(<span class="string">&quot;-0.01&quot;</span>), <span class="prelude-val">Some</span>(<span class="string">&quot;-233&quot;</span>)),
             (<span class="prelude-val">Some</span>(<span class="string">&quot;2.33&quot;</span>), <span class="prelude-val">Some</span>(<span class="string">&quot;0.01&quot;</span>), <span class="prelude-val">Some</span>(<span class="string">&quot;233&quot;</span>)),
@@ -2490,93 +2492,95 @@
         ];
 
         <span class="kw">for</span> (<span class="ident">lhs</span>, <span class="ident">rhs</span>, <span class="ident">expected</span>) <span class="kw">in</span> <span class="ident">cases</span> {
-            <span class="kw">let</span> <span class="ident">actual</span> <span class="op">=</span> <span class="ident">RpnFnScalarEvaluator</span>::<span class="ident">new</span>()
-                .<span class="ident">push_param</span>(<span class="ident">lhs</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">Decimal</span>::<span class="ident">from_str</span>(<span class="ident">s</span>).<span class="ident">unwrap</span>()))
-                .<span class="ident">push_param</span>(<span class="ident">rhs</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">Decimal</span>::<span class="ident">from_str</span>(<span class="ident">s</span>).<span class="ident">unwrap</span>()))
-                .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig</span>::<span class="ident">DivideDecimal</span>)
+            <span class="kw">let</span> <span class="ident">actual</span> <span class="op">=</span> <span class="ident">RpnFnScalarEvaluator::new</span>()
+                .<span class="ident">push_param</span>(<span class="ident">lhs</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">Decimal::from_str</span>(<span class="ident">s</span>).<span class="ident">unwrap</span>()))
+                .<span class="ident">push_param</span>(<span class="ident">rhs</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">Decimal::from_str</span>(<span class="ident">s</span>).<span class="ident">unwrap</span>()))
+                .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig::DivideDecimal</span>)
                 .<span class="ident">unwrap</span>();
 
-            <span class="kw">let</span> <span class="ident">expected</span> <span class="op">=</span> <span class="ident">expected</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">Decimal</span>::<span class="ident">from_str</span>(<span class="ident">s</span>).<span class="ident">unwrap</span>());
+            <span class="kw">let</span> <span class="ident">expected</span> <span class="op">=</span> <span class="ident">expected</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">Decimal::from_str</span>(<span class="ident">s</span>).<span class="ident">unwrap</span>());
 
-            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">actual</span>, <span class="ident">expected</span>, <span class="string">&quot;lhs={:?}, rhs={:?}&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>);
+            <span class="macro">assert_eq!</span>(<span class="ident">actual</span>, <span class="ident">expected</span>, <span class="string">&quot;lhs={:?}, rhs={:?}&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>);
         }
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_real_divide</span>() {
-        <span class="kw">let</span> <span class="ident">normal</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
-            (<span class="prelude-val">Some</span>(<span class="number">2.2</span>), <span class="prelude-val">Some</span>(<span class="number">1.1</span>), <span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">2.0</span>).<span class="ident">ok</span>()),
-            (<span class="prelude-val">Some</span>(<span class="number">2.33</span>), <span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">0.01</span>), <span class="ident">Real</span>::<span class="ident">new</span>(<span class="op">-</span><span class="number">233.0</span>).<span class="ident">ok</span>()),
-            (<span class="prelude-val">Some</span>(<span class="number">2.33</span>), <span class="prelude-val">Some</span>(<span class="number">0.01</span>), <span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">233.0</span>).<span class="ident">ok</span>()),
+        <span class="kw">let</span> <span class="ident">normal</span> <span class="op">=</span> <span class="macro">vec!</span>[
+            (<span class="prelude-val">Some</span>(<span class="number">2.2</span>), <span class="prelude-val">Some</span>(<span class="number">1.1</span>), <span class="ident">Real::new</span>(<span class="number">2.0</span>).<span class="ident">ok</span>()),
+            (<span class="prelude-val">Some</span>(<span class="number">2.33</span>), <span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">0.01</span>), <span class="ident">Real::new</span>(<span class="op">-</span><span class="number">233.0</span>).<span class="ident">ok</span>()),
+            (<span class="prelude-val">Some</span>(<span class="number">2.33</span>), <span class="prelude-val">Some</span>(<span class="number">0.01</span>), <span class="ident">Real::new</span>(<span class="number">233.0</span>).<span class="ident">ok</span>()),
             (<span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="number">2.0</span>), <span class="prelude-val">None</span>),
             (<span class="prelude-val">Some</span>(<span class="number">123.0</span>), <span class="prelude-val">None</span>, <span class="prelude-val">None</span>),
         ];
 
         <span class="kw">for</span> (<span class="ident">lhs</span>, <span class="ident">rhs</span>, <span class="ident">expected</span>) <span class="kw">in</span> <span class="ident">normal</span> {
-            <span class="kw">let</span> <span class="ident">actual</span> <span class="op">=</span> <span class="ident">RpnFnScalarEvaluator</span>::<span class="ident">new</span>()
+            <span class="kw">let</span> <span class="ident">actual</span> <span class="op">=</span> <span class="ident">RpnFnScalarEvaluator::new</span>()
                 .<span class="ident">push_param</span>(<span class="ident">lhs</span>)
                 .<span class="ident">push_param</span>(<span class="ident">rhs</span>)
-                .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig</span>::<span class="ident">DivideReal</span>)
+                .<span class="ident">evaluate</span>(<span class="ident">ScalarFuncSig::DivideReal</span>)
                 .<span class="ident">unwrap</span>();
 
-            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">actual</span>, <span class="ident">expected</span>, <span class="string">&quot;lhs={:?}, rhs={:?}&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>);
+            <span class="macro">assert_eq!</span>(<span class="ident">actual</span>, <span class="ident">expected</span>, <span class="string">&quot;lhs={:?}, rhs={:?}&quot;</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>);
         }
 
-        <span class="kw">let</span> <span class="ident">overflow</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[(<span class="ident">std</span>::<span class="ident">f64</span>::<span class="ident">MAX</span>, <span class="number">0.0001</span>)];
+        <span class="kw">let</span> <span class="ident">overflow</span> <span class="op">=</span> <span class="macro">vec!</span>[(<span class="ident">std::f64::MAX</span>, <span class="number">0.0001</span>)];
         <span class="kw">for</span> (<span class="ident">lhs</span>, <span class="ident">rhs</span>) <span class="kw">in</span> <span class="ident">overflow</span> {
-            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">RpnFnScalarEvaluator</span>::<span class="ident">new</span>()
-                .<span class="ident">push_param</span>(<span class="ident">lhs</span>)
-                .<span class="ident">push_param</span>(<span class="ident">rhs</span>)
-                .<span class="ident">evaluate</span>::<span class="op">&lt;</span><span class="ident">Real</span><span class="op">&gt;</span>(<span class="ident">ScalarFuncSig</span>::<span class="ident">DivideReal</span>)
-                .<span class="ident">is_err</span>())
+            <span class="macro">assert!</span>(
+                <span class="ident">RpnFnScalarEvaluator::new</span>()
+                    .<span class="ident">push_param</span>(<span class="ident">lhs</span>)
+                    .<span class="ident">push_param</span>(<span class="ident">rhs</span>)
+                    .<span class="ident">evaluate</span>::<span class="op">&lt;</span><span class="ident">Real</span><span class="op">&gt;</span>(<span class="ident">ScalarFuncSig::DivideReal</span>)
+                    .<span class="ident">is_err</span>()
+            )
         }
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_divide_by_zero</span>() {
-        <span class="kw">let</span> <span class="ident">cases</span>: <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">ScalarFuncSig</span>, <span class="ident">FieldTypeTp</span>, <span class="ident">ScalarValue</span>, <span class="ident">ScalarValue</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
+        <span class="kw">let</span> <span class="ident">cases</span>: <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">ScalarFuncSig</span>, <span class="ident">FieldTypeTp</span>, <span class="ident">ScalarValue</span>, <span class="ident">ScalarValue</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec!</span>[
             (
-                <span class="ident">ScalarFuncSig</span>::<span class="ident">DivideDecimal</span>,
-                <span class="ident">FieldTypeTp</span>::<span class="ident">NewDecimal</span>,
-                <span class="ident">Decimal</span>::<span class="ident">from_str</span>(<span class="string">&quot;2.33&quot;</span>).<span class="ident">unwrap</span>().<span class="ident">into</span>(),
-                <span class="ident">Decimal</span>::<span class="ident">from_str</span>(<span class="string">&quot;0.0&quot;</span>).<span class="ident">unwrap</span>().<span class="ident">into</span>(),
+                <span class="ident">ScalarFuncSig::DivideDecimal</span>,
+                <span class="ident">FieldTypeTp::NewDecimal</span>,
+                <span class="ident">Decimal::from_str</span>(<span class="string">&quot;2.33&quot;</span>).<span class="ident">unwrap</span>().<span class="ident">into</span>(),
+                <span class="ident">Decimal::from_str</span>(<span class="string">&quot;0.0&quot;</span>).<span class="ident">unwrap</span>().<span class="ident">into</span>(),
             ),
             (
-                <span class="ident">ScalarFuncSig</span>::<span class="ident">DivideDecimal</span>,
-                <span class="ident">FieldTypeTp</span>::<span class="ident">NewDecimal</span>,
-                <span class="ident">Decimal</span>::<span class="ident">from_str</span>(<span class="string">&quot;2.33&quot;</span>).<span class="ident">unwrap</span>().<span class="ident">into</span>(),
-                <span class="ident">Decimal</span>::<span class="ident">from_str</span>(<span class="string">&quot;-0.0&quot;</span>).<span class="ident">unwrap</span>().<span class="ident">into</span>(),
+                <span class="ident">ScalarFuncSig::DivideDecimal</span>,
+                <span class="ident">FieldTypeTp::NewDecimal</span>,
+                <span class="ident">Decimal::from_str</span>(<span class="string">&quot;2.33&quot;</span>).<span class="ident">unwrap</span>().<span class="ident">into</span>(),
+                <span class="ident">Decimal::from_str</span>(<span class="string">&quot;-0.0&quot;</span>).<span class="ident">unwrap</span>().<span class="ident">into</span>(),
             ),
             (
-                <span class="ident">ScalarFuncSig</span>::<span class="ident">DivideReal</span>,
-                <span class="ident">FieldTypeTp</span>::<span class="ident">Double</span>,
+                <span class="ident">ScalarFuncSig::DivideReal</span>,
+                <span class="ident">FieldTypeTp::Double</span>,
                 <span class="number">2.33</span>.<span class="ident">into</span>(),
                 <span class="number">0.0</span>.<span class="ident">into</span>(),
             ),
         ];
 
         <span class="comment">// Vec&lt;[(Flag, SqlMode, is_ok(bool), has_warning(bool))]&gt;</span>
-        <span class="kw">let</span> <span class="ident">modes</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
+        <span class="kw">let</span> <span class="ident">modes</span> <span class="op">=</span> <span class="macro">vec!</span>[
             <span class="comment">// Warning</span>
-            (<span class="ident">Flag</span>::<span class="ident">empty</span>(), <span class="ident">SqlMode</span>::<span class="ident">empty</span>(), <span class="bool-val">true</span>, <span class="bool-val">true</span>),
+            (<span class="ident">Flag::empty</span>(), <span class="ident">SqlMode::empty</span>(), <span class="bool-val">true</span>, <span class="bool-val">true</span>),
             <span class="comment">// Error</span>
             (
-                <span class="ident">Flag</span>::<span class="ident">IN_UPDATE_OR_DELETE_STMT</span>,
-                <span class="ident">SqlMode</span>::<span class="ident">ERROR_FOR_DIVISION_BY_ZERO</span> <span class="op">|</span> <span class="ident">SqlMode</span>::<span class="ident">STRICT_ALL_TABLES</span>,
+                <span class="ident">Flag::IN_UPDATE_OR_DELETE_STMT</span>,
+                <span class="ident">SqlMode::ERROR_FOR_DIVISION_BY_ZERO</span> <span class="op">|</span> <span class="ident">SqlMode::STRICT_ALL_TABLES</span>,
                 <span class="bool-val">false</span>,
                 <span class="bool-val">false</span>,
             ),
             <span class="comment">// Ok</span>
             (
-                <span class="ident">Flag</span>::<span class="ident">IN_UPDATE_OR_DELETE_STMT</span>,
-                <span class="ident">SqlMode</span>::<span class="ident">STRICT_ALL_TABLES</span>,
+                <span class="ident">Flag::IN_UPDATE_OR_DELETE_STMT</span>,
+                <span class="ident">SqlMode::STRICT_ALL_TABLES</span>,
                 <span class="bool-val">true</span>,
                 <span class="bool-val">false</span>,
             ),
             <span class="comment">// Warning</span>
             (
-                <span class="ident">Flag</span>::<span class="ident">IN_UPDATE_OR_DELETE_STMT</span> <span class="op">|</span> <span class="ident">Flag</span>::<span class="ident">DIVIDED_BY_ZERO_AS_WARNING</span>,
-                <span class="ident">SqlMode</span>::<span class="ident">ERROR_FOR_DIVISION_BY_ZERO</span> <span class="op">|</span> <span class="ident">SqlMode</span>::<span class="ident">STRICT_ALL_TABLES</span>,
+                <span class="ident">Flag::IN_UPDATE_OR_DELETE_STMT</span> <span class="op">|</span> <span class="ident">Flag::DIVIDED_BY_ZERO_AS_WARNING</span>,
+                <span class="ident">SqlMode::ERROR_FOR_DIVISION_BY_ZERO</span> <span class="op">|</span> <span class="ident">SqlMode::STRICT_ALL_TABLES</span>,
                 <span class="bool-val">true</span>,
                 <span class="bool-val">true</span>,
             ),
@@ -2585,33 +2589,33 @@
         <span class="kw">for</span> (<span class="ident">sig</span>, <span class="ident">ret_field_type</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>) <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">cases</span> {
             <span class="kw">for</span> <span class="kw-2">&amp;</span>(<span class="ident">flag</span>, <span class="ident">sql_mode</span>, <span class="ident">is_ok</span>, <span class="ident">has_warning</span>) <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">modes</span> {
                 <span class="comment">// Construct an `EvalContext`</span>
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">config</span> <span class="op">=</span> <span class="ident">EvalConfig</span>::<span class="ident">new</span>();
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">config</span> <span class="op">=</span> <span class="ident">EvalConfig::new</span>();
                 <span class="ident">config</span>.<span class="ident">set_flag</span>(<span class="ident">flag</span>).<span class="ident">set_sql_mode</span>(<span class="ident">sql_mode</span>);
 
-                <span class="kw">let</span> (<span class="ident">result</span>, <span class="kw-2">mut</span> <span class="ident">ctx</span>) <span class="op">=</span> <span class="ident">RpnFnScalarEvaluator</span>::<span class="ident">new</span>()
-                    .<span class="ident">context</span>(<span class="ident">EvalContext</span>::<span class="ident">new</span>(<span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">config</span>)))
+                <span class="kw">let</span> (<span class="ident">result</span>, <span class="kw-2">mut</span> <span class="ident">ctx</span>) <span class="op">=</span> <span class="ident">RpnFnScalarEvaluator::new</span>()
+                    .<span class="ident">context</span>(<span class="ident">EvalContext::new</span>(<span class="ident">std::sync::Arc::new</span>(<span class="ident">config</span>)))
                     .<span class="ident">push_param</span>(<span class="ident">lhs</span>.<span class="ident">to_owned</span>())
                     .<span class="ident">push_param</span>(<span class="ident">rhs</span>.<span class="ident">to_owned</span>())
                     .<span class="ident">evaluate_raw</span>(<span class="kw-2">*</span><span class="ident">ret_field_type</span>, <span class="kw-2">*</span><span class="ident">sig</span>);
 
                 <span class="kw">if</span> <span class="ident">is_ok</span> {
-                    <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">result</span>.<span class="ident">unwrap</span>().<span class="ident">is_none</span>());
+                    <span class="macro">assert!</span>(<span class="ident">result</span>.<span class="ident">unwrap</span>().<span class="ident">is_none</span>());
                 } <span class="kw">else</span> {
-                    <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">result</span>.<span class="ident">is_err</span>());
+                    <span class="macro">assert!</span>(<span class="ident">result</span>.<span class="ident">is_err</span>());
                 }
 
                 <span class="kw">if</span> <span class="ident">has_warning</span> {
-                    <span class="macro">assert_eq</span><span class="macro">!</span>(
+                    <span class="macro">assert_eq!</span>(
                         <span class="ident">ctx</span>.<span class="ident">take_warnings</span>().<span class="ident">warnings</span>[<span class="number">0</span>].<span class="ident">get_code</span>(),
                         <span class="ident">ERR_DIVISION_BY_ZERO</span>
                     );
                 } <span class="kw">else</span> {
-                    <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">ctx</span>.<span class="ident">take_warnings</span>().<span class="ident">warnings</span>.<span class="ident">is_empty</span>());
+                    <span class="macro">assert!</span>(<span class="ident">ctx</span>.<span class="ident">take_warnings</span>().<span class="ident">warnings</span>.<span class="ident">is_empty</span>());
                 }
             }
         }
     }
 }
 </pre></div>
-</section><section id="search" class="content hidden"></section><section class="footer"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="tidb_query_expr"></div>
-    <script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script><script defer src="../../search-index.js"></script></body></html>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="tidb_query_expr" data-search-js="../../search-index.js"></div>
+    <script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script></body></html>

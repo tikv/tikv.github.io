@@ -1,3 +1,3 @@
 (function() {var implementors = {};
-implementors["test_sst_importer"] = [{"text":"impl TablePropertiesCollector for TestPropertiesCollector","synthetic":false,"types":[]}];
+implementors["test_sst_importer"] = [{"text":"impl <a class=\"trait\" href=\"rocksdb/table_properties_collector/trait.TablePropertiesCollector.html\" title=\"trait rocksdb::table_properties_collector::TablePropertiesCollector\">TablePropertiesCollector</a> for <a class=\"struct\" href=\"test_sst_importer/struct.TestPropertiesCollector.html\" title=\"struct test_sst_importer::TestPropertiesCollector\">TestPropertiesCollector</a>","synthetic":false,"types":["test_sst_importer::TestPropertiesCollector"]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

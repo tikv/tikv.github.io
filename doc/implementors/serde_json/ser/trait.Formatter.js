@@ -1,4 +1,4 @@
 (function() {var implementors = {};
 implementors["serde_json"] = [];
-implementors["tidb_query_datatype"] = [{"text":"impl Formatter for MySQLFormatter","synthetic":false,"types":[]}];
+implementors["tidb_query_datatype"] = [{"text":"impl <a class=\"trait\" href=\"serde_json/ser/trait.Formatter.html\" title=\"trait serde_json::ser::Formatter\">Formatter</a> for <a class=\"struct\" href=\"tidb_query_datatype/codec/mysql/json/serde/struct.MySQLFormatter.html\" title=\"struct tidb_query_datatype::codec::mysql::json::serde::MySQLFormatter\">MySQLFormatter</a>","synthetic":false,"types":["tidb_query_datatype::codec::mysql::json::serde::MySQLFormatter"]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

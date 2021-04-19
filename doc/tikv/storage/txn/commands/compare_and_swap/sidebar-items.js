@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["RawCompareAndSwap","RawCompareAndSwap checks whether the previous value of the key equals to the given value. If they are equal, write the new value. The bool indicates whether they are equal. The previous value is always returned regardless of whether the new value is set."]]});

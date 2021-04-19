@@ -1,3 +1,3 @@
 (function() {var implementors = {};
-implementors["tikv"] = [{"text":"impl ReadIndexObserver for ReplicaReadLockChecker","synthetic":false,"types":[]}];
+implementors["tikv"] = [{"text":"impl <a class=\"trait\" href=\"raftstore/coprocessor/trait.ReadIndexObserver.html\" title=\"trait raftstore::coprocessor::ReadIndexObserver\">ReadIndexObserver</a> for <a class=\"struct\" href=\"tikv/server/raftkv/struct.ReplicaReadLockChecker.html\" title=\"struct tikv::server::raftkv::ReplicaReadLockChecker\">ReplicaReadLockChecker</a>","synthetic":false,"types":["tikv::server::raftkv::ReplicaReadLockChecker"]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

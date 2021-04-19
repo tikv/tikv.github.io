@@ -1,5 +1,5 @@
 (function() {var implementors = {};
-implementors["engine_panic"] = [{"text":"impl RaftEngine for PanicEngine","synthetic":false,"types":[]}];
-implementors["engine_rocks"] = [{"text":"impl RaftEngine for RocksEngine","synthetic":false,"types":[]}];
-implementors["raft_log_engine"] = [{"text":"impl RaftEngine for RaftLogEngine","synthetic":false,"types":[]}];
+implementors["engine_panic"] = [{"text":"impl <a class=\"trait\" href=\"engine_traits/raft_engine/trait.RaftEngine.html\" title=\"trait engine_traits::raft_engine::RaftEngine\">RaftEngine</a> for <a class=\"struct\" href=\"engine_panic/engine/struct.PanicEngine.html\" title=\"struct engine_panic::engine::PanicEngine\">PanicEngine</a>","synthetic":false,"types":["engine_panic::engine::PanicEngine"]}];
+implementors["engine_rocks"] = [{"text":"impl <a class=\"trait\" href=\"engine_traits/raft_engine/trait.RaftEngine.html\" title=\"trait engine_traits::raft_engine::RaftEngine\">RaftEngine</a> for <a class=\"struct\" href=\"engine_rocks/engine/struct.RocksEngine.html\" title=\"struct engine_rocks::engine::RocksEngine\">RocksEngine</a>","synthetic":false,"types":["engine_rocks::engine::RocksEngine"]}];
+implementors["raft_log_engine"] = [{"text":"impl <a class=\"trait\" href=\"engine_traits/raft_engine/trait.RaftEngine.html\" title=\"trait engine_traits::raft_engine::RaftEngine\">RaftEngine</a> for <a class=\"struct\" href=\"raft_log_engine/engine/struct.RaftLogEngine.html\" title=\"struct raft_log_engine::engine::RaftLogEngine\">RaftLogEngine</a>","synthetic":false,"types":["raft_log_engine::engine::RaftLogEngine"]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["RawStore",""]],"mod":[["store",""],["ttl",""]],"struct":[["TTLSnapshot",""]]});
+initSidebarItems({"enum":[["RawStore",""]],"mod":[["store",""],["ttl",""]]});

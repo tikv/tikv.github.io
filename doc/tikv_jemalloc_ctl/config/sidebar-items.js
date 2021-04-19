@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["malloc_conf","Default run-time options specified during `jemalloc`'s build configuration."],["malloc_conf_mib","See [`malloc_conf`]."]]});
+initSidebarItems({"struct":[["malloc_conf","Default run-time options specified during `jemalloc`’s build configuration."],["malloc_conf_mib","See [`malloc_conf`]."]]});

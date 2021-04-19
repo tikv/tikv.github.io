@@ -1,7 +1,7 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `components/tidb_query_datatype/src/codec/chunk/column.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>column.rs - source</title><link rel="stylesheet" type="text/css" href="../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `components/tidb_query_datatype/src/codec/chunk/column.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>column.rs - source</title><link rel="stylesheet" type="text/css" href="../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../../storage.js"></script><script src="../../../../crates.js"></script><noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg">
 <link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../../tidb_query_datatype/index.html'><div class='logo-container rust-logo'><img src='../../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><script src="../../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
-                <a id="settings-menu" href="../../../../settings.html"><img src="../../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">   1</span>
+<link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../../../tidb_query_datatype/index.html'><div class='logo-container rust-logo'><img src='../../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
+                <a id="settings-menu" href="../../../../settings.html"><img src="../../../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">   1</span>
 <span id="2">   2</span>
 <span id="3">   3</span>
 <span id="4">   4</span>
@@ -1039,31 +1039,31 @@
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">convert</span>::<span class="ident">TryFrom</span>;
+<span class="kw">use</span> <span class="ident">std::convert::TryFrom</span>;
 
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">prelude</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::prelude</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">EvalType</span>, <span class="ident">FieldTypeFlag</span>, <span class="ident">FieldTypeTp</span>};
-<span class="kw">use</span> <span class="ident">codec</span>::<span class="ident">buffer</span>::{<span class="ident">BufferReader</span>, <span class="ident">BufferWriter</span>};
-<span class="kw">use</span> <span class="ident">codec</span>::<span class="ident">number</span>::{<span class="ident">NumberDecoder</span>, <span class="ident">NumberEncoder</span>};
-<span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">buffer_vec</span>::<span class="ident">BufferVec</span>;
-<span class="kw">use</span> <span class="ident">tipb</span>::<span class="ident">FieldType</span>;
+<span class="kw">use</span> <span class="ident">codec::buffer</span>::{<span class="ident">BufferReader</span>, <span class="ident">BufferWriter</span>};
+<span class="kw">use</span> <span class="ident">codec::number</span>::{<span class="ident">NumberDecoder</span>, <span class="ident">NumberEncoder</span>};
+<span class="kw">use</span> <span class="ident">tikv_util::buffer_vec::BufferVec</span>;
+<span class="kw">use</span> <span class="ident">tipb::FieldType</span>;
 
 <span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">Error</span>, <span class="prelude-ty">Result</span>};
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">codec</span>::<span class="ident">data_type</span>::{<span class="ident">ChunkRef</span>, <span class="ident">VectorValue</span>};
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">codec</span>::<span class="ident">datum</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">codec</span>::<span class="ident">datum_codec</span>::<span class="ident">DatumPayloadDecoder</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">codec</span>::<span class="ident">mysql</span>::<span class="ident">decimal</span>::{
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::codec::data_type</span>::{<span class="ident">ChunkRef</span>, <span class="ident">VectorValue</span>};
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::codec::datum</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::codec::datum_codec::DatumPayloadDecoder</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::codec::mysql::decimal</span>::{
     <span class="ident">Decimal</span>, <span class="ident">DecimalDatumPayloadChunkEncoder</span>, <span class="ident">DecimalDecoder</span>, <span class="ident">DecimalEncoder</span>, <span class="ident">DECIMAL_STRUCT_SIZE</span>,
 };
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">codec</span>::<span class="ident">mysql</span>::<span class="ident">duration</span>::{
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::codec::mysql::duration</span>::{
     <span class="ident">Duration</span>, <span class="ident">DurationDatumPayloadChunkEncoder</span>, <span class="ident">DurationDecoder</span>, <span class="ident">DurationEncoder</span>,
 };
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">codec</span>::<span class="ident">mysql</span>::<span class="ident">json</span>::{
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::codec::mysql::json</span>::{
     <span class="ident">Json</span>, <span class="ident">JsonDatumPayloadChunkEncoder</span>, <span class="ident">JsonDecoder</span>, <span class="ident">JsonEncoder</span>, <span class="ident">JsonRef</span>,
 };
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">codec</span>::<span class="ident">mysql</span>::<span class="ident">time</span>::{<span class="ident">Time</span>, <span class="ident">TimeDatumPayloadChunkEncoder</span>, <span class="ident">TimeDecoder</span>, <span class="ident">TimeEncoder</span>};
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">codec</span>::<span class="ident">Datum</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">expr</span>::<span class="ident">EvalContext</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::codec::mysql::time</span>::{<span class="ident">Time</span>, <span class="ident">TimeDatumPayloadChunkEncoder</span>, <span class="ident">TimeDecoder</span>, <span class="ident">TimeEncoder</span>};
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::codec::Datum</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::expr::EvalContext</span>;
 
 <span class="doccomment">/// `Column` stores the same column data of multi rows in one chunk.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Default</span>)]</span>
@@ -1081,20 +1081,20 @@
     <span class="doccomment">/// Create the column with a specified type and capacity.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">field_type_tp</span>: <span class="ident">FieldTypeTp</span>, <span class="ident">init_cap</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Column</span> {
         <span class="kw">match</span> <span class="ident">field_type_tp</span> {
-            <span class="ident">FieldTypeTp</span>::<span class="ident">Tiny</span>
-            <span class="op">|</span> <span class="ident">FieldTypeTp</span>::<span class="ident">Short</span>
-            <span class="op">|</span> <span class="ident">FieldTypeTp</span>::<span class="ident">Int24</span>
-            <span class="op">|</span> <span class="ident">FieldTypeTp</span>::<span class="ident">Long</span>
-            <span class="op">|</span> <span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>
-            <span class="op">|</span> <span class="ident">FieldTypeTp</span>::<span class="ident">Year</span>
-            <span class="op">|</span> <span class="ident">FieldTypeTp</span>::<span class="ident">Double</span>
-            <span class="op">|</span> <span class="ident">FieldTypeTp</span>::<span class="ident">Duration</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Column</span>::<span class="ident">new_fixed_len</span>(<span class="number">8</span>, <span class="ident">init_cap</span>),
-            <span class="ident">FieldTypeTp</span>::<span class="ident">Float</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Column</span>::<span class="ident">new_fixed_len</span>(<span class="number">4</span>, <span class="ident">init_cap</span>),
-            <span class="ident">FieldTypeTp</span>::<span class="ident">Date</span> <span class="op">|</span> <span class="ident">FieldTypeTp</span>::<span class="ident">DateTime</span> <span class="op">|</span> <span class="ident">FieldTypeTp</span>::<span class="ident">Timestamp</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="ident">Column</span>::<span class="ident">new_fixed_len</span>(<span class="number">8</span>, <span class="ident">init_cap</span>)
+            <span class="ident">FieldTypeTp::Tiny</span>
+            <span class="op">|</span> <span class="ident">FieldTypeTp::Short</span>
+            <span class="op">|</span> <span class="ident">FieldTypeTp::Int24</span>
+            <span class="op">|</span> <span class="ident">FieldTypeTp::Long</span>
+            <span class="op">|</span> <span class="ident">FieldTypeTp::LongLong</span>
+            <span class="op">|</span> <span class="ident">FieldTypeTp::Year</span>
+            <span class="op">|</span> <span class="ident">FieldTypeTp::Double</span>
+            <span class="op">|</span> <span class="ident">FieldTypeTp::Duration</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Column::new_fixed_len</span>(<span class="number">8</span>, <span class="ident">init_cap</span>),
+            <span class="ident">FieldTypeTp::Float</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Column::new_fixed_len</span>(<span class="number">4</span>, <span class="ident">init_cap</span>),
+            <span class="ident">FieldTypeTp::Date</span> <span class="op">|</span> <span class="ident">FieldTypeTp::DateTime</span> <span class="op">|</span> <span class="ident">FieldTypeTp::Timestamp</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="ident">Column::new_fixed_len</span>(<span class="number">8</span>, <span class="ident">init_cap</span>)
             }
-            <span class="ident">FieldTypeTp</span>::<span class="ident">NewDecimal</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Column</span>::<span class="ident">new_fixed_len</span>(<span class="ident">DECIMAL_STRUCT_SIZE</span>, <span class="ident">init_cap</span>),
-            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Column</span>::<span class="ident">new_var_len_column</span>(<span class="ident">init_cap</span>),
+            <span class="ident">FieldTypeTp::NewDecimal</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Column::new_fixed_len</span>(<span class="ident">DECIMAL_STRUCT_SIZE</span>, <span class="ident">init_cap</span>),
+            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Column::new_var_len_column</span>(<span class="ident">init_cap</span>),
         }
     }
 
@@ -1104,11 +1104,11 @@
         <span class="ident">logical_rows</span>: <span class="kw-2">&amp;</span>[<span class="ident">usize</span>],
         <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">EvalContext</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">col</span> <span class="op">=</span> <span class="ident">Column</span>::<span class="ident">new</span>(<span class="ident">field_type</span>.<span class="ident">as_accessor</span>().<span class="ident">tp</span>(), <span class="ident">logical_rows</span>.<span class="ident">len</span>());
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">col</span> <span class="op">=</span> <span class="ident">Column::new</span>(<span class="ident">field_type</span>.<span class="ident">as_accessor</span>().<span class="ident">tp</span>(), <span class="ident">logical_rows</span>.<span class="ident">len</span>());
 
-        <span class="kw">let</span> <span class="ident">eval_type</span> <span class="op">=</span> <span class="macro">box_try</span><span class="macro">!</span>(<span class="ident">EvalType</span>::<span class="ident">try_from</span>(<span class="ident">field_type</span>.<span class="ident">as_accessor</span>().<span class="ident">tp</span>()));
+        <span class="kw">let</span> <span class="ident">eval_type</span> <span class="op">=</span> <span class="macro">box_try!</span>(<span class="ident">EvalType::try_from</span>(<span class="ident">field_type</span>.<span class="ident">as_accessor</span>().<span class="ident">tp</span>()));
         <span class="kw">match</span> <span class="ident">eval_type</span> {
-            <span class="ident">EvalType</span>::<span class="ident">Int</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">EvalType::Int</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">if</span> <span class="ident">field_type</span>.<span class="ident">is_unsigned</span>() {
                     <span class="kw">for</span> <span class="kw-2">&amp;</span><span class="ident">row_index</span> <span class="kw">in</span> <span class="ident">logical_rows</span> {
                         <span class="ident">col</span>.<span class="ident">append_u64_datum</span>(<span class="kw-2">&amp;</span><span class="ident">raw_datums</span>[<span class="ident">row_index</span>])<span class="question-mark">?</span>
@@ -1119,8 +1119,8 @@
                     }
                 }
             }
-            <span class="ident">EvalType</span>::<span class="ident">Real</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">if</span> <span class="ident">field_type</span>.<span class="ident">as_accessor</span>().<span class="ident">tp</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">FieldTypeTp</span>::<span class="ident">Float</span> {
+            <span class="ident">EvalType::Real</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="kw">if</span> <span class="ident">field_type</span>.<span class="ident">as_accessor</span>().<span class="ident">tp</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">FieldTypeTp::Float</span> {
                     <span class="kw">for</span> <span class="kw-2">&amp;</span><span class="ident">row_index</span> <span class="kw">in</span> <span class="ident">logical_rows</span> {
                         <span class="ident">col</span>.<span class="ident">append_f32_datum</span>(<span class="kw-2">&amp;</span><span class="ident">raw_datums</span>[<span class="ident">row_index</span>])<span class="question-mark">?</span>
                     }
@@ -1130,33 +1130,33 @@
                     }
                 }
             }
-            <span class="ident">EvalType</span>::<span class="ident">Decimal</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">EvalType::Decimal</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">for</span> <span class="kw-2">&amp;</span><span class="ident">row_index</span> <span class="kw">in</span> <span class="ident">logical_rows</span> {
                     <span class="ident">col</span>.<span class="ident">append_decimal_datum</span>(<span class="kw-2">&amp;</span><span class="ident">raw_datums</span>[<span class="ident">row_index</span>])<span class="question-mark">?</span>
                 }
             }
-            <span class="ident">EvalType</span>::<span class="ident">Bytes</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">EvalType::Bytes</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">for</span> <span class="kw-2">&amp;</span><span class="ident">row_index</span> <span class="kw">in</span> <span class="ident">logical_rows</span> {
                     <span class="ident">col</span>.<span class="ident">append_bytes_datum</span>(<span class="kw-2">&amp;</span><span class="ident">raw_datums</span>[<span class="ident">row_index</span>])<span class="question-mark">?</span>
                 }
             }
-            <span class="ident">EvalType</span>::<span class="ident">DateTime</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">EvalType::DateTime</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">for</span> <span class="kw-2">&amp;</span><span class="ident">row_index</span> <span class="kw">in</span> <span class="ident">logical_rows</span> {
                     <span class="ident">col</span>.<span class="ident">append_time_datum</span>(<span class="kw-2">&amp;</span><span class="ident">raw_datums</span>[<span class="ident">row_index</span>], <span class="ident">ctx</span>, <span class="ident">field_type</span>)<span class="question-mark">?</span>
                 }
             }
-            <span class="ident">EvalType</span>::<span class="ident">Duration</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">EvalType::Duration</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">for</span> <span class="kw-2">&amp;</span><span class="ident">row_index</span> <span class="kw">in</span> <span class="ident">logical_rows</span> {
                     <span class="ident">col</span>.<span class="ident">append_duration_datum</span>(<span class="kw-2">&amp;</span><span class="ident">raw_datums</span>[<span class="ident">row_index</span>])<span class="question-mark">?</span>
                 }
             }
-            <span class="ident">EvalType</span>::<span class="ident">Json</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">EvalType::Json</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">for</span> <span class="kw-2">&amp;</span><span class="ident">row_index</span> <span class="kw">in</span> <span class="ident">logical_rows</span> {
                     <span class="ident">col</span>.<span class="ident">append_json_datum</span>(<span class="kw-2">&amp;</span><span class="ident">raw_datums</span>[<span class="ident">row_index</span>])<span class="question-mark">?</span>
                 }
             }
-            <span class="ident">EvalType</span>::<span class="ident">Enum</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">unimplemented</span><span class="macro">!</span>(),
-            <span class="ident">EvalType</span>::<span class="ident">Set</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">unimplemented</span><span class="macro">!</span>(),
+            <span class="ident">EvalType::Enum</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">unimplemented!</span>(),
+            <span class="ident">EvalType::Set</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">unimplemented!</span>(),
         }
 
         <span class="prelude-val">Ok</span>(<span class="ident">col</span>)
@@ -1167,10 +1167,10 @@
         <span class="ident">v</span>: <span class="kw-2">&amp;</span><span class="ident">VectorValue</span>,
         <span class="ident">logical_rows</span>: <span class="kw-2">&amp;</span>[<span class="ident">usize</span>],
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">col</span> <span class="op">=</span> <span class="ident">Column</span>::<span class="ident">new</span>(<span class="ident">field_type</span>.<span class="ident">as_accessor</span>().<span class="ident">tp</span>(), <span class="ident">logical_rows</span>.<span class="ident">len</span>());
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">col</span> <span class="op">=</span> <span class="ident">Column::new</span>(<span class="ident">field_type</span>.<span class="ident">as_accessor</span>().<span class="ident">tp</span>(), <span class="ident">logical_rows</span>.<span class="ident">len</span>());
 
         <span class="kw">match</span> <span class="ident">v</span> {
-            <span class="ident">VectorValue</span>::<span class="ident">Int</span>(<span class="ident">vec</span>) <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">VectorValue::Int</span>(<span class="ident">vec</span>) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">if</span> <span class="ident">field_type</span>.<span class="ident">is_unsigned</span>() {
                     <span class="kw">for</span> <span class="kw-2">&amp;</span><span class="ident">row_index</span> <span class="kw">in</span> <span class="ident">logical_rows</span> {
                         <span class="kw">match</span> <span class="ident">vec</span>.<span class="ident">get_option_ref</span>(<span class="ident">row_index</span>) {
@@ -1195,7 +1195,7 @@
                     }
                 }
             }
-            <span class="ident">VectorValue</span>::<span class="ident">Real</span>(<span class="ident">vec</span>) <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">VectorValue::Real</span>(<span class="ident">vec</span>) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">if</span> <span class="ident">col</span>.<span class="ident">get_fixed_len</span>() <span class="op">=</span><span class="op">=</span> <span class="number">4</span> {
                     <span class="kw">for</span> <span class="kw-2">&amp;</span><span class="ident">row_index</span> <span class="kw">in</span> <span class="ident">logical_rows</span> {
                         <span class="kw">match</span> <span class="ident">vec</span>.<span class="ident">get_option_ref</span>(<span class="ident">row_index</span>) {
@@ -1203,7 +1203,7 @@
                                 <span class="ident">col</span>.<span class="ident">append_null</span>();
                             }
                             <span class="prelude-val">Some</span>(<span class="ident">val</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                                <span class="ident">col</span>.<span class="ident">append_f32</span>(<span class="ident">f64</span>::<span class="ident">from</span>(<span class="kw-2">*</span><span class="ident">val</span>) <span class="kw">as</span> <span class="ident">f32</span>)<span class="question-mark">?</span>;
+                                <span class="ident">col</span>.<span class="ident">append_f32</span>(<span class="ident">f64::from</span>(<span class="kw-2">*</span><span class="ident">val</span>) <span class="kw">as</span> <span class="ident">f32</span>)<span class="question-mark">?</span>;
                             }
                         }
                     }
@@ -1214,13 +1214,13 @@
                                 <span class="ident">col</span>.<span class="ident">append_null</span>();
                             }
                             <span class="prelude-val">Some</span>(<span class="ident">val</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                                <span class="ident">col</span>.<span class="ident">append_f64</span>(<span class="ident">f64</span>::<span class="ident">from</span>(<span class="kw-2">*</span><span class="ident">val</span>))<span class="question-mark">?</span>;
+                                <span class="ident">col</span>.<span class="ident">append_f64</span>(<span class="ident">f64::from</span>(<span class="kw-2">*</span><span class="ident">val</span>))<span class="question-mark">?</span>;
                             }
                         }
                     }
                 }
             }
-            <span class="ident">VectorValue</span>::<span class="ident">Decimal</span>(<span class="ident">vec</span>) <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">VectorValue::Decimal</span>(<span class="ident">vec</span>) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">for</span> <span class="kw-2">&amp;</span><span class="ident">row_index</span> <span class="kw">in</span> <span class="ident">logical_rows</span> {
                     <span class="kw">match</span> <span class="ident">vec</span>.<span class="ident">get_option_ref</span>(<span class="ident">row_index</span>) {
                         <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> {
@@ -1232,7 +1232,7 @@
                     }
                 }
             }
-            <span class="ident">VectorValue</span>::<span class="ident">Bytes</span>(<span class="ident">vec</span>) <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">VectorValue::Bytes</span>(<span class="ident">vec</span>) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">for</span> <span class="kw-2">&amp;</span><span class="ident">row_index</span> <span class="kw">in</span> <span class="ident">logical_rows</span> {
                     <span class="kw">match</span> <span class="ident">vec</span>.<span class="ident">get_option_ref</span>(<span class="ident">row_index</span>) {
                         <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> {
@@ -1244,7 +1244,7 @@
                     }
                 }
             }
-            <span class="ident">VectorValue</span>::<span class="ident">DateTime</span>(<span class="ident">vec</span>) <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">VectorValue::DateTime</span>(<span class="ident">vec</span>) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">for</span> <span class="kw-2">&amp;</span><span class="ident">row_index</span> <span class="kw">in</span> <span class="ident">logical_rows</span> {
                     <span class="kw">match</span> <span class="ident">vec</span>.<span class="ident">get_option_ref</span>(<span class="ident">row_index</span>) {
                         <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> {
@@ -1256,7 +1256,7 @@
                     }
                 }
             }
-            <span class="ident">VectorValue</span>::<span class="ident">Duration</span>(<span class="ident">vec</span>) <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">VectorValue::Duration</span>(<span class="ident">vec</span>) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">for</span> <span class="kw-2">&amp;</span><span class="ident">row_index</span> <span class="kw">in</span> <span class="ident">logical_rows</span> {
                     <span class="kw">match</span> <span class="ident">vec</span>.<span class="ident">get_option_ref</span>(<span class="ident">row_index</span>) {
                         <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> {
@@ -1268,7 +1268,7 @@
                     }
                 }
             }
-            <span class="ident">VectorValue</span>::<span class="ident">Json</span>(<span class="ident">vec</span>) <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">VectorValue::Json</span>(<span class="ident">vec</span>) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">for</span> <span class="kw-2">&amp;</span><span class="ident">row_index</span> <span class="kw">in</span> <span class="ident">logical_rows</span> {
                     <span class="kw">match</span> <span class="ident">vec</span>.<span class="ident">get_option_ref</span>(<span class="ident">row_index</span>) {
                         <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> {
@@ -1278,8 +1278,8 @@
                     }
                 }
             }
-            <span class="ident">VectorValue</span>::<span class="ident">Enum</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">unimplemented</span><span class="macro">!</span>(),
-            <span class="ident">VectorValue</span>::<span class="ident">Set</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">unimplemented</span><span class="macro">!</span>(),
+            <span class="ident">VectorValue::Enum</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">unimplemented!</span>(),
+            <span class="ident">VectorValue::Set</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">unimplemented!</span>(),
         }
         <span class="prelude-val">Ok</span>(<span class="ident">col</span>)
     }
@@ -1287,43 +1287,43 @@
     <span class="doccomment">/// Get the datum of one row with the specified type.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_datum</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">idx</span>: <span class="ident">usize</span>, <span class="ident">field_type</span>: <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">FieldTypeAccessor</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Datum</span><span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">is_null</span>(<span class="ident">idx</span>) {
-            <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">Datum</span>::<span class="ident">Null</span>);
+            <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">Datum::Null</span>);
         }
         <span class="kw">let</span> <span class="ident">d</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">field_type</span>.<span class="ident">tp</span>() {
-            <span class="ident">FieldTypeTp</span>::<span class="ident">Tiny</span>
-            <span class="op">|</span> <span class="ident">FieldTypeTp</span>::<span class="ident">Short</span>
-            <span class="op">|</span> <span class="ident">FieldTypeTp</span>::<span class="ident">Int24</span>
-            <span class="op">|</span> <span class="ident">FieldTypeTp</span>::<span class="ident">Long</span>
-            <span class="op">|</span> <span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>
-            <span class="op">|</span> <span class="ident">FieldTypeTp</span>::<span class="ident">Year</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">if</span> <span class="ident">field_type</span>.<span class="ident">flag</span>().<span class="ident">contains</span>(<span class="ident">FieldTypeFlag</span>::<span class="ident">UNSIGNED</span>) {
-                    <span class="ident">Datum</span>::<span class="ident">U64</span>(<span class="self">self</span>.<span class="ident">get_u64</span>(<span class="ident">idx</span>)<span class="question-mark">?</span>)
+            <span class="ident">FieldTypeTp::Tiny</span>
+            <span class="op">|</span> <span class="ident">FieldTypeTp::Short</span>
+            <span class="op">|</span> <span class="ident">FieldTypeTp::Int24</span>
+            <span class="op">|</span> <span class="ident">FieldTypeTp::Long</span>
+            <span class="op">|</span> <span class="ident">FieldTypeTp::LongLong</span>
+            <span class="op">|</span> <span class="ident">FieldTypeTp::Year</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="kw">if</span> <span class="ident">field_type</span>.<span class="ident">flag</span>().<span class="ident">contains</span>(<span class="ident">FieldTypeFlag::UNSIGNED</span>) {
+                    <span class="ident">Datum::U64</span>(<span class="self">self</span>.<span class="ident">get_u64</span>(<span class="ident">idx</span>)<span class="question-mark">?</span>)
                 } <span class="kw">else</span> {
-                    <span class="ident">Datum</span>::<span class="ident">I64</span>(<span class="self">self</span>.<span class="ident">get_i64</span>(<span class="ident">idx</span>)<span class="question-mark">?</span>)
+                    <span class="ident">Datum::I64</span>(<span class="self">self</span>.<span class="ident">get_i64</span>(<span class="ident">idx</span>)<span class="question-mark">?</span>)
                 }
             }
-            <span class="ident">FieldTypeTp</span>::<span class="ident">Double</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Datum</span>::<span class="ident">F64</span>(<span class="self">self</span>.<span class="ident">get_f64</span>(<span class="ident">idx</span>)<span class="question-mark">?</span>),
-            <span class="ident">FieldTypeTp</span>::<span class="ident">Float</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Datum</span>::<span class="ident">F64</span>(<span class="ident">f64</span>::<span class="ident">from</span>(<span class="self">self</span>.<span class="ident">get_f32</span>(<span class="ident">idx</span>)<span class="question-mark">?</span>)),
-            <span class="ident">FieldTypeTp</span>::<span class="ident">Date</span> <span class="op">|</span> <span class="ident">FieldTypeTp</span>::<span class="ident">DateTime</span> <span class="op">|</span> <span class="ident">FieldTypeTp</span>::<span class="ident">Timestamp</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="ident">Datum</span>::<span class="ident">Time</span>(<span class="self">self</span>.<span class="ident">get_time</span>(<span class="ident">idx</span>)<span class="question-mark">?</span>)
+            <span class="ident">FieldTypeTp::Double</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Datum::F64</span>(<span class="self">self</span>.<span class="ident">get_f64</span>(<span class="ident">idx</span>)<span class="question-mark">?</span>),
+            <span class="ident">FieldTypeTp::Float</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Datum::F64</span>(<span class="ident">f64::from</span>(<span class="self">self</span>.<span class="ident">get_f32</span>(<span class="ident">idx</span>)<span class="question-mark">?</span>)),
+            <span class="ident">FieldTypeTp::Date</span> <span class="op">|</span> <span class="ident">FieldTypeTp::DateTime</span> <span class="op">|</span> <span class="ident">FieldTypeTp::Timestamp</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="ident">Datum::Time</span>(<span class="self">self</span>.<span class="ident">get_time</span>(<span class="ident">idx</span>)<span class="question-mark">?</span>)
             }
-            <span class="ident">FieldTypeTp</span>::<span class="ident">Duration</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Datum</span>::<span class="ident">Dur</span>(<span class="self">self</span>.<span class="ident">get_duration</span>(<span class="ident">idx</span>, <span class="ident">field_type</span>.<span class="ident">decimal</span>())<span class="question-mark">?</span>),
-            <span class="ident">FieldTypeTp</span>::<span class="ident">NewDecimal</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Datum</span>::<span class="ident">Dec</span>(<span class="self">self</span>.<span class="ident">get_decimal</span>(<span class="ident">idx</span>)<span class="question-mark">?</span>),
-            <span class="ident">FieldTypeTp</span>::<span class="ident">JSON</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Datum</span>::<span class="ident">Json</span>(<span class="self">self</span>.<span class="ident">get_json</span>(<span class="ident">idx</span>)<span class="question-mark">?</span>),
-            <span class="ident">FieldTypeTp</span>::<span class="ident">Enum</span> <span class="op">|</span> <span class="ident">FieldTypeTp</span>::<span class="ident">Bit</span> <span class="op">|</span> <span class="ident">FieldTypeTp</span>::<span class="ident">Set</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(
+            <span class="ident">FieldTypeTp::Duration</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Datum::Dur</span>(<span class="self">self</span>.<span class="ident">get_duration</span>(<span class="ident">idx</span>, <span class="ident">field_type</span>.<span class="ident">decimal</span>())<span class="question-mark">?</span>),
+            <span class="ident">FieldTypeTp::NewDecimal</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Datum::Dec</span>(<span class="self">self</span>.<span class="ident">get_decimal</span>(<span class="ident">idx</span>)<span class="question-mark">?</span>),
+            <span class="ident">FieldTypeTp::JSON</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Datum::Json</span>(<span class="self">self</span>.<span class="ident">get_json</span>(<span class="ident">idx</span>)<span class="question-mark">?</span>),
+            <span class="ident">FieldTypeTp::Enum</span> <span class="op">|</span> <span class="ident">FieldTypeTp::Bit</span> <span class="op">|</span> <span class="ident">FieldTypeTp::Set</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err!</span>(
                     <span class="string">&quot;get datum with {} is not supported yet.&quot;</span>,
                     <span class="ident">field_type</span>.<span class="ident">tp</span>()
                 ));
             }
-            <span class="ident">FieldTypeTp</span>::<span class="ident">VarChar</span>
-            <span class="op">|</span> <span class="ident">FieldTypeTp</span>::<span class="ident">VarString</span>
-            <span class="op">|</span> <span class="ident">FieldTypeTp</span>::<span class="ident">String</span>
-            <span class="op">|</span> <span class="ident">FieldTypeTp</span>::<span class="ident">Blob</span>
-            <span class="op">|</span> <span class="ident">FieldTypeTp</span>::<span class="ident">TinyBlob</span>
-            <span class="op">|</span> <span class="ident">FieldTypeTp</span>::<span class="ident">MediumBlob</span>
-            <span class="op">|</span> <span class="ident">FieldTypeTp</span>::<span class="ident">LongBlob</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Datum</span>::<span class="ident">Bytes</span>(<span class="self">self</span>.<span class="ident">get_bytes</span>(<span class="ident">idx</span>).<span class="ident">to_vec</span>()),
-            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">unreachable</span><span class="macro">!</span>(),
+            <span class="ident">FieldTypeTp::VarChar</span>
+            <span class="op">|</span> <span class="ident">FieldTypeTp::VarString</span>
+            <span class="op">|</span> <span class="ident">FieldTypeTp::String</span>
+            <span class="op">|</span> <span class="ident">FieldTypeTp::Blob</span>
+            <span class="op">|</span> <span class="ident">FieldTypeTp::TinyBlob</span>
+            <span class="op">|</span> <span class="ident">FieldTypeTp::MediumBlob</span>
+            <span class="op">|</span> <span class="ident">FieldTypeTp::LongBlob</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Datum::Bytes</span>(<span class="self">self</span>.<span class="ident">get_bytes</span>(<span class="ident">idx</span>).<span class="ident">to_vec</span>()),
+            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">unreachable!</span>(),
         };
         <span class="prelude-val">Ok</span>(<span class="ident">d</span>)
     }
@@ -1331,25 +1331,25 @@
     <span class="doccomment">/// Append datum to the column.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">append_datum</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">data</span>: <span class="kw-2">&amp;</span><span class="ident">Datum</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">match</span> <span class="ident">data</span> {
-            <span class="ident">Datum</span>::<span class="ident">Null</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">Datum::Null</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="self">self</span>.<span class="ident">append_null</span>();
                 <span class="prelude-val">Ok</span>(())
             }
-            <span class="ident">Datum</span>::<span class="ident">I64</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_i64</span>(<span class="kw-2">*</span><span class="ident">v</span>),
-            <span class="ident">Datum</span>::<span class="ident">U64</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_u64</span>(<span class="kw-2">*</span><span class="ident">v</span>),
-            <span class="ident">Datum</span>::<span class="ident">F64</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">Datum::I64</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_i64</span>(<span class="kw-2">*</span><span class="ident">v</span>),
+            <span class="ident">Datum::U64</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_u64</span>(<span class="kw-2">*</span><span class="ident">v</span>),
+            <span class="ident">Datum::F64</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">if</span> <span class="self">self</span>.<span class="ident">fixed_len</span> <span class="op">=</span><span class="op">=</span> <span class="number">4</span> {
                     <span class="self">self</span>.<span class="ident">append_f32</span>(<span class="kw-2">*</span><span class="ident">v</span> <span class="kw">as</span> <span class="ident">f32</span>)
                 } <span class="kw">else</span> {
                     <span class="self">self</span>.<span class="ident">append_f64</span>(<span class="kw-2">*</span><span class="ident">v</span>)
                 }
             }
-            <span class="ident">Datum</span>::<span class="ident">Bytes</span>(<span class="kw-2">ref</span> <span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_bytes</span>(<span class="ident">v</span>),
-            <span class="ident">Datum</span>::<span class="ident">Dec</span>(<span class="kw-2">ref</span> <span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_decimal</span>(<span class="ident">v</span>),
-            <span class="ident">Datum</span>::<span class="ident">Dur</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_duration</span>(<span class="kw-2">*</span><span class="ident">v</span>),
-            <span class="ident">Datum</span>::<span class="ident">Time</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_time</span>(<span class="kw-2">*</span><span class="ident">v</span>),
-            <span class="ident">Datum</span>::<span class="ident">Json</span>(<span class="kw-2">ref</span> <span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_json</span>(<span class="ident">v</span>.<span class="ident">as_ref</span>()),
-            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(<span class="string">&quot;unsupported datum {:?}&quot;</span>, <span class="ident">data</span>)),
+            <span class="ident">Datum::Bytes</span>(<span class="kw-2">ref</span> <span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_bytes</span>(<span class="ident">v</span>),
+            <span class="ident">Datum::Dec</span>(<span class="kw-2">ref</span> <span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_decimal</span>(<span class="ident">v</span>),
+            <span class="ident">Datum::Dur</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_duration</span>(<span class="kw-2">*</span><span class="ident">v</span>),
+            <span class="ident">Datum::Time</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_time</span>(<span class="kw-2">*</span><span class="ident">v</span>),
+            <span class="ident">Datum::Json</span>(<span class="kw-2">ref</span> <span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_json</span>(<span class="ident">v</span>.<span class="ident">as_ref</span>()),
+            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Err</span>(<span class="macro">box_err!</span>(<span class="string">&quot;unsupported datum {:?}&quot;</span>, <span class="ident">data</span>)),
         }
     }
 
@@ -1357,21 +1357,21 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_fixed_len</span>(<span class="ident">element_len</span>: <span class="ident">usize</span>, <span class="ident">init_cap</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Column</span> {
         <span class="ident">Column</span> {
             <span class="ident">fixed_len</span>: <span class="ident">element_len</span>,
-            <span class="ident">data</span>: <span class="ident">Vec</span>::<span class="ident">with_capacity</span>(<span class="ident">element_len</span> <span class="op">*</span> <span class="ident">init_cap</span>),
-            <span class="ident">null_bitmap</span>: <span class="ident">Vec</span>::<span class="ident">with_capacity</span>(<span class="ident">init_cap</span> <span class="op">/</span> <span class="number">8</span>),
-            ..<span class="ident">Default</span>::<span class="ident">default</span>()
+            <span class="ident">data</span>: <span class="ident">Vec::with_capacity</span>(<span class="ident">element_len</span> <span class="op">*</span> <span class="ident">init_cap</span>),
+            <span class="ident">null_bitmap</span>: <span class="ident">Vec::with_capacity</span>(<span class="ident">init_cap</span> <span class="op">/</span> <span class="number">8</span>),
+            ..<span class="ident">Default::default</span>()
         }
     }
 
     <span class="doccomment">/// Create a column with variant element length.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_var_len_column</span>(<span class="ident">init_cap</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Column</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">offsets</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">with_capacity</span>(<span class="ident">init_cap</span> <span class="op">+</span> <span class="number">1</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">offsets</span> <span class="op">=</span> <span class="ident">Vec::with_capacity</span>(<span class="ident">init_cap</span> <span class="op">+</span> <span class="number">1</span>);
         <span class="ident">offsets</span>.<span class="ident">push</span>(<span class="number">0</span>);
         <span class="ident">Column</span> {
             <span class="ident">var_offsets</span>: <span class="ident">offsets</span>,
-            <span class="ident">data</span>: <span class="ident">Vec</span>::<span class="ident">with_capacity</span>(<span class="number">4</span> <span class="op">*</span> <span class="ident">init_cap</span>),
-            <span class="ident">null_bitmap</span>: <span class="ident">Vec</span>::<span class="ident">with_capacity</span>(<span class="ident">init_cap</span> <span class="op">/</span> <span class="number">8</span>),
-            ..<span class="ident">Default</span>::<span class="ident">default</span>()
+            <span class="ident">data</span>: <span class="ident">Vec::with_capacity</span>(<span class="number">4</span> <span class="op">*</span> <span class="ident">init_cap</span>),
+            <span class="ident">null_bitmap</span>: <span class="ident">Vec::with_capacity</span>(<span class="ident">init_cap</span> <span class="op">/</span> <span class="number">8</span>),
+            ..<span class="ident">Default::default</span>()
         }
     }
 
@@ -1408,7 +1408,7 @@
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">null_byte</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">null_bitmap</span>.<span class="ident">get</span>(<span class="ident">row_idx</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">3</span>) {
             <span class="ident">null_byte</span> <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> ((<span class="ident">row_idx</span>) <span class="op">&amp;</span> <span class="number">7</span>)) <span class="op">=</span><span class="op">=</span> <span class="number">0</span>
         } <span class="kw">else</span> {
-            <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;index out of range&quot;</span>);
+            <span class="macro">panic!</span>(<span class="string">&quot;index out of range&quot;</span>);
         }
     }
 
@@ -1469,22 +1469,22 @@
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">append_i64_datum</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">src_datum</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="ident">src_datum</span>.<span class="ident">is_empty</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">InvalidDataType</span>(
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error::InvalidDataType</span>(
                 <span class="string">&quot;Failed to decode datum flag&quot;</span>.<span class="ident">to_owned</span>(),
             ));
         }
         <span class="kw">let</span> <span class="ident">flag</span> <span class="op">=</span> <span class="ident">src_datum</span>[<span class="number">0</span>];
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">raw_datum</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">src_datum</span>[<span class="number">1</span>..];
         <span class="kw">match</span> <span class="ident">flag</span> {
-            <span class="ident">datum</span>::<span class="ident">NIL_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_null</span>(),
-            <span class="ident">datum</span>::<span class="ident">INT_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_i64</span>(<span class="ident">raw_datum</span>.<span class="ident">read_datum_payload_i64</span>()<span class="question-mark">?</span>)<span class="question-mark">?</span>,
-            <span class="ident">datum</span>::<span class="ident">UINT_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_i64</span>(<span class="ident">raw_datum</span>.<span class="ident">read_datum_payload_u64</span>()<span class="question-mark">?</span> <span class="kw">as</span> <span class="ident">i64</span>)<span class="question-mark">?</span>,
-            <span class="ident">datum</span>::<span class="ident">VAR_INT_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_i64</span>(<span class="ident">raw_datum</span>.<span class="ident">read_datum_payload_var_i64</span>()<span class="question-mark">?</span>)<span class="question-mark">?</span>,
-            <span class="ident">datum</span>::<span class="ident">VAR_UINT_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">datum::NIL_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_null</span>(),
+            <span class="ident">datum::INT_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_i64</span>(<span class="ident">raw_datum</span>.<span class="ident">read_datum_payload_i64</span>()<span class="question-mark">?</span>)<span class="question-mark">?</span>,
+            <span class="ident">datum::UINT_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_i64</span>(<span class="ident">raw_datum</span>.<span class="ident">read_datum_payload_u64</span>()<span class="question-mark">?</span> <span class="kw">as</span> <span class="ident">i64</span>)<span class="question-mark">?</span>,
+            <span class="ident">datum::VAR_INT_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_i64</span>(<span class="ident">raw_datum</span>.<span class="ident">read_datum_payload_var_i64</span>()<span class="question-mark">?</span>)<span class="question-mark">?</span>,
+            <span class="ident">datum::VAR_UINT_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="self">self</span>.<span class="ident">append_i64</span>(<span class="ident">raw_datum</span>.<span class="ident">read_datum_payload_var_u64</span>()<span class="question-mark">?</span> <span class="kw">as</span> <span class="ident">i64</span>)<span class="question-mark">?</span>
             }
             <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">InvalidDataType</span>(<span class="macro">format</span><span class="macro">!</span>(
+                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error::InvalidDataType</span>(<span class="macro">format!</span>(
                     <span class="string">&quot;Unsupported datum flag {} for Int vector&quot;</span>,
                     <span class="ident">flag</span>
                 )));
@@ -1499,7 +1499,7 @@
         <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">idx</span> <span class="op">*</span> <span class="self">self</span>.<span class="ident">fixed_len</span>;
         <span class="kw">let</span> <span class="ident">end</span> <span class="op">=</span> <span class="ident">start</span> <span class="op">+</span> <span class="self">self</span>.<span class="ident">fixed_len</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">data</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">data</span>[<span class="ident">start</span>..<span class="ident">end</span>];
-        <span class="ident">data</span>.<span class="ident">read_i64_le</span>().<span class="ident">map_err</span>(<span class="ident">Error</span>::<span class="ident">from</span>)
+        <span class="ident">data</span>.<span class="ident">read_i64_le</span>().<span class="ident">map_err</span>(<span class="ident">Error::from</span>)
     }
 
     <span class="doccomment">/// Append u64 datum to the column.</span>
@@ -1512,22 +1512,22 @@
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">append_u64_datum</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">src_datum</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="ident">src_datum</span>.<span class="ident">is_empty</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">InvalidDataType</span>(
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error::InvalidDataType</span>(
                 <span class="string">&quot;Failed to decode datum flag&quot;</span>.<span class="ident">to_owned</span>(),
             ));
         }
         <span class="kw">let</span> <span class="ident">flag</span> <span class="op">=</span> <span class="ident">src_datum</span>[<span class="number">0</span>];
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">raw_datum</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">src_datum</span>[<span class="number">1</span>..];
         <span class="kw">match</span> <span class="ident">flag</span> {
-            <span class="ident">datum</span>::<span class="ident">NIL_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_null</span>(),
-            <span class="ident">datum</span>::<span class="ident">INT_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_u64</span>(<span class="ident">raw_datum</span>.<span class="ident">read_datum_payload_i64</span>()<span class="question-mark">?</span> <span class="kw">as</span> <span class="ident">u64</span>)<span class="question-mark">?</span>,
-            <span class="ident">datum</span>::<span class="ident">UINT_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_u64</span>(<span class="ident">raw_datum</span>.<span class="ident">read_datum_payload_u64</span>()<span class="question-mark">?</span>)<span class="question-mark">?</span>,
-            <span class="ident">datum</span>::<span class="ident">VAR_INT_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">datum::NIL_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_null</span>(),
+            <span class="ident">datum::INT_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_u64</span>(<span class="ident">raw_datum</span>.<span class="ident">read_datum_payload_i64</span>()<span class="question-mark">?</span> <span class="kw">as</span> <span class="ident">u64</span>)<span class="question-mark">?</span>,
+            <span class="ident">datum::UINT_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_u64</span>(<span class="ident">raw_datum</span>.<span class="ident">read_datum_payload_u64</span>()<span class="question-mark">?</span>)<span class="question-mark">?</span>,
+            <span class="ident">datum::VAR_INT_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="self">self</span>.<span class="ident">append_u64</span>(<span class="ident">raw_datum</span>.<span class="ident">read_datum_payload_var_i64</span>()<span class="question-mark">?</span> <span class="kw">as</span> <span class="ident">u64</span>)<span class="question-mark">?</span>
             }
-            <span class="ident">datum</span>::<span class="ident">VAR_UINT_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_u64</span>(<span class="ident">raw_datum</span>.<span class="ident">read_datum_payload_var_u64</span>()<span class="question-mark">?</span>)<span class="question-mark">?</span>,
+            <span class="ident">datum::VAR_UINT_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_u64</span>(<span class="ident">raw_datum</span>.<span class="ident">read_datum_payload_var_u64</span>()<span class="question-mark">?</span>)<span class="question-mark">?</span>,
             <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">InvalidDataType</span>(<span class="macro">format</span><span class="macro">!</span>(
+                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error::InvalidDataType</span>(<span class="macro">format!</span>(
                     <span class="string">&quot;Unsupported datum flag {} for Int vector&quot;</span>,
                     <span class="ident">flag</span>
                 )));
@@ -1542,7 +1542,7 @@
         <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">idx</span> <span class="op">*</span> <span class="self">self</span>.<span class="ident">fixed_len</span>;
         <span class="kw">let</span> <span class="ident">end</span> <span class="op">=</span> <span class="ident">start</span> <span class="op">+</span> <span class="self">self</span>.<span class="ident">fixed_len</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">data</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">data</span>[<span class="ident">start</span>..<span class="ident">end</span>];
-        <span class="ident">data</span>.<span class="ident">read_u64_le</span>().<span class="ident">map_err</span>(<span class="ident">Error</span>::<span class="ident">from</span>)
+        <span class="ident">data</span>.<span class="ident">read_u64_le</span>().<span class="ident">map_err</span>(<span class="ident">Error::from</span>)
     }
 
     <span class="doccomment">/// Append a f64 datum to the column.</span>
@@ -1556,21 +1556,21 @@
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">append_f64_datum</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">src_datum</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="ident">src_datum</span>.<span class="ident">is_empty</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">InvalidDataType</span>(
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error::InvalidDataType</span>(
                 <span class="string">&quot;Failed to decode datum flag&quot;</span>.<span class="ident">to_owned</span>(),
             ));
         }
         <span class="kw">let</span> <span class="ident">flag</span> <span class="op">=</span> <span class="ident">src_datum</span>[<span class="number">0</span>];
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">raw_datum</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">src_datum</span>[<span class="number">1</span>..];
         <span class="kw">match</span> <span class="ident">flag</span> {
-            <span class="ident">datum</span>::<span class="ident">NIL_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_null</span>(),
+            <span class="ident">datum::NIL_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_null</span>(),
             <span class="comment">// In both index and record, it&#39;s flag is `FLOAT`. See TiDB&#39;s `encode()`.</span>
-            <span class="ident">datum</span>::<span class="ident">FLOAT_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">datum::FLOAT_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> <span class="ident">v</span> <span class="op">=</span> <span class="ident">raw_datum</span>.<span class="ident">read_datum_payload_f64</span>()<span class="question-mark">?</span>;
                 <span class="self">self</span>.<span class="ident">append_f64</span>(<span class="ident">v</span>)<span class="question-mark">?</span>;
             }
             <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">InvalidDataType</span>(<span class="macro">format</span><span class="macro">!</span>(
+                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error::InvalidDataType</span>(<span class="macro">format!</span>(
                     <span class="string">&quot;Unsupported datum flag {} for Real vector&quot;</span>,
                     <span class="ident">flag</span>
                 )));
@@ -1589,21 +1589,21 @@
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">append_f32_datum</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">src_datum</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="ident">src_datum</span>.<span class="ident">is_empty</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">InvalidDataType</span>(
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error::InvalidDataType</span>(
                 <span class="string">&quot;Failed to decode datum flag&quot;</span>.<span class="ident">to_owned</span>(),
             ));
         }
         <span class="kw">let</span> <span class="ident">flag</span> <span class="op">=</span> <span class="ident">src_datum</span>[<span class="number">0</span>];
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">raw_datum</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">src_datum</span>[<span class="number">1</span>..];
         <span class="kw">match</span> <span class="ident">flag</span> {
-            <span class="ident">datum</span>::<span class="ident">NIL_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_null</span>(),
+            <span class="ident">datum::NIL_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_null</span>(),
             <span class="comment">// In both index and record, it&#39;s flag is `FLOAT`. See TiDB&#39;s `encode()`.</span>
-            <span class="ident">datum</span>::<span class="ident">FLOAT_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">datum::FLOAT_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> <span class="ident">v</span> <span class="op">=</span> <span class="ident">raw_datum</span>.<span class="ident">read_datum_payload_f64</span>()<span class="question-mark">?</span>;
                 <span class="self">self</span>.<span class="ident">append_f32</span>(<span class="ident">v</span> <span class="kw">as</span> <span class="ident">f32</span>)<span class="question-mark">?</span>;
             }
             <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">InvalidDataType</span>(<span class="macro">format</span><span class="macro">!</span>(
+                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error::InvalidDataType</span>(<span class="macro">format!</span>(
                     <span class="string">&quot;Unsupported datum flag {} for Real vector&quot;</span>,
                     <span class="ident">flag</span>
                 )));
@@ -1618,7 +1618,7 @@
         <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">idx</span> <span class="op">*</span> <span class="self">self</span>.<span class="ident">fixed_len</span>;
         <span class="kw">let</span> <span class="ident">end</span> <span class="op">=</span> <span class="ident">start</span> <span class="op">+</span> <span class="self">self</span>.<span class="ident">fixed_len</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">data</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">data</span>[<span class="ident">start</span>..<span class="ident">end</span>];
-        <span class="ident">data</span>.<span class="ident">read_f64_le</span>().<span class="ident">map_err</span>(<span class="ident">Error</span>::<span class="ident">from</span>)
+        <span class="ident">data</span>.<span class="ident">read_f64_le</span>().<span class="ident">map_err</span>(<span class="ident">Error::from</span>)
     }
 
     <span class="doccomment">/// Get the f32 datum of the row in the column.</span>
@@ -1627,7 +1627,7 @@
         <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">idx</span> <span class="op">*</span> <span class="self">self</span>.<span class="ident">fixed_len</span>;
         <span class="kw">let</span> <span class="ident">end</span> <span class="op">=</span> <span class="ident">start</span> <span class="op">+</span> <span class="self">self</span>.<span class="ident">fixed_len</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">data</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">data</span>[<span class="ident">start</span>..<span class="ident">end</span>];
-        <span class="ident">data</span>.<span class="ident">read_f32_le</span>().<span class="ident">map_err</span>(<span class="ident">Error</span>::<span class="ident">from</span>)
+        <span class="ident">data</span>.<span class="ident">read_f32_le</span>().<span class="ident">map_err</span>(<span class="ident">Error::from</span>)
     }
 
     <span class="doccomment">/// Append a bytes datum to the column.</span>
@@ -1640,25 +1640,25 @@
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">append_bytes_datum</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">src_datum</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="ident">src_datum</span>.<span class="ident">is_empty</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">InvalidDataType</span>(
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error::InvalidDataType</span>(
                 <span class="string">&quot;Failed to decode datum flag&quot;</span>.<span class="ident">to_owned</span>(),
             ));
         }
         <span class="kw">let</span> <span class="ident">flag</span> <span class="op">=</span> <span class="ident">src_datum</span>[<span class="number">0</span>];
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">raw_datum</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">src_datum</span>[<span class="number">1</span>..];
         <span class="kw">match</span> <span class="ident">flag</span> {
-            <span class="ident">datum</span>::<span class="ident">NIL_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_null</span>(),
+            <span class="ident">datum::NIL_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_null</span>(),
             <span class="comment">// In index, it&#39;s flag is `BYTES`. See TiDB&#39;s `encode()`.</span>
             <span class="comment">// TODO: this method&#39;s performance can be further improved</span>
-            <span class="ident">datum</span>::<span class="ident">BYTES_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_bytes</span>(<span class="kw-2">&amp;</span><span class="ident">raw_datum</span>.<span class="ident">read_datum_payload_bytes</span>()<span class="question-mark">?</span>)<span class="question-mark">?</span>,
+            <span class="ident">datum::BYTES_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_bytes</span>(<span class="kw-2">&amp;</span><span class="ident">raw_datum</span>.<span class="ident">read_datum_payload_bytes</span>()<span class="question-mark">?</span>)<span class="question-mark">?</span>,
             <span class="comment">// In record, it&#39;s flag is `COMPACT_BYTES`. See TiDB&#39;s `encode()`.</span>
-            <span class="ident">datum</span>::<span class="ident">COMPACT_BYTES_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">datum::COMPACT_BYTES_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> <span class="ident">vn</span> <span class="op">=</span> <span class="ident">raw_datum</span>.<span class="ident">read_var_i64</span>()<span class="question-mark">?</span> <span class="kw">as</span> <span class="ident">usize</span>;
                 <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="ident">raw_datum</span>.<span class="ident">read_bytes</span>(<span class="ident">vn</span>)<span class="question-mark">?</span>;
                 <span class="self">self</span>.<span class="ident">append_bytes</span>(<span class="kw-2">&amp;</span><span class="ident">data</span>[<span class="number">0</span>..<span class="ident">vn</span>])<span class="question-mark">?</span>;
             }
             <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">InvalidDataType</span>(<span class="macro">format</span><span class="macro">!</span>(
+                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error::InvalidDataType</span>(<span class="macro">format!</span>(
                     <span class="string">&quot;Unsupported datum flag {} for Bytes vector&quot;</span>,
                     <span class="ident">flag</span>
                 )));
@@ -1690,7 +1690,7 @@
         <span class="ident">field_type</span>: <span class="kw-2">&amp;</span><span class="ident">FieldType</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="ident">src_datum</span>.<span class="ident">is_empty</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">InvalidDataType</span>(
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error::InvalidDataType</span>(
                 <span class="string">&quot;Failed to decode datum flag&quot;</span>.<span class="ident">to_owned</span>(),
             ));
         }
@@ -1698,21 +1698,21 @@
         <span class="kw">let</span> <span class="ident">raw_datum</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">src_datum</span>[<span class="number">1</span>..];
 
         <span class="kw">match</span> <span class="ident">flag</span> {
-            <span class="ident">datum</span>::<span class="ident">NIL_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_null</span>(),
+            <span class="ident">datum::NIL_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_null</span>(),
             <span class="comment">// In index, it&#39;s flag is `UINT`. See TiDB&#39;s `encode()`.</span>
-            <span class="ident">datum</span>::<span class="ident">UINT_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">datum::UINT_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="self">self</span>.<span class="ident">data</span>
                     .<span class="ident">write_time_to_chunk_by_datum_payload_int</span>(<span class="ident">raw_datum</span>, <span class="ident">ctx</span>, <span class="ident">field_type</span>)<span class="question-mark">?</span>;
                 <span class="self">self</span>.<span class="ident">finish_append_fixed</span>();
             }
             <span class="comment">// In record, it&#39;s flag is `VAR_UINT`. See TiDB&#39;s `flatten()` and `encode()`.</span>
-            <span class="ident">datum</span>::<span class="ident">VAR_UINT_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">datum::VAR_UINT_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="self">self</span>.<span class="ident">data</span>
                     .<span class="ident">write_time_to_chunk_by_datum_payload_varint</span>(<span class="ident">raw_datum</span>, <span class="ident">ctx</span>, <span class="ident">field_type</span>)<span class="question-mark">?</span>;
                 <span class="self">self</span>.<span class="ident">finish_append_fixed</span>();
             }
             <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">InvalidDataType</span>(<span class="macro">format</span><span class="macro">!</span>(
+                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error::InvalidDataType</span>(<span class="macro">format!</span>(
                     <span class="string">&quot;Unsupported datum flag {} for DateTime vector.&quot;</span>,
                     <span class="ident">flag</span>
                 )));
@@ -1740,28 +1740,28 @@
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">append_duration_datum</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">src_datum</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="ident">src_datum</span>.<span class="ident">is_empty</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">InvalidDataType</span>(
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error::InvalidDataType</span>(
                 <span class="string">&quot;Failed to decode datum flag&quot;</span>.<span class="ident">to_owned</span>(),
             ));
         }
         <span class="kw">let</span> <span class="ident">flag</span> <span class="op">=</span> <span class="ident">src_datum</span>[<span class="number">0</span>];
         <span class="kw">let</span> <span class="ident">raw_datum</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">src_datum</span>[<span class="number">1</span>..];
         <span class="kw">match</span> <span class="ident">flag</span> {
-            <span class="ident">datum</span>::<span class="ident">NIL_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_null</span>(),
+            <span class="ident">datum::NIL_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_null</span>(),
             <span class="comment">// In index, it&#39;s flag is `DURATION`. See TiDB&#39;s `encode()`.</span>
-            <span class="ident">datum</span>::<span class="ident">DURATION_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">datum::DURATION_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="self">self</span>.<span class="ident">data</span>
                     .<span class="ident">write_duration_to_chunk_by_datum_payload_int</span>(<span class="ident">raw_datum</span>)<span class="question-mark">?</span>;
                 <span class="self">self</span>.<span class="ident">finish_append_fixed</span>();
             }
             <span class="comment">// In record, it&#39;s flag is `VAR_INT`. See TiDB&#39;s `flatten()` and `encode()`.</span>
-            <span class="ident">datum</span>::<span class="ident">VAR_INT_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">datum::VAR_INT_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="self">self</span>.<span class="ident">data</span>
                     .<span class="ident">write_duration_to_chunk_by_datum_payload_varint</span>(<span class="ident">raw_datum</span>)<span class="question-mark">?</span>;
                 <span class="self">self</span>.<span class="ident">finish_append_fixed</span>();
             }
             <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">InvalidDataType</span>(<span class="macro">format</span><span class="macro">!</span>(
+                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error::InvalidDataType</span>(<span class="macro">format!</span>(
                     <span class="string">&quot;Unsupported datum flag {} for Duration vector&quot;</span>,
                     <span class="ident">flag</span>
                 )));
@@ -1789,22 +1789,22 @@
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">append_decimal_datum</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">src_datum</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="ident">src_datum</span>.<span class="ident">is_empty</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">InvalidDataType</span>(
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error::InvalidDataType</span>(
                 <span class="string">&quot;Failed to decode datum flag&quot;</span>.<span class="ident">to_owned</span>(),
             ));
         }
         <span class="kw">let</span> <span class="ident">flag</span> <span class="op">=</span> <span class="ident">src_datum</span>[<span class="number">0</span>];
         <span class="kw">let</span> <span class="ident">raw_datum</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">src_datum</span>[<span class="number">1</span>..];
         <span class="kw">match</span> <span class="ident">flag</span> {
-            <span class="ident">datum</span>::<span class="ident">NIL_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_null</span>(),
+            <span class="ident">datum::NIL_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_null</span>(),
             <span class="comment">// In both index and record, it&#39;s flag is `DECIMAL`. See TiDB&#39;s `encode()`.</span>
-            <span class="ident">datum</span>::<span class="ident">DECIMAL_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">datum::DECIMAL_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="self">self</span>.<span class="ident">data</span>
                     .<span class="ident">write_decimal_to_chunk_by_datum_payload</span>(<span class="ident">raw_datum</span>)<span class="question-mark">?</span>;
                 <span class="self">self</span>.<span class="ident">finish_append_fixed</span>();
             }
             <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">InvalidDataType</span>(<span class="macro">format</span><span class="macro">!</span>(
+                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error::InvalidDataType</span>(<span class="macro">format!</span>(
                     <span class="string">&quot;Unsupported datum flag {} for Decimal vector&quot;</span>,
                     <span class="ident">flag</span>
                 )));
@@ -1833,21 +1833,21 @@
     <span class="doccomment">/// Append a json datum in raw bytes to the column.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">append_json_datum</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">src_datum</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="ident">src_datum</span>.<span class="ident">is_empty</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">InvalidDataType</span>(
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error::InvalidDataType</span>(
                 <span class="string">&quot;Failed to decode datum flag&quot;</span>.<span class="ident">to_owned</span>(),
             ));
         }
         <span class="kw">let</span> <span class="ident">flag</span> <span class="op">=</span> <span class="ident">src_datum</span>[<span class="number">0</span>];
         <span class="kw">let</span> <span class="ident">raw_datum</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">src_datum</span>[<span class="number">1</span>..];
         <span class="kw">match</span> <span class="ident">flag</span> {
-            <span class="ident">datum</span>::<span class="ident">NIL_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_null</span>(),
+            <span class="ident">datum::NIL_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">append_null</span>(),
             <span class="comment">// In both index and record, it&#39;s flag is `JSON`. See TiDB&#39;s `encode()`.</span>
-            <span class="ident">datum</span>::<span class="ident">JSON_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">datum::JSON_FLAG</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="self">self</span>.<span class="ident">data</span>.<span class="ident">write_json_to_chunk_by_datum_payload</span>(<span class="ident">raw_datum</span>)<span class="question-mark">?</span>;
                 <span class="self">self</span>.<span class="ident">finished_append_var</span>();
             }
             <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">InvalidDataType</span>(<span class="macro">format</span><span class="macro">!</span>(
+                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error::InvalidDataType</span>(<span class="macro">format!</span>(
                     <span class="string">&quot;Unsupported datum flag {} for Json vector&quot;</span>,
                     <span class="ident">flag</span>
                 )));
@@ -1877,16 +1877,16 @@
     }
 
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">decode</span>(<span class="ident">buf</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">tikv_util</span>::<span class="ident">codec</span>::<span class="ident">BytesSlice</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>, <span class="ident">tp</span>: <span class="ident">FieldTypeTp</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Column</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">decode</span>(<span class="ident">buf</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">tikv_util::codec::BytesSlice</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>, <span class="ident">tp</span>: <span class="ident">FieldTypeTp</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Column</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">length</span> <span class="op">=</span> <span class="ident">buf</span>.<span class="ident">read_u32_le</span>()<span class="question-mark">?</span> <span class="kw">as</span> <span class="ident">usize</span>;
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">col</span> <span class="op">=</span> <span class="ident">Column</span>::<span class="ident">new</span>(<span class="ident">tp</span>, <span class="ident">length</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">col</span> <span class="op">=</span> <span class="ident">Column::new</span>(<span class="ident">tp</span>, <span class="ident">length</span>);
         <span class="ident">col</span>.<span class="ident">length</span> <span class="op">=</span> <span class="ident">length</span>;
         <span class="ident">col</span>.<span class="ident">null_cnt</span> <span class="op">=</span> <span class="ident">buf</span>.<span class="ident">read_u32_le</span>()<span class="question-mark">?</span> <span class="kw">as</span> <span class="ident">usize</span>;
         <span class="kw">let</span> <span class="ident">null_length</span> <span class="op">=</span> (<span class="ident">col</span>.<span class="ident">length</span> <span class="op">+</span> <span class="number">7</span>) <span class="op">/</span> <span class="number">8_usize</span>;
         <span class="kw">if</span> <span class="ident">col</span>.<span class="ident">null_cnt</span> <span class="op">&gt;</span> <span class="number">0</span> {
             <span class="ident">col</span>.<span class="ident">null_bitmap</span> <span class="op">=</span> <span class="ident">buf</span>.<span class="ident">read_bytes</span>(<span class="ident">null_length</span>)<span class="question-mark">?</span>.<span class="ident">to_vec</span>();
         } <span class="kw">else</span> {
-            <span class="ident">col</span>.<span class="ident">null_bitmap</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[<span class="number">0xFF</span>; <span class="ident">null_length</span>];
+            <span class="ident">col</span>.<span class="ident">null_bitmap</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="number">0xFF</span>; <span class="ident">null_length</span>];
         }
 
         <span class="kw">let</span> <span class="ident">data_length</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">col</span>.<span class="ident">is_fixed</span>() {
@@ -1933,145 +1933,145 @@
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
 <span class="kw">mod</span> <span class="ident">tests</span> {
     <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
-    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">codec</span>::<span class="ident">datum</span>::<span class="ident">Datum</span>;
+    <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::codec::datum::Datum</span>;
     <span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">f64</span>, <span class="ident">u64</span>};
-    <span class="kw">use</span> <span class="ident">tipb</span>::<span class="ident">FieldType</span>;
+    <span class="kw">use</span> <span class="ident">tipb::FieldType</span>;
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_column_i64</span>() {
-        <span class="kw">let</span> <span class="ident">fields</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FieldType</span><span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
-            <span class="ident">FieldTypeTp</span>::<span class="ident">Tiny</span>.<span class="ident">into</span>(),
-            <span class="ident">FieldTypeTp</span>::<span class="ident">Short</span>.<span class="ident">into</span>(),
-            <span class="ident">FieldTypeTp</span>::<span class="ident">Int24</span>.<span class="ident">into</span>(),
-            <span class="ident">FieldTypeTp</span>::<span class="ident">Long</span>.<span class="ident">into</span>(),
-            <span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>.<span class="ident">into</span>(),
-            <span class="ident">FieldTypeTp</span>::<span class="ident">Year</span>.<span class="ident">into</span>(),
+        <span class="kw">let</span> <span class="ident">fields</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FieldType</span><span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec!</span>[
+            <span class="ident">FieldTypeTp::Tiny</span>.<span class="ident">into</span>(),
+            <span class="ident">FieldTypeTp::Short</span>.<span class="ident">into</span>(),
+            <span class="ident">FieldTypeTp::Int24</span>.<span class="ident">into</span>(),
+            <span class="ident">FieldTypeTp::Long</span>.<span class="ident">into</span>(),
+            <span class="ident">FieldTypeTp::LongLong</span>.<span class="ident">into</span>(),
+            <span class="ident">FieldTypeTp::Year</span>.<span class="ident">into</span>(),
         ];
-        <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
-            <span class="ident">Datum</span>::<span class="ident">Null</span>,
-            <span class="ident">Datum</span>::<span class="ident">I64</span>(<span class="op">-</span><span class="number">1</span>),
-            <span class="ident">Datum</span>::<span class="ident">I64</span>(<span class="number">12</span>),
-            <span class="ident">Datum</span>::<span class="ident">I64</span>(<span class="number">1024</span>),
+        <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="macro">vec!</span>[
+            <span class="ident">Datum::Null</span>,
+            <span class="ident">Datum::I64</span>(<span class="op">-</span><span class="number">1</span>),
+            <span class="ident">Datum::I64</span>(<span class="number">12</span>),
+            <span class="ident">Datum::I64</span>(<span class="number">1024</span>),
         ];
         <span class="kw">for</span> <span class="ident">field</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">fields</span> {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">column</span> <span class="op">=</span> <span class="ident">Column</span>::<span class="ident">new</span>(<span class="ident">field</span>.<span class="ident">as_accessor</span>().<span class="ident">tp</span>(), <span class="ident">data</span>.<span class="ident">len</span>());
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">column</span> <span class="op">=</span> <span class="ident">Column::new</span>(<span class="ident">field</span>.<span class="ident">as_accessor</span>().<span class="ident">tp</span>(), <span class="ident">data</span>.<span class="ident">len</span>());
             <span class="kw">for</span> <span class="ident">v</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">data</span> {
                 <span class="ident">column</span>.<span class="ident">append_datum</span>(<span class="ident">v</span>).<span class="ident">unwrap</span>();
             }
 
             <span class="kw">for</span> (<span class="ident">id</span>, <span class="ident">expect</span>) <span class="kw">in</span> <span class="ident">data</span>.<span class="ident">iter</span>().<span class="ident">enumerate</span>() {
                 <span class="kw">let</span> <span class="ident">get</span> <span class="op">=</span> <span class="ident">column</span>.<span class="ident">get_datum</span>(<span class="ident">id</span>, <span class="ident">field</span>).<span class="ident">unwrap</span>();
-                <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="kw-2">&amp;</span><span class="ident">get</span>, <span class="ident">expect</span>);
+                <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span><span class="ident">get</span>, <span class="ident">expect</span>);
             }
         }
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_column_u64</span>() {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">fields</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FieldType</span><span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
-            <span class="ident">FieldTypeTp</span>::<span class="ident">Tiny</span>.<span class="ident">into</span>(),
-            <span class="ident">FieldTypeTp</span>::<span class="ident">Short</span>.<span class="ident">into</span>(),
-            <span class="ident">FieldTypeTp</span>::<span class="ident">Int24</span>.<span class="ident">into</span>(),
-            <span class="ident">FieldTypeTp</span>::<span class="ident">Long</span>.<span class="ident">into</span>(),
-            <span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>.<span class="ident">into</span>(),
-            <span class="ident">FieldTypeTp</span>::<span class="ident">Year</span>.<span class="ident">into</span>(),
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">fields</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FieldType</span><span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec!</span>[
+            <span class="ident">FieldTypeTp::Tiny</span>.<span class="ident">into</span>(),
+            <span class="ident">FieldTypeTp::Short</span>.<span class="ident">into</span>(),
+            <span class="ident">FieldTypeTp::Int24</span>.<span class="ident">into</span>(),
+            <span class="ident">FieldTypeTp::Long</span>.<span class="ident">into</span>(),
+            <span class="ident">FieldTypeTp::LongLong</span>.<span class="ident">into</span>(),
+            <span class="ident">FieldTypeTp::Year</span>.<span class="ident">into</span>(),
         ];
         <span class="kw">for</span> <span class="ident">field</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fields</span> {
-            <span class="ident">field</span>.<span class="ident">set_flag</span>(<span class="ident">FieldTypeFlag</span>::<span class="ident">UNSIGNED</span>.<span class="ident">bits</span>());
+            <span class="ident">field</span>.<span class="ident">set_flag</span>(<span class="ident">FieldTypeFlag::UNSIGNED</span>.<span class="ident">bits</span>());
         }
-        <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
-            <span class="ident">Datum</span>::<span class="ident">Null</span>,
-            <span class="ident">Datum</span>::<span class="ident">U64</span>(<span class="number">1</span>),
-            <span class="ident">Datum</span>::<span class="ident">U64</span>(<span class="ident">u64</span>::<span class="ident">MIN</span>),
-            <span class="ident">Datum</span>::<span class="ident">U64</span>(<span class="ident">u64</span>::<span class="ident">MAX</span>),
+        <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="macro">vec!</span>[
+            <span class="ident">Datum::Null</span>,
+            <span class="ident">Datum::U64</span>(<span class="number">1</span>),
+            <span class="ident">Datum::U64</span>(<span class="ident">u64::MIN</span>),
+            <span class="ident">Datum::U64</span>(<span class="ident">u64::MAX</span>),
         ];
         <span class="ident">test_colum_datum</span>(<span class="ident">fields</span>, <span class="ident">data</span>);
     }
 
     <span class="kw">fn</span> <span class="ident">test_colum_datum</span>(<span class="ident">fields</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FieldType</span><span class="op">&gt;</span>, <span class="ident">data</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Datum</span><span class="op">&gt;</span>) {
         <span class="kw">for</span> <span class="ident">field</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">fields</span> {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">column</span> <span class="op">=</span> <span class="ident">Column</span>::<span class="ident">new</span>(<span class="ident">field</span>.<span class="ident">as_accessor</span>().<span class="ident">tp</span>(), <span class="ident">data</span>.<span class="ident">len</span>());
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">column</span> <span class="op">=</span> <span class="ident">Column::new</span>(<span class="ident">field</span>.<span class="ident">as_accessor</span>().<span class="ident">tp</span>(), <span class="ident">data</span>.<span class="ident">len</span>());
             <span class="kw">for</span> <span class="ident">v</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">data</span> {
                 <span class="ident">column</span>.<span class="ident">append_datum</span>(<span class="ident">v</span>).<span class="ident">unwrap</span>();
             }
             <span class="kw">for</span> (<span class="ident">id</span>, <span class="ident">expect</span>) <span class="kw">in</span> <span class="ident">data</span>.<span class="ident">iter</span>().<span class="ident">enumerate</span>() {
                 <span class="kw">let</span> <span class="ident">get</span> <span class="op">=</span> <span class="ident">column</span>.<span class="ident">get_datum</span>(<span class="ident">id</span>, <span class="ident">field</span>).<span class="ident">unwrap</span>();
-                <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="kw-2">&amp;</span><span class="ident">get</span>, <span class="ident">expect</span>);
+                <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span><span class="ident">get</span>, <span class="ident">expect</span>);
             }
         }
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_column_f64</span>() {
-        <span class="kw">let</span> <span class="ident">fields</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FieldType</span><span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">FieldTypeTp</span>::<span class="ident">Double</span>.<span class="ident">into</span>()];
-        <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">Datum</span>::<span class="ident">Null</span>, <span class="ident">Datum</span>::<span class="ident">F64</span>(<span class="ident">f64</span>::<span class="ident">MIN</span>), <span class="ident">Datum</span>::<span class="ident">F64</span>(<span class="ident">f64</span>::<span class="ident">MAX</span>)];
+        <span class="kw">let</span> <span class="ident">fields</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FieldType</span><span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="ident">FieldTypeTp::Double</span>.<span class="ident">into</span>()];
+        <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="ident">Datum::Null</span>, <span class="ident">Datum::F64</span>(<span class="ident">f64::MIN</span>), <span class="ident">Datum::F64</span>(<span class="ident">f64::MAX</span>)];
         <span class="ident">test_colum_datum</span>(<span class="ident">fields</span>, <span class="ident">data</span>);
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_column_f32</span>() {
-        <span class="kw">let</span> <span class="ident">fields</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FieldType</span><span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">FieldTypeTp</span>::<span class="ident">Float</span>.<span class="ident">into</span>()];
-        <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
-            <span class="ident">Datum</span>::<span class="ident">Null</span>,
-            <span class="ident">Datum</span>::<span class="ident">F64</span>(<span class="ident">std</span>::<span class="ident">f32</span>::<span class="ident">MIN</span>.<span class="ident">into</span>()),
-            <span class="ident">Datum</span>::<span class="ident">F64</span>(<span class="ident">std</span>::<span class="ident">f32</span>::<span class="ident">MAX</span>.<span class="ident">into</span>()),
+        <span class="kw">let</span> <span class="ident">fields</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FieldType</span><span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="ident">FieldTypeTp::Float</span>.<span class="ident">into</span>()];
+        <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="macro">vec!</span>[
+            <span class="ident">Datum::Null</span>,
+            <span class="ident">Datum::F64</span>(<span class="ident">std::f32::MIN</span>.<span class="ident">into</span>()),
+            <span class="ident">Datum::F64</span>(<span class="ident">std::f32::MAX</span>.<span class="ident">into</span>()),
         ];
         <span class="ident">test_colum_datum</span>(<span class="ident">fields</span>, <span class="ident">data</span>);
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_column_time</span>() {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ctx</span> <span class="op">=</span> <span class="ident">EvalContext</span>::<span class="ident">default</span>();
-        <span class="kw">let</span> <span class="ident">fields</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FieldType</span><span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
-            <span class="ident">FieldTypeTp</span>::<span class="ident">Date</span>.<span class="ident">into</span>(),
-            <span class="ident">FieldTypeTp</span>::<span class="ident">DateTime</span>.<span class="ident">into</span>(),
-            <span class="ident">FieldTypeTp</span>::<span class="ident">Timestamp</span>.<span class="ident">into</span>(),
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ctx</span> <span class="op">=</span> <span class="ident">EvalContext::default</span>();
+        <span class="kw">let</span> <span class="ident">fields</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FieldType</span><span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec!</span>[
+            <span class="ident">FieldTypeTp::Date</span>.<span class="ident">into</span>(),
+            <span class="ident">FieldTypeTp::DateTime</span>.<span class="ident">into</span>(),
+            <span class="ident">FieldTypeTp::Timestamp</span>.<span class="ident">into</span>(),
         ];
-        <span class="kw">let</span> <span class="ident">time</span> <span class="op">=</span> <span class="ident">Time</span>::<span class="ident">parse_datetime</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>, <span class="string">&quot;2012-12-31 11:30:45&quot;</span>, <span class="op">-</span><span class="number">1</span>, <span class="bool-val">true</span>).<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">Datum</span>::<span class="ident">Null</span>, <span class="ident">Datum</span>::<span class="ident">Time</span>(<span class="ident">time</span>)];
+        <span class="kw">let</span> <span class="ident">time</span> <span class="op">=</span> <span class="ident">Time::parse_datetime</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>, <span class="string">&quot;2012-12-31 11:30:45&quot;</span>, <span class="op">-</span><span class="number">1</span>, <span class="bool-val">true</span>).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="ident">Datum::Null</span>, <span class="ident">Datum::Time</span>(<span class="ident">time</span>)];
         <span class="ident">test_colum_datum</span>(<span class="ident">fields</span>, <span class="ident">data</span>);
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_column_duration</span>() {
-        <span class="kw">let</span> <span class="ident">fields</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FieldType</span><span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">FieldTypeTp</span>::<span class="ident">Duration</span>.<span class="ident">into</span>()];
-        <span class="kw">let</span> <span class="ident">duration</span> <span class="op">=</span> <span class="ident">Duration</span>::<span class="ident">parse</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">EvalContext</span>::<span class="ident">default</span>(), <span class="string">&quot;10:11:12&quot;</span>, <span class="number">0</span>).<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">Datum</span>::<span class="ident">Null</span>, <span class="ident">Datum</span>::<span class="ident">Dur</span>(<span class="ident">duration</span>)];
+        <span class="kw">let</span> <span class="ident">fields</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FieldType</span><span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="ident">FieldTypeTp::Duration</span>.<span class="ident">into</span>()];
+        <span class="kw">let</span> <span class="ident">duration</span> <span class="op">=</span> <span class="ident">Duration::parse</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">EvalContext::default</span>(), <span class="string">&quot;10:11:12&quot;</span>, <span class="number">0</span>).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="ident">Datum::Null</span>, <span class="ident">Datum::Dur</span>(<span class="ident">duration</span>)];
         <span class="ident">test_colum_datum</span>(<span class="ident">fields</span>, <span class="ident">data</span>);
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_column_decimal</span>() {
-        <span class="kw">let</span> <span class="ident">fields</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FieldType</span><span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">FieldTypeTp</span>::<span class="ident">NewDecimal</span>.<span class="ident">into</span>()];
+        <span class="kw">let</span> <span class="ident">fields</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FieldType</span><span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="ident">FieldTypeTp::NewDecimal</span>.<span class="ident">into</span>()];
         <span class="kw">let</span> <span class="ident">dec</span>: <span class="ident">Decimal</span> <span class="op">=</span> <span class="string">&quot;1234.00&quot;</span>.<span class="ident">parse</span>().<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">Datum</span>::<span class="ident">Null</span>, <span class="ident">Datum</span>::<span class="ident">Dec</span>(<span class="ident">dec</span>)];
+        <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="ident">Datum::Null</span>, <span class="ident">Datum::Dec</span>(<span class="ident">dec</span>)];
         <span class="ident">test_colum_datum</span>(<span class="ident">fields</span>, <span class="ident">data</span>);
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_column_json</span>() {
-        <span class="kw">let</span> <span class="ident">fields</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FieldType</span><span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">FieldTypeTp</span>::<span class="ident">JSON</span>.<span class="ident">into</span>()];
+        <span class="kw">let</span> <span class="ident">fields</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FieldType</span><span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="ident">FieldTypeTp::JSON</span>.<span class="ident">into</span>()];
         <span class="kw">let</span> <span class="ident">json</span>: <span class="ident">Json</span> <span class="op">=</span> <span class="string">r#&quot;{&quot;k1&quot;:&quot;v1&quot;}&quot;#</span>.<span class="ident">parse</span>().<span class="ident">unwrap</span>();
 
-        <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">Datum</span>::<span class="ident">Null</span>, <span class="ident">Datum</span>::<span class="ident">Json</span>(<span class="ident">json</span>)];
+        <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="ident">Datum::Null</span>, <span class="ident">Datum::Json</span>(<span class="ident">json</span>)];
         <span class="ident">test_colum_datum</span>(<span class="ident">fields</span>, <span class="ident">data</span>);
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_column_bytes</span>() {
-        <span class="kw">let</span> <span class="ident">fields</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FieldType</span><span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
-            <span class="ident">FieldTypeTp</span>::<span class="ident">VarChar</span>.<span class="ident">into</span>(),
-            <span class="ident">FieldTypeTp</span>::<span class="ident">VarString</span>.<span class="ident">into</span>(),
-            <span class="ident">FieldTypeTp</span>::<span class="ident">String</span>.<span class="ident">into</span>(),
-            <span class="ident">FieldTypeTp</span>::<span class="ident">Blob</span>.<span class="ident">into</span>(),
-            <span class="ident">FieldTypeTp</span>::<span class="ident">TinyBlob</span>.<span class="ident">into</span>(),
-            <span class="ident">FieldTypeTp</span>::<span class="ident">MediumBlob</span>.<span class="ident">into</span>(),
-            <span class="ident">FieldTypeTp</span>::<span class="ident">LongBlob</span>.<span class="ident">into</span>(),
+        <span class="kw">let</span> <span class="ident">fields</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FieldType</span><span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec!</span>[
+            <span class="ident">FieldTypeTp::VarChar</span>.<span class="ident">into</span>(),
+            <span class="ident">FieldTypeTp::VarString</span>.<span class="ident">into</span>(),
+            <span class="ident">FieldTypeTp::String</span>.<span class="ident">into</span>(),
+            <span class="ident">FieldTypeTp::Blob</span>.<span class="ident">into</span>(),
+            <span class="ident">FieldTypeTp::TinyBlob</span>.<span class="ident">into</span>(),
+            <span class="ident">FieldTypeTp::MediumBlob</span>.<span class="ident">into</span>(),
+            <span class="ident">FieldTypeTp::LongBlob</span>.<span class="ident">into</span>(),
         ];
-        <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">Datum</span>::<span class="ident">Null</span>, <span class="ident">Datum</span>::<span class="ident">Bytes</span>(<span class="string">b&quot;xxx&quot;</span>.<span class="ident">to_vec</span>())];
+        <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="ident">Datum::Null</span>, <span class="ident">Datum::Bytes</span>(<span class="string">b&quot;xxx&quot;</span>.<span class="ident">to_vec</span>())];
         <span class="ident">test_colum_datum</span>(<span class="ident">fields</span>, <span class="ident">data</span>);
     }
 }
 </pre></div>
-</section><section id="search" class="content hidden"></section><section class="footer"></section><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="tidb_query_datatype"></div>
-    <script src="../../../../main.js"></script><script src="../../../../source-script.js"></script><script src="../../../../source-files.js"></script><script defer src="../../../../search-index.js"></script></body></html>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="tidb_query_datatype" data-search-js="../../../../search-index.js"></div>
+    <script src="../../../../main.js"></script><script src="../../../../source-script.js"></script><script src="../../../../source-files.js"></script></body></html>

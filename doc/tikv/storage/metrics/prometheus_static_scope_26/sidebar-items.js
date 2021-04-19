@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["SchedDurationVec",""],["SchedDurationVecDelegator",""],["SchedDurationVecInner",""]]});
+initSidebarItems({"struct":[["ProcessingReadVec",""],["ProcessingReadVecDelegator",""],["ProcessingReadVecInner",""]]});

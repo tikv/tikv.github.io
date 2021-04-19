@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["TEMP_DIR",""]],"struct":[["TestEngineBuilder","A builder to build a temporary `RocksEngine`."]]});

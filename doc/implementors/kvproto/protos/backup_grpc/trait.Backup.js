@@ -1,3 +1,3 @@
 (function() {var implementors = {};
-implementors["backup"] = [{"text":"impl Backup for Service","synthetic":false,"types":[]}];
+implementors["backup"] = [{"text":"impl <a class=\"trait\" href=\"kvproto/protos/backup_grpc/trait.Backup.html\" title=\"trait kvproto::protos::backup_grpc::Backup\">Backup</a> for <a class=\"struct\" href=\"backup/service/struct.Service.html\" title=\"struct backup::service::Service\">Service</a>","synthetic":false,"types":["backup::service::Service"]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

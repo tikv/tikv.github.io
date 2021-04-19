@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["_plugin_create",""]],"static":[["HOST_ALLOCATOR",""]],"struct":[["ExamplePlugin",""]]});

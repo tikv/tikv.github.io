@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["PLUGIN_CONSTRUCTOR_SYMBOL","Name of the exported constructor function for the plugin in the `dylib`."]],"fn":[["pkgname_to_libname","Transforms the name of a package into the name of the compiled library."]],"type":[["PluginConstructorSignature","Type signature of the exported constructor function for the plugin in the `dylib`."]]});

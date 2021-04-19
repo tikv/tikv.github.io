@@ -1,7 +1,7 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/server/node.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>node.rs - source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../favicon.svg">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/server/node.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>node.rs - source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../favicon.svg">
 <link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../tikv/index.html'><div class='logo-container rust-logo'><img src='../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><script src="../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
-                <a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../../tikv/index.html'><div class='logo-container rust-logo'><img src='../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
+                <a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
 <span id="2">  2</span>
 <span id="3">  3</span>
 <span id="4">  4</span>
@@ -426,39 +426,36 @@
 <span id="423">423</span>
 <span id="424">424</span>
 <span id="425">425</span>
-<span id="426">426</span>
-<span id="427">427</span>
-<span id="428">428</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::{<span class="ident">atomic</span>::<span class="ident">AtomicBool</span>, <span class="ident">Arc</span>, <span class="ident">Mutex</span>};
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">thread</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">time</span>::<span class="ident">Duration</span>;
+<span class="kw">use</span> <span class="ident">std::sync</span>::{<span class="ident">atomic::AtomicBool</span>, <span class="ident">Arc</span>, <span class="ident">Mutex</span>};
+<span class="kw">use</span> <span class="ident">std::thread</span>;
+<span class="kw">use</span> <span class="ident">std::time::Duration</span>;
 
-<span class="kw">use</span> <span class="kw">super</span>::<span class="ident">RaftKv</span>;
-<span class="kw">use</span> <span class="kw">super</span>::<span class="prelude-ty">Result</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">import</span>::<span class="ident">SSTImporter</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">read_pool</span>::<span class="ident">ReadPoolHandle</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">server</span>::<span class="ident">lock_manager</span>::<span class="ident">LockManager</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">server</span>::<span class="ident">Config</span> <span class="kw">as</span> <span class="ident">ServerConfig</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::{<span class="ident">config</span>::<span class="ident">Config</span> <span class="kw">as</span> <span class="ident">StorageConfig</span>, <span class="ident">Storage</span>};
-<span class="kw">use</span> <span class="ident">concurrency_manager</span>::<span class="ident">ConcurrencyManager</span>;
-<span class="kw">use</span> <span class="ident">engine_rocks</span>::<span class="ident">RocksEngine</span>;
+<span class="kw">use</span> <span class="kw">super</span><span class="ident">::RaftKv</span>;
+<span class="kw">use</span> <span class="kw">super</span><span class="ident">::Result</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::import::SSTImporter</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::read_pool::ReadPoolHandle</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::server::lock_manager::LockManager</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::server::Config</span> <span class="kw">as</span> <span class="ident">ServerConfig</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::storage</span>::{<span class="ident">config::Config</span> <span class="kw">as</span> <span class="ident">StorageConfig</span>, <span class="ident">Storage</span>};
+<span class="kw">use</span> <span class="ident">concurrency_manager::ConcurrencyManager</span>;
+<span class="kw">use</span> <span class="ident">engine_rocks::RocksEngine</span>;
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">Engines</span>, <span class="ident">Peekable</span>, <span class="ident">RaftEngine</span>};
-<span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">metapb</span>;
-<span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">raft_serverpb</span>::<span class="ident">StoreIdent</span>;
-<span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">replication_modepb</span>::<span class="ident">ReplicationStatus</span>;
+<span class="kw">use</span> <span class="ident">kvproto::metapb</span>;
+<span class="kw">use</span> <span class="ident">kvproto::raft_serverpb::StoreIdent</span>;
+<span class="kw">use</span> <span class="ident">kvproto::replication_modepb::ReplicationStatus</span>;
 <span class="kw">use</span> <span class="ident">pd_client</span>::{<span class="ident">Error</span> <span class="kw">as</span> <span class="ident">PdError</span>, <span class="ident">PdClient</span>, <span class="ident">INVALID_ID</span>};
-<span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">coprocessor</span>::<span class="ident">dispatcher</span>::<span class="ident">CoprocessorHost</span>;
-<span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">router</span>::{<span class="ident">LocalReadRouter</span>, <span class="ident">RaftStoreRouter</span>};
-<span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">store</span>::<span class="ident">fsm</span>::<span class="ident">store</span>::<span class="ident">StoreMeta</span>;
-<span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">store</span>::<span class="ident">fsm</span>::{<span class="ident">ApplyRouter</span>, <span class="ident">RaftBatchSystem</span>, <span class="ident">RaftRouter</span>};
-<span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">store</span>::<span class="ident">AutoSplitController</span>;
-<span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">store</span>::{<span class="self">self</span>, <span class="ident">initial_region</span>, <span class="ident">Config</span> <span class="kw">as</span> <span class="ident">StoreConfig</span>, <span class="ident">SnapManager</span>, <span class="ident">Transport</span>};
-<span class="kw">use</span> <span class="ident">raftstore</span>::<span class="ident">store</span>::{<span class="ident">GlobalReplicationState</span>, <span class="ident">PdTask</span>, <span class="ident">SplitCheckTask</span>};
-<span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">config</span>::<span class="ident">VersionTrack</span>;
-<span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">worker</span>::{<span class="ident">FutureWorker</span>, <span class="ident">Scheduler</span>, <span class="ident">Worker</span>};
+<span class="kw">use</span> <span class="ident">raftstore::coprocessor::dispatcher::CoprocessorHost</span>;
+<span class="kw">use</span> <span class="ident">raftstore::router</span>::{<span class="ident">LocalReadRouter</span>, <span class="ident">RaftStoreRouter</span>};
+<span class="kw">use</span> <span class="ident">raftstore::store::fsm::store::StoreMeta</span>;
+<span class="kw">use</span> <span class="ident">raftstore::store::fsm</span>::{<span class="ident">ApplyRouter</span>, <span class="ident">RaftBatchSystem</span>, <span class="ident">RaftRouter</span>};
+<span class="kw">use</span> <span class="ident">raftstore::store::AutoSplitController</span>;
+<span class="kw">use</span> <span class="ident">raftstore::store</span>::{<span class="self">self</span>, <span class="ident">initial_region</span>, <span class="ident">Config</span> <span class="kw">as</span> <span class="ident">StoreConfig</span>, <span class="ident">SnapManager</span>, <span class="ident">Transport</span>};
+<span class="kw">use</span> <span class="ident">raftstore::store</span>::{<span class="ident">GlobalReplicationState</span>, <span class="ident">PdTask</span>, <span class="ident">SplitCheckTask</span>};
+<span class="kw">use</span> <span class="ident">tikv_util::config::VersionTrack</span>;
+<span class="kw">use</span> <span class="ident">tikv_util::worker</span>::{<span class="ident">FutureWorker</span>, <span class="ident">Scheduler</span>, <span class="ident">Worker</span>};
 
 <span class="kw">const</span> <span class="ident">MAX_CHECK_CLUSTER_BOOTSTRAPPED_RETRY_COUNT</span>: <span class="ident">u64</span> <span class="op">=</span> <span class="number">60</span>;
 <span class="kw">const</span> <span class="ident">CHECK_CLUSTER_BOOTSTRAPPED_RETRY_SECONDS</span>: <span class="ident">u64</span> <span class="op">=</span> <span class="number">3</span>;
@@ -476,7 +473,7 @@
 <span class="kw">where</span>
     <span class="ident">S</span>: <span class="ident">RaftStoreRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">LocalReadRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
 {
-    <span class="kw">let</span> <span class="ident">store</span> <span class="op">=</span> <span class="ident">Storage</span>::<span class="ident">from_engine</span>(
+    <span class="kw">let</span> <span class="ident">store</span> <span class="op">=</span> <span class="ident">Storage::from_engine</span>(
         <span class="ident">engine</span>,
         <span class="ident">cfg</span>,
         <span class="ident">read_pool</span>,
@@ -491,7 +488,7 @@
 <span class="comment">// TODO: we will rename another better name like RaftStore later.</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Node</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">PdClient</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>, <span class="ident">ER</span>: <span class="ident">RaftEngine</span><span class="op">&gt;</span> {
     <span class="ident">cluster_id</span>: <span class="ident">u64</span>,
-    <span class="ident">store</span>: <span class="ident">metapb</span>::<span class="ident">Store</span>,
+    <span class="ident">store</span>: <span class="ident">metapb::Store</span>,
     <span class="ident">store_cfg</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">VersionTrack</span><span class="op">&lt;</span><span class="ident">StoreConfig</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">system</span>: <span class="ident">RaftBatchSystem</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">ER</span><span class="op">&gt;</span>,
     <span class="ident">has_started</span>: <span class="ident">bool</span>,
@@ -515,7 +512,7 @@
         <span class="ident">state</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">GlobalReplicationState</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">bg_worker</span>: <span class="ident">Worker</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Node</span><span class="op">&lt;</span><span class="ident">C</span>, <span class="ident">ER</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">store</span> <span class="op">=</span> <span class="ident">metapb</span>::<span class="ident">Store</span>::<span class="ident">default</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">store</span> <span class="op">=</span> <span class="ident">metapb::Store::default</span>();
         <span class="ident">store</span>.<span class="ident">set_id</span>(<span class="ident">INVALID_ID</span>);
         <span class="kw">if</span> <span class="ident">cfg</span>.<span class="ident">advertise_addr</span>.<span class="ident">is_empty</span>() {
             <span class="ident">store</span>.<span class="ident">set_address</span>(<span class="ident">cfg</span>.<span class="ident">addr</span>.<span class="ident">clone</span>());
@@ -527,24 +524,24 @@
         } <span class="kw">else</span> {
             <span class="ident">store</span>.<span class="ident">set_status_address</span>(<span class="ident">cfg</span>.<span class="ident">advertise_status_addr</span>.<span class="ident">clone</span>())
         }
-        <span class="ident">store</span>.<span class="ident">set_version</span>(<span class="macro">env</span><span class="macro">!</span>(<span class="string">&quot;CARGO_PKG_VERSION&quot;</span>).<span class="ident">to_string</span>());
+        <span class="ident">store</span>.<span class="ident">set_version</span>(<span class="macro">env!</span>(<span class="string">&quot;CARGO_PKG_VERSION&quot;</span>).<span class="ident">to_string</span>());
 
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">path</span>) <span class="op">=</span> <span class="ident">std</span>::<span class="ident">env</span>::<span class="ident">current_exe</span>() {
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">path</span>) <span class="op">=</span> <span class="ident">std::env::current_exe</span>() {
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">path</span>) <span class="op">=</span> <span class="ident">path</span>.<span class="ident">parent</span>() {
                 <span class="ident">store</span>.<span class="ident">set_deploy_path</span>(<span class="ident">path</span>.<span class="ident">to_string_lossy</span>().<span class="ident">to_string</span>());
             }
         };
 
-        <span class="ident">store</span>.<span class="ident">set_start_timestamp</span>(<span class="ident">chrono</span>::<span class="ident">Local</span>::<span class="ident">now</span>().<span class="ident">timestamp</span>());
+        <span class="ident">store</span>.<span class="ident">set_start_timestamp</span>(<span class="ident">chrono::Local::now</span>().<span class="ident">timestamp</span>());
         <span class="ident">store</span>.<span class="ident">set_git_hash</span>(
-            <span class="macro">option_env</span><span class="macro">!</span>(<span class="string">&quot;TIKV_BUILD_GIT_HASH&quot;</span>)
+            <span class="macro">option_env!</span>(<span class="string">&quot;TIKV_BUILD_GIT_HASH&quot;</span>)
                 .<span class="ident">unwrap_or</span>(<span class="string">&quot;Unknown git hash&quot;</span>)
                 .<span class="ident">to_string</span>(),
         );
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">labels</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">new</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">labels</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
         <span class="kw">for</span> (<span class="ident">k</span>, <span class="ident">v</span>) <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">cfg</span>.<span class="ident">labels</span> {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">label</span> <span class="op">=</span> <span class="ident">metapb</span>::<span class="ident">StoreLabel</span>::<span class="ident">default</span>();
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">label</span> <span class="op">=</span> <span class="ident">metapb::StoreLabel::default</span>();
             <span class="ident">label</span>.<span class="ident">set_key</span>(<span class="ident">k</span>.<span class="ident">to_owned</span>());
             <span class="ident">label</span>.<span class="ident">set_value</span>(<span class="ident">v</span>.<span class="ident">to_owned</span>());
             <span class="ident">labels</span>.<span class="ident">push</span>(<span class="ident">label</span>);
@@ -563,10 +560,24 @@
         }
     }
 
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">try_bootstrap_store</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">engines</span>: <span class="ident">Engines</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">ER</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">store_id</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">check_store</span>(<span class="kw-2">&amp;</span><span class="ident">engines</span>)<span class="question-mark">?</span>;
+        <span class="kw">if</span> <span class="ident">store_id</span> <span class="op">=</span><span class="op">=</span> <span class="ident">INVALID_ID</span> {
+            <span class="ident">store_id</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">alloc_id</span>()<span class="question-mark">?</span>;
+            <span class="macro">debug!</span>(<span class="string">&quot;alloc store id&quot;</span>; <span class="string">&quot;store_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">store_id</span>);
+            <span class="ident">store::bootstrap_store</span>(<span class="kw-2">&amp;</span><span class="ident">engines</span>, <span class="self">self</span>.<span class="ident">cluster_id</span>, <span class="ident">store_id</span>)<span class="question-mark">?</span>;
+            <span class="macro">fail_point!</span>(<span class="string">&quot;node_after_bootstrap_store&quot;</span>, <span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="prelude-val">Err</span>(<span class="macro">box_err!</span>(
+                <span class="string">&quot;injected error: node_after_bootstrap_store&quot;</span>
+            )));
+        }
+        <span class="self">self</span>.<span class="ident">store</span>.<span class="ident">set_id</span>(<span class="ident">store_id</span>);
+        <span class="prelude-val">Ok</span>(())
+    }
+
     <span class="doccomment">/// Starts the Node. It tries to bootstrap cluster if the cluster is not</span>
     <span class="doccomment">/// bootstrapped yet. Then it spawns a thread to run the raftstore in</span>
     <span class="doccomment">/// background.</span>
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy</span>::<span class="ident">too_many_arguments</span>)]</span>
+    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::too_many_arguments</span>)]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
         <span class="ident">engines</span>: <span class="ident">Engines</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">ER</span><span class="op">&gt;</span>,
@@ -583,29 +594,22 @@
     <span class="kw">where</span>
         <span class="ident">T</span>: <span class="ident">Transport</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
     {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">store_id</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">check_store</span>(<span class="kw-2">&amp;</span><span class="ident">engines</span>)<span class="question-mark">?</span>;
-        <span class="kw">if</span> <span class="ident">store_id</span> <span class="op">=</span><span class="op">=</span> <span class="ident">INVALID_ID</span> {
-            <span class="ident">store_id</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">bootstrap_store</span>(<span class="kw-2">&amp;</span><span class="ident">engines</span>)<span class="question-mark">?</span>;
-            <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;node_after_bootstrap_store&quot;</span>, <span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(
-                <span class="string">&quot;injected error: node_after_bootstrap_store&quot;</span>
-            )));
-        }
-        <span class="self">self</span>.<span class="ident">store</span>.<span class="ident">set_id</span>(<span class="ident">store_id</span>);
+        <span class="kw">let</span> <span class="ident">store_id</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">id</span>();
         {
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">meta</span> <span class="op">=</span> <span class="ident">store_meta</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
             <span class="ident">meta</span>.<span class="ident">store_id</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">store_id</span>);
         }
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">first_region</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">check_or_prepare_bootstrap_cluster</span>(<span class="kw-2">&amp;</span><span class="ident">engines</span>, <span class="ident">store_id</span>)<span class="question-mark">?</span> {
-            <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;trying to bootstrap cluster&quot;</span>; <span class="string">&quot;store_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">store_id</span>, <span class="string">&quot;region&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">first_region</span>);
+            <span class="macro">info!</span>(<span class="string">&quot;trying to bootstrap cluster&quot;</span>; <span class="string">&quot;store_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">store_id</span>, <span class="string">&quot;region&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">first_region</span>);
             <span class="comment">// cluster is not bootstrapped, and we choose first store to bootstrap</span>
-            <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;node_after_prepare_bootstrap_cluster&quot;</span>, <span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(
+            <span class="macro">fail_point!</span>(<span class="string">&quot;node_after_prepare_bootstrap_cluster&quot;</span>, <span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="prelude-val">Err</span>(<span class="macro">box_err!</span>(
                 <span class="string">&quot;injected error: node_after_prepare_bootstrap_cluster&quot;</span>
             )));
             <span class="self">self</span>.<span class="ident">bootstrap_cluster</span>(<span class="kw-2">&amp;</span><span class="ident">engines</span>, <span class="ident">first_region</span>)<span class="question-mark">?</span>;
         }
 
         <span class="comment">// Put store only if the cluster is bootstrapped.</span>
-        <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;put store to PD&quot;</span>; <span class="string">&quot;store&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">store</span>);
+        <span class="macro">info!</span>(<span class="string">&quot;put store to PD&quot;</span>; <span class="string">&quot;store&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">store</span>);
         <span class="kw">let</span> <span class="ident">status</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pd_client</span>.<span class="ident">put_store</span>(<span class="self">self</span>.<span class="ident">store</span>.<span class="ident">clone</span>())<span class="question-mark">?</span>;
         <span class="self">self</span>.<span class="ident">load_all_stores</span>(<span class="ident">status</span>);
 
@@ -644,14 +648,14 @@
     <span class="comment">// check store, return store id for the engine.</span>
     <span class="comment">// If the store is not bootstrapped, use INVALID_ID.</span>
     <span class="kw">fn</span> <span class="ident">check_store</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">engines</span>: <span class="kw-2">&amp;</span><span class="ident">Engines</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">ER</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">get_msg</span>::<span class="op">&lt;</span><span class="ident">StoreIdent</span><span class="op">&gt;</span>(<span class="ident">keys</span>::<span class="ident">STORE_IDENT_KEY</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">get_msg</span>::<span class="op">&lt;</span><span class="ident">StoreIdent</span><span class="op">&gt;</span>(<span class="ident">keys::STORE_IDENT_KEY</span>)<span class="question-mark">?</span>;
         <span class="kw">if</span> <span class="ident">res</span>.<span class="ident">is_none</span>() {
             <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">INVALID_ID</span>);
         }
 
         <span class="kw">let</span> <span class="ident">ident</span> <span class="op">=</span> <span class="ident">res</span>.<span class="ident">unwrap</span>();
         <span class="kw">if</span> <span class="ident">ident</span>.<span class="ident">get_cluster_id</span>() <span class="op">!</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">cluster_id</span> {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err!</span>(
                 <span class="string">&quot;cluster ID mismatch, local {} != remote {}, \
                  you are trying to connect to another cluster, please reconnect to the correct PD&quot;</span>,
                 <span class="ident">ident</span>.<span class="ident">get_cluster_id</span>(),
@@ -661,7 +665,7 @@
 
         <span class="kw">let</span> <span class="ident">store_id</span> <span class="op">=</span> <span class="ident">ident</span>.<span class="ident">get_store_id</span>();
         <span class="kw">if</span> <span class="ident">store_id</span> <span class="op">=</span><span class="op">=</span> <span class="ident">INVALID_ID</span> {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(<span class="string">&quot;invalid store ident {:?}&quot;</span>, <span class="ident">ident</span>));
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err!</span>(<span class="string">&quot;invalid store ident {:?}&quot;</span>, <span class="ident">ident</span>));
         }
         <span class="prelude-val">Ok</span>(<span class="ident">store_id</span>)
     }
@@ -672,10 +676,10 @@
     }
 
     <span class="kw">fn</span> <span class="ident">load_all_stores</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">status</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ReplicationStatus</span><span class="op">&gt;</span>) {
-        <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;initializing replication mode&quot;</span>; <span class="string">&quot;status&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">status</span>, <span class="string">&quot;store_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">store</span>.<span class="ident">id</span>);
+        <span class="macro">info!</span>(<span class="string">&quot;initializing replication mode&quot;</span>; <span class="string">&quot;status&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">status</span>, <span class="string">&quot;store_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">store</span>.<span class="ident">id</span>);
         <span class="kw">let</span> <span class="ident">stores</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">pd_client</span>.<span class="ident">get_all_stores</span>(<span class="bool-val">false</span>) {
             <span class="prelude-val">Ok</span>(<span class="ident">stores</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">stores</span>,
-            <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;failed to load all stores: {:?}&quot;</span>, <span class="ident">e</span>),
+            <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic!</span>(<span class="string">&quot;failed to load all stores: {:?}&quot;</span>, <span class="ident">e</span>),
         };
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">state</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">state</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">s</span>) <span class="op">=</span> <span class="ident">status</span> {
@@ -688,38 +692,29 @@
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">bootstrap_store</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">engines</span>: <span class="kw-2">&amp;</span><span class="ident">Engines</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">ER</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">store_id</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">alloc_id</span>()<span class="question-mark">?</span>;
-        <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;alloc store id&quot;</span>; <span class="string">&quot;store_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">store_id</span>);
-
-        <span class="ident">store</span>::<span class="ident">bootstrap_store</span>(<span class="kw-2">&amp;</span><span class="ident">engines</span>, <span class="self">self</span>.<span class="ident">cluster_id</span>, <span class="ident">store_id</span>)<span class="question-mark">?</span>;
-
-        <span class="prelude-val">Ok</span>(<span class="ident">store_id</span>)
-    }
-
     <span class="comment">// Exported for tests.</span>
     <span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">prepare_bootstrap_cluster</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">engines</span>: <span class="kw-2">&amp;</span><span class="ident">Engines</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">ER</span><span class="op">&gt;</span>,
         <span class="ident">store_id</span>: <span class="ident">u64</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">metapb</span>::<span class="ident">Region</span><span class="op">&gt;</span> {
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">metapb::Region</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">region_id</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">alloc_id</span>()<span class="question-mark">?</span>;
-        <span class="macro">debug</span><span class="macro">!</span>(
+        <span class="macro">debug!</span>(
             <span class="string">&quot;alloc first region id&quot;</span>;
             <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>,
             <span class="string">&quot;cluster_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">cluster_id</span>,
             <span class="string">&quot;store_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">store_id</span>
         );
         <span class="kw">let</span> <span class="ident">peer_id</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">alloc_id</span>()<span class="question-mark">?</span>;
-        <span class="macro">debug</span><span class="macro">!</span>(
+        <span class="macro">debug!</span>(
             <span class="string">&quot;alloc first peer id for first region&quot;</span>;
             <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">peer_id</span>,
             <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>,
         );
 
         <span class="kw">let</span> <span class="ident">region</span> <span class="op">=</span> <span class="ident">initial_region</span>(<span class="ident">store_id</span>, <span class="ident">region_id</span>, <span class="ident">peer_id</span>);
-        <span class="ident">store</span>::<span class="ident">prepare_bootstrap_cluster</span>(<span class="kw-2">&amp;</span><span class="ident">engines</span>, <span class="kw-2">&amp;</span><span class="ident">region</span>)<span class="question-mark">?</span>;
+        <span class="ident">store::prepare_bootstrap_cluster</span>(<span class="kw-2">&amp;</span><span class="ident">engines</span>, <span class="kw-2">&amp;</span><span class="ident">region</span>)<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(<span class="ident">region</span>)
     }
 
@@ -727,8 +722,8 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">engines</span>: <span class="kw-2">&amp;</span><span class="ident">Engines</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">ER</span><span class="op">&gt;</span>,
         <span class="ident">store_id</span>: <span class="ident">u64</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">metapb</span>::<span class="ident">Region</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">first_region</span>) <span class="op">=</span> <span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">get_msg</span>(<span class="ident">keys</span>::<span class="ident">PREPARE_BOOTSTRAP_KEY</span>)<span class="question-mark">?</span> {
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">metapb::Region</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">first_region</span>) <span class="op">=</span> <span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">get_msg</span>(<span class="ident">keys::PREPARE_BOOTSTRAP_KEY</span>)<span class="question-mark">?</span> {
             <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">first_region</span>))
         } <span class="kw">else</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">check_cluster_bootstrapped</span>()<span class="question-mark">?</span> {
             <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
@@ -740,7 +735,7 @@
     <span class="kw">fn</span> <span class="ident">bootstrap_cluster</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
         <span class="ident">engines</span>: <span class="kw-2">&amp;</span><span class="ident">Engines</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">ER</span><span class="op">&gt;</span>,
-        <span class="ident">first_region</span>: <span class="ident">metapb</span>::<span class="ident">Region</span>,
+        <span class="ident">first_region</span>: <span class="ident">metapb::Region</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">region_id</span> <span class="op">=</span> <span class="ident">first_region</span>.<span class="ident">get_id</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">retry</span> <span class="op">=</span> <span class="number">0</span>;
@@ -750,37 +745,36 @@
                 .<span class="ident">bootstrap_cluster</span>(<span class="self">self</span>.<span class="ident">store</span>.<span class="ident">clone</span>(), <span class="ident">first_region</span>.<span class="ident">clone</span>())
             {
                 <span class="prelude-val">Ok</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;bootstrap cluster ok&quot;</span>; <span class="string">&quot;cluster_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">cluster_id</span>);
-                    <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;node_after_bootstrap_cluster&quot;</span>, <span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(
+                    <span class="macro">info!</span>(<span class="string">&quot;bootstrap cluster ok&quot;</span>; <span class="string">&quot;cluster_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">cluster_id</span>);
+                    <span class="macro">fail_point!</span>(<span class="string">&quot;node_after_bootstrap_cluster&quot;</span>, <span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="prelude-val">Err</span>(<span class="macro">box_err!</span>(
                         <span class="string">&quot;injected error: node_after_bootstrap_cluster&quot;</span>
                     )));
-                    <span class="ident">store</span>::<span class="ident">clear_prepare_bootstrap_key</span>(<span class="kw-2">&amp;</span><span class="ident">engines</span>)<span class="question-mark">?</span>;
+                    <span class="ident">store::clear_prepare_bootstrap_key</span>(<span class="kw-2">&amp;</span><span class="ident">engines</span>)<span class="question-mark">?</span>;
                     <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
                 }
-                <span class="prelude-val">Err</span>(<span class="ident">PdError</span>::<span class="ident">ClusterBootstrapped</span>(<span class="kw">_</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">pd_client</span>.<span class="ident">get_region</span>(<span class="string">b&quot;&quot;</span>) {
+                <span class="prelude-val">Err</span>(<span class="ident">PdError::ClusterBootstrapped</span>(<span class="kw">_</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">pd_client</span>.<span class="ident">get_region</span>(<span class="string">b&quot;&quot;</span>) {
                     <span class="prelude-val">Ok</span>(<span class="ident">region</span>) <span class="op">=</span><span class="op">&gt;</span> {
                         <span class="kw">if</span> <span class="ident">region</span> <span class="op">=</span><span class="op">=</span> <span class="ident">first_region</span> {
-                            <span class="ident">store</span>::<span class="ident">clear_prepare_bootstrap_key</span>(<span class="kw-2">&amp;</span><span class="ident">engines</span>)<span class="question-mark">?</span>;
-                            <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
+                            <span class="ident">store::clear_prepare_bootstrap_key</span>(<span class="kw-2">&amp;</span><span class="ident">engines</span>)<span class="question-mark">?</span>;
                         } <span class="kw">else</span> {
-                            <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;cluster is already bootstrapped&quot;</span>; <span class="string">&quot;cluster_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">cluster_id</span>);
-                            <span class="ident">store</span>::<span class="ident">clear_prepare_bootstrap_cluster</span>(<span class="kw-2">&amp;</span><span class="ident">engines</span>, <span class="ident">region_id</span>)<span class="question-mark">?</span>;
-                            <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
+                            <span class="macro">info!</span>(<span class="string">&quot;cluster is already bootstrapped&quot;</span>; <span class="string">&quot;cluster_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">cluster_id</span>);
+                            <span class="ident">store::clear_prepare_bootstrap_cluster</span>(<span class="kw-2">&amp;</span><span class="ident">engines</span>, <span class="ident">region_id</span>)<span class="question-mark">?</span>;
                         }
+                        <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
                     }
                     <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                        <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;get the first region failed&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
+                        <span class="macro">warn!</span>(<span class="string">&quot;get the first region failed&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
                     }
                 },
                 <span class="comment">// TODO: should we clean region for other errors too?</span>
-                <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">error</span><span class="macro">!</span>(<span class="question-mark">?</span><span class="ident">e</span>; <span class="string">&quot;bootstrap cluster&quot;</span>; <span class="string">&quot;cluster_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">cluster_id</span>,),
+                <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">error!</span>(<span class="question-mark">?</span><span class="ident">e</span>; <span class="string">&quot;bootstrap cluster&quot;</span>; <span class="string">&quot;cluster_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">cluster_id</span>,),
             }
             <span class="ident">retry</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
-            <span class="ident">thread</span>::<span class="ident">sleep</span>(<span class="ident">Duration</span>::<span class="ident">from_secs</span>(
+            <span class="ident">thread::sleep</span>(<span class="ident">Duration::from_secs</span>(
                 <span class="ident">CHECK_CLUSTER_BOOTSTRAPPED_RETRY_SECONDS</span>,
             ));
         }
-        <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(<span class="string">&quot;bootstrapped cluster failed&quot;</span>))
+        <span class="prelude-val">Err</span>(<span class="macro">box_err!</span>(<span class="string">&quot;bootstrapped cluster failed&quot;</span>))
     }
 
     <span class="kw">fn</span> <span class="ident">check_cluster_bootstrapped</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">bool</span><span class="op">&gt;</span> {
@@ -788,17 +782,17 @@
             <span class="kw">match</span> <span class="self">self</span>.<span class="ident">pd_client</span>.<span class="ident">is_cluster_bootstrapped</span>() {
                 <span class="prelude-val">Ok</span>(<span class="ident">b</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">b</span>),
                 <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;check cluster bootstrapped failed&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
+                    <span class="macro">warn!</span>(<span class="string">&quot;check cluster bootstrapped failed&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
                 }
             }
-            <span class="ident">thread</span>::<span class="ident">sleep</span>(<span class="ident">Duration</span>::<span class="ident">from_secs</span>(
+            <span class="ident">thread::sleep</span>(<span class="ident">Duration::from_secs</span>(
                 <span class="ident">CHECK_CLUSTER_BOOTSTRAPPED_RETRY_SECONDS</span>,
             ));
         }
-        <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(<span class="string">&quot;check cluster bootstrapped failed&quot;</span>))
+        <span class="prelude-val">Err</span>(<span class="macro">box_err!</span>(<span class="string">&quot;check cluster bootstrapped failed&quot;</span>))
     }
 
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy</span>::<span class="ident">too_many_arguments</span>)]</span>
+    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::too_many_arguments</span>)]</span>
     <span class="kw">fn</span> <span class="ident">start_store</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
         <span class="ident">store_id</span>: <span class="ident">u64</span>,
@@ -816,14 +810,14 @@
     <span class="kw">where</span>
         <span class="ident">T</span>: <span class="ident">Transport</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
     {
-        <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;start raft store thread&quot;</span>; <span class="string">&quot;store_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">store_id</span>);
+        <span class="macro">info!</span>(<span class="string">&quot;start raft store thread&quot;</span>; <span class="string">&quot;store_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">store_id</span>);
 
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">has_started</span> {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(<span class="string">&quot;{} is already started&quot;</span>, <span class="ident">store_id</span>));
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err!</span>(<span class="string">&quot;{} is already started&quot;</span>, <span class="ident">store_id</span>));
         }
         <span class="self">self</span>.<span class="ident">has_started</span> <span class="op">=</span> <span class="bool-val">true</span>;
         <span class="kw">let</span> <span class="ident">cfg</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">store_cfg</span>.<span class="ident">clone</span>();
-        <span class="kw">let</span> <span class="ident">pd_client</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">pd_client</span>);
+        <span class="kw">let</span> <span class="ident">pd_client</span> <span class="op">=</span> <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">pd_client</span>);
         <span class="kw">let</span> <span class="ident">store</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">store</span>.<span class="ident">clone</span>();
 
         <span class="self">self</span>.<span class="ident">system</span>.<span class="ident">spawn</span>(
@@ -847,7 +841,7 @@
     }
 
     <span class="kw">fn</span> <span class="ident">stop_store</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">store_id</span>: <span class="ident">u64</span>) {
-        <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;stop raft store thread&quot;</span>; <span class="string">&quot;store_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">store_id</span>);
+        <span class="macro">info!</span>(<span class="string">&quot;stop raft store thread&quot;</span>; <span class="string">&quot;store_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">store_id</span>);
         <span class="self">self</span>.<span class="ident">system</span>.<span class="ident">shutdown</span>();
     }
 
@@ -859,5 +853,5 @@
     }
 }
 </pre></div>
-</section><section id="search" class="content hidden"></section><section class="footer"></section><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="tikv"></div>
-    <script src="../../../main.js"></script><script src="../../../source-script.js"></script><script src="../../../source-files.js"></script><script defer src="../../../search-index.js"></script></body></html>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="tikv" data-search-js="../../../search-index.js"></div>
+    <script src="../../../main.js"></script><script src="../../../source-script.js"></script><script src="../../../source-files.js"></script></body></html>

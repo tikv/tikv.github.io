@@ -1,3 +1,3 @@
 (function() {var implementors = {};
-implementors["aws"] = [{"text":"impl KmsProvider for AwsKms","synthetic":false,"types":[]}];
+implementors["aws"] = [{"text":"impl <a class=\"trait\" href=\"cloud/kms/trait.KmsProvider.html\" title=\"trait cloud::kms::KmsProvider\">KmsProvider</a> for <a class=\"struct\" href=\"aws/kms/struct.AwsKms.html\" title=\"struct aws::kms::AwsKms\">AwsKms</a>","synthetic":false,"types":["aws::kms::AwsKms"]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

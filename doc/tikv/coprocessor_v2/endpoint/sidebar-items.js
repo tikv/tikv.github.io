@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["Endpoint","A pool to build and run Coprocessor request handlers."]]});
+initSidebarItems({"enum":[["CoprocessorError",""]],"fn":[["extract_region_error",""]],"struct":[["Endpoint","A pool to build and run Coprocessor request handlers."]]});

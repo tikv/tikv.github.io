@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["RawStorageImpl","Implementation of the [`RawStorage`] trait."],["StorageErrorShim","Helper struct for converting between [`storage::errors::Error`] and [`coprocessor_plugin_api::StorageError`]."]]});

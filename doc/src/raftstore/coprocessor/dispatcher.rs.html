@@ -1,7 +1,7 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `components/raftstore/src/coprocessor/dispatcher.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>dispatcher.rs - source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../favicon.svg">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `components/raftstore/src/coprocessor/dispatcher.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>dispatcher.rs - source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../favicon.svg">
 <link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../raftstore/index.html'><div class='logo-container rust-logo'><img src='../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><script src="../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
-                <a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../../raftstore/index.html'><div class='logo-container rust-logo'><img src='../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
+                <a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
 <span id="2">  2</span>
 <span id="3">  3</span>
 <span id="4">  4</span>
@@ -825,21 +825,28 @@
 <span id="822">822</span>
 <span id="823">823</span>
 <span id="824">824</span>
+<span id="825">825</span>
+<span id="826">826</span>
+<span id="827">827</span>
+<span id="828">828</span>
+<span id="829">829</span>
+<span id="830">830</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">marker</span>::<span class="ident">PhantomData</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">mem</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">ops</span>::<span class="ident">Deref</span>;
+<span class="kw">use</span> <span class="ident">std::marker::PhantomData</span>;
+<span class="kw">use</span> <span class="ident">std::mem</span>;
+<span class="kw">use</span> <span class="ident">std::ops::Deref</span>;
 
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">CfName</span>, <span class="ident">KvEngine</span>};
-<span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">metapb</span>::<span class="ident">Region</span>;
-<span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">pdpb</span>::<span class="ident">CheckPolicy</span>;
-<span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">raft_cmdpb</span>::{<span class="ident">ComputeHashRequest</span>, <span class="ident">RaftCmdRequest</span>};
-<span class="kw">use</span> <span class="ident">raft</span>::<span class="ident">eraftpb</span>;
+<span class="kw">use</span> <span class="ident">kvproto::metapb::Region</span>;
+<span class="kw">use</span> <span class="ident">kvproto::pdpb::CheckPolicy</span>;
+<span class="kw">use</span> <span class="ident">kvproto::raft_cmdpb</span>::{<span class="ident">ComputeHashRequest</span>, <span class="ident">RaftCmdRequest</span>};
+<span class="kw">use</span> <span class="ident">raft::eraftpb</span>;
+<span class="kw">use</span> <span class="ident">tikv_util::box_try</span>;
 
 <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">CasualRouter</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::store::CasualRouter</span>;
 
 <span class="kw">struct</span> <span class="ident">Entry</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
     <span class="ident">priority</span>: <span class="ident">u32</span>,
@@ -857,17 +864,17 @@
 
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">ClonableObserver</span>: <span class="lifetime">&#39;static</span> <span class="op">+</span> <span class="ident">Send</span> {
     <span class="kw">type</span> <span class="ident">Ob</span>: <span class="question-mark">?</span><span class="ident">Sized</span> <span class="op">+</span> <span class="ident">Send</span>;
-    <span class="kw">fn</span> <span class="ident">inner</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="self">Self</span>::<span class="ident">Ob</span>;
-    <span class="kw">fn</span> <span class="ident">inner_mut</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">Self</span>::<span class="ident">Ob</span>;
-    <span class="kw">fn</span> <span class="ident">box_clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">ClonableObserver</span><span class="op">&lt;</span><span class="ident">Ob</span> <span class="op">=</span> <span class="self">Self</span>::<span class="ident">Ob</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span>;
+    <span class="kw">fn</span> <span class="ident">inner</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="self">Self</span><span class="ident">::Ob</span>;
+    <span class="kw">fn</span> <span class="ident">inner_mut</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">Self</span><span class="ident">::Ob</span>;
+    <span class="kw">fn</span> <span class="ident">box_clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">ClonableObserver</span><span class="op">&lt;</span><span class="ident">Ob</span> <span class="op">=</span> <span class="self">Self</span><span class="ident">::Ob</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span>;
 }
 
-<span class="macro">macro_rules</span><span class="macro">!</span> <span class="ident">impl_box_observer</span> {
+<span class="macro">macro_rules!</span> <span class="ident">impl_box_observer</span> {
     (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>:<span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ob</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">wrapper</span>: <span class="ident">ident</span>) <span class="op">=</span><span class="op">&gt;</span> {
         <span class="kw">pub</span> <span class="kw">struct</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>(<span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">ClonableObserver</span><span class="op">&lt;</span><span class="ident">Ob</span> <span class="op">=</span> <span class="kw">dyn</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ob</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span>);
         <span class="kw">impl</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span> {
             <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="lifetime">&#39;static</span> <span class="op">+</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ob</span> <span class="op">+</span> <span class="ident">Clone</span><span class="op">&gt;</span>(<span class="ident">observer</span>: <span class="ident">T</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span> {
-                <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">wrapper</span> { <span class="ident">inner</span>: <span class="ident">observer</span> }))
+                <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>(<span class="ident">Box::new</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">wrapper</span> { <span class="ident">inner</span>: <span class="ident">observer</span> }))
             }
         }
         <span class="kw">impl</span> <span class="ident">Clone</span> <span class="kw">for</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span> {
@@ -888,16 +895,16 @@
         }
         <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="lifetime">&#39;static</span> <span class="op">+</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ob</span> <span class="op">+</span> <span class="ident">Clone</span><span class="op">&gt;</span> <span class="ident">ClonableObserver</span> <span class="kw">for</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">wrapper</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
             <span class="kw">type</span> <span class="ident">Ob</span> <span class="op">=</span> <span class="kw">dyn</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ob</span>;
-            <span class="kw">fn</span> <span class="ident">inner</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="self">Self</span>::<span class="ident">Ob</span> {
+            <span class="kw">fn</span> <span class="ident">inner</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="self">Self</span><span class="ident">::Ob</span> {
                 <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">inner</span> <span class="kw">as</span> <span class="kw">_</span>
             }
 
-            <span class="kw">fn</span> <span class="ident">inner_mut</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">Self</span>::<span class="ident">Ob</span> {
+            <span class="kw">fn</span> <span class="ident">inner_mut</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">Self</span><span class="ident">::Ob</span> {
                 <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">inner</span> <span class="kw">as</span> <span class="kw">_</span>
             }
 
-            <span class="kw">fn</span> <span class="ident">box_clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">ClonableObserver</span><span class="op">&lt;</span><span class="ident">Ob</span> <span class="op">=</span> <span class="self">Self</span>::<span class="ident">Ob</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span> {
-                <span class="ident">Box</span>::<span class="ident">new</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">wrapper</span> {
+            <span class="kw">fn</span> <span class="ident">box_clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">ClonableObserver</span><span class="op">&lt;</span><span class="ident">Ob</span> <span class="op">=</span> <span class="self">Self</span><span class="ident">::Ob</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span> {
+                <span class="ident">Box::new</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">wrapper</span> {
                     <span class="ident">inner</span>: <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">clone</span>(),
                 })
             }
@@ -906,12 +913,12 @@
 }
 
 <span class="comment">// This is the same as impl_box_observer_g except $ob has a typaram</span>
-<span class="macro">macro_rules</span><span class="macro">!</span> <span class="ident">impl_box_observer_g</span> {
+<span class="macro">macro_rules!</span> <span class="ident">impl_box_observer_g</span> {
     (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>:<span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ob</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">wrapper</span>: <span class="ident">ident</span>) <span class="op">=</span><span class="op">&gt;</span> {
         <span class="kw">pub</span> <span class="kw">struct</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">KvEngine</span><span class="op">&gt;</span>(<span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">ClonableObserver</span><span class="op">&lt;</span><span class="ident">Ob</span> <span class="op">=</span> <span class="kw">dyn</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ob</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span>);
         <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">KvEngine</span> <span class="op">+</span> <span class="lifetime">&#39;static</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
             <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="lifetime">&#39;static</span> <span class="op">+</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ob</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Clone</span><span class="op">&gt;</span>(<span class="ident">observer</span>: <span class="ident">T</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
-                <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">wrapper</span> {
+                <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>(<span class="ident">Box::new</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">wrapper</span> {
                     <span class="ident">inner</span>: <span class="ident">observer</span>,
                     <span class="ident">_phantom</span>: <span class="ident">PhantomData</span>,
                 }))
@@ -938,16 +945,16 @@
             <span class="kw">for</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">wrapper</span><span class="op">&lt;</span><span class="ident">E</span>, <span class="ident">T</span><span class="op">&gt;</span>
         {
             <span class="kw">type</span> <span class="ident">Ob</span> <span class="op">=</span> <span class="kw">dyn</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ob</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>;
-            <span class="kw">fn</span> <span class="ident">inner</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="self">Self</span>::<span class="ident">Ob</span> {
+            <span class="kw">fn</span> <span class="ident">inner</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="self">Self</span><span class="ident">::Ob</span> {
                 <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">inner</span> <span class="kw">as</span> <span class="kw">_</span>
             }
 
-            <span class="kw">fn</span> <span class="ident">inner_mut</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">Self</span>::<span class="ident">Ob</span> {
+            <span class="kw">fn</span> <span class="ident">inner_mut</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">Self</span><span class="ident">::Ob</span> {
                 <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">inner</span> <span class="kw">as</span> <span class="kw">_</span>
             }
 
-            <span class="kw">fn</span> <span class="ident">box_clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">ClonableObserver</span><span class="op">&lt;</span><span class="ident">Ob</span> <span class="op">=</span> <span class="self">Self</span>::<span class="ident">Ob</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span> {
-                <span class="ident">Box</span>::<span class="ident">new</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">wrapper</span> {
+            <span class="kw">fn</span> <span class="ident">box_clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">ClonableObserver</span><span class="op">&lt;</span><span class="ident">Ob</span> <span class="op">=</span> <span class="self">Self</span><span class="ident">::Ob</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span> {
+                <span class="ident">Box::new</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">wrapper</span> {
                     <span class="ident">inner</span>: <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">clone</span>(),
                     <span class="ident">_phantom</span>: <span class="ident">PhantomData</span>,
                 })
@@ -956,31 +963,31 @@
     };
 }
 
-<span class="macro">impl_box_observer</span><span class="macro">!</span>(<span class="ident">BoxAdminObserver</span>, <span class="ident">AdminObserver</span>, <span class="ident">WrappedAdminObserver</span>);
-<span class="macro">impl_box_observer</span><span class="macro">!</span>(<span class="ident">BoxQueryObserver</span>, <span class="ident">QueryObserver</span>, <span class="ident">WrappedQueryObserver</span>);
-<span class="macro">impl_box_observer</span><span class="macro">!</span>(
+<span class="macro">impl_box_observer!</span>(<span class="ident">BoxAdminObserver</span>, <span class="ident">AdminObserver</span>, <span class="ident">WrappedAdminObserver</span>);
+<span class="macro">impl_box_observer!</span>(<span class="ident">BoxQueryObserver</span>, <span class="ident">QueryObserver</span>, <span class="ident">WrappedQueryObserver</span>);
+<span class="macro">impl_box_observer!</span>(
     <span class="ident">BoxApplySnapshotObserver</span>,
     <span class="ident">ApplySnapshotObserver</span>,
     <span class="ident">WrappedApplySnapshotObserver</span>
 );
-<span class="macro">impl_box_observer_g</span><span class="macro">!</span>(
+<span class="macro">impl_box_observer_g!</span>(
     <span class="ident">BoxSplitCheckObserver</span>,
     <span class="ident">SplitCheckObserver</span>,
     <span class="ident">WrappedSplitCheckObserver</span>
 );
-<span class="macro">impl_box_observer</span><span class="macro">!</span>(<span class="ident">BoxRoleObserver</span>, <span class="ident">RoleObserver</span>, <span class="ident">WrappedRoleObserver</span>);
-<span class="macro">impl_box_observer</span><span class="macro">!</span>(
+<span class="macro">impl_box_observer!</span>(<span class="ident">BoxRoleObserver</span>, <span class="ident">RoleObserver</span>, <span class="ident">WrappedRoleObserver</span>);
+<span class="macro">impl_box_observer!</span>(
     <span class="ident">BoxRegionChangeObserver</span>,
     <span class="ident">RegionChangeObserver</span>,
     <span class="ident">WrappedRegionChangeObserver</span>
 );
-<span class="macro">impl_box_observer</span><span class="macro">!</span>(
+<span class="macro">impl_box_observer!</span>(
     <span class="ident">BoxReadIndexObserver</span>,
     <span class="ident">ReadIndexObserver</span>,
     <span class="ident">WrappedReadIndexObserver</span>
 );
-<span class="macro">impl_box_observer_g</span><span class="macro">!</span>(<span class="ident">BoxCmdObserver</span>, <span class="ident">CmdObserver</span>, <span class="ident">WrappedCmdObserver</span>);
-<span class="macro">impl_box_observer_g</span><span class="macro">!</span>(
+<span class="macro">impl_box_observer_g!</span>(<span class="ident">BoxCmdObserver</span>, <span class="ident">CmdObserver</span>, <span class="ident">WrappedCmdObserver</span>);
+<span class="macro">impl_box_observer_g!</span>(
     <span class="ident">BoxConsistencyCheckObserver</span>,
     <span class="ident">ConsistencyCheckObserver</span>,
     <span class="ident">WrappedConsistencyCheckObserver</span>
@@ -1007,20 +1014,20 @@
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">KvEngine</span><span class="op">&gt;</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">Registry</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
     <span class="kw">fn</span> <span class="ident">default</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Registry</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
         <span class="ident">Registry</span> {
-            <span class="ident">admin_observers</span>: <span class="ident">Default</span>::<span class="ident">default</span>(),
-            <span class="ident">query_observers</span>: <span class="ident">Default</span>::<span class="ident">default</span>(),
-            <span class="ident">apply_snapshot_observers</span>: <span class="ident">Default</span>::<span class="ident">default</span>(),
-            <span class="ident">split_check_observers</span>: <span class="ident">Default</span>::<span class="ident">default</span>(),
-            <span class="ident">consistency_check_observers</span>: <span class="ident">Default</span>::<span class="ident">default</span>(),
-            <span class="ident">role_observers</span>: <span class="ident">Default</span>::<span class="ident">default</span>(),
-            <span class="ident">region_change_observers</span>: <span class="ident">Default</span>::<span class="ident">default</span>(),
-            <span class="ident">cmd_observers</span>: <span class="ident">Default</span>::<span class="ident">default</span>(),
-            <span class="ident">read_index_observers</span>: <span class="ident">Default</span>::<span class="ident">default</span>(),
+            <span class="ident">admin_observers</span>: <span class="ident">Default::default</span>(),
+            <span class="ident">query_observers</span>: <span class="ident">Default::default</span>(),
+            <span class="ident">apply_snapshot_observers</span>: <span class="ident">Default::default</span>(),
+            <span class="ident">split_check_observers</span>: <span class="ident">Default::default</span>(),
+            <span class="ident">consistency_check_observers</span>: <span class="ident">Default::default</span>(),
+            <span class="ident">role_observers</span>: <span class="ident">Default::default</span>(),
+            <span class="ident">region_change_observers</span>: <span class="ident">Default::default</span>(),
+            <span class="ident">cmd_observers</span>: <span class="ident">Default::default</span>(),
+            <span class="ident">read_index_observers</span>: <span class="ident">Default::default</span>(),
         }
     }
 }
 
-<span class="macro">macro_rules</span><span class="macro">!</span> <span class="ident">push</span> {
+<span class="macro">macro_rules!</span> <span class="ident">push</span> {
     (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">p</span>:<span class="ident">expr</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>:<span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">vec</span>:<span class="ident">expr</span>) <span class="op">=</span><span class="op">&gt;</span> {
         <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>.<span class="ident">inner</span>().<span class="ident">start</span>();
         <span class="kw">let</span> <span class="ident">e</span> <span class="op">=</span> <span class="ident">Entry</span> {
@@ -1035,11 +1042,11 @@
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">KvEngine</span><span class="op">&gt;</span> <span class="ident">Registry</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">register_admin_observer</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">priority</span>: <span class="ident">u32</span>, <span class="ident">ao</span>: <span class="ident">BoxAdminObserver</span>) {
-        <span class="macro">push</span><span class="macro">!</span>(<span class="ident">priority</span>, <span class="ident">ao</span>, <span class="self">self</span>.<span class="ident">admin_observers</span>);
+        <span class="macro">push!</span>(<span class="ident">priority</span>, <span class="ident">ao</span>, <span class="self">self</span>.<span class="ident">admin_observers</span>);
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">register_query_observer</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">priority</span>: <span class="ident">u32</span>, <span class="ident">qo</span>: <span class="ident">BoxQueryObserver</span>) {
-        <span class="macro">push</span><span class="macro">!</span>(<span class="ident">priority</span>, <span class="ident">qo</span>, <span class="self">self</span>.<span class="ident">query_observers</span>);
+        <span class="macro">push!</span>(<span class="ident">priority</span>, <span class="ident">qo</span>, <span class="self">self</span>.<span class="ident">query_observers</span>);
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">register_apply_snapshot_observer</span>(
@@ -1047,11 +1054,11 @@
         <span class="ident">priority</span>: <span class="ident">u32</span>,
         <span class="ident">aso</span>: <span class="ident">BoxApplySnapshotObserver</span>,
     ) {
-        <span class="macro">push</span><span class="macro">!</span>(<span class="ident">priority</span>, <span class="ident">aso</span>, <span class="self">self</span>.<span class="ident">apply_snapshot_observers</span>);
+        <span class="macro">push!</span>(<span class="ident">priority</span>, <span class="ident">aso</span>, <span class="self">self</span>.<span class="ident">apply_snapshot_observers</span>);
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">register_split_check_observer</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">priority</span>: <span class="ident">u32</span>, <span class="ident">sco</span>: <span class="ident">BoxSplitCheckObserver</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>) {
-        <span class="macro">push</span><span class="macro">!</span>(<span class="ident">priority</span>, <span class="ident">sco</span>, <span class="self">self</span>.<span class="ident">split_check_observers</span>);
+        <span class="macro">push!</span>(<span class="ident">priority</span>, <span class="ident">sco</span>, <span class="self">self</span>.<span class="ident">split_check_observers</span>);
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">register_consistency_check_observer</span>(
@@ -1059,38 +1066,38 @@
         <span class="ident">priority</span>: <span class="ident">u32</span>,
         <span class="ident">cco</span>: <span class="ident">BoxConsistencyCheckObserver</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>,
     ) {
-        <span class="macro">push</span><span class="macro">!</span>(<span class="ident">priority</span>, <span class="ident">cco</span>, <span class="self">self</span>.<span class="ident">consistency_check_observers</span>);
+        <span class="macro">push!</span>(<span class="ident">priority</span>, <span class="ident">cco</span>, <span class="self">self</span>.<span class="ident">consistency_check_observers</span>);
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">register_role_observer</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">priority</span>: <span class="ident">u32</span>, <span class="ident">ro</span>: <span class="ident">BoxRoleObserver</span>) {
-        <span class="macro">push</span><span class="macro">!</span>(<span class="ident">priority</span>, <span class="ident">ro</span>, <span class="self">self</span>.<span class="ident">role_observers</span>);
+        <span class="macro">push!</span>(<span class="ident">priority</span>, <span class="ident">ro</span>, <span class="self">self</span>.<span class="ident">role_observers</span>);
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">register_region_change_observer</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">priority</span>: <span class="ident">u32</span>, <span class="ident">rlo</span>: <span class="ident">BoxRegionChangeObserver</span>) {
-        <span class="macro">push</span><span class="macro">!</span>(<span class="ident">priority</span>, <span class="ident">rlo</span>, <span class="self">self</span>.<span class="ident">region_change_observers</span>);
+        <span class="macro">push!</span>(<span class="ident">priority</span>, <span class="ident">rlo</span>, <span class="self">self</span>.<span class="ident">region_change_observers</span>);
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">register_cmd_observer</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">priority</span>: <span class="ident">u32</span>, <span class="ident">rlo</span>: <span class="ident">BoxCmdObserver</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>) {
-        <span class="macro">push</span><span class="macro">!</span>(<span class="ident">priority</span>, <span class="ident">rlo</span>, <span class="self">self</span>.<span class="ident">cmd_observers</span>);
+        <span class="macro">push!</span>(<span class="ident">priority</span>, <span class="ident">rlo</span>, <span class="self">self</span>.<span class="ident">cmd_observers</span>);
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">register_read_index_observer</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">priority</span>: <span class="ident">u32</span>, <span class="ident">rio</span>: <span class="ident">BoxReadIndexObserver</span>) {
-        <span class="macro">push</span><span class="macro">!</span>(<span class="ident">priority</span>, <span class="ident">rio</span>, <span class="self">self</span>.<span class="ident">read_index_observers</span>);
+        <span class="macro">push!</span>(<span class="ident">priority</span>, <span class="ident">rio</span>, <span class="self">self</span>.<span class="ident">read_index_observers</span>);
     }
 }
 
 <span class="doccomment">/// A macro that loops over all observers and returns early when error is found or</span>
 <span class="doccomment">/// bypass is set. `try_loop_ob` is expected to be used for hook that returns a `Result`.</span>
-<span class="macro">macro_rules</span><span class="macro">!</span> <span class="ident">try_loop_ob</span> {
+<span class="macro">macro_rules!</span> <span class="ident">try_loop_ob</span> {
     (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">r</span>:<span class="ident">expr</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">obs</span>:<span class="ident">expr</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">hook</span>:<span class="ident">ident</span>, $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">args</span>:<span class="ident">tt</span>)<span class="kw-2">*</span>) <span class="op">=</span><span class="op">&gt;</span> {
-        <span class="macro">loop_ob</span><span class="macro">!</span>(<span class="ident">_imp</span> <span class="ident">_res</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">r</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">obs</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">hook</span>, $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">args</span>)<span class="kw-2">*</span>)
+        <span class="macro">loop_ob!</span>(<span class="ident">_imp</span> <span class="ident">_res</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">r</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">obs</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">hook</span>, $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">args</span>)<span class="kw-2">*</span>)
     };
 }
 
 <span class="doccomment">/// A macro that loops over all observers and returns early when bypass is set.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Using a macro so we don&#39;t need to write tests for every observers.</span>
-<span class="macro">macro_rules</span><span class="macro">!</span> <span class="ident">loop_ob</span> {
+<span class="macro">macro_rules!</span> <span class="ident">loop_ob</span> {
     <span class="comment">// Execute a hook, return early if error is found.</span>
     (<span class="ident">_exec</span> <span class="ident">_res</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">o</span>:<span class="ident">expr</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">hook</span>:<span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ctx</span>:<span class="ident">expr</span>, $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">args</span>:<span class="ident">tt</span>)<span class="kw-2">*</span>) <span class="op">=</span><span class="op">&gt;</span> {
         <span class="macro-nonterminal">$</span><span class="macro-nonterminal">o</span>.<span class="ident">inner</span>().<span class="macro-nonterminal">$</span><span class="macro-nonterminal">hook</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">ctx</span>, $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">args</span>)<span class="kw-2">*</span>)<span class="question-mark">?</span>
@@ -1107,19 +1114,19 @@
     (<span class="ident">_done</span> <span class="ident">_tup</span>) <span class="op">=</span><span class="op">&gt;</span> {{}};
     <span class="comment">// Actual implementation of the for loop.</span>
     (<span class="ident">_imp</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">res_type</span>:<span class="ident">tt</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">r</span>:<span class="ident">expr</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">obs</span>:<span class="ident">expr</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">hook</span>:<span class="ident">ident</span>, $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">args</span>:<span class="ident">tt</span>)<span class="kw-2">*</span>) <span class="op">=</span><span class="op">&gt;</span> {{
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ctx</span> <span class="op">=</span> <span class="ident">ObserverContext</span>::<span class="ident">new</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">r</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ctx</span> <span class="op">=</span> <span class="ident">ObserverContext::new</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">r</span>);
         <span class="kw">for</span> <span class="ident">o</span> <span class="kw">in</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">obs</span> {
-            <span class="macro">loop_ob</span><span class="macro">!</span>(<span class="ident">_exec</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">res_type</span>, <span class="ident">o</span>.<span class="ident">observer</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">hook</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>, $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">args</span>)<span class="kw-2">*</span>);
+            <span class="macro">loop_ob!</span>(<span class="ident">_exec</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">res_type</span>, <span class="ident">o</span>.<span class="ident">observer</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">hook</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>, $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">args</span>)<span class="kw-2">*</span>);
             <span class="kw">if</span> <span class="ident">ctx</span>.<span class="ident">bypass</span> {
                 <span class="kw">break</span>;
             }
         }
-        <span class="macro">loop_ob</span><span class="macro">!</span>(<span class="ident">_done</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">res_type</span>)
+        <span class="macro">loop_ob!</span>(<span class="ident">_done</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">res_type</span>)
     }};
     <span class="comment">// Loop over all observers and return early when bypass is set.</span>
     <span class="comment">// This macro is expected to be used for hook that returns `()`.</span>
     (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">r</span>:<span class="ident">expr</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">obs</span>:<span class="ident">expr</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">hook</span>:<span class="ident">ident</span>, $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">args</span>:<span class="ident">tt</span>)<span class="kw-2">*</span>) <span class="op">=</span><span class="op">&gt;</span> {
-        <span class="macro">loop_ob</span><span class="macro">!</span>(<span class="ident">_imp</span> <span class="ident">_tup</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">r</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">obs</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">hook</span>, $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">args</span>)<span class="kw-2">*</span>)
+        <span class="macro">loop_ob!</span>(<span class="ident">_imp</span> <span class="ident">_tup</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">r</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">obs</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">hook</span>, $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">args</span>)<span class="kw-2">*</span>)
     };
 }
 
@@ -1130,6 +1137,7 @@
     <span class="ident">E</span>: <span class="ident">KvEngine</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
 {
     <span class="kw">pub</span> <span class="ident">registry</span>: <span class="ident">Registry</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">cfg</span>: <span class="ident">Config</span>,
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">KvEngine</span><span class="op">&gt;</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">CoprocessorHost</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>
@@ -1138,37 +1146,41 @@
 {
     <span class="kw">fn</span> <span class="ident">default</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="ident">CoprocessorHost</span> {
-            <span class="ident">registry</span>: <span class="ident">Default</span>::<span class="ident">default</span>(),
+            <span class="ident">registry</span>: <span class="ident">Default::default</span>(),
+            <span class="ident">cfg</span>: <span class="ident">Default::default</span>(),
         }
     }
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">KvEngine</span><span class="op">&gt;</span> <span class="ident">CoprocessorHost</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">CasualRouter</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Clone</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span>(<span class="ident">ch</span>: <span class="ident">C</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">CoprocessorHost</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">registry</span> <span class="op">=</span> <span class="ident">Registry</span>::<span class="ident">default</span>();
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">CasualRouter</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Clone</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span>(
+        <span class="ident">ch</span>: <span class="ident">C</span>,
+        <span class="ident">cfg</span>: <span class="ident">Config</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">CoprocessorHost</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">registry</span> <span class="op">=</span> <span class="ident">Registry::default</span>();
         <span class="ident">registry</span>.<span class="ident">register_split_check_observer</span>(
             <span class="number">200</span>,
-            <span class="ident">BoxSplitCheckObserver</span>::<span class="ident">new</span>(<span class="ident">SizeCheckObserver</span>::<span class="ident">new</span>(<span class="ident">ch</span>.<span class="ident">clone</span>())),
+            <span class="ident">BoxSplitCheckObserver::new</span>(<span class="ident">SizeCheckObserver::new</span>(<span class="ident">ch</span>.<span class="ident">clone</span>())),
         );
         <span class="ident">registry</span>.<span class="ident">register_split_check_observer</span>(
             <span class="number">200</span>,
-            <span class="ident">BoxSplitCheckObserver</span>::<span class="ident">new</span>(<span class="ident">KeysCheckObserver</span>::<span class="ident">new</span>(<span class="ident">ch</span>)),
+            <span class="ident">BoxSplitCheckObserver::new</span>(<span class="ident">KeysCheckObserver::new</span>(<span class="ident">ch</span>)),
         );
         <span class="comment">// TableCheckObserver has higher priority than SizeCheckObserver.</span>
-        <span class="ident">registry</span>.<span class="ident">register_split_check_observer</span>(<span class="number">100</span>, <span class="ident">BoxSplitCheckObserver</span>::<span class="ident">new</span>(<span class="ident">HalfCheckObserver</span>));
+        <span class="ident">registry</span>.<span class="ident">register_split_check_observer</span>(<span class="number">100</span>, <span class="ident">BoxSplitCheckObserver::new</span>(<span class="ident">HalfCheckObserver</span>));
         <span class="ident">registry</span>.<span class="ident">register_split_check_observer</span>(
             <span class="number">400</span>,
-            <span class="ident">BoxSplitCheckObserver</span>::<span class="ident">new</span>(<span class="ident">TableCheckObserver</span>::<span class="ident">default</span>()),
+            <span class="ident">BoxSplitCheckObserver::new</span>(<span class="ident">TableCheckObserver::default</span>()),
         );
-        <span class="ident">CoprocessorHost</span> { <span class="ident">registry</span> }
+        <span class="ident">CoprocessorHost</span> { <span class="ident">registry</span>, <span class="ident">cfg</span> }
     }
 
     <span class="doccomment">/// Call all propose hooks until bypass is set to true.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">pre_propose</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">region</span>: <span class="kw-2">&amp;</span><span class="ident">Region</span>, <span class="ident">req</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">RaftCmdRequest</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="op">!</span><span class="ident">req</span>.<span class="ident">has_admin_request</span>() {
             <span class="kw">let</span> <span class="ident">query</span> <span class="op">=</span> <span class="ident">req</span>.<span class="ident">mut_requests</span>();
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">vec_query</span> <span class="op">=</span> <span class="ident">mem</span>::<span class="ident">take</span>(<span class="ident">query</span>).<span class="ident">into</span>();
-            <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="macro">try_loop_ob</span><span class="macro">!</span>(
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">vec_query</span> <span class="op">=</span> <span class="ident">mem::take</span>(<span class="ident">query</span>).<span class="ident">into</span>();
+            <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="macro">try_loop_ob!</span>(
                 <span class="ident">region</span>,
                 <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">registry</span>.<span class="ident">query_observers</span>,
                 <span class="ident">pre_propose_query</span>,
@@ -1178,7 +1190,7 @@
             <span class="ident">result</span>
         } <span class="kw">else</span> {
             <span class="kw">let</span> <span class="ident">admin</span> <span class="op">=</span> <span class="ident">req</span>.<span class="ident">mut_admin_request</span>();
-            <span class="macro">try_loop_ob</span><span class="macro">!</span>(
+            <span class="macro">try_loop_ob!</span>(
                 <span class="ident">region</span>,
                 <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">registry</span>.<span class="ident">admin_observers</span>,
                 <span class="ident">pre_propose_admin</span>,
@@ -1191,7 +1203,7 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">pre_apply</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">region</span>: <span class="kw-2">&amp;</span><span class="ident">Region</span>, <span class="ident">req</span>: <span class="kw-2">&amp;</span><span class="ident">RaftCmdRequest</span>) {
         <span class="kw">if</span> <span class="op">!</span><span class="ident">req</span>.<span class="ident">has_admin_request</span>() {
             <span class="kw">let</span> <span class="ident">query</span> <span class="op">=</span> <span class="ident">req</span>.<span class="ident">get_requests</span>();
-            <span class="macro">loop_ob</span><span class="macro">!</span>(
+            <span class="macro">loop_ob!</span>(
                 <span class="ident">region</span>,
                 <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">registry</span>.<span class="ident">query_observers</span>,
                 <span class="ident">pre_apply_query</span>,
@@ -1199,7 +1211,7 @@
             );
         } <span class="kw">else</span> {
             <span class="kw">let</span> <span class="ident">admin</span> <span class="op">=</span> <span class="ident">req</span>.<span class="ident">get_admin_request</span>();
-            <span class="macro">loop_ob</span><span class="macro">!</span>(
+            <span class="macro">loop_ob!</span>(
                 <span class="ident">region</span>,
                 <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">registry</span>.<span class="ident">admin_observers</span>,
                 <span class="ident">pre_apply_admin</span>,
@@ -1210,7 +1222,7 @@
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">post_apply</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">region</span>: <span class="kw-2">&amp;</span><span class="ident">Region</span>, <span class="ident">cmd</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Cmd</span>) {
         <span class="kw">if</span> <span class="op">!</span><span class="ident">cmd</span>.<span class="ident">response</span>.<span class="ident">has_admin_response</span>() {
-            <span class="macro">loop_ob</span><span class="macro">!</span>(
+            <span class="macro">loop_ob!</span>(
                 <span class="ident">region</span>,
                 <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">registry</span>.<span class="ident">query_observers</span>,
                 <span class="ident">post_apply_query</span>,
@@ -1218,7 +1230,7 @@
             );
         } <span class="kw">else</span> {
             <span class="kw">let</span> <span class="ident">admin</span> <span class="op">=</span> <span class="ident">cmd</span>.<span class="ident">response</span>.<span class="ident">mut_admin_response</span>();
-            <span class="macro">loop_ob</span><span class="macro">!</span>(
+            <span class="macro">loop_ob!</span>(
                 <span class="ident">region</span>,
                 <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">registry</span>.<span class="ident">admin_observers</span>,
                 <span class="ident">post_apply_admin</span>,
@@ -1233,7 +1245,7 @@
         <span class="ident">cf</span>: <span class="ident">CfName</span>,
         <span class="ident">kv_pairs</span>: <span class="kw-2">&amp;</span>[(<span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>)],
     ) {
-        <span class="macro">loop_ob</span><span class="macro">!</span>(
+        <span class="macro">loop_ob!</span>(
             <span class="ident">region</span>,
             <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">registry</span>.<span class="ident">apply_snapshot_observers</span>,
             <span class="ident">apply_plain_kvs</span>,
@@ -1243,7 +1255,7 @@
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">post_apply_sst_from_snapshot</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">region</span>: <span class="kw-2">&amp;</span><span class="ident">Region</span>, <span class="ident">cf</span>: <span class="ident">CfName</span>, <span class="ident">path</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) {
-        <span class="macro">loop_ob</span><span class="macro">!</span>(
+        <span class="macro">loop_ob!</span>(
             <span class="ident">region</span>,
             <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">registry</span>.<span class="ident">apply_snapshot_observers</span>,
             <span class="ident">apply_sst</span>,
@@ -1253,15 +1265,14 @@
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_split_checker_host</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">cfg</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">Config</span>,
+        <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="self">self</span>,
         <span class="ident">region</span>: <span class="kw-2">&amp;</span><span class="ident">Region</span>,
         <span class="ident">engine</span>: <span class="kw-2">&amp;</span><span class="ident">E</span>,
         <span class="ident">auto_split</span>: <span class="ident">bool</span>,
         <span class="ident">policy</span>: <span class="ident">CheckPolicy</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">SplitCheckerHost</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">E</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">host</span> <span class="op">=</span> <span class="ident">SplitCheckerHost</span>::<span class="ident">new</span>(<span class="ident">auto_split</span>, <span class="ident">cfg</span>);
-        <span class="macro">loop_ob</span><span class="macro">!</span>(
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">host</span> <span class="op">=</span> <span class="ident">SplitCheckerHost::new</span>(<span class="ident">auto_split</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">cfg</span>);
+        <span class="macro">loop_ob!</span>(
             <span class="ident">region</span>,
             <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">registry</span>.<span class="ident">split_check_observers</span>,
             <span class="ident">add_checker</span>,
@@ -1285,14 +1296,14 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">region</span>: <span class="kw-2">&amp;</span><span class="ident">Region</span>,
         <span class="ident">context</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>],
-        <span class="ident">snap</span>: <span class="ident">E</span>::<span class="ident">Snapshot</span>,
+        <span class="ident">snap</span>: <span class="ident">E::Snapshot</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>, <span class="ident">u32</span>)<span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">hashes</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">new</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">hashes</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
         <span class="kw">let</span> (<span class="kw-2">mut</span> <span class="ident">reader</span>, <span class="ident">context_len</span>) <span class="op">=</span> (<span class="ident">context</span>, <span class="ident">context</span>.<span class="ident">len</span>());
         <span class="kw">for</span> <span class="ident">observer</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">registry</span>.<span class="ident">consistency_check_observers</span> {
             <span class="kw">let</span> <span class="ident">observer</span> <span class="op">=</span> <span class="ident">observer</span>.<span class="ident">observer</span>.<span class="ident">inner</span>();
             <span class="kw">let</span> <span class="ident">old_len</span> <span class="op">=</span> <span class="ident">reader</span>.<span class="ident">len</span>();
-            <span class="kw">let</span> <span class="ident">hash</span> <span class="op">=</span> <span class="kw">match</span> <span class="macro">box_try</span><span class="macro">!</span>(<span class="ident">observer</span>.<span class="ident">compute_hash</span>(<span class="ident">region</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">reader</span>, <span class="kw-2">&amp;</span><span class="ident">snap</span>)) {
+            <span class="kw">let</span> <span class="ident">hash</span> <span class="op">=</span> <span class="kw">match</span> <span class="macro">box_try!</span>(<span class="ident">observer</span>.<span class="ident">compute_hash</span>(<span class="ident">region</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">reader</span>, <span class="kw-2">&amp;</span><span class="ident">snap</span>)) {
                 <span class="prelude-val">Some</span>(<span class="ident">hash</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">hash</span>,
                 <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">break</span>,
             };
@@ -1304,11 +1315,11 @@
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">on_role_change</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">region</span>: <span class="kw-2">&amp;</span><span class="ident">Region</span>, <span class="ident">role</span>: <span class="ident">StateRole</span>) {
-        <span class="macro">loop_ob</span><span class="macro">!</span>(<span class="ident">region</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">registry</span>.<span class="ident">role_observers</span>, <span class="ident">on_role_change</span>, <span class="ident">role</span>);
+        <span class="macro">loop_ob!</span>(<span class="ident">region</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">registry</span>.<span class="ident">role_observers</span>, <span class="ident">on_role_change</span>, <span class="ident">role</span>);
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">on_region_changed</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">region</span>: <span class="kw-2">&amp;</span><span class="ident">Region</span>, <span class="ident">event</span>: <span class="ident">RegionChangeEvent</span>, <span class="ident">role</span>: <span class="ident">StateRole</span>) {
-        <span class="macro">loop_ob</span><span class="macro">!</span>(
+        <span class="macro">loop_ob!</span>(
             <span class="ident">region</span>,
             <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">registry</span>.<span class="ident">region_change_observers</span>,
             <span class="ident">on_region_changed</span>,
@@ -1327,7 +1338,7 @@
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">on_apply_cmd</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">observe_id</span>: <span class="ident">ObserveID</span>, <span class="ident">region_id</span>: <span class="ident">u64</span>, <span class="ident">cmd</span>: <span class="ident">Cmd</span>) {
-        <span class="macro">assert</span><span class="macro">!</span>(
+        <span class="macro">assert!</span>(
             <span class="op">!</span><span class="self">self</span>.<span class="ident">registry</span>.<span class="ident">cmd_observers</span>.<span class="ident">is_empty</span>(),
             <span class="string">&quot;CmdObserver is not registered&quot;</span>
         );
@@ -1372,7 +1383,7 @@
             .<span class="ident">on_flush_apply</span>(<span class="ident">engine</span>)
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">on_step_read_index</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">msg</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">eraftpb</span>::<span class="ident">Message</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">on_step_read_index</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">msg</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">eraftpb::Message</span>) {
         <span class="kw">for</span> <span class="ident">step_ob</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">registry</span>.<span class="ident">read_index_observers</span> {
             <span class="ident">step_ob</span>.<span class="ident">observer</span>.<span class="ident">inner</span>().<span class="ident">on_step</span>(<span class="ident">msg</span>);
         }
@@ -1396,15 +1407,16 @@
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
 <span class="kw">mod</span> <span class="ident">tests</span> {
-    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">coprocessor</span>::<span class="kw-2">*</span>;
-    <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::<span class="kw-2">*</span>;
-    <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">Arc</span>;
+    <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::coprocessor</span>::<span class="kw-2">*</span>;
+    <span class="kw">use</span> <span class="ident">std::sync::atomic</span>::<span class="kw-2">*</span>;
+    <span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
 
-    <span class="kw">use</span> <span class="ident">engine_panic</span>::<span class="ident">PanicEngine</span>;
-    <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">metapb</span>::<span class="ident">Region</span>;
-    <span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">raft_cmdpb</span>::{
+    <span class="kw">use</span> <span class="ident">engine_panic::PanicEngine</span>;
+    <span class="kw">use</span> <span class="ident">kvproto::metapb::Region</span>;
+    <span class="kw">use</span> <span class="ident">kvproto::raft_cmdpb</span>::{
         <span class="ident">AdminRequest</span>, <span class="ident">AdminResponse</span>, <span class="ident">RaftCmdRequest</span>, <span class="ident">RaftCmdResponse</span>, <span class="ident">Request</span>,
     };
+    <span class="kw">use</span> <span class="ident">tikv_util::box_err</span>;
 
     <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Default</span>)]</span>
     <span class="kw">struct</span> <span class="ident">TestCoprocessor</span> {
@@ -1421,22 +1433,22 @@
             <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ObserverContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>,
             <span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">AdminRequest</span>,
         ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-            <span class="self">self</span>.<span class="ident">called</span>.<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
-            <span class="ident">ctx</span>.<span class="ident">bypass</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">bypass</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
-            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">return_err</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>) {
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(<span class="string">&quot;error&quot;</span>));
+            <span class="self">self</span>.<span class="ident">called</span>.<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>);
+            <span class="ident">ctx</span>.<span class="ident">bypass</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">bypass</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>);
+            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">return_err</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>) {
+                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err!</span>(<span class="string">&quot;error&quot;</span>));
             }
             <span class="prelude-val">Ok</span>(())
         }
 
         <span class="kw">fn</span> <span class="ident">pre_apply_admin</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ObserverContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>, <span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="ident">AdminRequest</span>) {
-            <span class="self">self</span>.<span class="ident">called</span>.<span class="ident">fetch_add</span>(<span class="number">2</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
-            <span class="ident">ctx</span>.<span class="ident">bypass</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">bypass</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
+            <span class="self">self</span>.<span class="ident">called</span>.<span class="ident">fetch_add</span>(<span class="number">2</span>, <span class="ident">Ordering::SeqCst</span>);
+            <span class="ident">ctx</span>.<span class="ident">bypass</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">bypass</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>);
         }
 
         <span class="kw">fn</span> <span class="ident">post_apply_admin</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ObserverContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>, <span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">AdminResponse</span>) {
-            <span class="self">self</span>.<span class="ident">called</span>.<span class="ident">fetch_add</span>(<span class="number">3</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
-            <span class="ident">ctx</span>.<span class="ident">bypass</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">bypass</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
+            <span class="self">self</span>.<span class="ident">called</span>.<span class="ident">fetch_add</span>(<span class="number">3</span>, <span class="ident">Ordering::SeqCst</span>);
+            <span class="ident">ctx</span>.<span class="ident">bypass</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">bypass</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>);
         }
     }
 
@@ -1446,29 +1458,29 @@
             <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ObserverContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>,
             <span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Request</span><span class="op">&gt;</span>,
         ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-            <span class="self">self</span>.<span class="ident">called</span>.<span class="ident">fetch_add</span>(<span class="number">4</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
-            <span class="ident">ctx</span>.<span class="ident">bypass</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">bypass</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
-            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">return_err</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>) {
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(<span class="string">&quot;error&quot;</span>));
+            <span class="self">self</span>.<span class="ident">called</span>.<span class="ident">fetch_add</span>(<span class="number">4</span>, <span class="ident">Ordering::SeqCst</span>);
+            <span class="ident">ctx</span>.<span class="ident">bypass</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">bypass</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>);
+            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">return_err</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>) {
+                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err!</span>(<span class="string">&quot;error&quot;</span>));
             }
             <span class="prelude-val">Ok</span>(())
         }
 
         <span class="kw">fn</span> <span class="ident">pre_apply_query</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ObserverContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>, <span class="kw">_</span>: <span class="kw-2">&amp;</span>[<span class="ident">Request</span>]) {
-            <span class="self">self</span>.<span class="ident">called</span>.<span class="ident">fetch_add</span>(<span class="number">5</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
-            <span class="ident">ctx</span>.<span class="ident">bypass</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">bypass</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
+            <span class="self">self</span>.<span class="ident">called</span>.<span class="ident">fetch_add</span>(<span class="number">5</span>, <span class="ident">Ordering::SeqCst</span>);
+            <span class="ident">ctx</span>.<span class="ident">bypass</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">bypass</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>);
         }
 
         <span class="kw">fn</span> <span class="ident">post_apply_query</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ObserverContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>, <span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Cmd</span>) {
-            <span class="self">self</span>.<span class="ident">called</span>.<span class="ident">fetch_add</span>(<span class="number">6</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
-            <span class="ident">ctx</span>.<span class="ident">bypass</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">bypass</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
+            <span class="self">self</span>.<span class="ident">called</span>.<span class="ident">fetch_add</span>(<span class="number">6</span>, <span class="ident">Ordering::SeqCst</span>);
+            <span class="ident">ctx</span>.<span class="ident">bypass</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">bypass</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>);
         }
     }
 
     <span class="kw">impl</span> <span class="ident">RoleObserver</span> <span class="kw">for</span> <span class="ident">TestCoprocessor</span> {
         <span class="kw">fn</span> <span class="ident">on_role_change</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ObserverContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>, <span class="kw">_</span>: <span class="ident">StateRole</span>) {
-            <span class="self">self</span>.<span class="ident">called</span>.<span class="ident">fetch_add</span>(<span class="number">7</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
-            <span class="ident">ctx</span>.<span class="ident">bypass</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">bypass</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
+            <span class="self">self</span>.<span class="ident">called</span>.<span class="ident">fetch_add</span>(<span class="number">7</span>, <span class="ident">Ordering::SeqCst</span>);
+            <span class="ident">ctx</span>.<span class="ident">bypass</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">bypass</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>);
         }
     }
 
@@ -1479,8 +1491,8 @@
             <span class="kw">_</span>: <span class="ident">RegionChangeEvent</span>,
             <span class="kw">_</span>: <span class="ident">StateRole</span>,
         ) {
-            <span class="self">self</span>.<span class="ident">called</span>.<span class="ident">fetch_add</span>(<span class="number">8</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
-            <span class="ident">ctx</span>.<span class="ident">bypass</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">bypass</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
+            <span class="self">self</span>.<span class="ident">called</span>.<span class="ident">fetch_add</span>(<span class="number">8</span>, <span class="ident">Ordering::SeqCst</span>);
+            <span class="ident">ctx</span>.<span class="ident">bypass</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">bypass</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>);
         }
     }
 
@@ -1491,165 +1503,165 @@
             <span class="kw">_</span>: <span class="ident">CfName</span>,
             <span class="kw">_</span>: <span class="kw-2">&amp;</span>[(<span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>)],
         ) {
-            <span class="self">self</span>.<span class="ident">called</span>.<span class="ident">fetch_add</span>(<span class="number">9</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
-            <span class="ident">ctx</span>.<span class="ident">bypass</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">bypass</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
+            <span class="self">self</span>.<span class="ident">called</span>.<span class="ident">fetch_add</span>(<span class="number">9</span>, <span class="ident">Ordering::SeqCst</span>);
+            <span class="ident">ctx</span>.<span class="ident">bypass</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">bypass</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>);
         }
 
         <span class="kw">fn</span> <span class="ident">apply_sst</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ObserverContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>, <span class="kw">_</span>: <span class="ident">CfName</span>, <span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) {
-            <span class="self">self</span>.<span class="ident">called</span>.<span class="ident">fetch_add</span>(<span class="number">10</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
-            <span class="ident">ctx</span>.<span class="ident">bypass</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">bypass</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
+            <span class="self">self</span>.<span class="ident">called</span>.<span class="ident">fetch_add</span>(<span class="number">10</span>, <span class="ident">Ordering::SeqCst</span>);
+            <span class="ident">ctx</span>.<span class="ident">bypass</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">bypass</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>);
         }
     }
 
     <span class="kw">impl</span> <span class="ident">CmdObserver</span><span class="op">&lt;</span><span class="ident">PanicEngine</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">TestCoprocessor</span> {
         <span class="kw">fn</span> <span class="ident">on_prepare_for_apply</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw">_</span>: <span class="ident">ObserveID</span>, <span class="kw">_</span>: <span class="ident">u64</span>) {
-            <span class="self">self</span>.<span class="ident">called</span>.<span class="ident">fetch_add</span>(<span class="number">11</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
+            <span class="self">self</span>.<span class="ident">called</span>.<span class="ident">fetch_add</span>(<span class="number">11</span>, <span class="ident">Ordering::SeqCst</span>);
         }
         <span class="kw">fn</span> <span class="ident">on_apply_cmd</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw">_</span>: <span class="ident">ObserveID</span>, <span class="kw">_</span>: <span class="ident">u64</span>, <span class="kw">_</span>: <span class="ident">Cmd</span>) {
-            <span class="self">self</span>.<span class="ident">called</span>.<span class="ident">fetch_add</span>(<span class="number">12</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
+            <span class="self">self</span>.<span class="ident">called</span>.<span class="ident">fetch_add</span>(<span class="number">12</span>, <span class="ident">Ordering::SeqCst</span>);
         }
         <span class="kw">fn</span> <span class="ident">on_flush_apply</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw">_</span>: <span class="ident">PanicEngine</span>) {
-            <span class="self">self</span>.<span class="ident">called</span>.<span class="ident">fetch_add</span>(<span class="number">13</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
+            <span class="self">self</span>.<span class="ident">called</span>.<span class="ident">fetch_add</span>(<span class="number">13</span>, <span class="ident">Ordering::SeqCst</span>);
         }
     }
 
-    <span class="macro">macro_rules</span><span class="macro">!</span> <span class="ident">assert_all</span> {
+    <span class="macro">macro_rules!</span> <span class="ident">assert_all</span> {
         (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">target</span>:<span class="ident">expr</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">expect</span>:<span class="ident">expr</span>) <span class="op">=</span><span class="op">&gt;</span> {{
             <span class="kw">for</span> (<span class="ident">c</span>, <span class="ident">e</span>) <span class="kw">in</span> (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">target</span>).<span class="ident">iter</span>().<span class="ident">zip</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">expect</span>) {
-                <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">c</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>), <span class="kw-2">*</span><span class="ident">e</span>);
+                <span class="macro">assert_eq!</span>(<span class="ident">c</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>), <span class="kw-2">*</span><span class="ident">e</span>);
             }
         }};
     }
 
-    <span class="macro">macro_rules</span><span class="macro">!</span> <span class="ident">set_all</span> {
+    <span class="macro">macro_rules!</span> <span class="ident">set_all</span> {
         (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">target</span>:<span class="ident">expr</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">v</span>:<span class="ident">expr</span>) <span class="op">=</span><span class="op">&gt;</span> {{
             <span class="kw">for</span> <span class="ident">v</span> <span class="kw">in</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">target</span> {
-                <span class="ident">v</span>.<span class="ident">store</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">v</span>, <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>);
+                <span class="ident">v</span>.<span class="ident">store</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">v</span>, <span class="ident">Ordering::SeqCst</span>);
             }
         }};
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_trigger_right_hook</span>() {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">host</span> <span class="op">=</span> <span class="ident">CoprocessorHost</span>::<span class="op">&lt;</span><span class="ident">PanicEngine</span><span class="op">&gt;</span>::<span class="ident">default</span>();
-        <span class="kw">let</span> <span class="ident">ob</span> <span class="op">=</span> <span class="ident">TestCoprocessor</span>::<span class="ident">default</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">host</span> <span class="op">=</span> <span class="ident">CoprocessorHost</span>::<span class="op">&lt;</span><span class="ident">PanicEngine</span><span class="op">&gt;</span><span class="ident">::default</span>();
+        <span class="kw">let</span> <span class="ident">ob</span> <span class="op">=</span> <span class="ident">TestCoprocessor::default</span>();
         <span class="ident">host</span>.<span class="ident">registry</span>
-            .<span class="ident">register_admin_observer</span>(<span class="number">1</span>, <span class="ident">BoxAdminObserver</span>::<span class="ident">new</span>(<span class="ident">ob</span>.<span class="ident">clone</span>()));
+            .<span class="ident">register_admin_observer</span>(<span class="number">1</span>, <span class="ident">BoxAdminObserver::new</span>(<span class="ident">ob</span>.<span class="ident">clone</span>()));
         <span class="ident">host</span>.<span class="ident">registry</span>
-            .<span class="ident">register_query_observer</span>(<span class="number">1</span>, <span class="ident">BoxQueryObserver</span>::<span class="ident">new</span>(<span class="ident">ob</span>.<span class="ident">clone</span>()));
+            .<span class="ident">register_query_observer</span>(<span class="number">1</span>, <span class="ident">BoxQueryObserver::new</span>(<span class="ident">ob</span>.<span class="ident">clone</span>()));
         <span class="ident">host</span>.<span class="ident">registry</span>
-            .<span class="ident">register_apply_snapshot_observer</span>(<span class="number">1</span>, <span class="ident">BoxApplySnapshotObserver</span>::<span class="ident">new</span>(<span class="ident">ob</span>.<span class="ident">clone</span>()));
+            .<span class="ident">register_apply_snapshot_observer</span>(<span class="number">1</span>, <span class="ident">BoxApplySnapshotObserver::new</span>(<span class="ident">ob</span>.<span class="ident">clone</span>()));
         <span class="ident">host</span>.<span class="ident">registry</span>
-            .<span class="ident">register_role_observer</span>(<span class="number">1</span>, <span class="ident">BoxRoleObserver</span>::<span class="ident">new</span>(<span class="ident">ob</span>.<span class="ident">clone</span>()));
+            .<span class="ident">register_role_observer</span>(<span class="number">1</span>, <span class="ident">BoxRoleObserver::new</span>(<span class="ident">ob</span>.<span class="ident">clone</span>()));
         <span class="ident">host</span>.<span class="ident">registry</span>
-            .<span class="ident">register_region_change_observer</span>(<span class="number">1</span>, <span class="ident">BoxRegionChangeObserver</span>::<span class="ident">new</span>(<span class="ident">ob</span>.<span class="ident">clone</span>()));
+            .<span class="ident">register_region_change_observer</span>(<span class="number">1</span>, <span class="ident">BoxRegionChangeObserver::new</span>(<span class="ident">ob</span>.<span class="ident">clone</span>()));
         <span class="ident">host</span>.<span class="ident">registry</span>
-            .<span class="ident">register_cmd_observer</span>(<span class="number">1</span>, <span class="ident">BoxCmdObserver</span>::<span class="ident">new</span>(<span class="ident">ob</span>.<span class="ident">clone</span>()));
-        <span class="kw">let</span> <span class="ident">region</span> <span class="op">=</span> <span class="ident">Region</span>::<span class="ident">default</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">admin_req</span> <span class="op">=</span> <span class="ident">RaftCmdRequest</span>::<span class="ident">default</span>();
-        <span class="ident">admin_req</span>.<span class="ident">set_admin_request</span>(<span class="ident">AdminRequest</span>::<span class="ident">default</span>());
+            .<span class="ident">register_cmd_observer</span>(<span class="number">1</span>, <span class="ident">BoxCmdObserver::new</span>(<span class="ident">ob</span>.<span class="ident">clone</span>()));
+        <span class="kw">let</span> <span class="ident">region</span> <span class="op">=</span> <span class="ident">Region::default</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">admin_req</span> <span class="op">=</span> <span class="ident">RaftCmdRequest::default</span>();
+        <span class="ident">admin_req</span>.<span class="ident">set_admin_request</span>(<span class="ident">AdminRequest::default</span>());
         <span class="ident">host</span>.<span class="ident">pre_propose</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">admin_req</span>).<span class="ident">unwrap</span>();
-        <span class="macro">assert_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">1</span>]);
+        <span class="macro">assert_all!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">1</span>]);
         <span class="ident">host</span>.<span class="ident">pre_apply</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="kw-2">&amp;</span><span class="ident">admin_req</span>);
-        <span class="macro">assert_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">3</span>]);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">admin_resp</span> <span class="op">=</span> <span class="ident">RaftCmdResponse</span>::<span class="ident">default</span>();
-        <span class="ident">admin_resp</span>.<span class="ident">set_admin_response</span>(<span class="ident">AdminResponse</span>::<span class="ident">default</span>());
-        <span class="ident">host</span>.<span class="ident">post_apply</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Cmd</span>::<span class="ident">new</span>(<span class="number">0</span>, <span class="ident">admin_req</span>, <span class="ident">admin_resp</span>));
-        <span class="macro">assert_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">6</span>]);
+        <span class="macro">assert_all!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">3</span>]);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">admin_resp</span> <span class="op">=</span> <span class="ident">RaftCmdResponse::default</span>();
+        <span class="ident">admin_resp</span>.<span class="ident">set_admin_response</span>(<span class="ident">AdminResponse::default</span>());
+        <span class="ident">host</span>.<span class="ident">post_apply</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Cmd::new</span>(<span class="number">0</span>, <span class="ident">admin_req</span>, <span class="ident">admin_resp</span>));
+        <span class="macro">assert_all!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">6</span>]);
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">query_req</span> <span class="op">=</span> <span class="ident">RaftCmdRequest</span>::<span class="ident">default</span>();
-        <span class="ident">query_req</span>.<span class="ident">set_requests</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">Request</span>::<span class="ident">default</span>()].<span class="ident">into</span>());
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">query_req</span> <span class="op">=</span> <span class="ident">RaftCmdRequest::default</span>();
+        <span class="ident">query_req</span>.<span class="ident">set_requests</span>(<span class="macro">vec!</span>[<span class="ident">Request::default</span>()].<span class="ident">into</span>());
         <span class="ident">host</span>.<span class="ident">pre_propose</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">query_req</span>).<span class="ident">unwrap</span>();
-        <span class="macro">assert_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">10</span>]);
+        <span class="macro">assert_all!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">10</span>]);
         <span class="ident">host</span>.<span class="ident">pre_apply</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="kw-2">&amp;</span><span class="ident">query_req</span>);
-        <span class="macro">assert_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">15</span>]);
-        <span class="kw">let</span> <span class="ident">query_resp</span> <span class="op">=</span> <span class="ident">RaftCmdResponse</span>::<span class="ident">default</span>();
-        <span class="ident">host</span>.<span class="ident">post_apply</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Cmd</span>::<span class="ident">new</span>(<span class="number">0</span>, <span class="ident">query_req</span>, <span class="ident">query_resp</span>));
-        <span class="macro">assert_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">21</span>]);
+        <span class="macro">assert_all!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">15</span>]);
+        <span class="kw">let</span> <span class="ident">query_resp</span> <span class="op">=</span> <span class="ident">RaftCmdResponse::default</span>();
+        <span class="ident">host</span>.<span class="ident">post_apply</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Cmd::new</span>(<span class="number">0</span>, <span class="ident">query_req</span>, <span class="ident">query_resp</span>));
+        <span class="macro">assert_all!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">21</span>]);
 
-        <span class="ident">host</span>.<span class="ident">on_role_change</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="ident">StateRole</span>::<span class="ident">Leader</span>);
-        <span class="macro">assert_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">28</span>]);
+        <span class="ident">host</span>.<span class="ident">on_role_change</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="ident">StateRole::Leader</span>);
+        <span class="macro">assert_all!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">28</span>]);
 
-        <span class="ident">host</span>.<span class="ident">on_region_changed</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="ident">RegionChangeEvent</span>::<span class="ident">Create</span>, <span class="ident">StateRole</span>::<span class="ident">Follower</span>);
-        <span class="macro">assert_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">36</span>]);
+        <span class="ident">host</span>.<span class="ident">on_region_changed</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="ident">RegionChangeEvent::Create</span>, <span class="ident">StateRole::Follower</span>);
+        <span class="macro">assert_all!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">36</span>]);
 
         <span class="ident">host</span>.<span class="ident">post_apply_plain_kvs_from_snapshot</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="string">&quot;default&quot;</span>, <span class="kw-2">&amp;</span>[]);
-        <span class="macro">assert_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">45</span>]);
+        <span class="macro">assert_all!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">45</span>]);
         <span class="ident">host</span>.<span class="ident">post_apply_sst_from_snapshot</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="string">&quot;default&quot;</span>, <span class="string">&quot;&quot;</span>);
-        <span class="macro">assert_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">55</span>]);
-        <span class="kw">let</span> <span class="ident">observe_id</span> <span class="op">=</span> <span class="ident">ObserveID</span>::<span class="ident">new</span>();
+        <span class="macro">assert_all!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">55</span>]);
+        <span class="kw">let</span> <span class="ident">observe_id</span> <span class="op">=</span> <span class="ident">ObserveID::new</span>();
         <span class="ident">host</span>.<span class="ident">prepare_for_apply</span>(<span class="ident">observe_id</span>, <span class="number">0</span>);
-        <span class="macro">assert_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">66</span>]);
+        <span class="macro">assert_all!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">66</span>]);
         <span class="ident">host</span>.<span class="ident">on_apply_cmd</span>(
             <span class="ident">observe_id</span>,
             <span class="number">0</span>,
-            <span class="ident">Cmd</span>::<span class="ident">new</span>(<span class="number">0</span>, <span class="ident">RaftCmdRequest</span>::<span class="ident">default</span>(), <span class="ident">RaftCmdResponse</span>::<span class="ident">default</span>()),
+            <span class="ident">Cmd::new</span>(<span class="number">0</span>, <span class="ident">RaftCmdRequest::default</span>(), <span class="ident">RaftCmdResponse::default</span>()),
         );
-        <span class="macro">assert_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">78</span>]);
+        <span class="macro">assert_all!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">78</span>]);
         <span class="ident">host</span>.<span class="ident">on_flush_apply</span>(<span class="ident">PanicEngine</span>);
-        <span class="macro">assert_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">91</span>]);
+        <span class="macro">assert_all!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">91</span>]);
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_order</span>() {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">host</span> <span class="op">=</span> <span class="ident">CoprocessorHost</span>::<span class="op">&lt;</span><span class="ident">PanicEngine</span><span class="op">&gt;</span>::<span class="ident">default</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">host</span> <span class="op">=</span> <span class="ident">CoprocessorHost</span>::<span class="op">&lt;</span><span class="ident">PanicEngine</span><span class="op">&gt;</span><span class="ident">::default</span>();
 
-        <span class="kw">let</span> <span class="ident">ob1</span> <span class="op">=</span> <span class="ident">TestCoprocessor</span>::<span class="ident">default</span>();
+        <span class="kw">let</span> <span class="ident">ob1</span> <span class="op">=</span> <span class="ident">TestCoprocessor::default</span>();
         <span class="ident">host</span>.<span class="ident">registry</span>
-            .<span class="ident">register_admin_observer</span>(<span class="number">3</span>, <span class="ident">BoxAdminObserver</span>::<span class="ident">new</span>(<span class="ident">ob1</span>.<span class="ident">clone</span>()));
+            .<span class="ident">register_admin_observer</span>(<span class="number">3</span>, <span class="ident">BoxAdminObserver::new</span>(<span class="ident">ob1</span>.<span class="ident">clone</span>()));
         <span class="ident">host</span>.<span class="ident">registry</span>
-            .<span class="ident">register_query_observer</span>(<span class="number">3</span>, <span class="ident">BoxQueryObserver</span>::<span class="ident">new</span>(<span class="ident">ob1</span>.<span class="ident">clone</span>()));
-        <span class="kw">let</span> <span class="ident">ob2</span> <span class="op">=</span> <span class="ident">TestCoprocessor</span>::<span class="ident">default</span>();
+            .<span class="ident">register_query_observer</span>(<span class="number">3</span>, <span class="ident">BoxQueryObserver::new</span>(<span class="ident">ob1</span>.<span class="ident">clone</span>()));
+        <span class="kw">let</span> <span class="ident">ob2</span> <span class="op">=</span> <span class="ident">TestCoprocessor::default</span>();
         <span class="ident">host</span>.<span class="ident">registry</span>
-            .<span class="ident">register_admin_observer</span>(<span class="number">2</span>, <span class="ident">BoxAdminObserver</span>::<span class="ident">new</span>(<span class="ident">ob2</span>.<span class="ident">clone</span>()));
+            .<span class="ident">register_admin_observer</span>(<span class="number">2</span>, <span class="ident">BoxAdminObserver::new</span>(<span class="ident">ob2</span>.<span class="ident">clone</span>()));
         <span class="ident">host</span>.<span class="ident">registry</span>
-            .<span class="ident">register_query_observer</span>(<span class="number">2</span>, <span class="ident">BoxQueryObserver</span>::<span class="ident">new</span>(<span class="ident">ob2</span>.<span class="ident">clone</span>()));
+            .<span class="ident">register_query_observer</span>(<span class="number">2</span>, <span class="ident">BoxQueryObserver::new</span>(<span class="ident">ob2</span>.<span class="ident">clone</span>()));
 
-        <span class="kw">let</span> <span class="ident">region</span> <span class="op">=</span> <span class="ident">Region</span>::<span class="ident">default</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">admin_req</span> <span class="op">=</span> <span class="ident">RaftCmdRequest</span>::<span class="ident">default</span>();
-        <span class="ident">admin_req</span>.<span class="ident">set_admin_request</span>(<span class="ident">AdminRequest</span>::<span class="ident">default</span>());
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">admin_resp</span> <span class="op">=</span> <span class="ident">RaftCmdResponse</span>::<span class="ident">default</span>();
-        <span class="ident">admin_resp</span>.<span class="ident">set_admin_response</span>(<span class="ident">AdminResponse</span>::<span class="ident">default</span>());
-        <span class="kw">let</span> <span class="ident">query_req</span> <span class="op">=</span> <span class="ident">RaftCmdRequest</span>::<span class="ident">default</span>();
-        <span class="kw">let</span> <span class="ident">query_resp</span> <span class="op">=</span> <span class="ident">RaftCmdResponse</span>::<span class="ident">default</span>();
+        <span class="kw">let</span> <span class="ident">region</span> <span class="op">=</span> <span class="ident">Region::default</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">admin_req</span> <span class="op">=</span> <span class="ident">RaftCmdRequest::default</span>();
+        <span class="ident">admin_req</span>.<span class="ident">set_admin_request</span>(<span class="ident">AdminRequest::default</span>());
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">admin_resp</span> <span class="op">=</span> <span class="ident">RaftCmdResponse::default</span>();
+        <span class="ident">admin_resp</span>.<span class="ident">set_admin_response</span>(<span class="ident">AdminResponse::default</span>());
+        <span class="kw">let</span> <span class="ident">query_req</span> <span class="op">=</span> <span class="ident">RaftCmdRequest::default</span>();
+        <span class="kw">let</span> <span class="ident">query_resp</span> <span class="op">=</span> <span class="ident">RaftCmdResponse::default</span>();
 
-        <span class="kw">let</span> <span class="ident">cases</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[(<span class="number">0</span>, <span class="ident">admin_req</span>, <span class="ident">admin_resp</span>), (<span class="number">3</span>, <span class="ident">query_req</span>, <span class="ident">query_resp</span>)];
+        <span class="kw">let</span> <span class="ident">cases</span> <span class="op">=</span> <span class="macro">vec!</span>[(<span class="number">0</span>, <span class="ident">admin_req</span>, <span class="ident">admin_resp</span>), (<span class="number">3</span>, <span class="ident">query_req</span>, <span class="ident">query_resp</span>)];
 
         <span class="kw">for</span> (<span class="ident">base_score</span>, <span class="kw-2">mut</span> <span class="ident">req</span>, <span class="ident">resp</span>) <span class="kw">in</span> <span class="ident">cases</span> {
-            <span class="macro">set_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob1</span>.<span class="ident">return_err</span>, <span class="kw-2">&amp;</span><span class="ident">ob2</span>.<span class="ident">return_err</span>], <span class="bool-val">false</span>);
-            <span class="macro">set_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob1</span>.<span class="ident">called</span>, <span class="kw-2">&amp;</span><span class="ident">ob2</span>.<span class="ident">called</span>], <span class="number">0</span>);
-            <span class="macro">set_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob1</span>.<span class="ident">bypass</span>, <span class="kw-2">&amp;</span><span class="ident">ob2</span>.<span class="ident">bypass</span>], <span class="bool-val">true</span>);
+            <span class="macro">set_all!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob1</span>.<span class="ident">return_err</span>, <span class="kw-2">&amp;</span><span class="ident">ob2</span>.<span class="ident">return_err</span>], <span class="bool-val">false</span>);
+            <span class="macro">set_all!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob1</span>.<span class="ident">called</span>, <span class="kw-2">&amp;</span><span class="ident">ob2</span>.<span class="ident">called</span>], <span class="number">0</span>);
+            <span class="macro">set_all!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob1</span>.<span class="ident">bypass</span>, <span class="kw-2">&amp;</span><span class="ident">ob2</span>.<span class="ident">bypass</span>], <span class="bool-val">true</span>);
 
             <span class="ident">host</span>.<span class="ident">pre_propose</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">req</span>).<span class="ident">unwrap</span>();
 
             <span class="comment">// less means more.</span>
-            <span class="macro">assert_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob1</span>.<span class="ident">called</span>, <span class="kw-2">&amp;</span><span class="ident">ob2</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">0</span>, <span class="ident">base_score</span> <span class="op">+</span> <span class="number">1</span>]);
+            <span class="macro">assert_all!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob1</span>.<span class="ident">called</span>, <span class="kw-2">&amp;</span><span class="ident">ob2</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">0</span>, <span class="ident">base_score</span> <span class="op">+</span> <span class="number">1</span>]);
 
             <span class="ident">host</span>.<span class="ident">pre_apply</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="kw-2">&amp;</span><span class="ident">req</span>);
-            <span class="macro">assert_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob1</span>.<span class="ident">called</span>, <span class="kw-2">&amp;</span><span class="ident">ob2</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">0</span>, <span class="ident">base_score</span> <span class="op">*</span> <span class="number">2</span> <span class="op">+</span> <span class="number">3</span>]);
+            <span class="macro">assert_all!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob1</span>.<span class="ident">called</span>, <span class="kw-2">&amp;</span><span class="ident">ob2</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">0</span>, <span class="ident">base_score</span> <span class="op">*</span> <span class="number">2</span> <span class="op">+</span> <span class="number">3</span>]);
 
-            <span class="ident">host</span>.<span class="ident">post_apply</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Cmd</span>::<span class="ident">new</span>(<span class="number">0</span>, <span class="ident">req</span>.<span class="ident">clone</span>(), <span class="ident">resp</span>.<span class="ident">clone</span>()));
-            <span class="macro">assert_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob1</span>.<span class="ident">called</span>, <span class="kw-2">&amp;</span><span class="ident">ob2</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">0</span>, <span class="ident">base_score</span> <span class="op">*</span> <span class="number">3</span> <span class="op">+</span> <span class="number">6</span>]);
+            <span class="ident">host</span>.<span class="ident">post_apply</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Cmd::new</span>(<span class="number">0</span>, <span class="ident">req</span>.<span class="ident">clone</span>(), <span class="ident">resp</span>.<span class="ident">clone</span>()));
+            <span class="macro">assert_all!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob1</span>.<span class="ident">called</span>, <span class="kw-2">&amp;</span><span class="ident">ob2</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">0</span>, <span class="ident">base_score</span> <span class="op">*</span> <span class="number">3</span> <span class="op">+</span> <span class="number">6</span>]);
 
-            <span class="macro">set_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob2</span>.<span class="ident">bypass</span>], <span class="bool-val">false</span>);
-            <span class="macro">set_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob2</span>.<span class="ident">called</span>], <span class="number">0</span>);
+            <span class="macro">set_all!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob2</span>.<span class="ident">bypass</span>], <span class="bool-val">false</span>);
+            <span class="macro">set_all!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob2</span>.<span class="ident">called</span>], <span class="number">0</span>);
 
             <span class="ident">host</span>.<span class="ident">pre_propose</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">req</span>).<span class="ident">unwrap</span>();
 
-            <span class="macro">assert_all</span><span class="macro">!</span>(
+            <span class="macro">assert_all!</span>(
                 <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob1</span>.<span class="ident">called</span>, <span class="kw-2">&amp;</span><span class="ident">ob2</span>.<span class="ident">called</span>],
                 <span class="kw-2">&amp;</span>[<span class="ident">base_score</span> <span class="op">+</span> <span class="number">1</span>, <span class="ident">base_score</span> <span class="op">+</span> <span class="number">1</span>]
             );
 
-            <span class="macro">set_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob1</span>.<span class="ident">called</span>, <span class="kw-2">&amp;</span><span class="ident">ob2</span>.<span class="ident">called</span>], <span class="number">0</span>);
+            <span class="macro">set_all!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob1</span>.<span class="ident">called</span>, <span class="kw-2">&amp;</span><span class="ident">ob2</span>.<span class="ident">called</span>], <span class="number">0</span>);
 
             <span class="comment">// when return error, following coprocessor should not be run.</span>
-            <span class="macro">set_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob2</span>.<span class="ident">return_err</span>], <span class="bool-val">true</span>);
+            <span class="macro">set_all!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob2</span>.<span class="ident">return_err</span>], <span class="bool-val">true</span>);
             <span class="ident">host</span>.<span class="ident">pre_propose</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">req</span>).<span class="ident">unwrap_err</span>();
-            <span class="macro">assert_all</span><span class="macro">!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob1</span>.<span class="ident">called</span>, <span class="kw-2">&amp;</span><span class="ident">ob2</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">0</span>, <span class="ident">base_score</span> <span class="op">+</span> <span class="number">1</span>]);
+            <span class="macro">assert_all!</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">ob1</span>.<span class="ident">called</span>, <span class="kw-2">&amp;</span><span class="ident">ob2</span>.<span class="ident">called</span>], <span class="kw-2">&amp;</span>[<span class="number">0</span>, <span class="ident">base_score</span> <span class="op">+</span> <span class="number">1</span>]);
         }
     }
 }
 </pre></div>
-</section><section id="search" class="content hidden"></section><section class="footer"></section><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="raftstore"></div>
-    <script src="../../../main.js"></script><script src="../../../source-script.js"></script><script src="../../../source-files.js"></script><script defer src="../../../search-index.js"></script></body></html>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="raftstore" data-search-js="../../../search-index.js"></div>
+    <script src="../../../main.js"></script><script src="../../../source-script.js"></script><script src="../../../source-files.js"></script></body></html>

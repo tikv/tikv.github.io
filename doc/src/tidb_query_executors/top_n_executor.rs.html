@@ -1,7 +1,7 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `components/tidb_query_executors/src/top_n_executor.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>top_n_executor.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `components/tidb_query_executors/src/top_n_executor.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>top_n_executor.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><script src="../../crates.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
 <link rel="alternate icon" type="image/png" href="../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../tidb_query_executors/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
-                <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">   1</span>
+<link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../tidb_query_executors/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
+                <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">   1</span>
 <span id="2">   2</span>
 <span id="3">   3</span>
 <span id="4">   4</span>
@@ -1305,25 +1305,33 @@
 <span id="1302">1302</span>
 <span id="1303">1303</span>
 <span id="1304">1304</span>
+<span id="1305">1305</span>
+<span id="1306">1306</span>
+<span id="1307">1307</span>
+<span id="1308">1308</span>
+<span id="1309">1309</span>
+<span id="1310">1310</span>
+<span id="1311">1311</span>
+<span id="1312">1312</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">cmp</span>::<span class="ident">Ordering</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">collections</span>::<span class="ident">BinaryHeap</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">ptr</span>::<span class="ident">NonNull</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">Arc</span>;
+<span class="kw">use</span> <span class="ident">std::cmp::Ordering</span>;
+<span class="kw">use</span> <span class="ident">std::collections::BinaryHeap</span>;
+<span class="kw">use</span> <span class="ident">std::ptr::NonNull</span>;
+<span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
 
 <span class="kw">use</span> <span class="ident">tipb</span>::{<span class="ident">Expr</span>, <span class="ident">FieldType</span>, <span class="ident">TopN</span>};
 
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">interface</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident">tidb_query_common</span>::<span class="ident">storage</span>::<span class="ident">IntervalRange</span>;
-<span class="kw">use</span> <span class="ident">tidb_query_common</span>::<span class="prelude-ty">Result</span>;
-<span class="kw">use</span> <span class="ident">tidb_query_datatype</span>::<span class="ident">codec</span>::<span class="ident">batch</span>::{<span class="ident">LazyBatchColumn</span>, <span class="ident">LazyBatchColumnVec</span>};
-<span class="kw">use</span> <span class="ident">tidb_query_datatype</span>::<span class="ident">codec</span>::<span class="ident">data_type</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident">tidb_query_datatype</span>::<span class="ident">expr</span>::<span class="ident">EvalWarnings</span>;
-<span class="kw">use</span> <span class="ident">tidb_query_datatype</span>::<span class="ident">expr</span>::{<span class="ident">EvalConfig</span>, <span class="ident">EvalContext</span>};
-<span class="kw">use</span> <span class="ident">tidb_query_expr</span>::<span class="ident">RpnStackNode</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::interface</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident">tidb_query_common::storage::IntervalRange</span>;
+<span class="kw">use</span> <span class="ident">tidb_query_common::Result</span>;
+<span class="kw">use</span> <span class="ident">tidb_query_datatype::codec::batch</span>::{<span class="ident">LazyBatchColumn</span>, <span class="ident">LazyBatchColumnVec</span>};
+<span class="kw">use</span> <span class="ident">tidb_query_datatype::codec::data_type</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident">tidb_query_datatype::expr::EvalWarnings</span>;
+<span class="kw">use</span> <span class="ident">tidb_query_datatype::expr</span>::{<span class="ident">EvalConfig</span>, <span class="ident">EvalContext</span>};
+<span class="kw">use</span> <span class="ident">tidb_query_expr::RpnStackNode</span>;
 <span class="kw">use</span> <span class="ident">tidb_query_expr</span>::{<span class="ident">RpnExpression</span>, <span class="ident">RpnExpressionBuilder</span>};
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">BatchTopNExecutor</span><span class="op">&lt;</span><span class="ident">Src</span>: <span class="ident">BatchExecutor</span><span class="op">&gt;</span> {
@@ -1349,7 +1357,7 @@
     <span class="doccomment">///</span>
     <span class="doccomment">/// This field is placed before `order_exprs` and `src` because it relies on data in</span>
     <span class="doccomment">/// those fields and we want this field to be dropped first.</span>
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy</span>::<span class="ident">box_vec</span>)]</span>
+    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::box_vec</span>)]</span>
     <span class="ident">eval_columns_buffer_unsafe</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">RpnStackNode</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 
     <span class="ident">order_exprs</span>: <span class="ident">Box</span><span class="op">&lt;</span>[<span class="ident">RpnExpression</span>]<span class="op">&gt;</span>,
@@ -1379,10 +1387,10 @@
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">check_supported</span>(<span class="ident">descriptor</span>: <span class="kw-2">&amp;</span><span class="ident">TopN</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="ident">descriptor</span>.<span class="ident">get_order_by</span>().<span class="ident">is_empty</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">other_err</span><span class="macro">!</span>(<span class="string">&quot;Missing Top N column&quot;</span>));
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">other_err!</span>(<span class="string">&quot;Missing Top N column&quot;</span>));
         }
         <span class="kw">for</span> <span class="ident">item</span> <span class="kw">in</span> <span class="ident">descriptor</span>.<span class="ident">get_order_by</span>() {
-            <span class="ident">RpnExpressionBuilder</span>::<span class="ident">check_expr_tree_supported</span>(<span class="ident">item</span>.<span class="ident">get_expr</span>())<span class="question-mark">?</span>;
+            <span class="ident">RpnExpressionBuilder::check_expr_tree_supported</span>(<span class="ident">item</span>.<span class="ident">get_expr</span>())<span class="question-mark">?</span>;
         }
         <span class="prelude-val">Ok</span>(())
     }
@@ -1396,7 +1404,7 @@
         <span class="ident">order_is_desc</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">bool</span><span class="op">&gt;</span>,
         <span class="ident">n</span>: <span class="ident">usize</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">order_exprs</span>.<span class="ident">len</span>(), <span class="ident">order_is_desc</span>.<span class="ident">len</span>());
+        <span class="macro">assert_eq!</span>(<span class="ident">order_exprs</span>.<span class="ident">len</span>(), <span class="ident">order_is_desc</span>.<span class="ident">len</span>());
 
         <span class="kw">let</span> <span class="ident">order_exprs_field_type</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FieldType</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">order_exprs</span>
             .<span class="ident">iter</span>()
@@ -1404,32 +1412,32 @@
             .<span class="ident">collect</span>();
 
         <span class="self">Self</span> {
-            <span class="ident">heap</span>: <span class="ident">BinaryHeap</span>::<span class="ident">new</span>(),
-            <span class="ident">eval_columns_buffer_unsafe</span>: <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">Vec</span>::<span class="ident">new</span>()),
+            <span class="ident">heap</span>: <span class="ident">BinaryHeap::new</span>(),
+            <span class="ident">eval_columns_buffer_unsafe</span>: <span class="ident">Box::new</span>(<span class="ident">Vec::new</span>()),
             <span class="ident">order_exprs</span>: <span class="ident">order_exprs</span>.<span class="ident">into_boxed_slice</span>(),
             <span class="ident">order_exprs_field_type</span>: <span class="ident">order_exprs_field_type</span>.<span class="ident">into_boxed_slice</span>(),
             <span class="ident">order_is_desc</span>: <span class="ident">order_is_desc</span>.<span class="ident">into_boxed_slice</span>(),
             <span class="ident">n</span>,
 
-            <span class="ident">context</span>: <span class="ident">EvalContext</span>::<span class="ident">default</span>(),
+            <span class="ident">context</span>: <span class="ident">EvalContext::default</span>(),
             <span class="ident">src</span>,
             <span class="ident">is_ended</span>: <span class="bool-val">false</span>,
         }
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
-        <span class="ident">config</span>: <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">EvalConfig</span><span class="op">&gt;</span>,
+        <span class="ident">config</span>: <span class="ident">std::sync::Arc</span><span class="op">&lt;</span><span class="ident">EvalConfig</span><span class="op">&gt;</span>,
         <span class="ident">src</span>: <span class="ident">Src</span>,
         <span class="ident">order_exprs_def</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Expr</span><span class="op">&gt;</span>,
         <span class="ident">order_is_desc</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">bool</span><span class="op">&gt;</span>,
         <span class="ident">n</span>: <span class="ident">usize</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">order_exprs_def</span>.<span class="ident">len</span>(), <span class="ident">order_is_desc</span>.<span class="ident">len</span>());
+        <span class="macro">assert_eq!</span>(<span class="ident">order_exprs_def</span>.<span class="ident">len</span>(), <span class="ident">order_is_desc</span>.<span class="ident">len</span>());
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">order_exprs</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">RpnExpression</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">with_capacity</span>(<span class="ident">order_exprs_def</span>.<span class="ident">len</span>());
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ctx</span> <span class="op">=</span> <span class="ident">EvalContext</span>::<span class="ident">new</span>(<span class="ident">config</span>.<span class="ident">clone</span>());
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">order_exprs</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">RpnExpression</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Vec::with_capacity</span>(<span class="ident">order_exprs_def</span>.<span class="ident">len</span>());
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ctx</span> <span class="op">=</span> <span class="ident">EvalContext::new</span>(<span class="ident">config</span>.<span class="ident">clone</span>());
         <span class="kw">for</span> <span class="ident">def</span> <span class="kw">in</span> <span class="ident">order_exprs_def</span> {
-            <span class="ident">order_exprs</span>.<span class="ident">push</span>(<span class="ident">RpnExpressionBuilder</span>::<span class="ident">build_from_expr_tree</span>(
+            <span class="ident">order_exprs</span>.<span class="ident">push</span>(<span class="ident">RpnExpressionBuilder::build_from_expr_tree</span>(
                 <span class="ident">def</span>,
                 <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>,
                 <span class="ident">src</span>.<span class="ident">schema</span>().<span class="ident">len</span>(),
@@ -1442,15 +1450,15 @@
 
         <span class="prelude-val">Ok</span>(<span class="self">Self</span> {
             <span class="comment">// Avoid large N causing OOM</span>
-            <span class="ident">heap</span>: <span class="ident">BinaryHeap</span>::<span class="ident">with_capacity</span>(<span class="ident">n</span>.<span class="ident">min</span>(<span class="number">1024</span>)),
+            <span class="ident">heap</span>: <span class="ident">BinaryHeap::with_capacity</span>(<span class="ident">n</span>.<span class="ident">min</span>(<span class="number">1024</span>)),
             <span class="comment">// Simply large enough to avoid repeated allocations</span>
-            <span class="ident">eval_columns_buffer_unsafe</span>: <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">Vec</span>::<span class="ident">with_capacity</span>(<span class="number">512</span>)),
+            <span class="ident">eval_columns_buffer_unsafe</span>: <span class="ident">Box::new</span>(<span class="ident">Vec::with_capacity</span>(<span class="number">512</span>)),
             <span class="ident">order_exprs</span>: <span class="ident">order_exprs</span>.<span class="ident">into_boxed_slice</span>(),
             <span class="ident">order_exprs_field_type</span>: <span class="ident">order_exprs_field_type</span>.<span class="ident">into_boxed_slice</span>(),
             <span class="ident">order_is_desc</span>: <span class="ident">order_is_desc</span>.<span class="ident">into_boxed_slice</span>(),
             <span class="ident">n</span>,
 
-            <span class="ident">context</span>: <span class="ident">EvalContext</span>::<span class="ident">new</span>(<span class="ident">config</span>),
+            <span class="ident">context</span>: <span class="ident">EvalContext::new</span>(<span class="ident">config</span>),
             <span class="ident">src</span>,
             <span class="ident">is_ended</span>: <span class="bool-val">false</span>,
         })
@@ -1460,7 +1468,7 @@
     <span class="kw">fn</span> <span class="ident">handle_next_batch</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">LazyBatchColumnVec</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="comment">// Use max batch size from the beginning because top N</span>
         <span class="comment">// always needs to calculate over all data.</span>
-        <span class="kw">let</span> <span class="ident">src_result</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">src</span>.<span class="ident">next_batch</span>(<span class="kw">crate</span>::<span class="ident">runner</span>::<span class="ident">BATCH_MAX_SIZE</span>);
+        <span class="kw">let</span> <span class="ident">src_result</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">src</span>.<span class="ident">next_batch</span>(<span class="kw">crate</span><span class="ident">::runner::BATCH_MAX_SIZE</span>);
 
         <span class="self">self</span>.<span class="ident">context</span>.<span class="ident">warnings</span> <span class="op">=</span> <span class="ident">src_result</span>.<span class="ident">warnings</span>;
 
@@ -1492,7 +1500,7 @@
 
         <span class="comment">// Pin data behind an Arc, so that they won&#39;t be dropped as long as this `pinned_data`</span>
         <span class="comment">// is kept somewhere.</span>
-        <span class="kw">let</span> <span class="ident">pinned_source_data</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">HeapItemSourceData</span> {
+        <span class="kw">let</span> <span class="ident">pinned_source_data</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">HeapItemSourceData</span> {
             <span class="ident">physical_columns</span>,
             <span class="ident">logical_rows</span>,
         });
@@ -1535,7 +1543,7 @@
         } <span class="kw">else</span> {
             <span class="comment">// Swap the greatest row in the heap if this row is smaller than that row.</span>
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">greatest_row</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">heap</span>.<span class="ident">peek_mut</span>().<span class="ident">unwrap</span>();
-            <span class="kw">if</span> <span class="ident">row</span>.<span class="ident">cmp_sort_key</span>(<span class="kw-2">&amp;</span><span class="ident">greatest_row</span>)<span class="question-mark">?</span> <span class="op">=</span><span class="op">=</span> <span class="ident">Ordering</span>::<span class="ident">Less</span> {
+            <span class="kw">if</span> <span class="ident">row</span>.<span class="ident">cmp_sort_key</span>(<span class="kw-2">&amp;</span><span class="ident">greatest_row</span>)<span class="question-mark">?</span> <span class="op">=</span><span class="op">=</span> <span class="ident">Ordering::Less</span> {
                 <span class="kw-2">*</span><span class="ident">greatest_row</span> <span class="op">=</span> <span class="ident">row</span>;
             }
         }
@@ -1543,12 +1551,12 @@
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy</span>::<span class="ident">clone_on_copy</span>)]</span>
+    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::clone_on_copy</span>)]</span>
     <span class="kw">fn</span> <span class="ident">heap_take_all</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">LazyBatchColumnVec</span> {
-        <span class="kw">let</span> <span class="ident">heap</span> <span class="op">=</span> <span class="ident">std</span>::<span class="ident">mem</span>::<span class="ident">take</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">heap</span>);
+        <span class="kw">let</span> <span class="ident">heap</span> <span class="op">=</span> <span class="ident">std::mem::take</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">heap</span>);
         <span class="kw">let</span> <span class="ident">sorted_items</span> <span class="op">=</span> <span class="ident">heap</span>.<span class="ident">into_sorted_vec</span>();
         <span class="kw">if</span> <span class="ident">sorted_items</span>.<span class="ident">is_empty</span>() {
-            <span class="kw">return</span> <span class="ident">LazyBatchColumnVec</span>::<span class="ident">empty</span>();
+            <span class="kw">return</span> <span class="ident">LazyBatchColumnVec::empty</span>();
         }
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">sorted_items</span>[<span class="number">0</span>]
@@ -1558,15 +1566,15 @@
 
         <span class="kw">for</span> (<span class="ident">column_index</span>, <span class="ident">result_column</span>) <span class="kw">in</span> <span class="ident">result</span>.<span class="ident">as_mut_slice</span>().<span class="ident">iter_mut</span>().<span class="ident">enumerate</span>() {
             <span class="kw">match</span> <span class="ident">result_column</span> {
-                <span class="ident">LazyBatchColumn</span>::<span class="ident">Raw</span>(<span class="ident">dest_column</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="ident">LazyBatchColumn::Raw</span>(<span class="ident">dest_column</span>) <span class="op">=</span><span class="op">&gt;</span> {
                     <span class="kw">for</span> <span class="ident">item</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">sorted_items</span> {
                         <span class="kw">let</span> <span class="ident">src</span> <span class="op">=</span> <span class="ident">item</span>.<span class="ident">source_data</span>.<span class="ident">physical_columns</span>[<span class="ident">column_index</span>].<span class="ident">raw</span>();
                         <span class="ident">dest_column</span>
                             .<span class="ident">push</span>(<span class="kw-2">&amp;</span><span class="ident">src</span>[<span class="ident">item</span>.<span class="ident">source_data</span>.<span class="ident">logical_rows</span>[<span class="ident">item</span>.<span class="ident">logical_row_index</span>]]);
                     }
                 }
-                <span class="ident">LazyBatchColumn</span>::<span class="ident">Decoded</span>(<span class="ident">dest_vector_value</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="ident">match_template</span>::<span class="macro">match_template</span><span class="macro">!</span> {
+                <span class="ident">LazyBatchColumn::Decoded</span>(<span class="ident">dest_vector_value</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="macro">match_template::match_template!</span> {
                         <span class="ident">TT</span> <span class="op">=</span> [
                             <span class="ident">Int</span>,
                             <span class="ident">Real</span>,
@@ -1579,10 +1587,10 @@
                             <span class="ident">Set</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">SetRef</span>,
                         ],
                         <span class="kw">match</span> <span class="ident">dest_vector_value</span> {
-                            <span class="ident">VectorValue</span>::<span class="ident">TT</span>(<span class="ident">dest_column</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                            <span class="ident">VectorValue::TT</span>(<span class="ident">dest_column</span>) <span class="op">=</span><span class="op">&gt;</span> {
                                 <span class="kw">for</span> <span class="ident">item</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">sorted_items</span> {
                                     <span class="kw">let</span> <span class="ident">src</span>: <span class="kw-2">&amp;</span><span class="ident">VectorValue</span> <span class="op">=</span> <span class="ident">item</span>.<span class="ident">source_data</span>.<span class="ident">physical_columns</span>[<span class="ident">column_index</span>].<span class="ident">decoded</span>();
-                                    <span class="kw">let</span> <span class="ident">src_ref</span> <span class="op">=</span> <span class="ident">TT</span>::<span class="ident">borrow_vector_value</span>(<span class="ident">src</span>);
+                                    <span class="kw">let</span> <span class="ident">src_ref</span> <span class="op">=</span> <span class="ident">TT::borrow_vector_value</span>(<span class="ident">src</span>);
                                     <span class="comment">// TODO: This clone is not necessary.</span>
                                     <span class="ident">dest_column</span>.<span class="ident">push</span>(<span class="ident">src_ref</span>.<span class="ident">get_option_ref</span>(<span class="ident">item</span>.<span class="ident">source_data</span>.<span class="ident">logical_rows</span>[<span class="ident">item</span>.<span class="ident">logical_row_index</span>]).<span class="ident">map</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span>.<span class="ident">into_owned_value</span>()));
                                 }
@@ -1599,7 +1607,7 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">Src</span>: <span class="ident">BatchExecutor</span><span class="op">&gt;</span> <span class="ident">BatchExecutor</span> <span class="kw">for</span> <span class="ident">BatchTopNExecutor</span><span class="op">&lt;</span><span class="ident">Src</span><span class="op">&gt;</span> {
-    <span class="kw">type</span> <span class="ident">StorageStats</span> <span class="op">=</span> <span class="ident">Src</span>::<span class="ident">StorageStats</span>;
+    <span class="kw">type</span> <span class="ident">StorageStats</span> <span class="op">=</span> <span class="ident">Src::StorageStats</span>;
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">fn</span> <span class="ident">schema</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span>[<span class="ident">FieldType</span>] {
@@ -1608,14 +1616,14 @@
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">fn</span> <span class="ident">next_batch</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">_scan_rows</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">BatchExecuteResult</span> {
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="self">self</span>.<span class="ident">is_ended</span>);
+        <span class="macro">assert!</span>(<span class="op">!</span><span class="self">self</span>.<span class="ident">is_ended</span>);
 
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">n</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
             <span class="self">self</span>.<span class="ident">is_ended</span> <span class="op">=</span> <span class="bool-val">true</span>;
             <span class="kw">return</span> <span class="ident">BatchExecuteResult</span> {
-                <span class="ident">physical_columns</span>: <span class="ident">LazyBatchColumnVec</span>::<span class="ident">empty</span>(),
-                <span class="ident">logical_rows</span>: <span class="ident">Vec</span>::<span class="ident">new</span>(),
-                <span class="ident">warnings</span>: <span class="ident">EvalWarnings</span>::<span class="ident">default</span>(),
+                <span class="ident">physical_columns</span>: <span class="ident">LazyBatchColumnVec::empty</span>(),
+                <span class="ident">logical_rows</span>: <span class="ident">Vec::new</span>(),
+                <span class="ident">warnings</span>: <span class="ident">EvalWarnings::default</span>(),
                 <span class="ident">is_drained</span>: <span class="prelude-val">Ok</span>(<span class="bool-val">true</span>),
             };
         }
@@ -1627,8 +1635,8 @@
                 <span class="comment">// When there are error, we can just return empty data.</span>
                 <span class="self">self</span>.<span class="ident">is_ended</span> <span class="op">=</span> <span class="bool-val">true</span>;
                 <span class="ident">BatchExecuteResult</span> {
-                    <span class="ident">physical_columns</span>: <span class="ident">LazyBatchColumnVec</span>::<span class="ident">empty</span>(),
-                    <span class="ident">logical_rows</span>: <span class="ident">Vec</span>::<span class="ident">new</span>(),
+                    <span class="ident">physical_columns</span>: <span class="ident">LazyBatchColumnVec::empty</span>(),
+                    <span class="ident">logical_rows</span>: <span class="ident">Vec::new</span>(),
                     <span class="ident">warnings</span>: <span class="self">self</span>.<span class="ident">context</span>.<span class="ident">take_warnings</span>(),
                     <span class="ident">is_drained</span>: <span class="prelude-val">Err</span>(<span class="ident">e</span>),
                 }
@@ -1644,8 +1652,8 @@
                 }
             }
             <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">BatchExecuteResult</span> {
-                <span class="ident">physical_columns</span>: <span class="ident">LazyBatchColumnVec</span>::<span class="ident">empty</span>(),
-                <span class="ident">logical_rows</span>: <span class="ident">Vec</span>::<span class="ident">new</span>(),
+                <span class="ident">physical_columns</span>: <span class="ident">LazyBatchColumnVec::empty</span>(),
+                <span class="ident">logical_rows</span>: <span class="ident">Vec::new</span>(),
                 <span class="ident">warnings</span>: <span class="self">self</span>.<span class="ident">context</span>.<span class="ident">take_warnings</span>(),
                 <span class="ident">is_drained</span>: <span class="prelude-val">Ok</span>(<span class="bool-val">false</span>),
             },
@@ -1658,7 +1666,7 @@
     }
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">collect_storage_stats</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">dest</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">Self</span>::<span class="ident">StorageStats</span>) {
+    <span class="kw">fn</span> <span class="ident">collect_storage_stats</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">dest</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">Self</span><span class="ident">::StorageStats</span>) {
         <span class="self">self</span>.<span class="ident">src</span>.<span class="ident">collect_storage_stats</span>(<span class="ident">dest</span>);
     }
 
@@ -1722,7 +1730,7 @@
 
     <span class="kw">fn</span> <span class="ident">cmp_sort_key</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Ordering</span><span class="op">&gt;</span> {
         <span class="comment">// Only debug assert because this function is called pretty frequently.</span>
-        <span class="macro">debug_assert_eq</span><span class="macro">!</span>(<span class="self">self</span>.<span class="ident">get_order_is_desc</span>(), <span class="ident">other</span>.<span class="ident">get_order_is_desc</span>());
+        <span class="macro">debug_assert_eq!</span>(<span class="self">self</span>.<span class="ident">get_order_is_desc</span>(), <span class="ident">other</span>.<span class="ident">get_order_is_desc</span>());
 
         <span class="kw">let</span> <span class="ident">order_is_desc</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_order_is_desc</span>();
         <span class="kw">let</span> <span class="ident">order_exprs_field_type</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_order_exprs_field_type</span>();
@@ -1740,7 +1748,7 @@
             <span class="comment">// column should be consistent for each `HeapItemUnsafe`.</span>
             <span class="kw">let</span> <span class="ident">ord</span> <span class="op">=</span> <span class="ident">lhs</span>.<span class="ident">cmp_sort_key</span>(<span class="kw-2">&amp;</span><span class="ident">rhs</span>, <span class="kw-2">&amp;</span><span class="ident">order_exprs_field_type</span>[<span class="ident">column_idx</span>])<span class="question-mark">?</span>;
 
-            <span class="kw">if</span> <span class="ident">ord</span> <span class="op">=</span><span class="op">=</span> <span class="ident">Ordering</span>::<span class="ident">Equal</span> {
+            <span class="kw">if</span> <span class="ident">ord</span> <span class="op">=</span><span class="op">=</span> <span class="ident">Ordering::Equal</span> {
                 <span class="kw">continue</span>;
             }
             <span class="kw">if</span> <span class="op">!</span><span class="ident">order_is_desc</span>[<span class="ident">column_idx</span>] {
@@ -1750,7 +1758,7 @@
             }
         }
 
-        <span class="prelude-val">Ok</span>(<span class="ident">Ordering</span>::<span class="ident">Equal</span>)
+        <span class="prelude-val">Ok</span>(<span class="ident">Ordering::Equal</span>)
     }
 }
 
@@ -1770,7 +1778,7 @@
 
 <span class="kw">impl</span> <span class="ident">PartialEq</span> <span class="kw">for</span> <span class="ident">HeapItemUnsafe</span> {
     <span class="kw">fn</span> <span class="ident">eq</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">cmp</span>(<span class="ident">other</span>) <span class="op">=</span><span class="op">=</span> <span class="ident">Ordering</span>::<span class="ident">Equal</span>
+        <span class="self">self</span>.<span class="ident">cmp</span>(<span class="ident">other</span>) <span class="op">=</span><span class="op">=</span> <span class="ident">Ordering::Equal</span>
     }
 }
 
@@ -1780,79 +1788,83 @@
 <span class="kw">mod</span> <span class="ident">tests</span> {
     <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 
-    <span class="kw">use</span> <span class="ident">tidb_query_datatype</span>::<span class="ident">builder</span>::<span class="ident">FieldTypeBuilder</span>;
+    <span class="kw">use</span> <span class="ident">tidb_query_datatype::builder::FieldTypeBuilder</span>;
     <span class="kw">use</span> <span class="ident">tidb_query_datatype</span>::{<span class="ident">Collation</span>, <span class="ident">FieldTypeFlag</span>, <span class="ident">FieldTypeTp</span>};
 
-    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">mock_executor</span>::<span class="ident">MockExecutor</span>;
-    <span class="kw">use</span> <span class="ident">tidb_query_datatype</span>::<span class="ident">expr</span>::<span class="ident">EvalWarnings</span>;
-    <span class="kw">use</span> <span class="ident">tidb_query_expr</span>::<span class="ident">RpnExpressionBuilder</span>;
+    <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::mock_executor::MockExecutor</span>;
+    <span class="kw">use</span> <span class="ident">tidb_query_datatype::expr::EvalWarnings</span>;
+    <span class="kw">use</span> <span class="ident">tidb_query_expr::RpnExpressionBuilder</span>;
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_top_0</span>() {
-        <span class="kw">let</span> <span class="ident">src_exec</span> <span class="op">=</span> <span class="ident">MockExecutor</span>::<span class="ident">new</span>(
-            <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">FieldTypeTp</span>::<span class="ident">Double</span>.<span class="ident">into</span>()],
-            <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">BatchExecuteResult</span> {
-                <span class="ident">physical_columns</span>: <span class="ident">LazyBatchColumnVec</span>::<span class="ident">from</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">VectorValue</span>::<span class="ident">Real</span>(
-                    <span class="macro">vec</span><span class="macro">!</span>[<span class="prelude-val">None</span>, <span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">7.0</span>).<span class="ident">ok</span>(), <span class="prelude-val">None</span>, <span class="prelude-val">None</span>].<span class="ident">into</span>(),
+        <span class="kw">let</span> <span class="ident">src_exec</span> <span class="op">=</span> <span class="ident">MockExecutor::new</span>(
+            <span class="macro">vec!</span>[<span class="ident">FieldTypeTp::Double</span>.<span class="ident">into</span>()],
+            <span class="macro">vec!</span>[<span class="ident">BatchExecuteResult</span> {
+                <span class="ident">physical_columns</span>: <span class="ident">LazyBatchColumnVec::from</span>(<span class="macro">vec!</span>[<span class="ident">VectorValue::Real</span>(
+                    <span class="macro">vec!</span>[<span class="prelude-val">None</span>, <span class="ident">Real::new</span>(<span class="number">7.0</span>).<span class="ident">ok</span>(), <span class="prelude-val">None</span>, <span class="prelude-val">None</span>].<span class="ident">into</span>(),
                 )]),
                 <span class="ident">logical_rows</span>: (<span class="number">0</span>..<span class="number">1</span>).<span class="ident">collect</span>(),
-                <span class="ident">warnings</span>: <span class="ident">EvalWarnings</span>::<span class="ident">default</span>(),
+                <span class="ident">warnings</span>: <span class="ident">EvalWarnings::default</span>(),
                 <span class="ident">is_drained</span>: <span class="prelude-val">Ok</span>(<span class="bool-val">true</span>),
             }],
         );
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">exec</span> <span class="op">=</span> <span class="ident">BatchTopNExecutor</span>::<span class="ident">new_for_test</span>(
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">exec</span> <span class="op">=</span> <span class="ident">BatchTopNExecutor::new_for_test</span>(
             <span class="ident">src_exec</span>,
-            <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">RpnExpressionBuilder</span>::<span class="ident">new_for_test</span>()
-                .<span class="ident">push_constant_for_test</span>(<span class="number">1</span>)
-                .<span class="ident">build_for_test</span>()],
-            <span class="macro">vec</span><span class="macro">!</span>[<span class="bool-val">false</span>],
+            <span class="macro">vec!</span>[
+                <span class="ident">RpnExpressionBuilder::new_for_test</span>()
+                    .<span class="ident">push_constant_for_test</span>(<span class="number">1</span>)
+                    .<span class="ident">build_for_test</span>(),
+            ],
+            <span class="macro">vec!</span>[<span class="bool-val">false</span>],
             <span class="number">0</span>,
         );
 
         <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="ident">exec</span>.<span class="ident">next_batch</span>(<span class="number">1</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">0</span>);
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">0</span>);
+        <span class="macro">assert!</span>(<span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_no_row</span>() {
-        <span class="kw">let</span> <span class="ident">src_exec</span> <span class="op">=</span> <span class="ident">MockExecutor</span>::<span class="ident">new</span>(
-            <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>.<span class="ident">into</span>()],
-            <span class="macro">vec</span><span class="macro">!</span>[
+        <span class="kw">let</span> <span class="ident">src_exec</span> <span class="op">=</span> <span class="ident">MockExecutor::new</span>(
+            <span class="macro">vec!</span>[<span class="ident">FieldTypeTp::LongLong</span>.<span class="ident">into</span>()],
+            <span class="macro">vec!</span>[
                 <span class="ident">BatchExecuteResult</span> {
-                    <span class="ident">physical_columns</span>: <span class="ident">LazyBatchColumnVec</span>::<span class="ident">from</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">VectorValue</span>::<span class="ident">Int</span>(
-                        <span class="macro">vec</span><span class="macro">!</span>[<span class="prelude-val">Some</span>(<span class="number">5</span>)].<span class="ident">into</span>(),
+                    <span class="ident">physical_columns</span>: <span class="ident">LazyBatchColumnVec::from</span>(<span class="macro">vec!</span>[<span class="ident">VectorValue::Int</span>(
+                        <span class="macro">vec!</span>[<span class="prelude-val">Some</span>(<span class="number">5</span>)].<span class="ident">into</span>(),
                     )]),
-                    <span class="ident">logical_rows</span>: <span class="ident">Vec</span>::<span class="ident">new</span>(),
-                    <span class="ident">warnings</span>: <span class="ident">EvalWarnings</span>::<span class="ident">default</span>(),
+                    <span class="ident">logical_rows</span>: <span class="ident">Vec::new</span>(),
+                    <span class="ident">warnings</span>: <span class="ident">EvalWarnings::default</span>(),
                     <span class="ident">is_drained</span>: <span class="prelude-val">Ok</span>(<span class="bool-val">false</span>),
                 },
                 <span class="ident">BatchExecuteResult</span> {
-                    <span class="ident">physical_columns</span>: <span class="ident">LazyBatchColumnVec</span>::<span class="ident">empty</span>(),
-                    <span class="ident">logical_rows</span>: <span class="ident">Vec</span>::<span class="ident">new</span>(),
-                    <span class="ident">warnings</span>: <span class="ident">EvalWarnings</span>::<span class="ident">default</span>(),
+                    <span class="ident">physical_columns</span>: <span class="ident">LazyBatchColumnVec::empty</span>(),
+                    <span class="ident">logical_rows</span>: <span class="ident">Vec::new</span>(),
+                    <span class="ident">warnings</span>: <span class="ident">EvalWarnings::default</span>(),
                     <span class="ident">is_drained</span>: <span class="prelude-val">Ok</span>(<span class="bool-val">true</span>),
                 },
             ],
         );
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">exec</span> <span class="op">=</span> <span class="ident">BatchTopNExecutor</span>::<span class="ident">new_for_test</span>(
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">exec</span> <span class="op">=</span> <span class="ident">BatchTopNExecutor::new_for_test</span>(
             <span class="ident">src_exec</span>,
-            <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">RpnExpressionBuilder</span>::<span class="ident">new_for_test</span>()
-                .<span class="ident">push_column_ref_for_test</span>(<span class="number">0</span>)
-                .<span class="ident">build_for_test</span>()],
-            <span class="macro">vec</span><span class="macro">!</span>[<span class="bool-val">false</span>],
+            <span class="macro">vec!</span>[
+                <span class="ident">RpnExpressionBuilder::new_for_test</span>()
+                    .<span class="ident">push_column_ref_for_test</span>(<span class="number">0</span>)
+                    .<span class="ident">build_for_test</span>(),
+            ],
+            <span class="macro">vec!</span>[<span class="bool-val">false</span>],
             <span class="number">10</span>,
         );
 
         <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="ident">exec</span>.<span class="ident">next_batch</span>(<span class="number">1</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">0</span>);
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">0</span>);
+        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
 
         <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="ident">exec</span>.<span class="ident">next_batch</span>(<span class="number">1</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">0</span>);
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">0</span>);
+        <span class="macro">assert!</span>(<span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
     }
 
     <span class="doccomment">/// Builds an executor that will return these data:</span>
@@ -1871,63 +1883,63 @@
     <span class="doccomment">/// -10             -10             0.0</span>
     <span class="doccomment">/// (drained)</span>
     <span class="kw">fn</span> <span class="ident">make_src_executor</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">MockExecutor</span> {
-        <span class="ident">MockExecutor</span>::<span class="ident">new</span>(
-            <span class="macro">vec</span><span class="macro">!</span>[
-                <span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>.<span class="ident">into</span>(),
-                <span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>.<span class="ident">into</span>(),
-                <span class="ident">FieldTypeTp</span>::<span class="ident">Double</span>.<span class="ident">into</span>(),
+        <span class="ident">MockExecutor::new</span>(
+            <span class="macro">vec!</span>[
+                <span class="ident">FieldTypeTp::LongLong</span>.<span class="ident">into</span>(),
+                <span class="ident">FieldTypeTp::LongLong</span>.<span class="ident">into</span>(),
+                <span class="ident">FieldTypeTp::Double</span>.<span class="ident">into</span>(),
             ],
-            <span class="macro">vec</span><span class="macro">!</span>[
+            <span class="macro">vec!</span>[
                 <span class="ident">BatchExecuteResult</span> {
-                    <span class="ident">physical_columns</span>: <span class="ident">LazyBatchColumnVec</span>::<span class="ident">from</span>(<span class="macro">vec</span><span class="macro">!</span>[
-                        <span class="ident">VectorValue</span>::<span class="ident">Int</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="number">5</span>), <span class="prelude-val">None</span>].<span class="ident">into</span>()),
-                        <span class="ident">VectorValue</span>::<span class="ident">Int</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="number">1</span>), <span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">1</span>)].<span class="ident">into</span>()),
-                        <span class="ident">VectorValue</span>::<span class="ident">Real</span>(
-                            <span class="macro">vec</span><span class="macro">!</span>[
-                                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">2.0</span>).<span class="ident">ok</span>(),
-                                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">4.0</span>).<span class="ident">ok</span>(),
+                    <span class="ident">physical_columns</span>: <span class="ident">LazyBatchColumnVec::from</span>(<span class="macro">vec!</span>[
+                        <span class="ident">VectorValue::Int</span>(<span class="macro">vec!</span>[<span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="number">5</span>), <span class="prelude-val">None</span>].<span class="ident">into</span>()),
+                        <span class="ident">VectorValue::Int</span>(<span class="macro">vec!</span>[<span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="number">1</span>), <span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">1</span>)].<span class="ident">into</span>()),
+                        <span class="ident">VectorValue::Real</span>(
+                            <span class="macro">vec!</span>[
+                                <span class="ident">Real::new</span>(<span class="number">2.0</span>).<span class="ident">ok</span>(),
+                                <span class="ident">Real::new</span>(<span class="number">4.0</span>).<span class="ident">ok</span>(),
                                 <span class="prelude-val">None</span>,
-                                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="op">-</span><span class="number">1.0</span>).<span class="ident">ok</span>(),
+                                <span class="ident">Real::new</span>(<span class="op">-</span><span class="number">1.0</span>).<span class="ident">ok</span>(),
                             ]
                             .<span class="ident">into</span>(),
                         ),
                     ]),
-                    <span class="ident">logical_rows</span>: <span class="macro">vec</span><span class="macro">!</span>[<span class="number">3</span>, <span class="number">0</span>, <span class="number">1</span>],
-                    <span class="ident">warnings</span>: <span class="ident">EvalWarnings</span>::<span class="ident">default</span>(),
+                    <span class="ident">logical_rows</span>: <span class="macro">vec!</span>[<span class="number">3</span>, <span class="number">0</span>, <span class="number">1</span>],
+                    <span class="ident">warnings</span>: <span class="ident">EvalWarnings::default</span>(),
                     <span class="ident">is_drained</span>: <span class="prelude-val">Ok</span>(<span class="bool-val">false</span>),
                 },
                 <span class="ident">BatchExecuteResult</span> {
-                    <span class="ident">physical_columns</span>: <span class="ident">LazyBatchColumnVec</span>::<span class="ident">from</span>(<span class="macro">vec</span><span class="macro">!</span>[
-                        <span class="ident">VectorValue</span>::<span class="ident">Int</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="prelude-val">Some</span>(<span class="number">0</span>)].<span class="ident">into</span>()),
-                        <span class="ident">VectorValue</span>::<span class="ident">Int</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="prelude-val">Some</span>(<span class="number">10</span>)].<span class="ident">into</span>()),
-                        <span class="ident">VectorValue</span>::<span class="ident">Real</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">10.0</span>).<span class="ident">ok</span>()].<span class="ident">into</span>()),
+                    <span class="ident">physical_columns</span>: <span class="ident">LazyBatchColumnVec::from</span>(<span class="macro">vec!</span>[
+                        <span class="ident">VectorValue::Int</span>(<span class="macro">vec!</span>[<span class="prelude-val">Some</span>(<span class="number">0</span>)].<span class="ident">into</span>()),
+                        <span class="ident">VectorValue::Int</span>(<span class="macro">vec!</span>[<span class="prelude-val">Some</span>(<span class="number">10</span>)].<span class="ident">into</span>()),
+                        <span class="ident">VectorValue::Real</span>(<span class="macro">vec!</span>[<span class="ident">Real::new</span>(<span class="number">10.0</span>).<span class="ident">ok</span>()].<span class="ident">into</span>()),
                     ]),
-                    <span class="ident">logical_rows</span>: <span class="ident">Vec</span>::<span class="ident">new</span>(),
-                    <span class="ident">warnings</span>: <span class="ident">EvalWarnings</span>::<span class="ident">default</span>(),
+                    <span class="ident">logical_rows</span>: <span class="ident">Vec::new</span>(),
+                    <span class="ident">warnings</span>: <span class="ident">EvalWarnings::default</span>(),
                     <span class="ident">is_drained</span>: <span class="prelude-val">Ok</span>(<span class="bool-val">false</span>),
                 },
                 <span class="ident">BatchExecuteResult</span> {
-                    <span class="ident">physical_columns</span>: <span class="ident">LazyBatchColumnVec</span>::<span class="ident">from</span>(<span class="macro">vec</span><span class="macro">!</span>[
-                        <span class="ident">VectorValue</span>::<span class="ident">Int</span>(
-                            <span class="macro">vec</span><span class="macro">!</span>[<span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">10</span>), <span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">1</span>), <span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">10</span>), <span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">10</span>), <span class="prelude-val">None</span>].<span class="ident">into</span>(),
+                    <span class="ident">physical_columns</span>: <span class="ident">LazyBatchColumnVec::from</span>(<span class="macro">vec!</span>[
+                        <span class="ident">VectorValue::Int</span>(
+                            <span class="macro">vec!</span>[<span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">10</span>), <span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">1</span>), <span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">10</span>), <span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">10</span>), <span class="prelude-val">None</span>].<span class="ident">into</span>(),
                         ),
-                        <span class="ident">VectorValue</span>::<span class="ident">Int</span>(
-                            <span class="macro">vec</span><span class="macro">!</span>[<span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="number">10</span>), <span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">9</span>), <span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">10</span>), <span class="prelude-val">None</span>].<span class="ident">into</span>(),
+                        <span class="ident">VectorValue::Int</span>(
+                            <span class="macro">vec!</span>[<span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="number">10</span>), <span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">9</span>), <span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">10</span>), <span class="prelude-val">None</span>].<span class="ident">into</span>(),
                         ),
-                        <span class="ident">VectorValue</span>::<span class="ident">Real</span>(
-                            <span class="macro">vec</span><span class="macro">!</span>[
-                                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="op">-</span><span class="number">5.0</span>).<span class="ident">ok</span>(),
+                        <span class="ident">VectorValue::Real</span>(
+                            <span class="macro">vec!</span>[
+                                <span class="ident">Real::new</span>(<span class="op">-</span><span class="number">5.0</span>).<span class="ident">ok</span>(),
                                 <span class="prelude-val">None</span>,
-                                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">3.0</span>).<span class="ident">ok</span>(),
+                                <span class="ident">Real::new</span>(<span class="number">3.0</span>).<span class="ident">ok</span>(),
                                 <span class="prelude-val">None</span>,
-                                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">0.0</span>).<span class="ident">ok</span>(),
-                                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">9.9</span>).<span class="ident">ok</span>(),
+                                <span class="ident">Real::new</span>(<span class="number">0.0</span>).<span class="ident">ok</span>(),
+                                <span class="ident">Real::new</span>(<span class="number">9.9</span>).<span class="ident">ok</span>(),
                             ]
                             .<span class="ident">into</span>(),
                         ),
                     ]),
-                    <span class="ident">logical_rows</span>: <span class="macro">vec</span><span class="macro">!</span>[<span class="number">1</span>, <span class="number">2</span>, <span class="number">0</span>, <span class="number">4</span>],
-                    <span class="ident">warnings</span>: <span class="ident">EvalWarnings</span>::<span class="ident">default</span>(),
+                    <span class="ident">logical_rows</span>: <span class="macro">vec!</span>[<span class="number">1</span>, <span class="number">2</span>, <span class="number">0</span>, <span class="number">4</span>],
+                    <span class="ident">warnings</span>: <span class="ident">EvalWarnings::default</span>(),
                     <span class="ident">is_drained</span>: <span class="prelude-val">Ok</span>(<span class="bool-val">true</span>),
                 },
             ],
@@ -1956,50 +1968,52 @@
 
         <span class="kw">let</span> <span class="ident">src_exec</span> <span class="op">=</span> <span class="ident">make_src_executor</span>();
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">exec</span> <span class="op">=</span> <span class="ident">BatchTopNExecutor</span>::<span class="ident">new_for_test</span>(
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">exec</span> <span class="op">=</span> <span class="ident">BatchTopNExecutor::new_for_test</span>(
             <span class="ident">src_exec</span>,
-            <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">RpnExpressionBuilder</span>::<span class="ident">new_for_test</span>()
-                .<span class="ident">push_column_ref_for_test</span>(<span class="number">2</span>)
-                .<span class="ident">build_for_test</span>()],
-            <span class="macro">vec</span><span class="macro">!</span>[<span class="bool-val">false</span>],
+            <span class="macro">vec!</span>[
+                <span class="ident">RpnExpressionBuilder::new_for_test</span>()
+                    .<span class="ident">push_column_ref_for_test</span>(<span class="number">2</span>)
+                    .<span class="ident">build_for_test</span>(),
+            ],
+            <span class="macro">vec!</span>[<span class="bool-val">false</span>],
             <span class="number">100</span>,
         );
 
         <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="ident">exec</span>.<span class="ident">next_batch</span>(<span class="number">1</span>);
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">logical_rows</span>.<span class="ident">is_empty</span>());
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">0</span>);
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
+        <span class="macro">assert!</span>(<span class="ident">r</span>.<span class="ident">logical_rows</span>.<span class="ident">is_empty</span>());
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">0</span>);
+        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
 
         <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="ident">exec</span>.<span class="ident">next_batch</span>(<span class="number">1</span>);
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">logical_rows</span>.<span class="ident">is_empty</span>());
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">0</span>);
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
+        <span class="macro">assert!</span>(<span class="ident">r</span>.<span class="ident">logical_rows</span>.<span class="ident">is_empty</span>());
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">0</span>);
+        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
 
         <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="ident">exec</span>.<span class="ident">next_batch</span>(<span class="number">1</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="kw-2">&amp;</span><span class="ident">r</span>.<span class="ident">logical_rows</span>, <span class="kw-2">&amp;</span>[<span class="number">0</span>, <span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>, <span class="number">5</span>, <span class="number">6</span>]);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">7</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">columns_len</span>(), <span class="number">3</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(
+        <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span><span class="ident">r</span>.<span class="ident">logical_rows</span>, <span class="kw-2">&amp;</span>[<span class="number">0</span>, <span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>, <span class="number">5</span>, <span class="number">6</span>]);
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">7</span>);
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">columns_len</span>(), <span class="number">3</span>);
+        <span class="macro">assert_eq!</span>(
             <span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">0</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(),
             <span class="kw-2">&amp;</span>[<span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">1</span>), <span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">10</span>), <span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">10</span>), <span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">10</span>), <span class="prelude-val">None</span>]
         );
-        <span class="macro">assert_eq</span><span class="macro">!</span>(
+        <span class="macro">assert_eq!</span>(
             <span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">1</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(),
             <span class="kw-2">&amp;</span>[<span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">1</span>), <span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">10</span>), <span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="number">10</span>), <span class="prelude-val">Some</span>(<span class="number">1</span>)]
         );
-        <span class="macro">assert_eq</span><span class="macro">!</span>(
+        <span class="macro">assert_eq!</span>(
             <span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">2</span>].<span class="ident">decoded</span>().<span class="ident">to_real_vec</span>(),
             <span class="kw-2">&amp;</span>[
                 <span class="prelude-val">None</span>,
-                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="op">-</span><span class="number">5.0</span>).<span class="ident">ok</span>(),
-                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="op">-</span><span class="number">1.0</span>).<span class="ident">ok</span>(),
-                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">0.0</span>).<span class="ident">ok</span>(),
-                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">2.0</span>).<span class="ident">ok</span>(),
-                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">3.0</span>).<span class="ident">ok</span>(),
-                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">4.0</span>).<span class="ident">ok</span>()
+                <span class="ident">Real::new</span>(<span class="op">-</span><span class="number">5.0</span>).<span class="ident">ok</span>(),
+                <span class="ident">Real::new</span>(<span class="op">-</span><span class="number">1.0</span>).<span class="ident">ok</span>(),
+                <span class="ident">Real::new</span>(<span class="number">0.0</span>).<span class="ident">ok</span>(),
+                <span class="ident">Real::new</span>(<span class="number">2.0</span>).<span class="ident">ok</span>(),
+                <span class="ident">Real::new</span>(<span class="number">3.0</span>).<span class="ident">ok</span>(),
+                <span class="ident">Real::new</span>(<span class="number">4.0</span>).<span class="ident">ok</span>()
             ]
         );
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
+        <span class="macro">assert!</span>(<span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
@@ -2021,61 +2035,61 @@
 
         <span class="kw">let</span> <span class="ident">src_exec</span> <span class="op">=</span> <span class="ident">make_src_executor</span>();
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">exec</span> <span class="op">=</span> <span class="ident">BatchTopNExecutor</span>::<span class="ident">new_for_test</span>(
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">exec</span> <span class="op">=</span> <span class="ident">BatchTopNExecutor::new_for_test</span>(
             <span class="ident">src_exec</span>,
-            <span class="macro">vec</span><span class="macro">!</span>[
-                <span class="ident">RpnExpressionBuilder</span>::<span class="ident">new_for_test</span>()
+            <span class="macro">vec!</span>[
+                <span class="ident">RpnExpressionBuilder::new_for_test</span>()
                     .<span class="ident">push_column_ref_for_test</span>(<span class="number">0</span>)
                     .<span class="ident">build_for_test</span>(),
-                <span class="ident">RpnExpressionBuilder</span>::<span class="ident">new_for_test</span>()
+                <span class="ident">RpnExpressionBuilder::new_for_test</span>()
                     .<span class="ident">push_column_ref_for_test</span>(<span class="number">1</span>)
                     .<span class="ident">build_for_test</span>(),
             ],
-            <span class="macro">vec</span><span class="macro">!</span>[<span class="bool-val">true</span>, <span class="bool-val">false</span>],
+            <span class="macro">vec!</span>[<span class="bool-val">true</span>, <span class="bool-val">false</span>],
             <span class="number">7</span>,
         );
 
         <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="ident">exec</span>.<span class="ident">next_batch</span>(<span class="number">1</span>);
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">logical_rows</span>.<span class="ident">is_empty</span>());
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">0</span>);
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
+        <span class="macro">assert!</span>(<span class="ident">r</span>.<span class="ident">logical_rows</span>.<span class="ident">is_empty</span>());
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">0</span>);
+        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
 
         <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="ident">exec</span>.<span class="ident">next_batch</span>(<span class="number">1</span>);
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">logical_rows</span>.<span class="ident">is_empty</span>());
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">0</span>);
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
+        <span class="macro">assert!</span>(<span class="ident">r</span>.<span class="ident">logical_rows</span>.<span class="ident">is_empty</span>());
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">0</span>);
+        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
 
         <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="ident">exec</span>.<span class="ident">next_batch</span>(<span class="number">1</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="kw-2">&amp;</span><span class="ident">r</span>.<span class="ident">logical_rows</span>, <span class="kw-2">&amp;</span>[<span class="number">0</span>, <span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>, <span class="number">5</span>, <span class="number">6</span>]);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">7</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">columns_len</span>(), <span class="number">3</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(
+        <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span><span class="ident">r</span>.<span class="ident">logical_rows</span>, <span class="kw-2">&amp;</span>[<span class="number">0</span>, <span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>, <span class="number">5</span>, <span class="number">6</span>]);
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">7</span>);
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">columns_len</span>(), <span class="number">3</span>);
+        <span class="macro">assert_eq!</span>(
             <span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">0</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(),
             <span class="kw-2">&amp;</span>[<span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">1</span>), <span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">10</span>), <span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">10</span>), <span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">10</span>), <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>]
         );
-        <span class="macro">assert_eq</span><span class="macro">!</span>(
+        <span class="macro">assert_eq!</span>(
             <span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">1</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(),
             <span class="kw-2">&amp;</span>[<span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">10</span>), <span class="prelude-val">Some</span>(<span class="number">10</span>), <span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">1</span>), <span class="prelude-val">Some</span>(<span class="number">1</span>)]
         );
-        <span class="macro">assert_eq</span><span class="macro">!</span>(
+        <span class="macro">assert_eq!</span>(
             <span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">2</span>].<span class="ident">decoded</span>().<span class="ident">to_real_vec</span>(),
             <span class="kw-2">&amp;</span>[
                 <span class="prelude-val">None</span>,
-                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="op">-</span><span class="number">5.0</span>).<span class="ident">ok</span>(),
-                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">0.0</span>).<span class="ident">ok</span>(),
-                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">3.0</span>).<span class="ident">ok</span>(),
-                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">2.0</span>).<span class="ident">ok</span>(),
-                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="op">-</span><span class="number">1.0</span>).<span class="ident">ok</span>(),
-                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">4.0</span>).<span class="ident">ok</span>()
+                <span class="ident">Real::new</span>(<span class="op">-</span><span class="number">5.0</span>).<span class="ident">ok</span>(),
+                <span class="ident">Real::new</span>(<span class="number">0.0</span>).<span class="ident">ok</span>(),
+                <span class="ident">Real::new</span>(<span class="number">3.0</span>).<span class="ident">ok</span>(),
+                <span class="ident">Real::new</span>(<span class="number">2.0</span>).<span class="ident">ok</span>(),
+                <span class="ident">Real::new</span>(<span class="op">-</span><span class="number">1.0</span>).<span class="ident">ok</span>(),
+                <span class="ident">Real::new</span>(<span class="number">4.0</span>).<span class="ident">ok</span>()
             ]
         );
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
+        <span class="macro">assert!</span>(<span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_integration_3</span>() {
-        <span class="kw">use</span> <span class="ident">tidb_query_expr</span>::<span class="ident">impl_arithmetic</span>::{<span class="ident">arithmetic_fn_meta</span>, <span class="ident">IntIntPlus</span>};
-        <span class="kw">use</span> <span class="ident">tidb_query_expr</span>::<span class="ident">impl_op</span>::<span class="ident">is_null_fn_meta</span>;
+        <span class="kw">use</span> <span class="ident">tidb_query_expr::impl_arithmetic</span>::{<span class="ident">arithmetic_fn_meta</span>, <span class="ident">IntIntPlus</span>};
+        <span class="kw">use</span> <span class="ident">tidb_query_expr::impl_op::is_null_fn_meta</span>;
 
         <span class="comment">// Order by multiple expressions, data len &gt; n.</span>
         <span class="comment">//</span>
@@ -2092,63 +2106,63 @@
 
         <span class="kw">let</span> <span class="ident">src_exec</span> <span class="op">=</span> <span class="ident">make_src_executor</span>();
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">exec</span> <span class="op">=</span> <span class="ident">BatchTopNExecutor</span>::<span class="ident">new_for_test</span>(
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">exec</span> <span class="op">=</span> <span class="ident">BatchTopNExecutor::new_for_test</span>(
             <span class="ident">src_exec</span>,
-            <span class="macro">vec</span><span class="macro">!</span>[
-                <span class="ident">RpnExpressionBuilder</span>::<span class="ident">new_for_test</span>()
+            <span class="macro">vec!</span>[
+                <span class="ident">RpnExpressionBuilder::new_for_test</span>()
                     .<span class="ident">push_column_ref_for_test</span>(<span class="number">0</span>)
-                    .<span class="ident">push_fn_call_for_test</span>(<span class="ident">is_null_fn_meta</span>::<span class="op">&lt;</span><span class="ident">Int</span><span class="op">&gt;</span>(), <span class="number">1</span>, <span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>)
+                    .<span class="ident">push_fn_call_for_test</span>(<span class="ident">is_null_fn_meta</span>::<span class="op">&lt;</span><span class="ident">Int</span><span class="op">&gt;</span>(), <span class="number">1</span>, <span class="ident">FieldTypeTp::LongLong</span>)
                     .<span class="ident">build_for_test</span>(),
-                <span class="ident">RpnExpressionBuilder</span>::<span class="ident">new_for_test</span>()
+                <span class="ident">RpnExpressionBuilder::new_for_test</span>()
                     .<span class="ident">push_column_ref_for_test</span>(<span class="number">0</span>)
                     .<span class="ident">build_for_test</span>(),
-                <span class="ident">RpnExpressionBuilder</span>::<span class="ident">new_for_test</span>()
+                <span class="ident">RpnExpressionBuilder::new_for_test</span>()
                     .<span class="ident">push_column_ref_for_test</span>(<span class="number">1</span>)
                     .<span class="ident">push_constant_for_test</span>(<span class="number">1</span>)
                     .<span class="ident">push_fn_call_for_test</span>(
                         <span class="ident">arithmetic_fn_meta</span>::<span class="op">&lt;</span><span class="ident">IntIntPlus</span><span class="op">&gt;</span>(),
                         <span class="number">2</span>,
-                        <span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>,
+                        <span class="ident">FieldTypeTp::LongLong</span>,
                     )
                     .<span class="ident">build_for_test</span>(),
             ],
-            <span class="macro">vec</span><span class="macro">!</span>[<span class="bool-val">false</span>, <span class="bool-val">false</span>, <span class="bool-val">true</span>],
+            <span class="macro">vec!</span>[<span class="bool-val">false</span>, <span class="bool-val">false</span>, <span class="bool-val">true</span>],
             <span class="number">5</span>,
         );
 
         <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="ident">exec</span>.<span class="ident">next_batch</span>(<span class="number">1</span>);
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">logical_rows</span>.<span class="ident">is_empty</span>());
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">0</span>);
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
+        <span class="macro">assert!</span>(<span class="ident">r</span>.<span class="ident">logical_rows</span>.<span class="ident">is_empty</span>());
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">0</span>);
+        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
 
         <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="ident">exec</span>.<span class="ident">next_batch</span>(<span class="number">1</span>);
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">logical_rows</span>.<span class="ident">is_empty</span>());
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">0</span>);
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
+        <span class="macro">assert!</span>(<span class="ident">r</span>.<span class="ident">logical_rows</span>.<span class="ident">is_empty</span>());
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">0</span>);
+        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
 
         <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="ident">exec</span>.<span class="ident">next_batch</span>(<span class="number">1</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="kw-2">&amp;</span><span class="ident">r</span>.<span class="ident">logical_rows</span>, <span class="kw-2">&amp;</span>[<span class="number">0</span>, <span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>]);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">5</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">columns_len</span>(), <span class="number">3</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(
+        <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span><span class="ident">r</span>.<span class="ident">logical_rows</span>, <span class="kw-2">&amp;</span>[<span class="number">0</span>, <span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>]);
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">5</span>);
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">columns_len</span>(), <span class="number">3</span>);
+        <span class="macro">assert_eq!</span>(
             <span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">0</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(),
             <span class="kw-2">&amp;</span>[<span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">10</span>), <span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">10</span>), <span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">10</span>), <span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">1</span>), <span class="prelude-val">None</span>]
         );
-        <span class="macro">assert_eq</span><span class="macro">!</span>(
+        <span class="macro">assert_eq!</span>(
             <span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">1</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(),
             <span class="kw-2">&amp;</span>[<span class="prelude-val">Some</span>(<span class="number">10</span>), <span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">10</span>), <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="number">1</span>)]
         );
-        <span class="macro">assert_eq</span><span class="macro">!</span>(
+        <span class="macro">assert_eq!</span>(
             <span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">2</span>].<span class="ident">decoded</span>().<span class="ident">to_real_vec</span>(),
             <span class="kw-2">&amp;</span>[
-                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">3.0</span>).<span class="ident">ok</span>(),
-                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">0.0</span>).<span class="ident">ok</span>(),
-                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="op">-</span><span class="number">5.0</span>).<span class="ident">ok</span>(),
+                <span class="ident">Real::new</span>(<span class="number">3.0</span>).<span class="ident">ok</span>(),
+                <span class="ident">Real::new</span>(<span class="number">0.0</span>).<span class="ident">ok</span>(),
+                <span class="ident">Real::new</span>(<span class="op">-</span><span class="number">5.0</span>).<span class="ident">ok</span>(),
                 <span class="prelude-val">None</span>,
-                <span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">4.0</span>).<span class="ident">ok</span>()
+                <span class="ident">Real::new</span>(<span class="number">4.0</span>).<span class="ident">ok</span>()
             ]
         );
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
+        <span class="macro">assert!</span>(<span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
     }
 
     <span class="doccomment">/// Builds an executor that will return these data:</span>
@@ -2167,49 +2181,49 @@
     <span class="doccomment">/// &quot;aaa&quot;                               &quot;Aa&quot;                        &quot;áa&quot;</span>
     <span class="doccomment">/// (drained)</span>
     <span class="kw">fn</span> <span class="ident">make_bytes_src_executor</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">MockExecutor</span> {
-        <span class="ident">MockExecutor</span>::<span class="ident">new</span>(
-            <span class="macro">vec</span><span class="macro">!</span>[
-                <span class="ident">FieldTypeBuilder</span>::<span class="ident">new</span>()
-                    .<span class="ident">tp</span>(<span class="ident">FieldTypeTp</span>::<span class="ident">VarChar</span>)
-                    .<span class="ident">collation</span>(<span class="ident">Collation</span>::<span class="ident">Utf8Mb4GeneralCi</span>)
+        <span class="ident">MockExecutor::new</span>(
+            <span class="macro">vec!</span>[
+                <span class="ident">FieldTypeBuilder::new</span>()
+                    .<span class="ident">tp</span>(<span class="ident">FieldTypeTp::VarChar</span>)
+                    .<span class="ident">collation</span>(<span class="ident">Collation::Utf8Mb4GeneralCi</span>)
                     .<span class="ident">into</span>(),
-                <span class="ident">FieldTypeBuilder</span>::<span class="ident">new</span>()
-                    .<span class="ident">tp</span>(<span class="ident">FieldTypeTp</span>::<span class="ident">VarChar</span>)
-                    .<span class="ident">collation</span>(<span class="ident">Collation</span>::<span class="ident">Utf8Mb4Bin</span>)
+                <span class="ident">FieldTypeBuilder::new</span>()
+                    .<span class="ident">tp</span>(<span class="ident">FieldTypeTp::VarChar</span>)
+                    .<span class="ident">collation</span>(<span class="ident">Collation::Utf8Mb4Bin</span>)
                     .<span class="ident">into</span>(),
-                <span class="ident">FieldTypeBuilder</span>::<span class="ident">new</span>()
-                    .<span class="ident">tp</span>(<span class="ident">FieldTypeTp</span>::<span class="ident">VarChar</span>)
-                    .<span class="ident">collation</span>(<span class="ident">Collation</span>::<span class="ident">Binary</span>)
+                <span class="ident">FieldTypeBuilder::new</span>()
+                    .<span class="ident">tp</span>(<span class="ident">FieldTypeTp::VarChar</span>)
+                    .<span class="ident">collation</span>(<span class="ident">Collation::Binary</span>)
                     .<span class="ident">into</span>(),
             ],
-            <span class="macro">vec</span><span class="macro">!</span>[
+            <span class="macro">vec!</span>[
                 <span class="ident">BatchExecuteResult</span> {
-                    <span class="ident">physical_columns</span>: <span class="ident">LazyBatchColumnVec</span>::<span class="ident">from</span>(<span class="macro">vec</span><span class="macro">!</span>[
-                        <span class="ident">VectorValue</span>::<span class="ident">Bytes</span>(
-                            <span class="macro">vec</span><span class="macro">!</span>[<span class="prelude-val">Some</span>(<span class="string">b&quot;aa&quot;</span>.<span class="ident">to_vec</span>()), <span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="string">b&quot;aa&quot;</span>.<span class="ident">to_vec</span>())].<span class="ident">into</span>(),
+                    <span class="ident">physical_columns</span>: <span class="ident">LazyBatchColumnVec::from</span>(<span class="macro">vec!</span>[
+                        <span class="ident">VectorValue::Bytes</span>(
+                            <span class="macro">vec!</span>[<span class="prelude-val">Some</span>(<span class="string">b&quot;aa&quot;</span>.<span class="ident">to_vec</span>()), <span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="string">b&quot;aa&quot;</span>.<span class="ident">to_vec</span>())].<span class="ident">into</span>(),
                         ),
-                        <span class="ident">VectorValue</span>::<span class="ident">Bytes</span>(
-                            <span class="macro">vec</span><span class="macro">!</span>[<span class="prelude-val">Some</span>(<span class="string">b&quot;aa&quot;</span>.<span class="ident">to_vec</span>()), <span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="string">b&quot;aaa&quot;</span>.<span class="ident">to_vec</span>())].<span class="ident">into</span>(),
+                        <span class="ident">VectorValue::Bytes</span>(
+                            <span class="macro">vec!</span>[<span class="prelude-val">Some</span>(<span class="string">b&quot;aa&quot;</span>.<span class="ident">to_vec</span>()), <span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="string">b&quot;aaa&quot;</span>.<span class="ident">to_vec</span>())].<span class="ident">into</span>(),
                         ),
-                        <span class="ident">VectorValue</span>::<span class="ident">Bytes</span>(
-                            <span class="macro">vec</span><span class="macro">!</span>[<span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="string">b&quot;Aa&quot;</span>.<span class="ident">to_vec</span>()), <span class="prelude-val">Some</span>(<span class="string">&quot;áaA&quot;</span>.<span class="ident">as_bytes</span>().<span class="ident">to_vec</span>())]
+                        <span class="ident">VectorValue::Bytes</span>(
+                            <span class="macro">vec!</span>[<span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="string">b&quot;Aa&quot;</span>.<span class="ident">to_vec</span>()), <span class="prelude-val">Some</span>(<span class="string">&quot;áaA&quot;</span>.<span class="ident">as_bytes</span>().<span class="ident">to_vec</span>())]
                                 .<span class="ident">into</span>(),
                         ),
                     ]),
-                    <span class="ident">logical_rows</span>: <span class="macro">vec</span><span class="macro">!</span>[<span class="number">2</span>, <span class="number">1</span>, <span class="number">0</span>],
-                    <span class="ident">warnings</span>: <span class="ident">EvalWarnings</span>::<span class="ident">default</span>(),
+                    <span class="ident">logical_rows</span>: <span class="macro">vec!</span>[<span class="number">2</span>, <span class="number">1</span>, <span class="number">0</span>],
+                    <span class="ident">warnings</span>: <span class="ident">EvalWarnings::default</span>(),
                     <span class="ident">is_drained</span>: <span class="prelude-val">Ok</span>(<span class="bool-val">false</span>),
                 },
                 <span class="ident">BatchExecuteResult</span> {
-                    <span class="ident">physical_columns</span>: <span class="ident">LazyBatchColumnVec</span>::<span class="ident">empty</span>(),
-                    <span class="ident">logical_rows</span>: <span class="ident">Vec</span>::<span class="ident">new</span>(),
-                    <span class="ident">warnings</span>: <span class="ident">EvalWarnings</span>::<span class="ident">default</span>(),
+                    <span class="ident">physical_columns</span>: <span class="ident">LazyBatchColumnVec::empty</span>(),
+                    <span class="ident">logical_rows</span>: <span class="ident">Vec::new</span>(),
+                    <span class="ident">warnings</span>: <span class="ident">EvalWarnings::default</span>(),
                     <span class="ident">is_drained</span>: <span class="prelude-val">Ok</span>(<span class="bool-val">false</span>),
                 },
                 <span class="ident">BatchExecuteResult</span> {
-                    <span class="ident">physical_columns</span>: <span class="ident">LazyBatchColumnVec</span>::<span class="ident">from</span>(<span class="macro">vec</span><span class="macro">!</span>[
-                        <span class="ident">VectorValue</span>::<span class="ident">Bytes</span>(
-                            <span class="macro">vec</span><span class="macro">!</span>[
+                    <span class="ident">physical_columns</span>: <span class="ident">LazyBatchColumnVec::from</span>(<span class="macro">vec!</span>[
+                        <span class="ident">VectorValue::Bytes</span>(
+                            <span class="macro">vec!</span>[
                                 <span class="prelude-val">Some</span>(<span class="string">&quot;áaA&quot;</span>.<span class="ident">as_bytes</span>().<span class="ident">to_vec</span>()),
                                 <span class="prelude-val">Some</span>(<span class="string">&quot;áa&quot;</span>.<span class="ident">as_bytes</span>().<span class="ident">to_vec</span>()),
                                 <span class="prelude-val">Some</span>(<span class="string">b&quot;Aa&quot;</span>.<span class="ident">to_vec</span>()),
@@ -2217,8 +2231,8 @@
                             ]
                             .<span class="ident">into</span>(),
                         ),
-                        <span class="ident">VectorValue</span>::<span class="ident">Bytes</span>(
-                            <span class="macro">vec</span><span class="macro">!</span>[
+                        <span class="ident">VectorValue::Bytes</span>(
+                            <span class="macro">vec!</span>[
                                 <span class="prelude-val">Some</span>(<span class="string">&quot;áa&quot;</span>.<span class="ident">as_bytes</span>().<span class="ident">to_vec</span>()),
                                 <span class="prelude-val">Some</span>(<span class="string">&quot;áaA&quot;</span>.<span class="ident">as_bytes</span>().<span class="ident">to_vec</span>()),
                                 <span class="prelude-val">None</span>,
@@ -2226,8 +2240,8 @@
                             ]
                             .<span class="ident">into</span>(),
                         ),
-                        <span class="ident">VectorValue</span>::<span class="ident">Bytes</span>(
-                            <span class="macro">vec</span><span class="macro">!</span>[
+                        <span class="ident">VectorValue::Bytes</span>(
+                            <span class="macro">vec!</span>[
                                 <span class="prelude-val">None</span>,
                                 <span class="prelude-val">Some</span>(<span class="string">b&quot;aa&quot;</span>.<span class="ident">to_vec</span>()),
                                 <span class="prelude-val">Some</span>(<span class="string">b&quot;aaa&quot;</span>.<span class="ident">to_vec</span>()),
@@ -2236,8 +2250,8 @@
                             .<span class="ident">into</span>(),
                         ),
                     ]),
-                    <span class="ident">logical_rows</span>: <span class="macro">vec</span><span class="macro">!</span>[<span class="number">0</span>, <span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>],
-                    <span class="ident">warnings</span>: <span class="ident">EvalWarnings</span>::<span class="ident">default</span>(),
+                    <span class="ident">logical_rows</span>: <span class="macro">vec!</span>[<span class="number">0</span>, <span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>],
+                    <span class="ident">warnings</span>: <span class="ident">EvalWarnings::default</span>(),
                     <span class="ident">is_drained</span>: <span class="prelude-val">Ok</span>(<span class="bool-val">true</span>),
                 },
             ],
@@ -2261,38 +2275,38 @@
 
         <span class="kw">let</span> <span class="ident">src_exec</span> <span class="op">=</span> <span class="ident">make_bytes_src_executor</span>();
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">exec</span> <span class="op">=</span> <span class="ident">BatchTopNExecutor</span>::<span class="ident">new_for_test</span>(
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">exec</span> <span class="op">=</span> <span class="ident">BatchTopNExecutor::new_for_test</span>(
             <span class="ident">src_exec</span>,
-            <span class="macro">vec</span><span class="macro">!</span>[
-                <span class="ident">RpnExpressionBuilder</span>::<span class="ident">new_for_test</span>()
+            <span class="macro">vec!</span>[
+                <span class="ident">RpnExpressionBuilder::new_for_test</span>()
                     .<span class="ident">push_column_ref_for_test</span>(<span class="number">0</span>)
                     .<span class="ident">build_for_test</span>(),
-                <span class="ident">RpnExpressionBuilder</span>::<span class="ident">new_for_test</span>()
+                <span class="ident">RpnExpressionBuilder::new_for_test</span>()
                     .<span class="ident">push_column_ref_for_test</span>(<span class="number">2</span>)
                     .<span class="ident">build_for_test</span>(),
-                <span class="ident">RpnExpressionBuilder</span>::<span class="ident">new_for_test</span>()
+                <span class="ident">RpnExpressionBuilder::new_for_test</span>()
                     .<span class="ident">push_column_ref_for_test</span>(<span class="number">1</span>)
                     .<span class="ident">build_for_test</span>(),
             ],
-            <span class="macro">vec</span><span class="macro">!</span>[<span class="bool-val">true</span>, <span class="bool-val">true</span>, <span class="bool-val">false</span>],
+            <span class="macro">vec!</span>[<span class="bool-val">true</span>, <span class="bool-val">true</span>, <span class="bool-val">false</span>],
             <span class="number">5</span>,
         );
 
         <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="ident">exec</span>.<span class="ident">next_batch</span>(<span class="number">1</span>);
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">logical_rows</span>.<span class="ident">is_empty</span>());
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">0</span>);
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
+        <span class="macro">assert!</span>(<span class="ident">r</span>.<span class="ident">logical_rows</span>.<span class="ident">is_empty</span>());
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">0</span>);
+        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
 
         <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="ident">exec</span>.<span class="ident">next_batch</span>(<span class="number">1</span>);
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">logical_rows</span>.<span class="ident">is_empty</span>());
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">0</span>);
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
+        <span class="macro">assert!</span>(<span class="ident">r</span>.<span class="ident">logical_rows</span>.<span class="ident">is_empty</span>());
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">0</span>);
+        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
 
         <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="ident">exec</span>.<span class="ident">next_batch</span>(<span class="number">1</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="kw-2">&amp;</span><span class="ident">r</span>.<span class="ident">logical_rows</span>, <span class="kw-2">&amp;</span>[<span class="number">0</span>, <span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>]);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">5</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">columns_len</span>(), <span class="number">3</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(
+        <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span><span class="ident">r</span>.<span class="ident">logical_rows</span>, <span class="kw-2">&amp;</span>[<span class="number">0</span>, <span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>]);
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">5</span>);
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">columns_len</span>(), <span class="number">3</span>);
+        <span class="macro">assert_eq!</span>(
             <span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">0</span>].<span class="ident">decoded</span>().<span class="ident">to_bytes_vec</span>(),
             <span class="kw-2">&amp;</span>[
                 <span class="prelude-val">Some</span>(<span class="string">b&quot;aaa&quot;</span>.<span class="ident">to_vec</span>()),
@@ -2302,7 +2316,7 @@
                 <span class="prelude-val">Some</span>(<span class="string">&quot;áa&quot;</span>.<span class="ident">as_bytes</span>().<span class="ident">to_vec</span>()),
             ]
         );
-        <span class="macro">assert_eq</span><span class="macro">!</span>(
+        <span class="macro">assert_eq!</span>(
             <span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">1</span>].<span class="ident">decoded</span>().<span class="ident">to_bytes_vec</span>(),
             <span class="kw-2">&amp;</span>[
                 <span class="prelude-val">Some</span>(<span class="string">b&quot;Aa&quot;</span>.<span class="ident">to_vec</span>()),
@@ -2312,7 +2326,7 @@
                 <span class="prelude-val">Some</span>(<span class="string">&quot;áaA&quot;</span>.<span class="ident">as_bytes</span>().<span class="ident">to_vec</span>()),
             ]
         );
-        <span class="macro">assert_eq</span><span class="macro">!</span>(
+        <span class="macro">assert_eq!</span>(
             <span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">2</span>].<span class="ident">decoded</span>().<span class="ident">to_bytes_vec</span>(),
             <span class="kw-2">&amp;</span>[
                 <span class="prelude-val">Some</span>(<span class="string">&quot;áa&quot;</span>.<span class="ident">as_bytes</span>().<span class="ident">to_vec</span>()),
@@ -2322,7 +2336,7 @@
                 <span class="prelude-val">Some</span>(<span class="string">b&quot;aa&quot;</span>.<span class="ident">to_vec</span>()),
             ]
         );
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
+        <span class="macro">assert!</span>(<span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
@@ -2342,38 +2356,38 @@
 
         <span class="kw">let</span> <span class="ident">src_exec</span> <span class="op">=</span> <span class="ident">make_bytes_src_executor</span>();
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">exec</span> <span class="op">=</span> <span class="ident">BatchTopNExecutor</span>::<span class="ident">new_for_test</span>(
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">exec</span> <span class="op">=</span> <span class="ident">BatchTopNExecutor::new_for_test</span>(
             <span class="ident">src_exec</span>,
-            <span class="macro">vec</span><span class="macro">!</span>[
-                <span class="ident">RpnExpressionBuilder</span>::<span class="ident">new_for_test</span>()
+            <span class="macro">vec!</span>[
+                <span class="ident">RpnExpressionBuilder::new_for_test</span>()
                     .<span class="ident">push_column_ref_for_test</span>(<span class="number">0</span>)
                     .<span class="ident">build_for_test</span>(),
-                <span class="ident">RpnExpressionBuilder</span>::<span class="ident">new_for_test</span>()
+                <span class="ident">RpnExpressionBuilder::new_for_test</span>()
                     .<span class="ident">push_column_ref_for_test</span>(<span class="number">1</span>)
                     .<span class="ident">build_for_test</span>(),
-                <span class="ident">RpnExpressionBuilder</span>::<span class="ident">new_for_test</span>()
+                <span class="ident">RpnExpressionBuilder::new_for_test</span>()
                     .<span class="ident">push_column_ref_for_test</span>(<span class="number">2</span>)
                     .<span class="ident">build_for_test</span>(),
             ],
-            <span class="macro">vec</span><span class="macro">!</span>[<span class="bool-val">false</span>, <span class="bool-val">false</span>, <span class="bool-val">false</span>],
+            <span class="macro">vec!</span>[<span class="bool-val">false</span>, <span class="bool-val">false</span>, <span class="bool-val">false</span>],
             <span class="number">5</span>,
         );
 
         <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="ident">exec</span>.<span class="ident">next_batch</span>(<span class="number">1</span>);
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">logical_rows</span>.<span class="ident">is_empty</span>());
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">0</span>);
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
+        <span class="macro">assert!</span>(<span class="ident">r</span>.<span class="ident">logical_rows</span>.<span class="ident">is_empty</span>());
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">0</span>);
+        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
 
         <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="ident">exec</span>.<span class="ident">next_batch</span>(<span class="number">1</span>);
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">logical_rows</span>.<span class="ident">is_empty</span>());
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">0</span>);
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
+        <span class="macro">assert!</span>(<span class="ident">r</span>.<span class="ident">logical_rows</span>.<span class="ident">is_empty</span>());
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">0</span>);
+        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
 
         <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="ident">exec</span>.<span class="ident">next_batch</span>(<span class="number">1</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="kw-2">&amp;</span><span class="ident">r</span>.<span class="ident">logical_rows</span>, <span class="kw-2">&amp;</span>[<span class="number">0</span>, <span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>]);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">5</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">columns_len</span>(), <span class="number">3</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(
+        <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span><span class="ident">r</span>.<span class="ident">logical_rows</span>, <span class="kw-2">&amp;</span>[<span class="number">0</span>, <span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>]);
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">5</span>);
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">columns_len</span>(), <span class="number">3</span>);
+        <span class="macro">assert_eq!</span>(
             <span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">0</span>].<span class="ident">decoded</span>().<span class="ident">to_bytes_vec</span>(),
             <span class="kw-2">&amp;</span>[
                 <span class="prelude-val">None</span>,
@@ -2383,7 +2397,7 @@
                 <span class="prelude-val">Some</span>(<span class="string">&quot;áa&quot;</span>.<span class="ident">as_bytes</span>().<span class="ident">to_vec</span>()),
             ]
         );
-        <span class="macro">assert_eq</span><span class="macro">!</span>(
+        <span class="macro">assert_eq!</span>(
             <span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">1</span>].<span class="ident">decoded</span>().<span class="ident">to_bytes_vec</span>(),
             <span class="kw-2">&amp;</span>[
                 <span class="prelude-val">None</span>,
@@ -2393,7 +2407,7 @@
                 <span class="prelude-val">Some</span>(<span class="string">&quot;áaA&quot;</span>.<span class="ident">as_bytes</span>().<span class="ident">to_vec</span>()),
             ]
         );
-        <span class="macro">assert_eq</span><span class="macro">!</span>(
+        <span class="macro">assert_eq!</span>(
             <span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">2</span>].<span class="ident">decoded</span>().<span class="ident">to_bytes_vec</span>(),
             <span class="kw-2">&amp;</span>[
                 <span class="prelude-val">Some</span>(<span class="string">b&quot;Aa&quot;</span>.<span class="ident">to_vec</span>()),
@@ -2403,7 +2417,7 @@
                 <span class="prelude-val">Some</span>(<span class="string">b&quot;aa&quot;</span>.<span class="ident">to_vec</span>()),
             ]
         );
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
+        <span class="macro">assert!</span>(<span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
     }
 
     <span class="doccomment">/// Builds an executor that will return these data:</span>
@@ -2422,32 +2436,32 @@
     <span class="doccomment">/// 9,223,372,036,854,775,808      -9,223,372,036,854,775,808   2,147,483,648</span>
     <span class="doccomment">/// (drained)                      (drained)                    (drained)</span>
     <span class="kw">fn</span> <span class="ident">make_src_executor_unsigned</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">MockExecutor</span> {
-        <span class="ident">MockExecutor</span>::<span class="ident">new</span>(
-            <span class="macro">vec</span><span class="macro">!</span>[
-                <span class="ident">FieldTypeBuilder</span>::<span class="ident">new</span>()
-                    .<span class="ident">tp</span>(<span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>)
-                    .<span class="ident">flag</span>(<span class="ident">FieldTypeFlag</span>::<span class="ident">UNSIGNED</span>)
+        <span class="ident">MockExecutor::new</span>(
+            <span class="macro">vec!</span>[
+                <span class="ident">FieldTypeBuilder::new</span>()
+                    .<span class="ident">tp</span>(<span class="ident">FieldTypeTp::LongLong</span>)
+                    .<span class="ident">flag</span>(<span class="ident">FieldTypeFlag::UNSIGNED</span>)
                     .<span class="ident">into</span>(),
-                <span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>.<span class="ident">into</span>(),
-                <span class="ident">FieldTypeBuilder</span>::<span class="ident">new</span>()
-                    .<span class="ident">tp</span>(<span class="ident">FieldTypeTp</span>::<span class="ident">Long</span>)
-                    .<span class="ident">flag</span>(<span class="ident">FieldTypeFlag</span>::<span class="ident">UNSIGNED</span>)
+                <span class="ident">FieldTypeTp::LongLong</span>.<span class="ident">into</span>(),
+                <span class="ident">FieldTypeBuilder::new</span>()
+                    .<span class="ident">tp</span>(<span class="ident">FieldTypeTp::Long</span>)
+                    .<span class="ident">flag</span>(<span class="ident">FieldTypeFlag::UNSIGNED</span>)
                     .<span class="ident">into</span>(),
             ],
-            <span class="macro">vec</span><span class="macro">!</span>[
+            <span class="macro">vec!</span>[
                 <span class="ident">BatchExecuteResult</span> {
-                    <span class="ident">physical_columns</span>: <span class="ident">LazyBatchColumnVec</span>::<span class="ident">from</span>(<span class="macro">vec</span><span class="macro">!</span>[
-                        <span class="ident">VectorValue</span>::<span class="ident">Int</span>(
-                            <span class="macro">vec</span><span class="macro">!</span>[
+                    <span class="ident">physical_columns</span>: <span class="ident">LazyBatchColumnVec::from</span>(<span class="macro">vec!</span>[
+                        <span class="ident">VectorValue::Int</span>(
+                            <span class="macro">vec!</span>[
                                 <span class="prelude-val">Some</span>(<span class="number">18_446_744_073_709_551_613_u64</span> <span class="kw">as</span> <span class="ident">i64</span>),
                                 <span class="prelude-val">None</span>,
                                 <span class="prelude-val">Some</span>(<span class="number">18_446_744_073_709_551_615_u64</span> <span class="kw">as</span> <span class="ident">i64</span>),
                             ]
                             .<span class="ident">into</span>(),
                         ),
-                        <span class="ident">VectorValue</span>::<span class="ident">Int</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">1</span>), <span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">3</span>)].<span class="ident">into</span>()),
-                        <span class="ident">VectorValue</span>::<span class="ident">Int</span>(
-                            <span class="macro">vec</span><span class="macro">!</span>[
+                        <span class="ident">VectorValue::Int</span>(<span class="macro">vec!</span>[<span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">1</span>), <span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="op">-</span><span class="number">3</span>)].<span class="ident">into</span>()),
+                        <span class="ident">VectorValue::Int</span>(
+                            <span class="macro">vec!</span>[
                                 <span class="prelude-val">Some</span>(<span class="number">4_294_967_295_u32</span> <span class="kw">as</span> <span class="ident">i64</span>),
                                 <span class="prelude-val">None</span>,
                                 <span class="prelude-val">Some</span>(<span class="number">4_294_967_295_u32</span> <span class="kw">as</span> <span class="ident">i64</span>),
@@ -2455,20 +2469,20 @@
                             .<span class="ident">into</span>(),
                         ),
                     ]),
-                    <span class="ident">logical_rows</span>: <span class="macro">vec</span><span class="macro">!</span>[<span class="number">2</span>, <span class="number">1</span>, <span class="number">0</span>],
-                    <span class="ident">warnings</span>: <span class="ident">EvalWarnings</span>::<span class="ident">default</span>(),
+                    <span class="ident">logical_rows</span>: <span class="macro">vec!</span>[<span class="number">2</span>, <span class="number">1</span>, <span class="number">0</span>],
+                    <span class="ident">warnings</span>: <span class="ident">EvalWarnings::default</span>(),
                     <span class="ident">is_drained</span>: <span class="prelude-val">Ok</span>(<span class="bool-val">false</span>),
                 },
                 <span class="ident">BatchExecuteResult</span> {
-                    <span class="ident">physical_columns</span>: <span class="ident">LazyBatchColumnVec</span>::<span class="ident">empty</span>(),
-                    <span class="ident">logical_rows</span>: <span class="ident">Vec</span>::<span class="ident">new</span>(),
-                    <span class="ident">warnings</span>: <span class="ident">EvalWarnings</span>::<span class="ident">default</span>(),
+                    <span class="ident">physical_columns</span>: <span class="ident">LazyBatchColumnVec::empty</span>(),
+                    <span class="ident">logical_rows</span>: <span class="ident">Vec::new</span>(),
+                    <span class="ident">warnings</span>: <span class="ident">EvalWarnings::default</span>(),
                     <span class="ident">is_drained</span>: <span class="prelude-val">Ok</span>(<span class="bool-val">false</span>),
                 },
                 <span class="ident">BatchExecuteResult</span> {
-                    <span class="ident">physical_columns</span>: <span class="ident">LazyBatchColumnVec</span>::<span class="ident">from</span>(<span class="macro">vec</span><span class="macro">!</span>[
-                        <span class="ident">VectorValue</span>::<span class="ident">Int</span>(
-                            <span class="macro">vec</span><span class="macro">!</span>[
+                    <span class="ident">physical_columns</span>: <span class="ident">LazyBatchColumnVec::from</span>(<span class="macro">vec!</span>[
+                        <span class="ident">VectorValue::Int</span>(
+                            <span class="macro">vec!</span>[
                                 <span class="prelude-val">Some</span>(<span class="number">300_u64</span> <span class="kw">as</span> <span class="ident">i64</span>),
                                 <span class="prelude-val">Some</span>(<span class="number">9_223_372_036_854_775_807_u64</span> <span class="kw">as</span> <span class="ident">i64</span>),
                                 <span class="prelude-val">Some</span>(<span class="number">2000_u64</span> <span class="kw">as</span> <span class="ident">i64</span>),
@@ -2476,8 +2490,8 @@
                             ]
                             .<span class="ident">into</span>(),
                         ),
-                        <span class="ident">VectorValue</span>::<span class="ident">Int</span>(
-                            <span class="macro">vec</span><span class="macro">!</span>[
+                        <span class="ident">VectorValue::Int</span>(
+                            <span class="macro">vec!</span>[
                                 <span class="prelude-val">Some</span>(<span class="number">300</span>),
                                 <span class="prelude-val">Some</span>(<span class="number">9_223_372_036_854_775_807</span>),
                                 <span class="prelude-val">Some</span>(<span class="number">2000</span>),
@@ -2485,8 +2499,8 @@
                             ]
                             .<span class="ident">into</span>(),
                         ),
-                        <span class="ident">VectorValue</span>::<span class="ident">Int</span>(
-                            <span class="macro">vec</span><span class="macro">!</span>[
+                        <span class="ident">VectorValue::Int</span>(
+                            <span class="macro">vec!</span>[
                                 <span class="prelude-val">Some</span>(<span class="number">300_u32</span> <span class="kw">as</span> <span class="ident">i64</span>),
                                 <span class="prelude-val">Some</span>(<span class="number">2_147_483_647_u32</span> <span class="kw">as</span> <span class="ident">i64</span>),
                                 <span class="prelude-val">Some</span>(<span class="number">2000_u32</span> <span class="kw">as</span> <span class="ident">i64</span>),
@@ -2495,8 +2509,8 @@
                             .<span class="ident">into</span>(),
                         ),
                     ]),
-                    <span class="ident">logical_rows</span>: <span class="macro">vec</span><span class="macro">!</span>[<span class="number">2</span>, <span class="number">1</span>, <span class="number">0</span>, <span class="number">3</span>],
-                    <span class="ident">warnings</span>: <span class="ident">EvalWarnings</span>::<span class="ident">default</span>(),
+                    <span class="ident">logical_rows</span>: <span class="macro">vec!</span>[<span class="number">2</span>, <span class="number">1</span>, <span class="number">0</span>, <span class="number">3</span>],
+                    <span class="ident">warnings</span>: <span class="ident">EvalWarnings::default</span>(),
                     <span class="ident">is_drained</span>: <span class="prelude-val">Ok</span>(<span class="bool-val">true</span>),
                 },
             ],
@@ -2507,34 +2521,36 @@
     <span class="kw">fn</span> <span class="ident">test_top_unsigned</span>() {
         <span class="kw">let</span> <span class="ident">test_top5</span> <span class="op">=</span> <span class="op">|</span><span class="ident">col_index</span>: <span class="ident">usize</span>, <span class="ident">is_desc</span>: <span class="ident">bool</span>, <span class="ident">expected</span>: <span class="kw-2">&amp;</span>[<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">i64</span><span class="op">&gt;</span>]<span class="op">|</span> {
             <span class="kw">let</span> <span class="ident">src_exec</span> <span class="op">=</span> <span class="ident">make_src_executor_unsigned</span>();
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">exec</span> <span class="op">=</span> <span class="ident">BatchTopNExecutor</span>::<span class="ident">new_for_test</span>(
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">exec</span> <span class="op">=</span> <span class="ident">BatchTopNExecutor::new_for_test</span>(
                 <span class="ident">src_exec</span>,
-                <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">RpnExpressionBuilder</span>::<span class="ident">new_for_test</span>()
-                    .<span class="ident">push_column_ref_for_test</span>(<span class="ident">col_index</span>)
-                    .<span class="ident">build_for_test</span>()],
-                <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">is_desc</span>],
+                <span class="macro">vec!</span>[
+                    <span class="ident">RpnExpressionBuilder::new_for_test</span>()
+                        .<span class="ident">push_column_ref_for_test</span>(<span class="ident">col_index</span>)
+                        .<span class="ident">build_for_test</span>(),
+                ],
+                <span class="macro">vec!</span>[<span class="ident">is_desc</span>],
                 <span class="number">5</span>,
             );
 
             <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="ident">exec</span>.<span class="ident">next_batch</span>(<span class="number">1</span>);
-            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">logical_rows</span>.<span class="ident">is_empty</span>());
-            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">0</span>);
-            <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
+            <span class="macro">assert!</span>(<span class="ident">r</span>.<span class="ident">logical_rows</span>.<span class="ident">is_empty</span>());
+            <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">0</span>);
+            <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
 
             <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="ident">exec</span>.<span class="ident">next_batch</span>(<span class="number">1</span>);
-            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">logical_rows</span>.<span class="ident">is_empty</span>());
-            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">0</span>);
-            <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
+            <span class="macro">assert!</span>(<span class="ident">r</span>.<span class="ident">logical_rows</span>.<span class="ident">is_empty</span>());
+            <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">0</span>);
+            <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
 
             <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="ident">exec</span>.<span class="ident">next_batch</span>(<span class="number">1</span>);
-            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="kw-2">&amp;</span><span class="ident">r</span>.<span class="ident">logical_rows</span>, <span class="kw-2">&amp;</span>[<span class="number">0</span>, <span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>]);
-            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">5</span>);
-            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">columns_len</span>(), <span class="number">3</span>);
-            <span class="macro">assert_eq</span><span class="macro">!</span>(
+            <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span><span class="ident">r</span>.<span class="ident">logical_rows</span>, <span class="kw-2">&amp;</span>[<span class="number">0</span>, <span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>]);
+            <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">5</span>);
+            <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">columns_len</span>(), <span class="number">3</span>);
+            <span class="macro">assert_eq!</span>(
                 <span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="ident">col_index</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(),
                 <span class="ident">expected</span>
             );
-            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
+            <span class="macro">assert!</span>(<span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
         };
 
         <span class="ident">test_top5</span>(
@@ -2611,5 +2627,5 @@
     }
 }
 </pre></div>
-</section><section id="search" class="content hidden"></section><section class="footer"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="tidb_query_executors"></div>
-    <script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script><script defer src="../../search-index.js"></script></body></html>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="tidb_query_executors" data-search-js="../../search-index.js"></div>
+    <script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script></body></html>

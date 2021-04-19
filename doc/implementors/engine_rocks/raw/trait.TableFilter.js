@@ -1,3 +1,3 @@
 (function() {var implementors = {};
-implementors["engine_rocks"] = [{"text":"impl TableFilter for TsFilter","synthetic":false,"types":[]}];
+implementors["engine_rocks"] = [{"text":"impl <a class=\"trait\" href=\"engine_rocks/raw/trait.TableFilter.html\" title=\"trait engine_rocks::raw::TableFilter\">TableFilter</a> for <a class=\"struct\" href=\"engine_rocks/options/struct.TsFilter.html\" title=\"struct engine_rocks::options::TsFilter\">TsFilter</a>","synthetic":false,"types":["engine_rocks::options::TsFilter"]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

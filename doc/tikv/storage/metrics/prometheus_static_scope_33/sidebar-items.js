@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["SchedTooBusyVec",""],["SchedTooBusyVecDelegator",""],["SchedTooBusyVecInner",""]]});
+initSidebarItems({"struct":[["SchedCommandPriCounterVec",""],["SchedCommandPriCounterVecDelegator",""],["SchedCommandPriCounterVecInner",""]]});

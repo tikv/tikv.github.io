@@ -1,3 +1,3 @@
 (function() {var implementors = {};
-implementors["security"] = [{"text":"impl ServerChecker for CNChecker","synthetic":false,"types":[]}];
+implementors["security"] = [{"text":"impl <a class=\"trait\" href=\"grpcio/server/trait.ServerChecker.html\" title=\"trait grpcio::server::ServerChecker\">ServerChecker</a> for <a class=\"struct\" href=\"security/struct.CNChecker.html\" title=\"struct security::CNChecker\">CNChecker</a>","synthetic":false,"types":["security::CNChecker"]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

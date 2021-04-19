@@ -1,4 +1,4 @@
 (function() {var implementors = {};
-implementors["engine_panic"] = [{"text":"impl CompactedEvent for PanicCompactedEvent","synthetic":false,"types":[]}];
-implementors["engine_rocks"] = [{"text":"impl CompactedEvent for RocksCompactedEvent","synthetic":false,"types":[]}];
+implementors["engine_panic"] = [{"text":"impl <a class=\"trait\" href=\"engine_traits/compact/trait.CompactedEvent.html\" title=\"trait engine_traits::compact::CompactedEvent\">CompactedEvent</a> for <a class=\"struct\" href=\"engine_panic/compact/struct.PanicCompactedEvent.html\" title=\"struct engine_panic::compact::PanicCompactedEvent\">PanicCompactedEvent</a>","synthetic":false,"types":["engine_panic::compact::PanicCompactedEvent"]}];
+implementors["engine_rocks"] = [{"text":"impl <a class=\"trait\" href=\"engine_traits/compact/trait.CompactedEvent.html\" title=\"trait engine_traits::compact::CompactedEvent\">CompactedEvent</a> for <a class=\"struct\" href=\"engine_rocks/compact_listener/struct.RocksCompactedEvent.html\" title=\"struct engine_rocks::compact_listener::RocksCompactedEvent\">RocksCompactedEvent</a>","synthetic":false,"types":["engine_rocks::compact_listener::RocksCompactedEvent"]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

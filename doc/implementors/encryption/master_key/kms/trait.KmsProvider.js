@@ -1,3 +1,3 @@
 (function() {var implementors = {};
-implementors["encryption_export"] = [{"text":"impl KmsProvider for CloudKms","synthetic":false,"types":[]}];
+implementors["encryption_export"] = [{"text":"impl <a class=\"trait\" href=\"encryption/master_key/kms/trait.KmsProvider.html\" title=\"trait encryption::master_key::kms::KmsProvider\">KmsProvider</a> for <a class=\"struct\" href=\"encryption_export/struct.CloudKms.html\" title=\"struct encryption_export::CloudKms\">CloudKms</a>","synthetic":false,"types":["encryption_export::CloudKms"]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

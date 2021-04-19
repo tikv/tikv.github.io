@@ -1,7 +1,7 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/coprocessor/statistics/analyze.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>analyze.rs - source</title><link rel="stylesheet" type="text/css" href="../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/coprocessor/statistics/analyze.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>analyze.rs - source</title><link rel="stylesheet" type="text/css" href="../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../../storage.js"></script><script src="../../../../crates.js"></script><noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg">
 <link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../../tikv/index.html'><div class='logo-container rust-logo'><img src='../../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><script src="../../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
-                <a id="settings-menu" href="../../../../settings.html"><img src="../../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../../../tikv/index.html'><div class='logo-container rust-logo'><img src='../../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
+                <a id="settings-menu" href="../../../../settings.html"><img src="../../../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
 <span id="2">  2</span>
 <span id="3">  3</span>
 <span id="4">  4</span>
@@ -661,40 +661,50 @@
 <span id="658">658</span>
 <span id="659">659</span>
 <span id="660">660</span>
+<span id="661">661</span>
+<span id="662">662</span>
+<span id="663">663</span>
+<span id="664">664</span>
+<span id="665">665</span>
+<span id="666">666</span>
+<span id="667">667</span>
+<span id="668">668</span>
+<span id="669">669</span>
+<span id="670">670</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2017 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">cmp</span>::<span class="ident">Reverse</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">collections</span>::<span class="ident">BinaryHeap</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">mem</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">Arc</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">time</span>::<span class="ident">Instant</span>;
+<span class="kw">use</span> <span class="ident">std::cmp::Reverse</span>;
+<span class="kw">use</span> <span class="ident">std::collections::BinaryHeap</span>;
 
-<span class="kw">use</span> <span class="ident">async_trait</span>::<span class="ident">async_trait</span>;
-<span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">coprocessor</span>::{<span class="ident">KeyRange</span>, <span class="ident">Response</span>};
-<span class="kw">use</span> <span class="ident">protobuf</span>::<span class="ident">Message</span>;
-<span class="kw">use</span> <span class="ident">rand</span>::<span class="ident">rngs</span>::<span class="ident">StdRng</span>;
-<span class="kw">use</span> <span class="ident">rand</span>::<span class="ident">Rng</span>;
-<span class="kw">use</span> <span class="ident">tidb_query_common</span>::<span class="ident">storage</span>::<span class="ident">scanner</span>::{<span class="ident">RangesScanner</span>, <span class="ident">RangesScannerOptions</span>};
-<span class="kw">use</span> <span class="ident">tidb_query_common</span>::<span class="ident">storage</span>::<span class="ident">Range</span>;
-<span class="kw">use</span> <span class="ident">tidb_query_datatype</span>::<span class="ident">codec</span>::<span class="ident">datum</span>::{<span class="ident">encode_value</span>, <span class="ident">split_datum</span>, <span class="ident">Datum</span>, <span class="ident">NIL_FLAG</span>};
-<span class="kw">use</span> <span class="ident">tidb_query_datatype</span>::<span class="ident">codec</span>::<span class="ident">table</span>;
-<span class="kw">use</span> <span class="ident">tidb_query_datatype</span>::<span class="ident">def</span>::<span class="ident">Collation</span>;
-<span class="kw">use</span> <span class="ident">tidb_query_datatype</span>::<span class="ident">expr</span>::{<span class="ident">EvalConfig</span>, <span class="ident">EvalContext</span>};
-<span class="kw">use</span> <span class="ident">tidb_query_datatype</span>::<span class="ident">FieldTypeAccessor</span>;
+<span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
+<span class="kw">use</span> <span class="ident">std::time::Instant</span>;
+
+<span class="kw">use</span> <span class="ident">async_trait::async_trait</span>;
+<span class="kw">use</span> <span class="ident">kvproto::coprocessor</span>::{<span class="ident">KeyRange</span>, <span class="ident">Response</span>};
+<span class="kw">use</span> <span class="ident">protobuf::Message</span>;
+<span class="kw">use</span> <span class="ident">rand::rngs::StdRng</span>;
+<span class="kw">use</span> <span class="ident">rand::Rng</span>;
+<span class="kw">use</span> <span class="ident">tidb_query_common::storage::scanner</span>::{<span class="ident">RangesScanner</span>, <span class="ident">RangesScannerOptions</span>};
+<span class="kw">use</span> <span class="ident">tidb_query_common::storage::Range</span>;
+<span class="kw">use</span> <span class="ident">tidb_query_datatype::codec::datum</span>::{<span class="ident">encode_value</span>, <span class="ident">split_datum</span>, <span class="ident">Datum</span>, <span class="ident">NIL_FLAG</span>};
+<span class="kw">use</span> <span class="ident">tidb_query_datatype::codec::table</span>;
+<span class="kw">use</span> <span class="ident">tidb_query_datatype::def::Collation</span>;
+<span class="kw">use</span> <span class="ident">tidb_query_datatype::expr</span>::{<span class="ident">EvalConfig</span>, <span class="ident">EvalContext</span>};
+<span class="kw">use</span> <span class="ident">tidb_query_datatype::FieldTypeAccessor</span>;
 <span class="kw">use</span> <span class="ident">tidb_query_executors</span>::{
-    <span class="ident">interface</span>::<span class="ident">BatchExecutor</span>, <span class="ident">runner</span>::<span class="ident">MAX_TIME_SLICE</span>, <span class="ident">BatchTableScanExecutor</span>,
+    <span class="ident">interface::BatchExecutor</span>, <span class="ident">runner::MAX_TIME_SLICE</span>, <span class="ident">BatchTableScanExecutor</span>,
 };
-<span class="kw">use</span> <span class="ident">tidb_query_expr</span>::<span class="ident">BATCH_MAX_SIZE</span>;
+<span class="kw">use</span> <span class="ident">tidb_query_expr::BATCH_MAX_SIZE</span>;
 <span class="kw">use</span> <span class="ident">tipb</span>::{<span class="self">self</span>, <span class="ident">AnalyzeColumnsReq</span>, <span class="ident">AnalyzeIndexReq</span>, <span class="ident">AnalyzeReq</span>, <span class="ident">AnalyzeType</span>};
-<span class="kw">use</span> <span class="ident">yatp</span>::<span class="ident">task</span>::<span class="ident">future</span>::<span class="ident">reschedule</span>;
+<span class="kw">use</span> <span class="ident">yatp::task::future::reschedule</span>;
 
-<span class="kw">use</span> <span class="kw">super</span>::<span class="ident">cmsketch</span>::<span class="ident">CmSketch</span>;
-<span class="kw">use</span> <span class="kw">super</span>::<span class="ident">fmsketch</span>::<span class="ident">FmSketch</span>;
-<span class="kw">use</span> <span class="kw">super</span>::<span class="ident">histogram</span>::<span class="ident">Histogram</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">coprocessor</span>::<span class="ident">dag</span>::<span class="ident">TiKVStorage</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">coprocessor</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">storage</span>::{<span class="ident">Snapshot</span>, <span class="ident">SnapshotStore</span>, <span class="ident">Statistics</span>};
+<span class="kw">use</span> <span class="kw">super</span><span class="ident">::cmsketch::CmSketch</span>;
+<span class="kw">use</span> <span class="kw">super</span><span class="ident">::fmsketch::FmSketch</span>;
+<span class="kw">use</span> <span class="kw">super</span><span class="ident">::histogram::Histogram</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::coprocessor::dag::TiKVStorage</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::coprocessor</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::storage</span>::{<span class="ident">Snapshot</span>, <span class="ident">SnapshotStore</span>, <span class="ident">Statistics</span>};
 
 <span class="kw">const</span> <span class="ident">ANALYZE_VERSION_V1</span>: <span class="ident">i32</span> <span class="op">=</span> <span class="number">1</span>;
 <span class="kw">const</span> <span class="ident">ANALYZE_VERSION_V2</span>: <span class="ident">i32</span> <span class="op">=</span> <span class="number">2</span>;
@@ -715,7 +725,7 @@
         <span class="ident">snap</span>: <span class="ident">S</span>,
         <span class="ident">req_ctx</span>: <span class="kw-2">&amp;</span><span class="ident">ReqContext</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">store</span> <span class="op">=</span> <span class="ident">SnapshotStore</span>::<span class="ident">new</span>(
+        <span class="kw">let</span> <span class="ident">store</span> <span class="op">=</span> <span class="ident">SnapshotStore::new</span>(
             <span class="ident">snap</span>,
             <span class="ident">start_ts</span>.<span class="ident">into</span>(),
             <span class="ident">req_ctx</span>.<span class="ident">context</span>.<span class="ident">get_isolation_level</span>(),
@@ -725,9 +735,9 @@
         );
         <span class="prelude-val">Ok</span>(<span class="self">Self</span> {
             <span class="ident">req</span>,
-            <span class="ident">storage</span>: <span class="prelude-val">Some</span>(<span class="ident">TiKVStorage</span>::<span class="ident">new</span>(<span class="ident">store</span>, <span class="bool-val">false</span>)),
+            <span class="ident">storage</span>: <span class="prelude-val">Some</span>(<span class="ident">TiKVStorage::new</span>(<span class="ident">store</span>, <span class="bool-val">false</span>)),
             <span class="ident">ranges</span>,
-            <span class="ident">storage_stats</span>: <span class="ident">Statistics</span>::<span class="ident">default</span>(),
+            <span class="ident">storage_stats</span>: <span class="ident">Statistics::default</span>(),
         })
     }
 
@@ -739,7 +749,7 @@
 
         <span class="kw">let</span> <span class="ident">res_data</span> <span class="op">=</span> {
             <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">col_res</span>.<span class="ident">into_proto</span>();
-            <span class="macro">box_try</span><span class="macro">!</span>(<span class="ident">res</span>.<span class="ident">write_to_bytes</span>())
+            <span class="macro">box_try!</span>(<span class="ident">res</span>.<span class="ident">write_to_bytes</span>())
         };
         <span class="prelude-val">Ok</span>(<span class="ident">res_data</span>)
     }
@@ -748,14 +758,14 @@
         <span class="kw">let</span> (<span class="ident">col_res</span>, <span class="ident">idx_res</span>) <span class="op">=</span> <span class="ident">builder</span>.<span class="ident">collect_columns_stats</span>().<span class="kw">await</span><span class="question-mark">?</span>;
 
         <span class="kw">let</span> <span class="ident">res_data</span> <span class="op">=</span> {
-            <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">AnalyzeMixedResult</span>::<span class="ident">new</span>(
+            <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">AnalyzeMixedResult::new</span>(
                 <span class="ident">col_res</span>,
                 <span class="ident">idx_res</span>.<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> {
-                    <span class="ident">Error</span>::<span class="ident">Other</span>(<span class="string">&quot;Mixed analyze type should have index response.&quot;</span>.<span class="ident">into</span>())
+                    <span class="ident">Error::Other</span>(<span class="string">&quot;Mixed analyze type should have index response.&quot;</span>.<span class="ident">into</span>())
                 })<span class="question-mark">?</span>,
             )
             .<span class="ident">into_proto</span>();
-            <span class="macro">box_try</span><span class="macro">!</span>(<span class="ident">resp</span>.<span class="ident">write_to_bytes</span>())
+            <span class="macro">box_try!</span>(<span class="ident">resp</span>.<span class="ident">write_to_bytes</span>())
         };
         <span class="prelude-val">Ok</span>(<span class="ident">res_data</span>)
     }
@@ -767,19 +777,19 @@
         <span class="ident">scanner</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">RangesScanner</span><span class="op">&lt;</span><span class="ident">TiKVStorage</span><span class="op">&lt;</span><span class="ident">SnapshotStore</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">is_common_handle</span>: <span class="ident">bool</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">hist</span> <span class="op">=</span> <span class="ident">Histogram</span>::<span class="ident">new</span>(<span class="ident">req</span>.<span class="ident">get_bucket_size</span>() <span class="kw">as</span> <span class="ident">usize</span>);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cms</span> <span class="op">=</span> <span class="ident">CmSketch</span>::<span class="ident">new</span>(
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">hist</span> <span class="op">=</span> <span class="ident">Histogram::new</span>(<span class="ident">req</span>.<span class="ident">get_bucket_size</span>() <span class="kw">as</span> <span class="ident">usize</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cms</span> <span class="op">=</span> <span class="ident">CmSketch::new</span>(
             <span class="ident">req</span>.<span class="ident">get_cmsketch_depth</span>() <span class="kw">as</span> <span class="ident">usize</span>,
             <span class="ident">req</span>.<span class="ident">get_cmsketch_width</span>() <span class="kw">as</span> <span class="ident">usize</span>,
         );
-
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">fms</span> <span class="op">=</span> <span class="ident">FmSketch::new</span>(<span class="ident">req</span>.<span class="ident">get_sketch_size</span>() <span class="kw">as</span> <span class="ident">usize</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">row_count</span> <span class="op">=</span> <span class="number">0</span>;
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">time_slice_start</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">topn_heap</span> <span class="op">=</span> <span class="ident">BinaryHeap</span>::<span class="ident">new</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">time_slice_start</span> <span class="op">=</span> <span class="ident">Instant::now</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">topn_heap</span> <span class="op">=</span> <span class="ident">BinaryHeap::new</span>();
         <span class="comment">// cur_val recording the current value&#39;s data and its counts when iterating index&#39;s rows.</span>
         <span class="comment">// Once we met a new value, the old value will be pushed into the topn_heap to maintain the</span>
         <span class="comment">// top-n information.</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cur_val</span>: (<span class="ident">u32</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>) <span class="op">=</span> (<span class="number">0</span>, <span class="macro">vec</span><span class="macro">!</span>[]);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cur_val</span>: (<span class="ident">u32</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>) <span class="op">=</span> (<span class="number">0</span>, <span class="macro">vec!</span>[]);
         <span class="kw">let</span> <span class="ident">top_n_size</span> <span class="op">=</span> <span class="ident">req</span>.<span class="ident">get_top_n_size</span>() <span class="kw">as</span> <span class="ident">usize</span>;
         <span class="kw">let</span> <span class="ident">stats_version</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">req</span>.<span class="ident">has_version</span>() {
             <span class="ident">req</span>.<span class="ident">get_version</span>()
@@ -791,26 +801,26 @@
             <span class="kw">if</span> <span class="ident">row_count</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">BATCH_MAX_SIZE</span> {
                 <span class="kw">if</span> <span class="ident">time_slice_start</span>.<span class="ident">elapsed</span>() <span class="op">&gt;</span> <span class="ident">MAX_TIME_SLICE</span> {
                     <span class="ident">reschedule</span>().<span class="kw">await</span>;
-                    <span class="ident">time_slice_start</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now</span>();
+                    <span class="ident">time_slice_start</span> <span class="op">=</span> <span class="ident">Instant::now</span>();
                 }
                 <span class="ident">row_count</span> <span class="op">=</span> <span class="number">0</span>;
             }
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">key</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">key</span>[..];
             <span class="kw">if</span> <span class="ident">is_common_handle</span> {
-                <span class="ident">table</span>::<span class="ident">check_record_key</span>(<span class="ident">key</span>)<span class="question-mark">?</span>;
-                <span class="ident">key</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">key</span>[<span class="ident">table</span>::<span class="ident">PREFIX_LEN</span>..];
+                <span class="ident">table::check_record_key</span>(<span class="ident">key</span>)<span class="question-mark">?</span>;
+                <span class="ident">key</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">key</span>[<span class="ident">table::PREFIX_LEN</span>..];
             } <span class="kw">else</span> {
-                <span class="ident">table</span>::<span class="ident">check_index_key</span>(<span class="ident">key</span>)<span class="question-mark">?</span>;
-                <span class="ident">key</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">key</span>[<span class="ident">table</span>::<span class="ident">PREFIX_LEN</span> <span class="op">+</span> <span class="ident">table</span>::<span class="ident">ID_LEN</span>..];
+                <span class="ident">table::check_index_key</span>(<span class="ident">key</span>)<span class="question-mark">?</span>;
+                <span class="ident">key</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">key</span>[<span class="ident">table::PREFIX_LEN</span> <span class="op">+</span> <span class="ident">table::ID_LEN</span>..];
             }
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">datums</span> <span class="op">=</span> <span class="ident">key</span>;
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">data</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">with_capacity</span>(<span class="ident">key</span>.<span class="ident">len</span>());
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">data</span> <span class="op">=</span> <span class="ident">Vec::with_capacity</span>(<span class="ident">key</span>.<span class="ident">len</span>());
             <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">req</span>.<span class="ident">get_num_columns</span>() <span class="kw">as</span> <span class="ident">usize</span> {
                 <span class="kw">if</span> <span class="ident">datums</span>.<span class="ident">is_empty</span>() {
-                    <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(
+                    <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err!</span>(
                         <span class="string">&quot;{}th column is missing in datum buffer: {}&quot;</span>,
                         <span class="ident">i</span>,
-                        <span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>(<span class="ident">key</span>)
+                        <span class="ident">log_wrappers::Value::key</span>(<span class="ident">key</span>)
                     ));
                 }
                 <span class="kw">let</span> (<span class="ident">column</span>, <span class="ident">remaining</span>) <span class="op">=</span> <span class="ident">split_datum</span>(<span class="ident">datums</span>, <span class="bool-val">false</span>)<span class="question-mark">?</span>;
@@ -820,6 +830,7 @@
                     <span class="ident">cms</span>.<span class="ident">insert</span>(<span class="kw-2">&amp;</span><span class="ident">data</span>);
                 }
             }
+            <span class="ident">fms</span>.<span class="ident">insert</span>(<span class="kw-2">&amp;</span><span class="ident">data</span>);
             <span class="kw">if</span> <span class="ident">stats_version</span> <span class="op">=</span><span class="op">=</span> <span class="ident">ANALYZE_VERSION_V2</span> {
                 <span class="ident">hist</span>.<span class="ident">append</span>(<span class="kw-2">&amp;</span><span class="ident">data</span>, <span class="bool-val">true</span>);
                 <span class="kw">if</span> <span class="ident">cur_val</span>.<span class="number">1</span> <span class="op">=</span><span class="op">=</span> <span class="ident">data</span> {
@@ -853,8 +864,8 @@
             }
         }
 
-        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">AnalyzeIndexResult</span>::<span class="ident">new</span>(<span class="ident">hist</span>, <span class="ident">cms</span>).<span class="ident">into_proto</span>();
-        <span class="kw">let</span> <span class="ident">dt</span> <span class="op">=</span> <span class="macro">box_try</span><span class="macro">!</span>(<span class="ident">res</span>.<span class="ident">write_to_bytes</span>());
+        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">AnalyzeIndexResult::new</span>(<span class="ident">hist</span>, <span class="ident">cms</span>, <span class="prelude-val">Some</span>(<span class="ident">fms</span>)).<span class="ident">into_proto</span>();
+        <span class="kw">let</span> <span class="ident">dt</span> <span class="op">=</span> <span class="macro">box_try!</span>(<span class="ident">res</span>.<span class="ident">write_to_bytes</span>());
         <span class="prelude-val">Ok</span>(<span class="ident">dt</span>)
     }
 }
@@ -863,64 +874,64 @@
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">Snapshot</span><span class="op">&gt;</span> <span class="ident">RequestHandler</span> <span class="kw">for</span> <span class="ident">AnalyzeContext</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span> {
     <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">handle_request</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Response</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">ret</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">req</span>.<span class="ident">get_tp</span>() {
-            <span class="ident">AnalyzeType</span>::<span class="ident">TypeIndex</span> <span class="op">|</span> <span class="ident">AnalyzeType</span>::<span class="ident">TypeCommonHandle</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">AnalyzeType::TypeIndex</span> <span class="op">|</span> <span class="ident">AnalyzeType::TypeCommonHandle</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> <span class="ident">req</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">req</span>.<span class="ident">take_idx_req</span>();
-                <span class="kw">let</span> <span class="ident">ranges</span> <span class="op">=</span> <span class="ident">mem</span>::<span class="ident">replace</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">ranges</span>, <span class="macro">vec</span><span class="macro">!</span>[]);
-                <span class="ident">table</span>::<span class="ident">check_table_ranges</span>(<span class="kw-2">&amp;</span><span class="ident">ranges</span>)<span class="question-mark">?</span>;
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">scanner</span> <span class="op">=</span> <span class="ident">RangesScanner</span>::<span class="ident">new</span>(<span class="ident">RangesScannerOptions</span> {
+                <span class="kw">let</span> <span class="ident">ranges</span> <span class="op">=</span> <span class="ident">std::mem::take</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">ranges</span>);
+                <span class="ident">table::check_table_ranges</span>(<span class="kw-2">&amp;</span><span class="ident">ranges</span>)<span class="question-mark">?</span>;
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">scanner</span> <span class="op">=</span> <span class="ident">RangesScanner::new</span>(<span class="ident">RangesScannerOptions</span> {
                     <span class="ident">storage</span>: <span class="self">self</span>.<span class="ident">storage</span>.<span class="ident">take</span>().<span class="ident">unwrap</span>(),
                     <span class="ident">ranges</span>: <span class="ident">ranges</span>
                         .<span class="ident">into_iter</span>()
-                        .<span class="ident">map</span>(<span class="op">|</span><span class="ident">r</span><span class="op">|</span> <span class="ident">Range</span>::<span class="ident">from_pb_range</span>(<span class="ident">r</span>, <span class="bool-val">false</span>))
+                        .<span class="ident">map</span>(<span class="op">|</span><span class="ident">r</span><span class="op">|</span> <span class="ident">Range::from_pb_range</span>(<span class="ident">r</span>, <span class="bool-val">false</span>))
                         .<span class="ident">collect</span>(),
                     <span class="ident">scan_backward_in_range</span>: <span class="bool-val">false</span>,
                     <span class="ident">is_key_only</span>: <span class="bool-val">true</span>,
                     <span class="ident">is_scanned_range_aware</span>: <span class="bool-val">false</span>,
                 });
-                <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">AnalyzeContext</span>::<span class="ident">handle_index</span>(
+                <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">AnalyzeContext::handle_index</span>(
                     <span class="ident">req</span>,
                     <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">scanner</span>,
-                    <span class="self">self</span>.<span class="ident">req</span>.<span class="ident">get_tp</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">AnalyzeType</span>::<span class="ident">TypeCommonHandle</span>,
+                    <span class="self">self</span>.<span class="ident">req</span>.<span class="ident">get_tp</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">AnalyzeType::TypeCommonHandle</span>,
                 )
                 .<span class="kw">await</span>;
                 <span class="ident">scanner</span>.<span class="ident">collect_storage_stats</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">storage_stats</span>);
                 <span class="ident">res</span>
             }
 
-            <span class="ident">AnalyzeType</span>::<span class="ident">TypeColumn</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">AnalyzeType::TypeColumn</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> <span class="ident">col_req</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">req</span>.<span class="ident">take_col_req</span>();
                 <span class="kw">let</span> <span class="ident">storage</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">storage</span>.<span class="ident">take</span>().<span class="ident">unwrap</span>();
-                <span class="kw">let</span> <span class="ident">ranges</span> <span class="op">=</span> <span class="ident">mem</span>::<span class="ident">replace</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">ranges</span>, <span class="ident">Vec</span>::<span class="ident">new</span>());
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">builder</span> <span class="op">=</span> <span class="ident">SampleBuilder</span>::<span class="ident">new</span>(<span class="ident">col_req</span>, <span class="prelude-val">None</span>, <span class="ident">storage</span>, <span class="ident">ranges</span>)<span class="question-mark">?</span>;
-                <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">AnalyzeContext</span>::<span class="ident">handle_column</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">builder</span>).<span class="kw">await</span>;
+                <span class="kw">let</span> <span class="ident">ranges</span> <span class="op">=</span> <span class="ident">std::mem::take</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">ranges</span>);
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">builder</span> <span class="op">=</span> <span class="ident">SampleBuilder::new</span>(<span class="ident">col_req</span>, <span class="prelude-val">None</span>, <span class="ident">storage</span>, <span class="ident">ranges</span>)<span class="question-mark">?</span>;
+                <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">AnalyzeContext::handle_column</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">builder</span>).<span class="kw">await</span>;
                 <span class="ident">builder</span>.<span class="ident">data</span>.<span class="ident">collect_storage_stats</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">storage_stats</span>);
                 <span class="ident">res</span>
             }
 
             <span class="comment">// Type mixed is analyze common handle and columns by scan table rows once.</span>
-            <span class="ident">AnalyzeType</span>::<span class="ident">TypeMixed</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">AnalyzeType::TypeMixed</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> <span class="ident">col_req</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">req</span>.<span class="ident">take_col_req</span>();
                 <span class="kw">let</span> <span class="ident">idx_req</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">req</span>.<span class="ident">take_idx_req</span>();
                 <span class="kw">let</span> <span class="ident">storage</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">storage</span>.<span class="ident">take</span>().<span class="ident">unwrap</span>();
-                <span class="kw">let</span> <span class="ident">ranges</span> <span class="op">=</span> <span class="ident">mem</span>::<span class="ident">replace</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">ranges</span>, <span class="ident">Vec</span>::<span class="ident">new</span>());
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">builder</span> <span class="op">=</span> <span class="ident">SampleBuilder</span>::<span class="ident">new</span>(<span class="ident">col_req</span>, <span class="prelude-val">Some</span>(<span class="ident">idx_req</span>), <span class="ident">storage</span>, <span class="ident">ranges</span>)<span class="question-mark">?</span>;
-                <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">AnalyzeContext</span>::<span class="ident">handle_mixed</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">builder</span>).<span class="kw">await</span>;
+                <span class="kw">let</span> <span class="ident">ranges</span> <span class="op">=</span> <span class="ident">std::mem::take</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">ranges</span>);
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">builder</span> <span class="op">=</span> <span class="ident">SampleBuilder::new</span>(<span class="ident">col_req</span>, <span class="prelude-val">Some</span>(<span class="ident">idx_req</span>), <span class="ident">storage</span>, <span class="ident">ranges</span>)<span class="question-mark">?</span>;
+                <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">AnalyzeContext::handle_mixed</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">builder</span>).<span class="kw">await</span>;
                 <span class="ident">builder</span>.<span class="ident">data</span>.<span class="ident">collect_storage_stats</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">storage_stats</span>);
                 <span class="ident">res</span>
             }
 
-            <span class="ident">AnalyzeType</span>::<span class="ident">TypeSampleIndex</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">Other</span>(
+            <span class="ident">AnalyzeType::TypeSampleIndex</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Err</span>(<span class="ident">Error::Other</span>(
                 <span class="string">&quot;Analyze of this kind not implemented&quot;</span>.<span class="ident">to_string</span>(),
             )),
         };
         <span class="kw">match</span> <span class="ident">ret</span> {
             <span class="prelude-val">Ok</span>(<span class="ident">data</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">Response</span>::<span class="ident">default</span>();
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">Response::default</span>();
                 <span class="ident">resp</span>.<span class="ident">set_data</span>(<span class="ident">data</span>);
                 <span class="prelude-val">Ok</span>(<span class="ident">resp</span>)
             }
-            <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">Other</span>(<span class="ident">e</span>)) <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">Response</span>::<span class="ident">default</span>();
+            <span class="prelude-val">Err</span>(<span class="ident">Error::Other</span>(<span class="ident">e</span>)) <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">Response::default</span>();
                 <span class="ident">resp</span>.<span class="ident">set_other_error</span>(<span class="ident">e</span>);
                 <span class="prelude-val">Ok</span>(<span class="ident">resp</span>)
             }
@@ -930,7 +941,7 @@
 
     <span class="kw">fn</span> <span class="ident">collect_scan_statistics</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">dest</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Statistics</span>) {
         <span class="ident">dest</span>.<span class="ident">add</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">storage_stats</span>);
-        <span class="self">self</span>.<span class="ident">storage_stats</span> <span class="op">=</span> <span class="ident">Statistics</span>::<span class="ident">default</span>();
+        <span class="self">self</span>.<span class="ident">storage_stats</span> <span class="op">=</span> <span class="ident">Statistics::default</span>();
     }
 }
 
@@ -944,7 +955,7 @@
     <span class="ident">cm_sketch_width</span>: <span class="ident">usize</span>,
     <span class="ident">stats_version</span>: <span class="ident">i32</span>,
     <span class="ident">top_n_size</span>: <span class="ident">usize</span>,
-    <span class="ident">columns_info</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">tipb</span>::<span class="ident">ColumnInfo</span><span class="op">&gt;</span>,
+    <span class="ident">columns_info</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">tipb::ColumnInfo</span><span class="op">&gt;</span>,
     <span class="ident">analyze_common_handle</span>: <span class="ident">bool</span>,
     <span class="ident">common_handle_col_ids</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">i64</span><span class="op">&gt;</span>,
 }
@@ -955,18 +966,18 @@
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">Snapshot</span><span class="op">&gt;</span> <span class="ident">SampleBuilder</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span> {
     <span class="kw">fn</span> <span class="ident">new</span>(
         <span class="kw-2">mut</span> <span class="ident">req</span>: <span class="ident">AnalyzeColumnsReq</span>,
-        <span class="ident">common_handle_req</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">tipb</span>::<span class="ident">AnalyzeIndexReq</span><span class="op">&gt;</span>,
+        <span class="ident">common_handle_req</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">tipb::AnalyzeIndexReq</span><span class="op">&gt;</span>,
         <span class="ident">storage</span>: <span class="ident">TiKVStorage</span><span class="op">&lt;</span><span class="ident">SnapshotStore</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">ranges</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">KeyRange</span><span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">columns_info</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">req</span>.<span class="ident">take_columns_info</span>().<span class="ident">into</span>();
         <span class="kw">if</span> <span class="ident">columns_info</span>.<span class="ident">is_empty</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err</span><span class="macro">!</span>(<span class="string">&quot;empty columns_info&quot;</span>));
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">box_err!</span>(<span class="string">&quot;empty columns_info&quot;</span>));
         }
         <span class="kw">let</span> <span class="ident">common_handle_ids</span> <span class="op">=</span> <span class="ident">req</span>.<span class="ident">take_primary_column_ids</span>();
-        <span class="kw">let</span> <span class="ident">table_scanner</span> <span class="op">=</span> <span class="ident">BatchTableScanExecutor</span>::<span class="ident">new</span>(
+        <span class="kw">let</span> <span class="ident">table_scanner</span> <span class="op">=</span> <span class="ident">BatchTableScanExecutor::new</span>(
             <span class="ident">storage</span>,
-            <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">EvalConfig</span>::<span class="ident">default</span>()),
+            <span class="ident">Arc::new</span>(<span class="ident">EvalConfig::default</span>()),
             <span class="ident">columns_info</span>.<span class="ident">clone</span>(),
             <span class="ident">ranges</span>,
             <span class="ident">common_handle_ids</span>.<span class="ident">clone</span>(),
@@ -1005,16 +1016,16 @@
     <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">collect_columns_stats</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">AnalyzeColumnsResult</span>, <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">AnalyzeIndexResult</span><span class="op">&gt;</span>)<span class="op">&gt;</span> {
-        <span class="kw">use</span> <span class="ident">tidb_query_datatype</span>::<span class="ident">codec</span>::<span class="ident">collation</span>::{<span class="ident">match_template_collator</span>, <span class="ident">Collator</span>};
+        <span class="kw">use</span> <span class="ident">tidb_query_datatype::codec::collation</span>::{<span class="ident">match_template_collator</span>, <span class="ident">Collator</span>};
         <span class="kw">let</span> <span class="ident">columns_without_handle_len</span> <span class="op">=</span>
             <span class="self">self</span>.<span class="ident">columns_info</span>.<span class="ident">len</span>() <span class="op">-</span> <span class="self">self</span>.<span class="ident">columns_info</span>[<span class="number">0</span>].<span class="ident">get_pk_handle</span>() <span class="kw">as</span> <span class="ident">usize</span>;
 
         <span class="comment">// The number of columns need to be sampled is `columns_without_handle_len`.</span>
         <span class="comment">// It equals to `columns_info.len()` if the first column doesn&#39;t contain a handle.</span>
         <span class="comment">// Otherwise, it equals to `columns_info.len() - 1`.</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">pk_builder</span> <span class="op">=</span> <span class="ident">Histogram</span>::<span class="ident">new</span>(<span class="self">self</span>.<span class="ident">max_bucket_size</span>);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">collectors</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
-            <span class="ident">SampleCollector</span>::<span class="ident">new</span>(
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">pk_builder</span> <span class="op">=</span> <span class="ident">Histogram::new</span>(<span class="self">self</span>.<span class="ident">max_bucket_size</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">collectors</span> <span class="op">=</span> <span class="macro">vec!</span>[
+            <span class="ident">SampleCollector::new</span>(
                 <span class="self">self</span>.<span class="ident">max_sample_size</span>,
                 <span class="self">self</span>.<span class="ident">max_fm_sketch_size</span>,
                 <span class="self">self</span>.<span class="ident">cm_sketch_depth</span>,
@@ -1023,14 +1034,15 @@
             <span class="ident">columns_without_handle_len</span>
         ];
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">is_drained</span> <span class="op">=</span> <span class="bool-val">false</span>;
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">time_slice_start</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">common_handle_hist</span> <span class="op">=</span> <span class="ident">Histogram</span>::<span class="ident">new</span>(<span class="self">self</span>.<span class="ident">max_bucket_size</span>);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">common_handle_cms</span> <span class="op">=</span> <span class="ident">CmSketch</span>::<span class="ident">new</span>(<span class="self">self</span>.<span class="ident">cm_sketch_depth</span>, <span class="self">self</span>.<span class="ident">cm_sketch_width</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">time_slice_start</span> <span class="op">=</span> <span class="ident">Instant::now</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">common_handle_hist</span> <span class="op">=</span> <span class="ident">Histogram::new</span>(<span class="self">self</span>.<span class="ident">max_bucket_size</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">common_handle_cms</span> <span class="op">=</span> <span class="ident">CmSketch::new</span>(<span class="self">self</span>.<span class="ident">cm_sketch_depth</span>, <span class="self">self</span>.<span class="ident">cm_sketch_width</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">common_handle_fms</span> <span class="op">=</span> <span class="ident">FmSketch::new</span>(<span class="self">self</span>.<span class="ident">max_fm_sketch_size</span>);
         <span class="kw">while</span> <span class="op">!</span><span class="ident">is_drained</span> {
             <span class="kw">let</span> <span class="ident">time_slice_elapsed</span> <span class="op">=</span> <span class="ident">time_slice_start</span>.<span class="ident">elapsed</span>();
             <span class="kw">if</span> <span class="ident">time_slice_elapsed</span> <span class="op">&gt;</span> <span class="ident">MAX_TIME_SLICE</span> {
                 <span class="ident">reschedule</span>().<span class="kw">await</span>;
-                <span class="ident">time_slice_start</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now</span>();
+                <span class="ident">time_slice_start</span> <span class="op">=</span> <span class="ident">Instant::now</span>();
             }
             <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">data</span>.<span class="ident">next_batch</span>(<span class="ident">BATCH_MAX_SIZE</span>);
             <span class="ident">is_drained</span> <span class="op">=</span> <span class="ident">result</span>.<span class="ident">is_drained</span><span class="question-mark">?</span>;
@@ -1039,11 +1051,11 @@
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">columns_info</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">columns_info</span>[..];
             <span class="kw">if</span> <span class="ident">columns_without_handle_len</span> <span class="op">+</span> <span class="number">1</span> <span class="op">=</span><span class="op">=</span> <span class="ident">columns_slice</span>.<span class="ident">len</span>() {
                 <span class="kw">for</span> <span class="ident">logical_row</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">result</span>.<span class="ident">logical_rows</span> {
-                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">data</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[];
+                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">data</span> <span class="op">=</span> <span class="macro">vec!</span>[];
                     <span class="ident">columns_slice</span>[<span class="number">0</span>].<span class="ident">encode</span>(
                         <span class="kw-2">*</span><span class="ident">logical_row</span>,
                         <span class="kw-2">&amp;</span><span class="ident">columns_info</span>[<span class="number">0</span>],
-                        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">EvalContext</span>::<span class="ident">default</span>(),
+                        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">EvalContext::default</span>(),
                         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">data</span>,
                     )<span class="question-mark">?</span>;
                     <span class="ident">pk_builder</span>.<span class="ident">append</span>(<span class="kw-2">&amp;</span><span class="ident">data</span>, <span class="bool-val">false</span>);
@@ -1056,16 +1068,16 @@
                 <span class="comment">// cur_val recording the current value&#39;s data and its counts when iterating index&#39;s rows.</span>
                 <span class="comment">// Once we met a new value, the old value will be pushed into the topn_heap to maintain the</span>
                 <span class="comment">// top-n information.</span>
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cur_val</span>: (<span class="ident">u32</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>) <span class="op">=</span> (<span class="number">0</span>, <span class="macro">vec</span><span class="macro">!</span>[]);
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">topn_heap</span> <span class="op">=</span> <span class="ident">BinaryHeap</span>::<span class="ident">new</span>();
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cur_val</span>: (<span class="ident">u32</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>) <span class="op">=</span> (<span class="number">0</span>, <span class="macro">vec!</span>[]);
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">topn_heap</span> <span class="op">=</span> <span class="ident">BinaryHeap::new</span>();
                 <span class="kw">for</span> <span class="ident">logical_row</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">result</span>.<span class="ident">logical_rows</span> {
-                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">data</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[];
+                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">data</span> <span class="op">=</span> <span class="macro">vec!</span>[];
                     <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="self">self</span>.<span class="ident">common_handle_col_ids</span>.<span class="ident">len</span>() {
-                        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">handle_col_val</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[];
+                        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">handle_col_val</span> <span class="op">=</span> <span class="macro">vec!</span>[];
                         <span class="ident">columns_slice</span>[<span class="ident">i</span>].<span class="ident">encode</span>(
                             <span class="kw-2">*</span><span class="ident">logical_row</span>,
                             <span class="kw-2">&amp;</span><span class="ident">columns_info</span>[<span class="ident">i</span>],
-                            <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">EvalContext</span>::<span class="ident">default</span>(),
+                            <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">EvalContext::default</span>(),
                             <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">handle_col_val</span>,
                         )<span class="question-mark">?</span>;
                         <span class="ident">data</span>.<span class="ident">extend_from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">handle_col_val</span>);
@@ -1073,6 +1085,7 @@
                             <span class="ident">common_handle_cms</span>.<span class="ident">insert</span>(<span class="kw-2">&amp;</span><span class="ident">data</span>);
                         }
                     }
+                    <span class="ident">common_handle_fms</span>.<span class="ident">insert</span>(<span class="kw-2">&amp;</span><span class="ident">data</span>);
                     <span class="kw">if</span> <span class="self">self</span>.<span class="ident">stats_version</span> <span class="op">=</span><span class="op">=</span> <span class="ident">ANALYZE_VERSION_V2</span> {
                         <span class="ident">common_handle_hist</span>.<span class="ident">append</span>(<span class="kw-2">&amp;</span><span class="ident">data</span>, <span class="bool-val">true</span>);
                         <span class="kw">if</span> <span class="ident">cur_val</span>.<span class="number">1</span> <span class="op">=</span><span class="op">=</span> <span class="ident">data</span> {
@@ -1108,26 +1121,26 @@
 
             <span class="kw">for</span> (<span class="ident">i</span>, <span class="ident">collector</span>) <span class="kw">in</span> <span class="ident">collectors</span>.<span class="ident">iter_mut</span>().<span class="ident">enumerate</span>() {
                 <span class="kw">for</span> <span class="ident">logical_row</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">result</span>.<span class="ident">logical_rows</span> {
-                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">val</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[];
+                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">val</span> <span class="op">=</span> <span class="macro">vec!</span>[];
                     <span class="ident">columns_slice</span>[<span class="ident">i</span>].<span class="ident">encode</span>(
                         <span class="kw-2">*</span><span class="ident">logical_row</span>,
                         <span class="kw-2">&amp;</span><span class="ident">columns_info</span>[<span class="ident">i</span>],
-                        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">EvalContext</span>::<span class="ident">default</span>(),
+                        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">EvalContext::default</span>(),
                         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">val</span>,
                     )<span class="question-mark">?</span>;
                     <span class="kw">if</span> <span class="ident">columns_info</span>[<span class="ident">i</span>].<span class="ident">as_accessor</span>().<span class="ident">is_string_like</span>() {
-                        <span class="kw">let</span> <span class="ident">sorted_val</span> <span class="op">=</span> <span class="macro">match_template_collator</span><span class="macro">!</span> {
+                        <span class="kw">let</span> <span class="ident">sorted_val</span> <span class="op">=</span> <span class="macro">match_template_collator!</span> {
                             <span class="ident">TT</span>, <span class="kw">match</span> <span class="ident">columns_info</span>[<span class="ident">i</span>].<span class="ident">as_accessor</span>().<span class="ident">collation</span>()<span class="question-mark">?</span> {
-                                <span class="ident">Collation</span>::<span class="ident">TT</span> <span class="op">=</span><span class="op">&gt;</span> {
+                                <span class="ident">Collation::TT</span> <span class="op">=</span><span class="op">&gt;</span> {
                                     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">mut_val</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">val</span>[..];
-                                    <span class="kw">let</span> <span class="ident">decoded_val</span> <span class="op">=</span> <span class="ident">table</span>::<span class="ident">decode_col_value</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">mut_val</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">EvalContext</span>::<span class="ident">default</span>(), <span class="kw-2">&amp;</span><span class="ident">columns_info</span>[<span class="ident">i</span>])<span class="question-mark">?</span>;
-                                    <span class="kw">if</span> <span class="ident">decoded_val</span> <span class="op">=</span><span class="op">=</span> <span class="ident">Datum</span>::<span class="ident">Null</span> {
+                                    <span class="kw">let</span> <span class="ident">decoded_val</span> <span class="op">=</span> <span class="ident">table::decode_col_value</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">mut_val</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">EvalContext::default</span>(), <span class="kw-2">&amp;</span><span class="ident">columns_info</span>[<span class="ident">i</span>])<span class="question-mark">?</span>;
+                                    <span class="kw">if</span> <span class="ident">decoded_val</span> <span class="op">=</span><span class="op">=</span> <span class="ident">Datum::Null</span> {
                                         <span class="ident">val</span>
                                     } <span class="kw">else</span> {
                                         <span class="comment">// Only if the `decoded_val` is Datum::Null, `decoded_val` is a Ok(None).</span>
                                         <span class="comment">// So it is safe the unwrap the Ok value.</span>
-                                        <span class="kw">let</span> <span class="ident">decoded_sorted_val</span> <span class="op">=</span> <span class="ident">TT</span>::<span class="ident">sort_key</span>(<span class="kw-2">&amp;</span><span class="ident">decoded_val</span>.<span class="ident">as_string</span>()<span class="question-mark">?</span>.<span class="ident">unwrap</span>().<span class="ident">into_owned</span>())<span class="question-mark">?</span>;
-                                        <span class="ident">encode_value</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">EvalContext</span>::<span class="ident">default</span>(), <span class="kw-2">&amp;</span>[<span class="ident">Datum</span>::<span class="ident">Bytes</span>(<span class="ident">decoded_sorted_val</span>)])<span class="question-mark">?</span>
+                                        <span class="kw">let</span> <span class="ident">decoded_sorted_val</span> <span class="op">=</span> <span class="ident">TT::sort_key</span>(<span class="kw-2">&amp;</span><span class="ident">decoded_val</span>.<span class="ident">as_string</span>()<span class="question-mark">?</span>.<span class="ident">unwrap</span>().<span class="ident">into_owned</span>())<span class="question-mark">?</span>;
+                                        <span class="ident">encode_value</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">EvalContext::default</span>(), <span class="kw-2">&amp;</span>[<span class="ident">Datum::Bytes</span>(<span class="ident">decoded_sorted_val</span>)])<span class="question-mark">?</span>
                                     }
                                 }
                             }
@@ -1140,14 +1153,15 @@
             }
         }
         <span class="kw">let</span> <span class="ident">idx_res</span> <span class="op">=</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">analyze_common_handle</span> {
-            <span class="prelude-val">Some</span>(<span class="ident">AnalyzeIndexResult</span>::<span class="ident">new</span>(
+            <span class="prelude-val">Some</span>(<span class="ident">AnalyzeIndexResult::new</span>(
                 <span class="ident">common_handle_hist</span>,
                 <span class="ident">common_handle_cms</span>,
+                <span class="prelude-val">Some</span>(<span class="ident">common_handle_fms</span>),
             ))
         } <span class="kw">else</span> {
             <span class="prelude-val">None</span>
         };
-        <span class="prelude-val">Ok</span>((<span class="ident">AnalyzeColumnsResult</span>::<span class="ident">new</span>(<span class="ident">collectors</span>, <span class="ident">pk_builder</span>), <span class="ident">idx_res</span>))
+        <span class="prelude-val">Ok</span>((<span class="ident">AnalyzeColumnsResult::new</span>(<span class="ident">collectors</span>, <span class="ident">pk_builder</span>), <span class="ident">idx_res</span>))
     }
 }
 
@@ -1172,19 +1186,19 @@
         <span class="ident">cm_sketch_width</span>: <span class="ident">usize</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">SampleCollector</span> {
         <span class="ident">SampleCollector</span> {
-            <span class="ident">samples</span>: <span class="ident">Default</span>::<span class="ident">default</span>(),
+            <span class="ident">samples</span>: <span class="ident">Default::default</span>(),
             <span class="ident">null_count</span>: <span class="number">0</span>,
             <span class="ident">count</span>: <span class="number">0</span>,
             <span class="ident">max_sample_size</span>,
-            <span class="ident">fm_sketch</span>: <span class="ident">FmSketch</span>::<span class="ident">new</span>(<span class="ident">max_fm_sketch_size</span>),
-            <span class="ident">cm_sketch</span>: <span class="ident">CmSketch</span>::<span class="ident">new</span>(<span class="ident">cm_sketch_depth</span>, <span class="ident">cm_sketch_width</span>),
-            <span class="ident">rng</span>: <span class="ident">StdRng</span>::<span class="ident">from_entropy</span>(),
+            <span class="ident">fm_sketch</span>: <span class="ident">FmSketch::new</span>(<span class="ident">max_fm_sketch_size</span>),
+            <span class="ident">cm_sketch</span>: <span class="ident">CmSketch::new</span>(<span class="ident">cm_sketch_depth</span>, <span class="ident">cm_sketch_width</span>),
+            <span class="ident">rng</span>: <span class="ident">StdRng::from_entropy</span>(),
             <span class="ident">total_size</span>: <span class="number">0</span>,
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">into_proto</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">tipb</span>::<span class="ident">SampleCollector</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">s</span> <span class="op">=</span> <span class="ident">tipb</span>::<span class="ident">SampleCollector</span>::<span class="ident">default</span>();
+    <span class="kw">fn</span> <span class="ident">into_proto</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">tipb::SampleCollector</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">s</span> <span class="op">=</span> <span class="ident">tipb::SampleCollector::default</span>();
         <span class="ident">s</span>.<span class="ident">set_null_count</span>(<span class="self">self</span>.<span class="ident">null_count</span> <span class="kw">as</span> <span class="ident">i64</span>);
         <span class="ident">s</span>.<span class="ident">set_count</span>(<span class="self">self</span>.<span class="ident">count</span> <span class="kw">as</span> <span class="ident">i64</span>);
         <span class="ident">s</span>.<span class="ident">set_fm_sketch</span>(<span class="self">self</span>.<span class="ident">fm_sketch</span>.<span class="ident">into_proto</span>());
@@ -1235,14 +1249,14 @@
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">into_proto</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">tipb</span>::<span class="ident">AnalyzeColumnsResp</span> {
+    <span class="kw">fn</span> <span class="ident">into_proto</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">tipb::AnalyzeColumnsResp</span> {
         <span class="kw">let</span> <span class="ident">hist</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pk_hist</span>.<span class="ident">into_proto</span>();
-        <span class="kw">let</span> <span class="ident">cols</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">tipb</span>::<span class="ident">SampleCollector</span><span class="op">&gt;</span> <span class="op">=</span> <span class="self">self</span>
+        <span class="kw">let</span> <span class="ident">cols</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">tipb::SampleCollector</span><span class="op">&gt;</span> <span class="op">=</span> <span class="self">self</span>
             .<span class="ident">sample_collectors</span>
             .<span class="ident">into_iter</span>()
             .<span class="ident">map</span>(<span class="op">|</span><span class="ident">col</span><span class="op">|</span> <span class="ident">col</span>.<span class="ident">into_proto</span>())
             .<span class="ident">collect</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">tipb</span>::<span class="ident">AnalyzeColumnsResp</span>::<span class="ident">default</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">tipb::AnalyzeColumnsResp::default</span>();
         <span class="ident">res</span>.<span class="ident">set_collectors</span>(<span class="ident">cols</span>.<span class="ident">into</span>());
         <span class="ident">res</span>.<span class="ident">set_pk_hist</span>(<span class="ident">hist</span>);
         <span class="ident">res</span>
@@ -1254,18 +1268,24 @@
 <span class="kw">struct</span> <span class="ident">AnalyzeIndexResult</span> {
     <span class="ident">hist</span>: <span class="ident">Histogram</span>,
     <span class="ident">cms</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">CmSketch</span><span class="op">&gt;</span>,
+    <span class="ident">fms</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">FmSketch</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">AnalyzeIndexResult</span> {
-    <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">hist</span>: <span class="ident">Histogram</span>, <span class="ident">cms</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">CmSketch</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">AnalyzeIndexResult</span> {
-        <span class="ident">AnalyzeIndexResult</span> { <span class="ident">hist</span>, <span class="ident">cms</span> }
+    <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">hist</span>: <span class="ident">Histogram</span>, <span class="ident">cms</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">CmSketch</span><span class="op">&gt;</span>, <span class="ident">fms</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">FmSketch</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">AnalyzeIndexResult</span> {
+        <span class="ident">AnalyzeIndexResult</span> { <span class="ident">hist</span>, <span class="ident">cms</span>, <span class="ident">fms</span> }
     }
 
-    <span class="kw">fn</span> <span class="ident">into_proto</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">tipb</span>::<span class="ident">AnalyzeIndexResp</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">tipb</span>::<span class="ident">AnalyzeIndexResp</span>::<span class="ident">default</span>();
+    <span class="kw">fn</span> <span class="ident">into_proto</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">tipb::AnalyzeIndexResp</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">tipb::AnalyzeIndexResp::default</span>();
         <span class="ident">res</span>.<span class="ident">set_hist</span>(<span class="self">self</span>.<span class="ident">hist</span>.<span class="ident">into_proto</span>());
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">c</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">cms</span> {
             <span class="ident">res</span>.<span class="ident">set_cms</span>(<span class="ident">c</span>.<span class="ident">into_proto</span>());
+        }
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">f</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">fms</span> {
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">s</span> <span class="op">=</span> <span class="ident">tipb::SampleCollector::default</span>();
+            <span class="ident">s</span>.<span class="ident">set_fm_sketch</span>(<span class="ident">f</span>.<span class="ident">into_proto</span>());
+            <span class="ident">res</span>.<span class="ident">set_collector</span>(<span class="ident">s</span>);
         }
         <span class="ident">res</span>
     }
@@ -1283,8 +1303,8 @@
         <span class="ident">AnalyzeMixedResult</span> { <span class="ident">col_res</span>, <span class="ident">idx_res</span> }
     }
 
-    <span class="kw">fn</span> <span class="ident">into_proto</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">tipb</span>::<span class="ident">AnalyzeMixedResp</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">tipb</span>::<span class="ident">AnalyzeMixedResp</span>::<span class="ident">default</span>();
+    <span class="kw">fn</span> <span class="ident">into_proto</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">tipb::AnalyzeMixedResp</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">tipb::AnalyzeMixedResp::default</span>();
         <span class="ident">res</span>.<span class="ident">set_index_resp</span>(<span class="self">self</span>.<span class="ident">idx_res</span>.<span class="ident">into_proto</span>());
         <span class="ident">res</span>.<span class="ident">set_columns_resp</span>(<span class="self">self</span>.<span class="ident">col_res</span>.<span class="ident">into_proto</span>());
         <span class="ident">res</span>
@@ -1295,8 +1315,8 @@
 <span class="kw">mod</span> <span class="ident">tests</span> {
     <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 
-    <span class="kw">use</span> <span class="ident">tidb_query_datatype</span>::<span class="ident">codec</span>::<span class="ident">datum</span>;
-    <span class="kw">use</span> <span class="ident">tidb_query_datatype</span>::<span class="ident">codec</span>::<span class="ident">datum</span>::<span class="ident">Datum</span>;
+    <span class="kw">use</span> <span class="ident">tidb_query_datatype::codec::datum</span>;
+    <span class="kw">use</span> <span class="ident">tidb_query_datatype::codec::datum::Datum</span>;
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_sample_collector</span>() {
@@ -1304,24 +1324,24 @@
         <span class="kw">let</span> <span class="ident">max_fm_sketch_size</span> <span class="op">=</span> <span class="number">10</span>;
         <span class="kw">let</span> <span class="ident">cm_sketch_depth</span> <span class="op">=</span> <span class="number">2</span>;
         <span class="kw">let</span> <span class="ident">cm_sketch_width</span> <span class="op">=</span> <span class="number">16</span>;
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">sample</span> <span class="op">=</span> <span class="ident">SampleCollector</span>::<span class="ident">new</span>(
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">sample</span> <span class="op">=</span> <span class="ident">SampleCollector::new</span>(
             <span class="ident">max_sample_size</span>,
             <span class="ident">max_fm_sketch_size</span>,
             <span class="ident">cm_sketch_depth</span>,
             <span class="ident">cm_sketch_width</span>,
         );
-        <span class="kw">let</span> <span class="ident">cases</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">Datum</span>::<span class="ident">I64</span>(<span class="number">1</span>), <span class="ident">Datum</span>::<span class="ident">Null</span>, <span class="ident">Datum</span>::<span class="ident">I64</span>(<span class="number">2</span>), <span class="ident">Datum</span>::<span class="ident">I64</span>(<span class="number">5</span>)];
+        <span class="kw">let</span> <span class="ident">cases</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="ident">Datum::I64</span>(<span class="number">1</span>), <span class="ident">Datum::Null</span>, <span class="ident">Datum::I64</span>(<span class="number">2</span>), <span class="ident">Datum::I64</span>(<span class="number">5</span>)];
 
         <span class="kw">for</span> <span class="ident">data</span> <span class="kw">in</span> <span class="ident">cases</span> {
-            <span class="ident">sample</span>.<span class="ident">collect</span>(<span class="ident">datum</span>::<span class="ident">encode_value</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">EvalContext</span>::<span class="ident">default</span>(), <span class="kw-2">&amp;</span>[<span class="ident">data</span>]).<span class="ident">unwrap</span>());
+            <span class="ident">sample</span>.<span class="ident">collect</span>(<span class="ident">datum::encode_value</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">EvalContext::default</span>(), <span class="kw-2">&amp;</span>[<span class="ident">data</span>]).<span class="ident">unwrap</span>());
         }
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">sample</span>.<span class="ident">samples</span>.<span class="ident">len</span>(), <span class="ident">max_sample_size</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">sample</span>.<span class="ident">null_count</span>, <span class="number">1</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">sample</span>.<span class="ident">count</span>, <span class="number">3</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">sample</span>.<span class="ident">cm_sketch</span>.<span class="ident">unwrap</span>().<span class="ident">count</span>(), <span class="number">3</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">sample</span>.<span class="ident">total_size</span>, <span class="number">6</span>)
+        <span class="macro">assert_eq!</span>(<span class="ident">sample</span>.<span class="ident">samples</span>.<span class="ident">len</span>(), <span class="ident">max_sample_size</span>);
+        <span class="macro">assert_eq!</span>(<span class="ident">sample</span>.<span class="ident">null_count</span>, <span class="number">1</span>);
+        <span class="macro">assert_eq!</span>(<span class="ident">sample</span>.<span class="ident">count</span>, <span class="number">3</span>);
+        <span class="macro">assert_eq!</span>(<span class="ident">sample</span>.<span class="ident">cm_sketch</span>.<span class="ident">unwrap</span>().<span class="ident">count</span>(), <span class="number">3</span>);
+        <span class="macro">assert_eq!</span>(<span class="ident">sample</span>.<span class="ident">total_size</span>, <span class="number">6</span>)
     }
 }
 </pre></div>
-</section><section id="search" class="content hidden"></section><section class="footer"></section><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="tikv"></div>
-    <script src="../../../../main.js"></script><script src="../../../../source-script.js"></script><script src="../../../../source-files.js"></script><script defer src="../../../../search-index.js"></script></body></html>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="tikv" data-search-js="../../../../search-index.js"></div>
+    <script src="../../../../main.js"></script><script src="../../../../source-script.js"></script><script src="../../../../source-files.js"></script></body></html>

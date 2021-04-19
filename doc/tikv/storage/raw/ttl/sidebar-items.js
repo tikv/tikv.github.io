@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["TTLIterator",""],["TTLSnapshot",""]]});
+initSidebarItems({"fn":[["convert_to_expire_ts",""],["current_ts",""]],"struct":[["TTLIterator",""],["TTLSnapshot",""]]});

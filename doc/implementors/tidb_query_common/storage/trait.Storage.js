@@ -1,4 +1,4 @@
 (function() {var implementors = {};
 implementors["tidb_query_common"] = [];
-implementors["tikv"] = [{"text":"impl&lt;S:&nbsp;Store&gt; Storage for TiKVStorage&lt;S&gt;","synthetic":false,"types":[]}];
+implementors["tikv"] = [{"text":"impl&lt;S:&nbsp;<a class=\"trait\" href=\"tikv/storage/txn/store/trait.Store.html\" title=\"trait tikv::storage::txn::store::Store\">Store</a>&gt; <a class=\"trait\" href=\"tidb_query_common/storage/trait.Storage.html\" title=\"trait tidb_query_common::storage::Storage\">Storage</a> for <a class=\"struct\" href=\"tikv/coprocessor/dag/storage_impl/struct.TiKVStorage.html\" title=\"struct tikv::coprocessor::dag::storage_impl::TiKVStorage\">TiKVStorage</a>&lt;S&gt;","synthetic":false,"types":["tikv::coprocessor::dag::storage_impl::TiKVStorage"]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

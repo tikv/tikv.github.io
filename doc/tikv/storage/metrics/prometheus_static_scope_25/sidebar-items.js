@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["CommandScanDetails",""],["CommandScanDetails2Delegator",""],["CommandScanDetails2Inner",""],["CommandScanDetails3Delegator",""],["CommandScanDetails3Inner",""],["CommandScanDetailsDelegator",""],["CommandScanDetailsInner",""]]});
+initSidebarItems({"struct":[["SchedDurationVec",""],["SchedDurationVecDelegator",""],["SchedDurationVecInner",""]]});

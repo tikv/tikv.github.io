@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["RequestBatchRatioHistogramVec",""]]});
+initSidebarItems({"struct":[["AsyncRequestsCounterVec",""],["AsyncRequestsCounterVec2Delegator",""],["AsyncRequestsCounterVec2Inner",""],["AsyncRequestsCounterVecDelegator",""],["AsyncRequestsCounterVecInner",""]]});

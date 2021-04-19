@@ -1,3 +1,3 @@
 (function() {var implementors = {};
-implementors["tikv_util"] = [{"text":"impl ArcWake for BatchCommandsWaker","synthetic":false,"types":[]}];
+implementors["tikv_util"] = [{"text":"impl <a class=\"trait\" href=\"futures_task/arc_wake/trait.ArcWake.html\" title=\"trait futures_task::arc_wake::ArcWake\">ArcWake</a> for <a class=\"struct\" href=\"tikv_util/future/struct.BatchCommandsWaker.html\" title=\"struct tikv_util::future::BatchCommandsWaker\">BatchCommandsWaker</a>","synthetic":false,"types":["tikv_util::future::BatchCommandsWaker"]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

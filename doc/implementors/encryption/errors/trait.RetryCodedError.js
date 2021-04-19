@@ -1,3 +1,3 @@
 (function() {var implementors = {};
-implementors["encryption_export"] = [{"text":"impl RetryCodedError for CloudConvertError","synthetic":false,"types":[]}];
+implementors["encryption_export"] = [{"text":"impl <a class=\"trait\" href=\"encryption/errors/trait.RetryCodedError.html\" title=\"trait encryption::errors::RetryCodedError\">RetryCodedError</a> for <a class=\"struct\" href=\"encryption_export/struct.CloudConvertError.html\" title=\"struct encryption_export::CloudConvertError\">CloudConvertError</a>","synthetic":false,"types":["encryption_export::CloudConvertError"]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

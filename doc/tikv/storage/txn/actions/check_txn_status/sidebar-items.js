@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["check_txn_status_lock_exists",""],["check_txn_status_missing_lock",""]]});
+initSidebarItems({"enum":[["MissingLockAction",""]],"fn":[["check_txn_status_lock_exists",""],["check_txn_status_missing_lock",""],["collapse_prev_rollback",""],["make_rollback","Generate the Write record that should be written that means to perform a specified rollback operation."],["rollback_lock",""]]});

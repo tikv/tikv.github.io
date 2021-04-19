@@ -1,7 +1,7 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `components/tidb_query_executors/src/runner.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>runner.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `components/tidb_query_executors/src/runner.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>runner.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><script src="../../crates.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
 <link rel="alternate icon" type="image/png" href="../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../tidb_query_executors/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
-                <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../tidb_query_executors/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
+                <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
 <span id="2">  2</span>
 <span id="3">  3</span>
 <span id="4">  4</span>
@@ -606,29 +606,37 @@
 <span id="603">603</span>
 <span id="604">604</span>
 <span id="605">605</span>
+<span id="606">606</span>
+<span id="607">607</span>
+<span id="608">608</span>
+<span id="609">609</span>
+<span id="610">610</span>
+<span id="611">611</span>
+<span id="612">612</span>
+<span id="613">613</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
-<span class="kw">use</span> <span class="ident">protobuf</span>::<span class="ident">Message</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">convert</span>::<span class="ident">TryFrom</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">Arc</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">time</span>::{<span class="ident">Duration</span>, <span class="ident">Instant</span>};
+<span class="kw">use</span> <span class="ident">protobuf::Message</span>;
+<span class="kw">use</span> <span class="ident">std::convert::TryFrom</span>;
+<span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
+<span class="kw">use</span> <span class="ident">std::time</span>::{<span class="ident">Duration</span>, <span class="ident">Instant</span>};
 
-<span class="kw">use</span> <span class="ident">fail</span>::<span class="ident">fail_point</span>;
-<span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">coprocessor</span>::<span class="ident">KeyRange</span>;
+<span class="kw">use</span> <span class="ident">fail::fail_point</span>;
+<span class="kw">use</span> <span class="ident">kvproto::coprocessor::KeyRange</span>;
 <span class="kw">use</span> <span class="ident">tidb_query_datatype</span>::{<span class="ident">EvalType</span>, <span class="ident">FieldTypeAccessor</span>};
-<span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">deadline</span>::<span class="ident">Deadline</span>;
-<span class="kw">use</span> <span class="ident">tipb</span>::<span class="ident">StreamResponse</span>;
+<span class="kw">use</span> <span class="ident">tikv_util::deadline::Deadline</span>;
+<span class="kw">use</span> <span class="ident">tipb::StreamResponse</span>;
 <span class="kw">use</span> <span class="ident">tipb</span>::{<span class="self">self</span>, <span class="ident">ExecType</span>, <span class="ident">ExecutorExecutionSummary</span>, <span class="ident">FieldType</span>};
 <span class="kw">use</span> <span class="ident">tipb</span>::{<span class="ident">Chunk</span>, <span class="ident">DagRequest</span>, <span class="ident">EncodeType</span>, <span class="ident">SelectResponse</span>};
-<span class="kw">use</span> <span class="ident">yatp</span>::<span class="ident">task</span>::<span class="ident">future</span>::<span class="ident">reschedule</span>;
+<span class="kw">use</span> <span class="ident">yatp::task::future::reschedule</span>;
 
-<span class="kw">use</span> <span class="kw">super</span>::<span class="ident">interface</span>::{<span class="ident">BatchExecutor</span>, <span class="ident">ExecuteStats</span>};
+<span class="kw">use</span> <span class="kw">super</span><span class="ident">::interface</span>::{<span class="ident">BatchExecutor</span>, <span class="ident">ExecuteStats</span>};
 <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident">tidb_query_common</span>::<span class="ident">metrics</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident">tidb_query_common</span>::<span class="ident">storage</span>::{<span class="ident">IntervalRange</span>, <span class="ident">Storage</span>};
-<span class="kw">use</span> <span class="ident">tidb_query_common</span>::<span class="prelude-ty">Result</span>;
-<span class="kw">use</span> <span class="ident">tidb_query_datatype</span>::<span class="ident">expr</span>::{<span class="ident">EvalConfig</span>, <span class="ident">EvalContext</span>, <span class="ident">EvalWarnings</span>};
+<span class="kw">use</span> <span class="ident">tidb_query_common::metrics</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident">tidb_query_common::storage</span>::{<span class="ident">IntervalRange</span>, <span class="ident">Storage</span>};
+<span class="kw">use</span> <span class="ident">tidb_query_common::Result</span>;
+<span class="kw">use</span> <span class="ident">tidb_query_datatype::expr</span>::{<span class="ident">EvalConfig</span>, <span class="ident">EvalContext</span>, <span class="ident">EvalWarnings</span>};
 
 <span class="comment">// TODO: The value is chosen according to some very subjective experience, which is not tuned</span>
 <span class="comment">// carefully. We need to benchmark to find a best value. Also we may consider accepting this value</span>
@@ -636,14 +644,14 @@
 <span class="kw">const</span> <span class="ident">BATCH_INITIAL_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">32</span>;
 
 <span class="comment">// TODO: This value is chosen based on MonetDB/X100&#39;s research without our own benchmarks.</span>
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">tidb_query_expr</span>::<span class="ident">types</span>::<span class="ident">BATCH_MAX_SIZE</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">tidb_query_expr::types::BATCH_MAX_SIZE</span>;
 
 <span class="comment">// TODO: Maybe there can be some better strategy. Needs benchmarks and tunes.</span>
 <span class="kw">const</span> <span class="ident">BATCH_GROW_FACTOR</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">2</span>;
 
 <span class="doccomment">/// Batch executors are run in coroutines. `MAX_TIME_SLICE` is the maximum time a coroutine</span>
 <span class="doccomment">/// can run without being yielded.</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MAX_TIME_SLICE</span>: <span class="ident">Duration</span> <span class="op">=</span> <span class="ident">Duration</span>::<span class="ident">from_millis</span>(<span class="number">1</span>);
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MAX_TIME_SLICE</span>: <span class="ident">Duration</span> <span class="op">=</span> <span class="ident">Duration::from_millis</span>(<span class="number">1</span>);
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">BatchExecutorsRunner</span><span class="op">&lt;</span><span class="ident">SS</span><span class="op">&gt;</span> {
     <span class="doccomment">/// The deadline of this handler. For each check point (e.g. each iteration) we need to check</span>
@@ -679,65 +687,65 @@
 <span class="kw">impl</span> <span class="ident">BatchExecutorsRunner</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
     <span class="doccomment">/// Given a list of executor descriptors and checks whether all executor descriptors can</span>
     <span class="doccomment">/// be used to build batch executors.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">check_supported</span>(<span class="ident">exec_descriptors</span>: <span class="kw-2">&amp;</span>[<span class="ident">tipb</span>::<span class="ident">Executor</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">check_supported</span>(<span class="ident">exec_descriptors</span>: <span class="kw-2">&amp;</span>[<span class="ident">tipb::Executor</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">for</span> <span class="ident">ed</span> <span class="kw">in</span> <span class="ident">exec_descriptors</span> {
             <span class="kw">match</span> <span class="ident">ed</span>.<span class="ident">get_tp</span>() {
-                <span class="ident">ExecType</span>::<span class="ident">TypeTableScan</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="ident">ExecType::TypeTableScan</span> <span class="op">=</span><span class="op">&gt;</span> {
                     <span class="kw">let</span> <span class="ident">descriptor</span> <span class="op">=</span> <span class="ident">ed</span>.<span class="ident">get_tbl_scan</span>();
-                    <span class="ident">BatchTableScanExecutor</span>::<span class="ident">check_supported</span>(<span class="kw-2">&amp;</span><span class="ident">descriptor</span>)
-                        .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">other_err</span><span class="macro">!</span>(<span class="string">&quot;BatchTableScanExecutor: {}&quot;</span>, <span class="ident">e</span>))<span class="question-mark">?</span>;
+                    <span class="ident">BatchTableScanExecutor::check_supported</span>(<span class="kw-2">&amp;</span><span class="ident">descriptor</span>)
+                        .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">other_err!</span>(<span class="string">&quot;BatchTableScanExecutor: {}&quot;</span>, <span class="ident">e</span>))<span class="question-mark">?</span>;
                 }
-                <span class="ident">ExecType</span>::<span class="ident">TypeIndexScan</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="ident">ExecType::TypeIndexScan</span> <span class="op">=</span><span class="op">&gt;</span> {
                     <span class="kw">let</span> <span class="ident">descriptor</span> <span class="op">=</span> <span class="ident">ed</span>.<span class="ident">get_idx_scan</span>();
-                    <span class="ident">BatchIndexScanExecutor</span>::<span class="ident">check_supported</span>(<span class="kw-2">&amp;</span><span class="ident">descriptor</span>)
-                        .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">other_err</span><span class="macro">!</span>(<span class="string">&quot;BatchIndexScanExecutor: {}&quot;</span>, <span class="ident">e</span>))<span class="question-mark">?</span>;
+                    <span class="ident">BatchIndexScanExecutor::check_supported</span>(<span class="kw-2">&amp;</span><span class="ident">descriptor</span>)
+                        .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">other_err!</span>(<span class="string">&quot;BatchIndexScanExecutor: {}&quot;</span>, <span class="ident">e</span>))<span class="question-mark">?</span>;
                 }
-                <span class="ident">ExecType</span>::<span class="ident">TypeSelection</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="ident">ExecType::TypeSelection</span> <span class="op">=</span><span class="op">&gt;</span> {
                     <span class="kw">let</span> <span class="ident">descriptor</span> <span class="op">=</span> <span class="ident">ed</span>.<span class="ident">get_selection</span>();
-                    <span class="ident">BatchSelectionExecutor</span>::<span class="ident">check_supported</span>(<span class="kw-2">&amp;</span><span class="ident">descriptor</span>)
-                        .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">other_err</span><span class="macro">!</span>(<span class="string">&quot;BatchSelectionExecutor: {}&quot;</span>, <span class="ident">e</span>))<span class="question-mark">?</span>;
+                    <span class="ident">BatchSelectionExecutor::check_supported</span>(<span class="kw-2">&amp;</span><span class="ident">descriptor</span>)
+                        .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">other_err!</span>(<span class="string">&quot;BatchSelectionExecutor: {}&quot;</span>, <span class="ident">e</span>))<span class="question-mark">?</span>;
                 }
-                <span class="ident">ExecType</span>::<span class="ident">TypeAggregation</span> <span class="op">|</span> <span class="ident">ExecType</span>::<span class="ident">TypeStreamAgg</span>
+                <span class="ident">ExecType::TypeAggregation</span> <span class="op">|</span> <span class="ident">ExecType::TypeStreamAgg</span>
                     <span class="kw">if</span> <span class="ident">ed</span>.<span class="ident">get_aggregation</span>().<span class="ident">get_group_by</span>().<span class="ident">is_empty</span>() <span class="op">=</span><span class="op">&gt;</span>
                 {
                     <span class="kw">let</span> <span class="ident">descriptor</span> <span class="op">=</span> <span class="ident">ed</span>.<span class="ident">get_aggregation</span>();
-                    <span class="ident">BatchSimpleAggregationExecutor</span>::<span class="ident">check_supported</span>(<span class="kw-2">&amp;</span><span class="ident">descriptor</span>)
-                        .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">other_err</span><span class="macro">!</span>(<span class="string">&quot;BatchSimpleAggregationExecutor: {}&quot;</span>, <span class="ident">e</span>))<span class="question-mark">?</span>;
+                    <span class="ident">BatchSimpleAggregationExecutor::check_supported</span>(<span class="kw-2">&amp;</span><span class="ident">descriptor</span>)
+                        .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">other_err!</span>(<span class="string">&quot;BatchSimpleAggregationExecutor: {}&quot;</span>, <span class="ident">e</span>))<span class="question-mark">?</span>;
                 }
-                <span class="ident">ExecType</span>::<span class="ident">TypeAggregation</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="ident">ExecType::TypeAggregation</span> <span class="op">=</span><span class="op">&gt;</span> {
                     <span class="kw">let</span> <span class="ident">descriptor</span> <span class="op">=</span> <span class="ident">ed</span>.<span class="ident">get_aggregation</span>();
-                    <span class="kw">if</span> <span class="ident">BatchFastHashAggregationExecutor</span>::<span class="ident">check_supported</span>(<span class="kw-2">&amp;</span><span class="ident">descriptor</span>).<span class="ident">is_err</span>() {
-                        <span class="ident">BatchSlowHashAggregationExecutor</span>::<span class="ident">check_supported</span>(<span class="kw-2">&amp;</span><span class="ident">descriptor</span>)
-                            .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">other_err</span><span class="macro">!</span>(<span class="string">&quot;BatchSlowHashAggregationExecutor: {}&quot;</span>, <span class="ident">e</span>))<span class="question-mark">?</span>;
+                    <span class="kw">if</span> <span class="ident">BatchFastHashAggregationExecutor::check_supported</span>(<span class="kw-2">&amp;</span><span class="ident">descriptor</span>).<span class="ident">is_err</span>() {
+                        <span class="ident">BatchSlowHashAggregationExecutor::check_supported</span>(<span class="kw-2">&amp;</span><span class="ident">descriptor</span>)
+                            .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">other_err!</span>(<span class="string">&quot;BatchSlowHashAggregationExecutor: {}&quot;</span>, <span class="ident">e</span>))<span class="question-mark">?</span>;
                     }
                 }
-                <span class="ident">ExecType</span>::<span class="ident">TypeStreamAgg</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="ident">ExecType::TypeStreamAgg</span> <span class="op">=</span><span class="op">&gt;</span> {
                     <span class="comment">// Note: We won&#39;t check whether the source of stream aggregation is in order.</span>
                     <span class="comment">//       It is undefined behavior if the source is unordered.</span>
                     <span class="kw">let</span> <span class="ident">descriptor</span> <span class="op">=</span> <span class="ident">ed</span>.<span class="ident">get_aggregation</span>();
-                    <span class="ident">BatchStreamAggregationExecutor</span>::<span class="ident">check_supported</span>(<span class="kw-2">&amp;</span><span class="ident">descriptor</span>)
-                        .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">other_err</span><span class="macro">!</span>(<span class="string">&quot;BatchStreamAggregationExecutor: {}&quot;</span>, <span class="ident">e</span>))<span class="question-mark">?</span>;
+                    <span class="ident">BatchStreamAggregationExecutor::check_supported</span>(<span class="kw-2">&amp;</span><span class="ident">descriptor</span>)
+                        .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">other_err!</span>(<span class="string">&quot;BatchStreamAggregationExecutor: {}&quot;</span>, <span class="ident">e</span>))<span class="question-mark">?</span>;
                 }
-                <span class="ident">ExecType</span>::<span class="ident">TypeLimit</span> <span class="op">=</span><span class="op">&gt;</span> {}
-                <span class="ident">ExecType</span>::<span class="ident">TypeTopN</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="ident">ExecType::TypeLimit</span> <span class="op">=</span><span class="op">&gt;</span> {}
+                <span class="ident">ExecType::TypeTopN</span> <span class="op">=</span><span class="op">&gt;</span> {
                     <span class="kw">let</span> <span class="ident">descriptor</span> <span class="op">=</span> <span class="ident">ed</span>.<span class="ident">get_top_n</span>();
-                    <span class="ident">BatchTopNExecutor</span>::<span class="ident">check_supported</span>(<span class="kw-2">&amp;</span><span class="ident">descriptor</span>)
-                        .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">other_err</span><span class="macro">!</span>(<span class="string">&quot;BatchTopNExecutor: {}&quot;</span>, <span class="ident">e</span>))<span class="question-mark">?</span>;
+                    <span class="ident">BatchTopNExecutor::check_supported</span>(<span class="kw-2">&amp;</span><span class="ident">descriptor</span>)
+                        .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">other_err!</span>(<span class="string">&quot;BatchTopNExecutor: {}&quot;</span>, <span class="ident">e</span>))<span class="question-mark">?</span>;
                 }
-                <span class="ident">ExecType</span>::<span class="ident">TypeJoin</span> <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="macro">other_err</span><span class="macro">!</span>(<span class="string">&quot;Join executor not implemented&quot;</span>);
+                <span class="ident">ExecType::TypeJoin</span> <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="macro">other_err!</span>(<span class="string">&quot;Join executor not implemented&quot;</span>);
                 }
-                <span class="ident">ExecType</span>::<span class="ident">TypeKill</span> <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="macro">other_err</span><span class="macro">!</span>(<span class="string">&quot;Kill executor not implemented&quot;</span>);
+                <span class="ident">ExecType::TypeKill</span> <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="macro">other_err!</span>(<span class="string">&quot;Kill executor not implemented&quot;</span>);
                 }
-                <span class="ident">ExecType</span>::<span class="ident">TypeExchangeSender</span> <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="macro">other_err</span><span class="macro">!</span>(<span class="string">&quot;ExchangeSender executor not implemented&quot;</span>);
+                <span class="ident">ExecType::TypeExchangeSender</span> <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="macro">other_err!</span>(<span class="string">&quot;ExchangeSender executor not implemented&quot;</span>);
                 }
-                <span class="ident">ExecType</span>::<span class="ident">TypeExchangeReceiver</span> <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="macro">other_err</span><span class="macro">!</span>(<span class="string">&quot;ExchangeReceiver executor not implemented&quot;</span>);
+                <span class="ident">ExecType::TypeExchangeReceiver</span> <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="macro">other_err!</span>(<span class="string">&quot;ExchangeReceiver executor not implemented&quot;</span>);
                 }
-                <span class="ident">ExecType</span>::<span class="ident">TypeProjection</span> <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="macro">other_err</span><span class="macro">!</span>(<span class="string">&quot;Projection executor not implemented&quot;</span>);
+                <span class="ident">ExecType::TypeProjection</span> <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="macro">other_err!</span>(<span class="string">&quot;Projection executor not implemented&quot;</span>);
                 }
             }
         }
@@ -750,27 +758,30 @@
 <span class="kw">fn</span> <span class="ident">is_arrow_encodable</span>(<span class="ident">schema</span>: <span class="kw-2">&amp;</span>[<span class="ident">FieldType</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
     <span class="ident">schema</span>
         .<span class="ident">iter</span>()
-        .<span class="ident">all</span>(<span class="op">|</span><span class="ident">schema</span><span class="op">|</span> <span class="ident">EvalType</span>::<span class="ident">try_from</span>(<span class="ident">schema</span>.<span class="ident">as_accessor</span>().<span class="ident">tp</span>()).<span class="ident">is_ok</span>())
+        .<span class="ident">all</span>(<span class="op">|</span><span class="ident">schema</span><span class="op">|</span> <span class="ident">EvalType::try_from</span>(<span class="ident">schema</span>.<span class="ident">as_accessor</span>().<span class="ident">tp</span>()).<span class="ident">is_ok</span>())
 }
 
-<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy</span>::<span class="ident">explicit_counter_loop</span>)]</span>
+<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::explicit_counter_loop</span>)]</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">build_executors</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">Storage</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span>(
-    <span class="ident">executor_descriptors</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">tipb</span>::<span class="ident">Executor</span><span class="op">&gt;</span>,
+    <span class="ident">executor_descriptors</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">tipb::Executor</span><span class="op">&gt;</span>,
     <span class="ident">storage</span>: <span class="ident">S</span>,
     <span class="ident">ranges</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">KeyRange</span><span class="op">&gt;</span>,
     <span class="ident">config</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">EvalConfig</span><span class="op">&gt;</span>,
     <span class="ident">is_scanned_range_aware</span>: <span class="ident">bool</span>,
-) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">BatchExecutor</span><span class="op">&lt;</span><span class="ident">StorageStats</span> <span class="op">=</span> <span class="ident">S</span>::<span class="ident">Statistics</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">BatchExecutor</span><span class="op">&lt;</span><span class="ident">StorageStats</span> <span class="op">=</span> <span class="ident">S::Statistics</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">executor_descriptors</span> <span class="op">=</span> <span class="ident">executor_descriptors</span>.<span class="ident">into_iter</span>();
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">first_ed</span> <span class="op">=</span> <span class="ident">executor_descriptors</span>
         .<span class="ident">next</span>()
-        .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="macro">other_err</span><span class="macro">!</span>(<span class="string">&quot;No executors&quot;</span>))<span class="question-mark">?</span>;
+        .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="macro">other_err!</span>(<span class="string">&quot;No executors&quot;</span>))<span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">executor</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">BatchExecutor</span><span class="op">&lt;</span><span class="ident">StorageStats</span> <span class="op">=</span> <span class="ident">S</span>::<span class="ident">Statistics</span><span class="op">&gt;</span><span class="op">&gt;</span>;
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">executor</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">BatchExecutor</span><span class="op">&lt;</span><span class="ident">StorageStats</span> <span class="op">=</span> <span class="ident">S::Statistics</span><span class="op">&gt;</span><span class="op">&gt;</span>;
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">summary_slot_index</span> <span class="op">=</span> <span class="number">0</span>;
+    <span class="comment">// Limit executor use this flag to check if its src is table/index scan.</span>
+    <span class="comment">// Performance enhancement for plan like: limit 1 -&gt; table/index scan.</span>
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">is_src_scan_executor</span> <span class="op">=</span> <span class="bool-val">true</span>;
 
     <span class="kw">match</span> <span class="ident">first_ed</span>.<span class="ident">get_tp</span>() {
-        <span class="ident">ExecType</span>::<span class="ident">TypeTableScan</span> <span class="op">=</span><span class="op">&gt;</span> {
+        <span class="ident">ExecType::TypeTableScan</span> <span class="op">=</span><span class="op">&gt;</span> {
             <span class="ident">EXECUTOR_COUNT_METRICS</span>.<span class="ident">batch_table_scan</span>.<span class="ident">inc</span>();
 
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">descriptor</span> <span class="op">=</span> <span class="ident">first_ed</span>.<span class="ident">take_tbl_scan</span>();
@@ -778,8 +789,8 @@
             <span class="kw">let</span> <span class="ident">primary_column_ids</span> <span class="op">=</span> <span class="ident">descriptor</span>.<span class="ident">take_primary_column_ids</span>();
             <span class="kw">let</span> <span class="ident">primary_prefix_column_ids</span> <span class="op">=</span> <span class="ident">descriptor</span>.<span class="ident">take_primary_prefix_column_ids</span>();
 
-            <span class="ident">executor</span> <span class="op">=</span> <span class="ident">Box</span>::<span class="ident">new</span>(
-                <span class="ident">BatchTableScanExecutor</span>::<span class="ident">new</span>(
+            <span class="ident">executor</span> <span class="op">=</span> <span class="ident">Box::new</span>(
+                <span class="ident">BatchTableScanExecutor::new</span>(
                     <span class="ident">storage</span>,
                     <span class="ident">config</span>.<span class="ident">clone</span>(),
                     <span class="ident">columns_info</span>,
@@ -792,14 +803,14 @@
                 .<span class="ident">collect_summary</span>(<span class="ident">summary_slot_index</span>),
             );
         }
-        <span class="ident">ExecType</span>::<span class="ident">TypeIndexScan</span> <span class="op">=</span><span class="op">&gt;</span> {
+        <span class="ident">ExecType::TypeIndexScan</span> <span class="op">=</span><span class="op">&gt;</span> {
             <span class="ident">EXECUTOR_COUNT_METRICS</span>.<span class="ident">batch_index_scan</span>.<span class="ident">inc</span>();
 
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">descriptor</span> <span class="op">=</span> <span class="ident">first_ed</span>.<span class="ident">take_idx_scan</span>();
             <span class="kw">let</span> <span class="ident">columns_info</span> <span class="op">=</span> <span class="ident">descriptor</span>.<span class="ident">take_columns</span>().<span class="ident">into</span>();
             <span class="kw">let</span> <span class="ident">primary_column_ids_len</span> <span class="op">=</span> <span class="ident">descriptor</span>.<span class="ident">take_primary_column_ids</span>().<span class="ident">len</span>();
-            <span class="ident">executor</span> <span class="op">=</span> <span class="ident">Box</span>::<span class="ident">new</span>(
-                <span class="ident">BatchIndexScanExecutor</span>::<span class="ident">new</span>(
+            <span class="ident">executor</span> <span class="op">=</span> <span class="ident">Box::new</span>(
+                <span class="ident">BatchIndexScanExecutor::new</span>(
                     <span class="ident">storage</span>,
                     <span class="ident">config</span>.<span class="ident">clone</span>(),
                     <span class="ident">columns_info</span>,
@@ -813,7 +824,7 @@
             );
         }
         <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">other_err</span><span class="macro">!</span>(
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">other_err!</span>(
                 <span class="string">&quot;Unexpected first executor {:?}&quot;</span>,
                 <span class="ident">first_ed</span>.<span class="ident">get_tp</span>()
             ));
@@ -823,12 +834,12 @@
     <span class="kw">for</span> <span class="kw-2">mut</span> <span class="ident">ed</span> <span class="kw">in</span> <span class="ident">executor_descriptors</span> {
         <span class="ident">summary_slot_index</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
 
-        <span class="kw">let</span> <span class="ident">new_executor</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">BatchExecutor</span><span class="op">&lt;</span><span class="ident">StorageStats</span> <span class="op">=</span> <span class="ident">S</span>::<span class="ident">Statistics</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">ed</span>.<span class="ident">get_tp</span>() {
-            <span class="ident">ExecType</span>::<span class="ident">TypeSelection</span> <span class="op">=</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="ident">new_executor</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">BatchExecutor</span><span class="op">&lt;</span><span class="ident">StorageStats</span> <span class="op">=</span> <span class="ident">S::Statistics</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">ed</span>.<span class="ident">get_tp</span>() {
+            <span class="ident">ExecType::TypeSelection</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="ident">EXECUTOR_COUNT_METRICS</span>.<span class="ident">batch_selection</span>.<span class="ident">inc</span>();
 
-                <span class="ident">Box</span>::<span class="ident">new</span>(
-                    <span class="ident">BatchSelectionExecutor</span>::<span class="ident">new</span>(
+                <span class="ident">Box::new</span>(
+                    <span class="ident">BatchSelectionExecutor::new</span>(
                         <span class="ident">config</span>.<span class="ident">clone</span>(),
                         <span class="ident">executor</span>,
                         <span class="ident">ed</span>.<span class="ident">take_selection</span>().<span class="ident">take_conditions</span>().<span class="ident">into</span>(),
@@ -836,13 +847,13 @@
                     .<span class="ident">collect_summary</span>(<span class="ident">summary_slot_index</span>),
                 )
             }
-            <span class="ident">ExecType</span>::<span class="ident">TypeAggregation</span> <span class="op">|</span> <span class="ident">ExecType</span>::<span class="ident">TypeStreamAgg</span>
+            <span class="ident">ExecType::TypeAggregation</span> <span class="op">|</span> <span class="ident">ExecType::TypeStreamAgg</span>
                 <span class="kw">if</span> <span class="ident">ed</span>.<span class="ident">get_aggregation</span>().<span class="ident">get_group_by</span>().<span class="ident">is_empty</span>() <span class="op">=</span><span class="op">&gt;</span>
             {
                 <span class="ident">EXECUTOR_COUNT_METRICS</span>.<span class="ident">batch_simple_aggr</span>.<span class="ident">inc</span>();
 
-                <span class="ident">Box</span>::<span class="ident">new</span>(
-                    <span class="ident">BatchSimpleAggregationExecutor</span>::<span class="ident">new</span>(
+                <span class="ident">Box::new</span>(
+                    <span class="ident">BatchSimpleAggregationExecutor::new</span>(
                         <span class="ident">config</span>.<span class="ident">clone</span>(),
                         <span class="ident">executor</span>,
                         <span class="ident">ed</span>.<span class="ident">mut_aggregation</span>().<span class="ident">take_agg_func</span>().<span class="ident">into</span>(),
@@ -850,13 +861,13 @@
                     .<span class="ident">collect_summary</span>(<span class="ident">summary_slot_index</span>),
                 )
             }
-            <span class="ident">ExecType</span>::<span class="ident">TypeAggregation</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">if</span> <span class="ident">BatchFastHashAggregationExecutor</span>::<span class="ident">check_supported</span>(<span class="kw-2">&amp;</span><span class="ident">ed</span>.<span class="ident">get_aggregation</span>()).<span class="ident">is_ok</span>()
+            <span class="ident">ExecType::TypeAggregation</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="kw">if</span> <span class="ident">BatchFastHashAggregationExecutor::check_supported</span>(<span class="kw-2">&amp;</span><span class="ident">ed</span>.<span class="ident">get_aggregation</span>()).<span class="ident">is_ok</span>()
                 {
                     <span class="ident">EXECUTOR_COUNT_METRICS</span>.<span class="ident">batch_fast_hash_aggr</span>.<span class="ident">inc</span>();
 
-                    <span class="ident">Box</span>::<span class="ident">new</span>(
-                        <span class="ident">BatchFastHashAggregationExecutor</span>::<span class="ident">new</span>(
+                    <span class="ident">Box::new</span>(
+                        <span class="ident">BatchFastHashAggregationExecutor::new</span>(
                             <span class="ident">config</span>.<span class="ident">clone</span>(),
                             <span class="ident">executor</span>,
                             <span class="ident">ed</span>.<span class="ident">mut_aggregation</span>().<span class="ident">take_group_by</span>().<span class="ident">into</span>(),
@@ -867,8 +878,8 @@
                 } <span class="kw">else</span> {
                     <span class="ident">EXECUTOR_COUNT_METRICS</span>.<span class="ident">batch_slow_hash_aggr</span>.<span class="ident">inc</span>();
 
-                    <span class="ident">Box</span>::<span class="ident">new</span>(
-                        <span class="ident">BatchSlowHashAggregationExecutor</span>::<span class="ident">new</span>(
+                    <span class="ident">Box::new</span>(
+                        <span class="ident">BatchSlowHashAggregationExecutor::new</span>(
                             <span class="ident">config</span>.<span class="ident">clone</span>(),
                             <span class="ident">executor</span>,
                             <span class="ident">ed</span>.<span class="ident">mut_aggregation</span>().<span class="ident">take_group_by</span>().<span class="ident">into</span>(),
@@ -878,11 +889,11 @@
                     )
                 }
             }
-            <span class="ident">ExecType</span>::<span class="ident">TypeStreamAgg</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">ExecType::TypeStreamAgg</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="ident">EXECUTOR_COUNT_METRICS</span>.<span class="ident">batch_stream_aggr</span>.<span class="ident">inc</span>();
 
-                <span class="ident">Box</span>::<span class="ident">new</span>(
-                    <span class="ident">BatchStreamAggregationExecutor</span>::<span class="ident">new</span>(
+                <span class="ident">Box::new</span>(
+                    <span class="ident">BatchStreamAggregationExecutor::new</span>(
                         <span class="ident">config</span>.<span class="ident">clone</span>(),
                         <span class="ident">executor</span>,
                         <span class="ident">ed</span>.<span class="ident">mut_aggregation</span>().<span class="ident">take_group_by</span>().<span class="ident">into</span>(),
@@ -891,28 +902,32 @@
                     .<span class="ident">collect_summary</span>(<span class="ident">summary_slot_index</span>),
                 )
             }
-            <span class="ident">ExecType</span>::<span class="ident">TypeLimit</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">ExecType::TypeLimit</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="ident">EXECUTOR_COUNT_METRICS</span>.<span class="ident">batch_limit</span>.<span class="ident">inc</span>();
 
-                <span class="ident">Box</span>::<span class="ident">new</span>(
-                    <span class="ident">BatchLimitExecutor</span>::<span class="ident">new</span>(<span class="ident">executor</span>, <span class="ident">ed</span>.<span class="ident">get_limit</span>().<span class="ident">get_limit</span>() <span class="kw">as</span> <span class="ident">usize</span>)<span class="question-mark">?</span>
-                        .<span class="ident">collect_summary</span>(<span class="ident">summary_slot_index</span>),
+                <span class="ident">Box::new</span>(
+                    <span class="ident">BatchLimitExecutor::new</span>(
+                        <span class="ident">executor</span>,
+                        <span class="ident">ed</span>.<span class="ident">get_limit</span>().<span class="ident">get_limit</span>() <span class="kw">as</span> <span class="ident">usize</span>,
+                        <span class="ident">is_src_scan_executor</span>,
+                    )<span class="question-mark">?</span>
+                    .<span class="ident">collect_summary</span>(<span class="ident">summary_slot_index</span>),
                 )
             }
-            <span class="ident">ExecType</span>::<span class="ident">TypeTopN</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">ExecType::TypeTopN</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="ident">EXECUTOR_COUNT_METRICS</span>.<span class="ident">batch_top_n</span>.<span class="ident">inc</span>();
 
                 <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">d</span> <span class="op">=</span> <span class="ident">ed</span>.<span class="ident">take_top_n</span>();
                 <span class="kw">let</span> <span class="ident">order_bys</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">get_order_by</span>().<span class="ident">len</span>();
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">order_exprs_def</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">with_capacity</span>(<span class="ident">order_bys</span>);
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">order_is_desc</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">with_capacity</span>(<span class="ident">order_bys</span>);
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">order_exprs_def</span> <span class="op">=</span> <span class="ident">Vec::with_capacity</span>(<span class="ident">order_bys</span>);
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">order_is_desc</span> <span class="op">=</span> <span class="ident">Vec::with_capacity</span>(<span class="ident">order_bys</span>);
                 <span class="kw">for</span> <span class="kw-2">mut</span> <span class="ident">item</span> <span class="kw">in</span> <span class="ident">d</span>.<span class="ident">take_order_by</span>().<span class="ident">into_iter</span>() {
                     <span class="ident">order_exprs_def</span>.<span class="ident">push</span>(<span class="ident">item</span>.<span class="ident">take_expr</span>());
                     <span class="ident">order_is_desc</span>.<span class="ident">push</span>(<span class="ident">item</span>.<span class="ident">get_desc</span>());
                 }
 
-                <span class="ident">Box</span>::<span class="ident">new</span>(
-                    <span class="ident">BatchTopNExecutor</span>::<span class="ident">new</span>(
+                <span class="ident">Box::new</span>(
+                    <span class="ident">BatchTopNExecutor::new</span>(
                         <span class="ident">config</span>.<span class="ident">clone</span>(),
                         <span class="ident">executor</span>,
                         <span class="ident">order_exprs_def</span>,
@@ -923,13 +938,14 @@
                 )
             }
             <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">other_err</span><span class="macro">!</span>(
+                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">other_err!</span>(
                     <span class="string">&quot;Unexpected non-first executor {:?}&quot;</span>,
                     <span class="ident">ed</span>.<span class="ident">get_tp</span>()
                 ));
             }
         };
         <span class="ident">executor</span> <span class="op">=</span> <span class="ident">new_executor</span>;
+        <span class="ident">is_src_scan_executor</span> <span class="op">=</span> <span class="bool-val">false</span>;
     }
 
     <span class="prelude-val">Ok</span>(<span class="ident">executor</span>)
@@ -946,7 +962,7 @@
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">executors_len</span> <span class="op">=</span> <span class="ident">req</span>.<span class="ident">get_executors</span>().<span class="ident">len</span>();
         <span class="kw">let</span> <span class="ident">collect_exec_summary</span> <span class="op">=</span> <span class="ident">req</span>.<span class="ident">get_collect_execution_summaries</span>();
-        <span class="kw">let</span> <span class="ident">config</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">EvalConfig</span>::<span class="ident">from_request</span>(<span class="kw-2">&amp;</span><span class="ident">req</span>)<span class="question-mark">?</span>);
+        <span class="kw">let</span> <span class="ident">config</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">EvalConfig::from_request</span>(<span class="kw-2">&amp;</span><span class="ident">req</span>)<span class="question-mark">?</span>);
 
         <span class="kw">let</span> <span class="ident">out_most_executor</span> <span class="op">=</span> <span class="ident">build_executors</span>(
             <span class="ident">req</span>.<span class="ident">take_executors</span>().<span class="ident">into</span>(),
@@ -957,7 +973,7 @@
         )<span class="question-mark">?</span>;
 
         <span class="kw">let</span> <span class="ident">encode_type</span> <span class="op">=</span> <span class="kw">if</span> <span class="op">!</span><span class="ident">is_arrow_encodable</span>(<span class="ident">out_most_executor</span>.<span class="ident">schema</span>()) {
-            <span class="ident">EncodeType</span>::<span class="ident">TypeDefault</span>
+            <span class="ident">EncodeType::TypeDefault</span>
         } <span class="kw">else</span> {
             <span class="ident">req</span>.<span class="ident">get_encode_type</span>()
         };
@@ -967,7 +983,7 @@
         <span class="kw">let</span> <span class="ident">schema_len</span> <span class="op">=</span> <span class="ident">out_most_executor</span>.<span class="ident">schema</span>().<span class="ident">len</span>();
         <span class="kw">for</span> <span class="ident">offset</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">output_offsets</span> {
             <span class="kw">if</span> (<span class="kw-2">*</span><span class="ident">offset</span> <span class="kw">as</span> <span class="ident">usize</span>) <span class="op">&gt;</span><span class="op">=</span> <span class="ident">schema_len</span> {
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">other_err</span><span class="macro">!</span>(
+                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">other_err!</span>(
                     <span class="string">&quot;Invalid output offset (schema has {} columns, access index {})&quot;</span>,
                     <span class="ident">schema_len</span>,
                     <span class="ident">offset</span>
@@ -975,7 +991,7 @@
             }
         }
 
-        <span class="kw">let</span> <span class="ident">exec_stats</span> <span class="op">=</span> <span class="ident">ExecuteStats</span>::<span class="ident">new</span>(<span class="ident">executors_len</span>);
+        <span class="kw">let</span> <span class="ident">exec_stats</span> <span class="op">=</span> <span class="ident">ExecuteStats::new</span>(<span class="ident">executors_len</span>);
 
         <span class="prelude-val">Ok</span>(<span class="self">Self</span> {
             <span class="ident">deadline</span>,
@@ -984,33 +1000,33 @@
             <span class="ident">config</span>,
             <span class="ident">collect_exec_summary</span>,
             <span class="ident">exec_stats</span>,
-            <span class="ident">encode_type</span>,
             <span class="ident">stream_row_limit</span>,
+            <span class="ident">encode_type</span>,
         })
     }
 
     <span class="kw">fn</span> <span class="ident">batch_initial_size</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
-        <span class="macro">fail_point</span><span class="macro">!</span>(<span class="string">&quot;copr_batch_initial_size&quot;</span>, <span class="op">|</span><span class="ident">r</span><span class="op">|</span> <span class="ident">r</span>
+        <span class="macro">fail_point!</span>(<span class="string">&quot;copr_batch_initial_size&quot;</span>, <span class="op">|</span><span class="ident">r</span><span class="op">|</span> <span class="ident">r</span>
             .<span class="ident">map_or</span>(<span class="number">1</span>, <span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">e</span>.<span class="ident">parse</span>().<span class="ident">unwrap</span>()));
         <span class="ident">BATCH_INITIAL_SIZE</span>
     }
 
     <span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">handle_request</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">SelectResponse</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">chunks</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[];
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">batch_size</span> <span class="op">=</span> <span class="self">Self</span>::<span class="ident">batch_initial_size</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">chunks</span> <span class="op">=</span> <span class="macro">vec!</span>[];
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">batch_size</span> <span class="op">=</span> <span class="self">Self</span><span class="ident">::batch_initial_size</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">warnings</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">new_eval_warnings</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ctx</span> <span class="op">=</span> <span class="ident">EvalContext</span>::<span class="ident">new</span>(<span class="self">self</span>.<span class="ident">config</span>.<span class="ident">clone</span>());
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ctx</span> <span class="op">=</span> <span class="ident">EvalContext::new</span>(<span class="self">self</span>.<span class="ident">config</span>.<span class="ident">clone</span>());
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">time_slice_start</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">time_slice_start</span> <span class="op">=</span> <span class="ident">Instant::now</span>();
         <span class="kw">loop</span> {
             <span class="kw">let</span> <span class="ident">time_slice_len</span> <span class="op">=</span> <span class="ident">time_slice_start</span>.<span class="ident">elapsed</span>();
             <span class="comment">// Check whether we should yield from the execution</span>
             <span class="kw">if</span> <span class="ident">time_slice_len</span> <span class="op">&gt;</span> <span class="ident">MAX_TIME_SLICE</span> {
                 <span class="ident">reschedule</span>().<span class="kw">await</span>;
-                <span class="ident">time_slice_start</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now</span>();
+                <span class="ident">time_slice_start</span> <span class="op">=</span> <span class="ident">Instant::now</span>();
             }
 
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">chunk</span> <span class="op">=</span> <span class="ident">Chunk</span>::<span class="ident">default</span>();
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">chunk</span> <span class="op">=</span> <span class="ident">Chunk::default</span>();
 
             <span class="kw">let</span> (<span class="ident">drained</span>, <span class="ident">record_len</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">internal_handle_request</span>(
                 <span class="bool-val">false</span>,
@@ -1028,7 +1044,7 @@
                 <span class="self">self</span>.<span class="ident">out_most_executor</span>
                     .<span class="ident">collect_exec_stats</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">exec_stats</span>);
 
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">sel_resp</span> <span class="op">=</span> <span class="ident">SelectResponse</span>::<span class="ident">default</span>();
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">sel_resp</span> <span class="op">=</span> <span class="ident">SelectResponse::default</span>();
                 <span class="ident">sel_resp</span>.<span class="ident">set_chunks</span>(<span class="ident">chunks</span>.<span class="ident">into</span>());
                 <span class="ident">sel_resp</span>.<span class="ident">set_encode_type</span>(<span class="self">self</span>.<span class="ident">encode_type</span>);
 
@@ -1047,7 +1063,7 @@
                         .<span class="ident">summary_per_executor</span>
                         .<span class="ident">iter</span>()
                         .<span class="ident">map</span>(<span class="op">|</span><span class="ident">summary</span><span class="op">|</span> {
-                            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ret</span> <span class="op">=</span> <span class="ident">ExecutorExecutionSummary</span>::<span class="ident">default</span>();
+                            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ret</span> <span class="op">=</span> <span class="ident">ExecutorExecutionSummary::default</span>();
                             <span class="ident">ret</span>.<span class="ident">set_num_iterations</span>(<span class="ident">summary</span>.<span class="ident">num_iterations</span> <span class="kw">as</span> <span class="ident">u64</span>);
                             <span class="ident">ret</span>.<span class="ident">set_num_produced_rows</span>(<span class="ident">summary</span>.<span class="ident">num_produced_rows</span> <span class="kw">as</span> <span class="ident">u64</span>);
                             <span class="ident">ret</span>.<span class="ident">set_time_processed_ns</span>(<span class="ident">summary</span>.<span class="ident">time_processed_ns</span> <span class="kw">as</span> <span class="ident">u64</span>);
@@ -1077,13 +1093,13 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">warnings</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">new_eval_warnings</span>();
 
         <span class="kw">let</span> (<span class="kw-2">mut</span> <span class="ident">record_len</span>, <span class="kw-2">mut</span> <span class="ident">is_drained</span>) <span class="op">=</span> (<span class="number">0</span>, <span class="bool-val">false</span>);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">chunk</span> <span class="op">=</span> <span class="ident">Chunk</span>::<span class="ident">default</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ctx</span> <span class="op">=</span> <span class="ident">EvalContext</span>::<span class="ident">new</span>(<span class="self">self</span>.<span class="ident">config</span>.<span class="ident">clone</span>());
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">chunk</span> <span class="op">=</span> <span class="ident">Chunk::default</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ctx</span> <span class="op">=</span> <span class="ident">EvalContext::new</span>(<span class="self">self</span>.<span class="ident">config</span>.<span class="ident">clone</span>());
         <span class="kw">let</span> <span class="ident">batch_size</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">stream_row_limit</span>.<span class="ident">min</span>(<span class="ident">BATCH_MAX_SIZE</span>);
 
         <span class="comment">// record count less than batch size and is not drained</span>
         <span class="kw">while</span> <span class="ident">record_len</span> <span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">stream_row_limit</span> <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="ident">is_drained</span> {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">current_chunk</span> <span class="op">=</span> <span class="ident">Chunk</span>::<span class="ident">default</span>();
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">current_chunk</span> <span class="op">=</span> <span class="ident">Chunk::default</span>();
             <span class="kw">let</span> (<span class="ident">drained</span>, <span class="ident">len</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">internal_handle_request</span>(
                 <span class="bool-val">true</span>,
                 <span class="ident">batch_size</span>.<span class="ident">min</span>(<span class="self">self</span>.<span class="ident">stream_row_limit</span> <span class="op">-</span> <span class="ident">record_len</span>),
@@ -1132,7 +1148,7 @@
         <span class="kw">let</span> <span class="ident">is_drained</span> <span class="op">=</span> <span class="ident">result</span>.<span class="ident">is_drained</span><span class="question-mark">?</span>;
 
         <span class="kw">if</span> <span class="op">!</span><span class="ident">result</span>.<span class="ident">logical_rows</span>.<span class="ident">is_empty</span>() {
-            <span class="macro">assert_eq</span><span class="macro">!</span>(
+            <span class="macro">assert_eq!</span>(
                 <span class="ident">result</span>.<span class="ident">physical_columns</span>.<span class="ident">columns_len</span>(),
                 <span class="self">self</span>.<span class="ident">out_most_executor</span>.<span class="ident">schema</span>().<span class="ident">len</span>()
             );
@@ -1140,7 +1156,7 @@
                 <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="ident">chunk</span>.<span class="ident">mut_rows_data</span>();
                 <span class="comment">// Although `schema()` can be deeply nested, it is ok since we process data in</span>
                 <span class="comment">// batch.</span>
-                <span class="kw">if</span> <span class="ident">is_streaming</span> <span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">encode_type</span> <span class="op">=</span><span class="op">=</span> <span class="ident">EncodeType</span>::<span class="ident">TypeDefault</span> {
+                <span class="kw">if</span> <span class="ident">is_streaming</span> <span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">encode_type</span> <span class="op">=</span><span class="op">=</span> <span class="ident">EncodeType::TypeDefault</span> {
                     <span class="ident">data</span>.<span class="ident">reserve</span>(
                         <span class="ident">result</span>
                             .<span class="ident">physical_columns</span>
@@ -1183,8 +1199,8 @@
         <span class="self">self</span>.<span class="ident">out_most_executor</span>
             .<span class="ident">collect_exec_stats</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">exec_stats</span>);
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">s_resp</span> <span class="op">=</span> <span class="ident">StreamResponse</span>::<span class="ident">default</span>();
-        <span class="ident">s_resp</span>.<span class="ident">set_data</span>(<span class="macro">box_try</span><span class="macro">!</span>(<span class="ident">chunk</span>.<span class="ident">write_to_bytes</span>()));
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">s_resp</span> <span class="op">=</span> <span class="ident">StreamResponse::default</span>();
+        <span class="ident">s_resp</span>.<span class="ident">set_data</span>(<span class="macro">box_try!</span>(<span class="ident">chunk</span>.<span class="ident">write_to_bytes</span>()));
 
         <span class="ident">s_resp</span>.<span class="ident">set_output_counts</span>(
             <span class="self">self</span>.<span class="ident">exec_stats</span>
@@ -1213,5 +1229,5 @@
     }
 }
 </pre></div>
-</section><section id="search" class="content hidden"></section><section class="footer"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="tidb_query_executors"></div>
-    <script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script><script defer src="../../search-index.js"></script></body></html>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="tidb_query_executors" data-search-js="../../search-index.js"></div>
+    <script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script></body></html>

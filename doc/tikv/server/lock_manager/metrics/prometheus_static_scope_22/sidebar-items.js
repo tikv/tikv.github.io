@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["LocalTaskCounter",""],["LocalTaskCounterDelegator",""],["LocalTaskCounterInner",""]]});
+initSidebarItems({"struct":[["LocalErrorCounter",""],["LocalErrorCounterDelegator",""],["LocalErrorCounterInner",""]]});

@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["get_approximate_split_keys","Get region approximate split keys based on default, write and lock cf."],["get_region_approximate_size","Get the approximate size of the range."],["get_region_approximate_size_cf",""]],"struct":[["Checker",""],["SizeCheckObserver",""]]});
+initSidebarItems({"fn":[["get_approximate_split_keys","Get region approximate split keys based on default, write and lock cf."],["get_region_approximate_size","Get the approximate size of the range."]],"struct":[["Checker",""],["SizeCheckObserver",""]]});

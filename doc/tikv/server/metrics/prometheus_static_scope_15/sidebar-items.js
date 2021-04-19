@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["GrpcMsgHistogramVec",""],["GrpcMsgHistogramVecDelegator",""],["GrpcMsgHistogramVecInner",""]]});
+initSidebarItems({"struct":[["ReplicaReadLockCheckHistogramVec",""],["ReplicaReadLockCheckHistogramVecDelegator",""],["ReplicaReadLockCheckHistogramVecInner",""]]});

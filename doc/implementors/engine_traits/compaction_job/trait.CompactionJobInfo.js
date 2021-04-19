@@ -1,3 +1,3 @@
 (function() {var implementors = {};
-implementors["engine_rocks"] = [{"text":"impl CompactionJobInfo for RocksCompactionJobInfo&lt;'_&gt;","synthetic":false,"types":[]}];
+implementors["engine_rocks"] = [{"text":"impl <a class=\"trait\" href=\"engine_traits/compaction_job/trait.CompactionJobInfo.html\" title=\"trait engine_traits::compaction_job::CompactionJobInfo\">CompactionJobInfo</a> for <a class=\"struct\" href=\"engine_rocks/compact_listener/struct.RocksCompactionJobInfo.html\" title=\"struct engine_rocks::compact_listener::RocksCompactionJobInfo\">RocksCompactionJobInfo</a>&lt;'_&gt;","synthetic":false,"types":["engine_rocks::compact_listener::RocksCompactionJobInfo"]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

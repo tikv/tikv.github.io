@@ -1,7 +1,7 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `components/raftstore/src/store/worker/pd.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>pd.rs - source</title><link rel="stylesheet" type="text/css" href="../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `components/raftstore/src/store/worker/pd.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>pd.rs - source</title><link rel="stylesheet" type="text/css" href="../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../../storage.js"></script><script src="../../../../crates.js"></script><noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg">
 <link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../../raftstore/index.html'><div class='logo-container rust-logo'><img src='../../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><script src="../../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
-                <a id="settings-menu" href="../../../../settings.html"><img src="../../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">   1</span>
+<link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../../../raftstore/index.html'><div class='logo-container rust-logo'><img src='../../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
+                <a id="settings-menu" href="../../../../settings.html"><img src="../../../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">   1</span>
 <span id="2">   2</span>
 <span id="3">   3</span>
 <span id="4">   4</span>
@@ -1390,52 +1390,69 @@
 <span id="1387">1387</span>
 <span id="1388">1388</span>
 <span id="1389">1389</span>
+<span id="1390">1390</span>
+<span id="1391">1391</span>
+<span id="1392">1392</span>
+<span id="1393">1393</span>
+<span id="1394">1394</span>
+<span id="1395">1395</span>
+<span id="1396">1396</span>
+<span id="1397">1397</span>
+<span id="1398">1398</span>
+<span id="1399">1399</span>
+<span id="1400">1400</span>
+<span id="1401">1401</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">fmt</span>::{<span class="self">self</span>, <span class="ident">Display</span>, <span class="ident">Formatter</span>};
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">mpsc</span>::{<span class="self">self</span>, <span class="ident">Sender</span>};
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::{
+<span class="kw">use</span> <span class="ident">std::fmt</span>::{<span class="self">self</span>, <span class="ident">Display</span>, <span class="ident">Formatter</span>};
+<span class="kw">use</span> <span class="ident">std::sync::mpsc</span>::{<span class="self">self</span>, <span class="ident">Sender</span>};
+<span class="kw">use</span> <span class="ident">std::sync</span>::{
     <span class="ident">atomic</span>::{<span class="ident">AtomicU64</span>, <span class="ident">Ordering</span>},
     <span class="ident">Arc</span>,
 };
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">thread</span>::{<span class="ident">Builder</span>, <span class="ident">JoinHandle</span>};
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">time</span>::<span class="ident">Duration</span>;
+<span class="kw">use</span> <span class="ident">std::thread</span>::{<span class="ident">Builder</span>, <span class="ident">JoinHandle</span>};
+<span class="kw">use</span> <span class="ident">std::time</span>::{<span class="ident">Duration</span>, <span class="ident">Instant</span>};
 <span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">cmp</span>, <span class="ident">io</span>};
 
-<span class="kw">use</span> <span class="ident">futures</span>::<span class="ident">future</span>::<span class="ident">TryFutureExt</span>;
-<span class="kw">use</span> <span class="ident">tokio</span>::<span class="ident">task</span>::<span class="ident">spawn_local</span>;
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;failpoints&quot;</span>)]</span>
+<span class="kw">use</span> <span class="ident">fail::fail_point</span>;
+<span class="kw">use</span> <span class="ident">futures::future::TryFutureExt</span>;
+<span class="kw">use</span> <span class="ident">tokio::task::spawn_local</span>;
 
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">KvEngine</span>, <span class="ident">RaftEngine</span>};
-<span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">metapb</span>;
-<span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">pdpb</span>;
-<span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">raft_cmdpb</span>::{
+<span class="kw">use</span> <span class="ident">kvproto::raft_cmdpb</span>::{
     <span class="ident">AdminCmdType</span>, <span class="ident">AdminRequest</span>, <span class="ident">ChangePeerRequest</span>, <span class="ident">ChangePeerV2Request</span>, <span class="ident">RaftCmdRequest</span>,
     <span class="ident">SplitRequest</span>,
 };
-<span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">raft_serverpb</span>::<span class="ident">RaftMessage</span>;
-<span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">replication_modepb</span>::<span class="ident">RegionReplicationStatus</span>;
-<span class="kw">use</span> <span class="ident">prometheus</span>::<span class="ident">local</span>::<span class="ident">LocalHistogram</span>;
-<span class="kw">use</span> <span class="ident">raft</span>::<span class="ident">eraftpb</span>::<span class="ident">ConfChangeType</span>;
+<span class="kw">use</span> <span class="ident">kvproto::raft_serverpb::RaftMessage</span>;
+<span class="kw">use</span> <span class="ident">kvproto::replication_modepb::RegionReplicationStatus</span>;
+<span class="kw">use</span> <span class="ident">kvproto</span>::{<span class="ident">metapb</span>, <span class="ident">pdpb</span>};
+<span class="kw">use</span> <span class="ident">prometheus::local::LocalHistogram</span>;
+<span class="kw">use</span> <span class="ident">raft::eraftpb::ConfChangeType</span>;
 
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">cmd_resp</span>::<span class="ident">new_error</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">metrics</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">util</span>::{<span class="ident">is_epoch_stale</span>, <span class="ident">ConfChangeKind</span>, <span class="ident">KeysInfoFormatter</span>};
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">worker</span>::<span class="ident">split_controller</span>::{<span class="ident">SplitInfo</span>, <span class="ident">TOP_N</span>};
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">worker</span>::{<span class="ident">AutoSplitController</span>, <span class="ident">ReadStats</span>};
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">Callback</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::<span class="ident">StoreInfo</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">store</span>::{<span class="ident">CasualMessage</span>, <span class="ident">PeerMsg</span>, <span class="ident">RaftCommand</span>, <span class="ident">RaftRouter</span>, <span class="ident">StoreMsg</span>};
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::store::cmd_resp::new_error</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::store::metrics</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::store::util</span>::{<span class="ident">is_epoch_stale</span>, <span class="ident">ConfChangeKind</span>, <span class="ident">KeysInfoFormatter</span>};
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::store::worker::split_controller</span>::{<span class="ident">SplitInfo</span>, <span class="ident">TOP_N</span>};
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::store::worker</span>::{<span class="ident">AutoSplitController</span>, <span class="ident">ReadStats</span>};
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::store</span>::{
+    <span class="ident">Callback</span>, <span class="ident">CasualMessage</span>, <span class="ident">PeerMsg</span>, <span class="ident">RaftCommand</span>, <span class="ident">RaftRouter</span>, <span class="ident">SnapManager</span>, <span class="ident">StoreInfo</span>, <span class="ident">StoreMsg</span>,
+};
 
-<span class="kw">use</span> <span class="ident">collections</span>::<span class="ident">HashMap</span>;
-<span class="kw">use</span> <span class="ident">concurrency_manager</span>::<span class="ident">ConcurrencyManager</span>;
-<span class="kw">use</span> <span class="ident">pd_client</span>::<span class="ident">metrics</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident">collections::HashMap</span>;
+<span class="kw">use</span> <span class="ident">concurrency_manager::ConcurrencyManager</span>;
+<span class="kw">use</span> <span class="ident">futures::compat::Future01CompatExt</span>;
+<span class="kw">use</span> <span class="ident">futures::FutureExt</span>;
+<span class="kw">use</span> <span class="ident">pd_client::metrics</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">pd_client</span>::{<span class="ident">Error</span>, <span class="ident">PdClient</span>, <span class="ident">RegionStat</span>};
-<span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">metrics</span>::<span class="ident">ThreadInfoStatistics</span>;
-<span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">time</span>::<span class="ident">UnixSecs</span>;
-<span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">worker</span>::{<span class="ident">FutureRunnable</span> <span class="kw">as</span> <span class="ident">Runnable</span>, <span class="ident">FutureScheduler</span> <span class="kw">as</span> <span class="ident">Scheduler</span>, <span class="ident">Stopped</span>};
+<span class="kw">use</span> <span class="ident">tikv_util::metrics::ThreadInfoStatistics</span>;
+<span class="kw">use</span> <span class="ident">tikv_util::time::UnixSecs</span>;
+<span class="kw">use</span> <span class="ident">tikv_util::timer::GLOBAL_TIMER_HANDLE</span>;
+<span class="kw">use</span> <span class="ident">tikv_util::worker</span>::{<span class="ident">FutureRunnable</span> <span class="kw">as</span> <span class="ident">Runnable</span>, <span class="ident">FutureScheduler</span> <span class="kw">as</span> <span class="ident">Scheduler</span>, <span class="ident">Stopped</span>};
+<span class="kw">use</span> <span class="ident">tikv_util</span>::{<span class="ident">box_err</span>, <span class="ident">debug</span>, <span class="ident">error</span>, <span class="ident">info</span>, <span class="ident">thd_name</span>, <span class="ident">warn</span>};
 
-<span class="kw">type</span> <span class="ident">RecordPairVec</span> <span class="op">=</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">pdpb</span>::<span class="ident">RecordPair</span><span class="op">&gt;</span>;
+<span class="kw">type</span> <span class="ident">RecordPairVec</span> <span class="op">=</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">pdpb::RecordPair</span><span class="op">&gt;</span>;
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Default</span>, <span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">FlowStatistics</span> {
@@ -1461,18 +1478,18 @@
     <span class="ident">E</span>: <span class="ident">KvEngine</span>,
 {
     <span class="kw">fn</span> <span class="ident">report_read_stats</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">read_stats</span>: <span class="ident">ReadStats</span>) {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">schedule</span>(<span class="ident">Task</span>::<span class="ident">ReadStats</span> { <span class="ident">read_stats</span> }) {
-            <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;Failed to send read flow statistics&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">schedule</span>(<span class="ident">Task::ReadStats</span> { <span class="ident">read_stats</span> }) {
+            <span class="macro">error!</span>(<span class="string">&quot;Failed to send read flow statistics&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
         }
     }
 }
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">HeartbeatTask</span> {
     <span class="kw">pub</span> <span class="ident">term</span>: <span class="ident">u64</span>,
-    <span class="kw">pub</span> <span class="ident">region</span>: <span class="ident">metapb</span>::<span class="ident">Region</span>,
-    <span class="kw">pub</span> <span class="ident">peer</span>: <span class="ident">metapb</span>::<span class="ident">Peer</span>,
-    <span class="kw">pub</span> <span class="ident">down_peers</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">pdpb</span>::<span class="ident">PeerStats</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">pending_peers</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">metapb</span>::<span class="ident">Peer</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">region</span>: <span class="ident">metapb::Region</span>,
+    <span class="kw">pub</span> <span class="ident">peer</span>: <span class="ident">metapb::Peer</span>,
+    <span class="kw">pub</span> <span class="ident">down_peers</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">pdpb::PeerStats</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">pending_peers</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">metapb::Peer</span><span class="op">&gt;</span>,
     <span class="kw">pub</span> <span class="ident">written_bytes</span>: <span class="ident">u64</span>,
     <span class="kw">pub</span> <span class="ident">written_keys</span>: <span class="ident">u64</span>,
     <span class="kw">pub</span> <span class="ident">approximate_size</span>: <span class="ident">u64</span>,
@@ -1486,35 +1503,35 @@
     <span class="ident">E</span>: <span class="ident">KvEngine</span>,
 {
     <span class="ident">AskSplit</span> {
-        <span class="ident">region</span>: <span class="ident">metapb</span>::<span class="ident">Region</span>,
+        <span class="ident">region</span>: <span class="ident">metapb::Region</span>,
         <span class="ident">split_key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
-        <span class="ident">peer</span>: <span class="ident">metapb</span>::<span class="ident">Peer</span>,
+        <span class="ident">peer</span>: <span class="ident">metapb::Peer</span>,
         <span class="comment">// If true, right Region derives origin region_id.</span>
         <span class="ident">right_derive</span>: <span class="ident">bool</span>,
-        <span class="ident">callback</span>: <span class="ident">Callback</span><span class="op">&lt;</span><span class="ident">E</span>::<span class="ident">Snapshot</span><span class="op">&gt;</span>,
+        <span class="ident">callback</span>: <span class="ident">Callback</span><span class="op">&lt;</span><span class="ident">E::Snapshot</span><span class="op">&gt;</span>,
     },
     <span class="ident">AskBatchSplit</span> {
-        <span class="ident">region</span>: <span class="ident">metapb</span>::<span class="ident">Region</span>,
+        <span class="ident">region</span>: <span class="ident">metapb::Region</span>,
         <span class="ident">split_keys</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-        <span class="ident">peer</span>: <span class="ident">metapb</span>::<span class="ident">Peer</span>,
+        <span class="ident">peer</span>: <span class="ident">metapb::Peer</span>,
         <span class="comment">// If true, right Region derives origin region_id.</span>
         <span class="ident">right_derive</span>: <span class="ident">bool</span>,
-        <span class="ident">callback</span>: <span class="ident">Callback</span><span class="op">&lt;</span><span class="ident">E</span>::<span class="ident">Snapshot</span><span class="op">&gt;</span>,
+        <span class="ident">callback</span>: <span class="ident">Callback</span><span class="op">&lt;</span><span class="ident">E::Snapshot</span><span class="op">&gt;</span>,
     },
     <span class="ident">AutoSplit</span> {
         <span class="ident">split_infos</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SplitInfo</span><span class="op">&gt;</span>,
     },
     <span class="ident">Heartbeat</span>(<span class="ident">HeartbeatTask</span>),
     <span class="ident">StoreHeartbeat</span> {
-        <span class="ident">stats</span>: <span class="ident">pdpb</span>::<span class="ident">StoreStats</span>,
+        <span class="ident">stats</span>: <span class="ident">pdpb::StoreStats</span>,
         <span class="ident">store_info</span>: <span class="ident">StoreInfo</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>,
     },
     <span class="ident">ReportBatchSplit</span> {
-        <span class="ident">regions</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">metapb</span>::<span class="ident">Region</span><span class="op">&gt;</span>,
+        <span class="ident">regions</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">metapb::Region</span><span class="op">&gt;</span>,
     },
     <span class="ident">ValidatePeer</span> {
-        <span class="ident">region</span>: <span class="ident">metapb</span>::<span class="ident">Region</span>,
-        <span class="ident">peer</span>: <span class="ident">metapb</span>::<span class="ident">Peer</span>,
+        <span class="ident">region</span>: <span class="ident">metapb::Region</span>,
+        <span class="ident">peer</span>: <span class="ident">metapb::Peer</span>,
     },
     <span class="ident">ReadStats</span> {
         <span class="ident">read_stats</span>: <span class="ident">ReadStats</span>,
@@ -1562,15 +1579,15 @@
             <span class="ident">region_bytes_written</span>: <span class="ident">REGION_WRITTEN_BYTES_HISTOGRAM</span>.<span class="ident">local</span>(),
             <span class="ident">region_keys_written</span>: <span class="ident">REGION_WRITTEN_KEYS_HISTOGRAM</span>.<span class="ident">local</span>(),
 
-            <span class="ident">last_report_ts</span>: <span class="ident">UnixSecs</span>::<span class="ident">zero</span>(),
+            <span class="ident">last_report_ts</span>: <span class="ident">UnixSecs::zero</span>(),
             <span class="ident">engine_total_bytes_read</span>: <span class="number">0</span>,
             <span class="ident">engine_total_keys_read</span>: <span class="number">0</span>,
             <span class="ident">engine_last_total_bytes_read</span>: <span class="number">0</span>,
             <span class="ident">engine_last_total_keys_read</span>: <span class="number">0</span>,
 
-            <span class="ident">store_cpu_usages</span>: <span class="ident">RecordPairVec</span>::<span class="ident">default</span>(),
-            <span class="ident">store_read_io_rates</span>: <span class="ident">RecordPairVec</span>::<span class="ident">default</span>(),
-            <span class="ident">store_write_io_rates</span>: <span class="ident">RecordPairVec</span>::<span class="ident">default</span>(),
+            <span class="ident">store_cpu_usages</span>: <span class="ident">RecordPairVec::default</span>(),
+            <span class="ident">store_read_io_rates</span>: <span class="ident">RecordPairVec::default</span>(),
+            <span class="ident">store_write_io_rates</span>: <span class="ident">RecordPairVec::default</span>(),
         }
     }
 }
@@ -1592,91 +1609,81 @@
 <span class="kw">where</span>
     <span class="ident">E</span>: <span class="ident">KvEngine</span>,
 {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt</span>::<span class="prelude-ty">Result</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt::Result</span> {
         <span class="kw">match</span> <span class="kw-2">*</span><span class="self">self</span> {
-            <span class="ident">Task</span>::<span class="ident">AskSplit</span> {
+            <span class="ident">Task::AskSplit</span> {
                 <span class="kw-2">ref</span> <span class="ident">region</span>,
                 <span class="kw-2">ref</span> <span class="ident">split_key</span>,
                 ..
-            } <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write</span><span class="macro">!</span>(
+            } <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write!</span>(
                 <span class="ident">f</span>,
                 <span class="string">&quot;ask split region {} with key {}&quot;</span>,
                 <span class="ident">region</span>.<span class="ident">get_id</span>(),
-                <span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>(<span class="kw-2">&amp;</span><span class="ident">split_key</span>),
+                <span class="ident">log_wrappers::Value::key</span>(<span class="kw-2">&amp;</span><span class="ident">split_key</span>),
             ),
-            <span class="ident">Task</span>::<span class="ident">AutoSplit</span> {
-                <span class="kw-2">ref</span> <span class="ident">split_infos</span>,
-            } <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write</span><span class="macro">!</span>(
-                <span class="ident">f</span>,
-                <span class="string">&quot;auto split split regions, num is {}&quot;</span>,
-                <span class="ident">split_infos</span>.<span class="ident">len</span>(),
-            ),
-            <span class="ident">Task</span>::<span class="ident">AskBatchSplit</span> {
+            <span class="ident">Task::AutoSplit</span> { <span class="kw-2">ref</span> <span class="ident">split_infos</span> } <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;auto split split regions, num is {}&quot;</span>, <span class="ident">split_infos</span>.<span class="ident">len</span>(),)
+            }
+            <span class="ident">Task::AskBatchSplit</span> {
                 <span class="kw-2">ref</span> <span class="ident">region</span>,
                 <span class="kw-2">ref</span> <span class="ident">split_keys</span>,
                 ..
-            } <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write</span><span class="macro">!</span>(
+            } <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write!</span>(
                 <span class="ident">f</span>,
                 <span class="string">&quot;ask split region {} with {}&quot;</span>,
                 <span class="ident">region</span>.<span class="ident">get_id</span>(),
                 <span class="ident">KeysInfoFormatter</span>(<span class="ident">split_keys</span>.<span class="ident">iter</span>())
             ),
-            <span class="ident">Task</span>::<span class="ident">Heartbeat</span>(<span class="kw-2">ref</span> <span class="ident">hb_task</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write</span><span class="macro">!</span>(
+            <span class="ident">Task::Heartbeat</span>(<span class="kw-2">ref</span> <span class="ident">hb_task</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write!</span>(
                 <span class="ident">f</span>,
                 <span class="string">&quot;heartbeat for region {:?}, leader {}, replication status {:?}&quot;</span>,
                 <span class="ident">hb_task</span>.<span class="ident">region</span>,
                 <span class="ident">hb_task</span>.<span class="ident">peer</span>.<span class="ident">get_id</span>(),
                 <span class="ident">hb_task</span>.<span class="ident">replication_status</span>
             ),
-            <span class="ident">Task</span>::<span class="ident">StoreHeartbeat</span> { <span class="kw-2">ref</span> <span class="ident">stats</span>, .. } <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;store heartbeat stats: {:?}&quot;</span>, <span class="ident">stats</span>)
+            <span class="ident">Task::StoreHeartbeat</span> { <span class="kw-2">ref</span> <span class="ident">stats</span>, .. } <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;store heartbeat stats: {:?}&quot;</span>, <span class="ident">stats</span>)
             }
-            <span class="ident">Task</span>::<span class="ident">ReportBatchSplit</span> { <span class="kw-2">ref</span> <span class="ident">regions</span> } <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;report split {:?}&quot;</span>, <span class="ident">regions</span>),
-            <span class="ident">Task</span>::<span class="ident">ValidatePeer</span> {
+            <span class="ident">Task::ReportBatchSplit</span> { <span class="kw-2">ref</span> <span class="ident">regions</span> } <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;report split {:?}&quot;</span>, <span class="ident">regions</span>),
+            <span class="ident">Task::ValidatePeer</span> {
                 <span class="kw-2">ref</span> <span class="ident">region</span>,
                 <span class="kw-2">ref</span> <span class="ident">peer</span>,
-            } <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write</span><span class="macro">!</span>(
-                <span class="ident">f</span>,
-                <span class="string">&quot;validate peer {:?} with region {:?}&quot;</span>,
-                <span class="ident">peer</span>, <span class="ident">region</span>
-            ),
-            <span class="ident">Task</span>::<span class="ident">ReadStats</span> { <span class="kw-2">ref</span> <span class="ident">read_stats</span> } <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;get the read statistics {:?}&quot;</span>, <span class="ident">read_stats</span>)
+            } <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;validate peer {:?} with region {:?}&quot;</span>, <span class="ident">peer</span>, <span class="ident">region</span>),
+            <span class="ident">Task::ReadStats</span> { <span class="kw-2">ref</span> <span class="ident">read_stats</span> } <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;get the read statistics {:?}&quot;</span>, <span class="ident">read_stats</span>)
             }
-            <span class="ident">Task</span>::<span class="ident">DestroyPeer</span> { <span class="kw-2">ref</span> <span class="ident">region_id</span> } <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;destroy peer of region {}&quot;</span>, <span class="ident">region_id</span>)
+            <span class="ident">Task::DestroyPeer</span> { <span class="kw-2">ref</span> <span class="ident">region_id</span> } <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;destroy peer of region {}&quot;</span>, <span class="ident">region_id</span>)
             }
-            <span class="ident">Task</span>::<span class="ident">StoreInfos</span> {
+            <span class="ident">Task::StoreInfos</span> {
                 <span class="kw-2">ref</span> <span class="ident">cpu_usages</span>,
                 <span class="kw-2">ref</span> <span class="ident">read_io_rates</span>,
                 <span class="kw-2">ref</span> <span class="ident">write_io_rates</span>,
-            } <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write</span><span class="macro">!</span>(
+            } <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write!</span>(
                 <span class="ident">f</span>,
                 <span class="string">&quot;get store&#39;s informations: cpu_usages {:?}, read_io_rates {:?}, write_io_rates {:?}&quot;</span>,
                 <span class="ident">cpu_usages</span>, <span class="ident">read_io_rates</span>, <span class="ident">write_io_rates</span>,
             ),
-            <span class="ident">Task</span>::<span class="ident">UpdateMaxTimestamp</span> { <span class="ident">region_id</span>, .. } <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write</span><span class="macro">!</span>(
+            <span class="ident">Task::UpdateMaxTimestamp</span> { <span class="ident">region_id</span>, .. } <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write!</span>(
                 <span class="ident">f</span>,
                 <span class="string">&quot;update the max timestamp for region {} in the concurrency manager&quot;</span>,
                 <span class="ident">region_id</span>
             ),
-            <span class="ident">Task</span>::<span class="ident">QueryRegionLeader</span> { <span class="ident">region_id</span> } <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write</span><span class="macro">!</span>(
-                <span class="ident">f</span>,
-                <span class="string">&quot;query the leader of region {}&quot;</span>,
-                <span class="ident">region_id</span>
-            ),
+            <span class="ident">Task::QueryRegionLeader</span> { <span class="ident">region_id</span> } <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;query the leader of region {}&quot;</span>, <span class="ident">region_id</span>)
+            }
         }
     }
 }
 
-<span class="kw">const</span> <span class="ident">DEFAULT_QPS_INFO_INTERVAL</span>: <span class="ident">Duration</span> <span class="op">=</span> <span class="ident">Duration</span>::<span class="ident">from_secs</span>(<span class="number">1</span>);
-<span class="kw">const</span> <span class="ident">DEFAULT_COLLECT_INTERVAL</span>: <span class="ident">Duration</span> <span class="op">=</span> <span class="ident">Duration</span>::<span class="ident">from_secs</span>(<span class="number">1</span>);
+<span class="kw">const</span> <span class="ident">DEFAULT_QPS_INFO_INTERVAL</span>: <span class="ident">Duration</span> <span class="op">=</span> <span class="ident">Duration::from_secs</span>(<span class="number">1</span>);
+<span class="kw">const</span> <span class="ident">DEFAULT_COLLECT_INTERVAL</span>: <span class="ident">Duration</span> <span class="op">=</span> <span class="ident">Duration::from_secs</span>(<span class="number">1</span>);
 
 <span class="attribute">#[<span class="ident">inline</span>]</span>
 <span class="kw">fn</span> <span class="ident">convert_record_pairs</span>(<span class="ident">m</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">u64</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">RecordPairVec</span> {
     <span class="ident">m</span>.<span class="ident">into_iter</span>()
         .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">k</span>, <span class="ident">v</span>)<span class="op">|</span> {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">pair</span> <span class="op">=</span> <span class="ident">pdpb</span>::<span class="ident">RecordPair</span>::<span class="ident">default</span>();
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">pair</span> <span class="op">=</span> <span class="ident">pdpb::RecordPair::default</span>();
             <span class="ident">pair</span>.<span class="ident">set_key</span>(<span class="ident">k</span>);
             <span class="ident">pair</span>.<span class="ident">set_value</span>(<span class="ident">v</span>);
             <span class="ident">pair</span>
@@ -1708,8 +1715,8 @@
             <span class="ident">timer</span>: <span class="prelude-val">None</span>,
             <span class="ident">sender</span>: <span class="prelude-val">None</span>,
             <span class="ident">thread_info_interval</span>: <span class="ident">interval</span>,
-            <span class="ident">qps_info_interval</span>: <span class="ident">cmp</span>::<span class="ident">min</span>(<span class="ident">DEFAULT_QPS_INFO_INTERVAL</span>, <span class="ident">interval</span>),
-            <span class="ident">collect_interval</span>: <span class="ident">cmp</span>::<span class="ident">min</span>(<span class="ident">DEFAULT_COLLECT_INTERVAL</span>, <span class="ident">interval</span>),
+            <span class="ident">qps_info_interval</span>: <span class="ident">cmp::min</span>(<span class="ident">DEFAULT_QPS_INFO_INTERVAL</span>, <span class="ident">interval</span>),
+            <span class="ident">collect_interval</span>: <span class="ident">cmp::min</span>(<span class="ident">DEFAULT_COLLECT_INTERVAL</span>, <span class="ident">interval</span>),
         }
     }
 
@@ -1718,15 +1725,15 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
         <span class="kw-2">mut</span> <span class="ident">auto_split_controller</span>: <span class="ident">AutoSplitController</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">io</span>::<span class="ident">Error</span><span class="op">&gt;</span> {
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">io::Error</span><span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">collect_interval</span> <span class="op">&lt;</span> <span class="ident">DEFAULT_COLLECT_INTERVAL</span> {
-            <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;it seems we are running tests, skip stats monitoring.&quot;</span>);
+            <span class="macro">info!</span>(<span class="string">&quot;it seems we are running tests, skip stats monitoring.&quot;</span>);
             <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
         }
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">timer_cnt</span> <span class="op">=</span> <span class="number">0</span>; <span class="comment">// to run functions with different intervals in a loop</span>
         <span class="kw">let</span> <span class="ident">collect_interval</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">collect_interval</span>;
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">thread_info_interval</span> <span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">collect_interval</span> {
-            <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;running in test mode, skip starting monitor.&quot;</span>);
+            <span class="macro">info!</span>(<span class="string">&quot;running in test mode, skip starting monitor.&quot;</span>);
             <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
         }
         <span class="kw">let</span> <span class="ident">thread_info_interval</span> <span class="op">=</span> <span class="self">self</span>
@@ -1735,20 +1742,20 @@
         <span class="kw">let</span> <span class="ident">qps_info_interval</span> <span class="op">=</span> <span class="self">self</span>
             .<span class="ident">qps_info_interval</span>
             .<span class="ident">div_duration_f64</span>(<span class="self">self</span>.<span class="ident">collect_interval</span>) <span class="kw">as</span> <span class="ident">i32</span>;
-        <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">mpsc</span>::<span class="ident">channel</span>();
+        <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">mpsc::channel</span>();
         <span class="self">self</span>.<span class="ident">timer</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">tx</span>);
 
-        <span class="kw">let</span> (<span class="ident">sender</span>, <span class="ident">receiver</span>) <span class="op">=</span> <span class="ident">mpsc</span>::<span class="ident">channel</span>();
+        <span class="kw">let</span> (<span class="ident">sender</span>, <span class="ident">receiver</span>) <span class="op">=</span> <span class="ident">mpsc::channel</span>();
         <span class="self">self</span>.<span class="ident">sender</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">sender</span>);
 
         <span class="kw">let</span> <span class="ident">scheduler</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">scheduler</span>.<span class="ident">clone</span>();
 
-        <span class="kw">let</span> <span class="ident">h</span> <span class="op">=</span> <span class="ident">Builder</span>::<span class="ident">new</span>()
-            .<span class="ident">name</span>(<span class="macro">thd_name</span><span class="macro">!</span>(<span class="string">&quot;stats-monitor&quot;</span>))
+        <span class="kw">let</span> <span class="ident">h</span> <span class="op">=</span> <span class="ident">Builder::new</span>()
+            .<span class="ident">name</span>(<span class="macro">thd_name!</span>(<span class="string">&quot;stats-monitor&quot;</span>))
             .<span class="ident">spawn</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
-                <span class="ident">tikv_alloc</span>::<span class="ident">add_thread_memory_accessor</span>();
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">thread_stats</span> <span class="op">=</span> <span class="ident">ThreadInfoStatistics</span>::<span class="ident">new</span>();
-                <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">mpsc</span>::<span class="ident">RecvTimeoutError</span>::<span class="ident">Timeout</span>) <span class="op">=</span> <span class="ident">rx</span>.<span class="ident">recv_timeout</span>(<span class="ident">collect_interval</span>) {
+                <span class="ident">tikv_alloc::add_thread_memory_accessor</span>();
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">thread_stats</span> <span class="op">=</span> <span class="ident">ThreadInfoStatistics::new</span>();
+                <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">mpsc::RecvTimeoutError::Timeout</span>) <span class="op">=</span> <span class="ident">rx</span>.<span class="ident">recv_timeout</span>(<span class="ident">collect_interval</span>) {
                     <span class="kw">if</span> <span class="ident">timer_cnt</span> <span class="op">%</span> <span class="ident">thread_info_interval</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
                         <span class="ident">thread_stats</span>.<span class="ident">record</span>();
                         <span class="kw">let</span> <span class="ident">cpu_usages</span> <span class="op">=</span> <span class="ident">convert_record_pairs</span>(<span class="ident">thread_stats</span>.<span class="ident">get_cpu_usages</span>());
@@ -1756,28 +1763,28 @@
                         <span class="kw">let</span> <span class="ident">write_io_rates</span> <span class="op">=</span>
                             <span class="ident">convert_record_pairs</span>(<span class="ident">thread_stats</span>.<span class="ident">get_write_io_rates</span>());
 
-                        <span class="kw">let</span> <span class="ident">task</span> <span class="op">=</span> <span class="ident">Task</span>::<span class="ident">StoreInfos</span> {
+                        <span class="kw">let</span> <span class="ident">task</span> <span class="op">=</span> <span class="ident">Task::StoreInfos</span> {
                             <span class="ident">cpu_usages</span>,
                             <span class="ident">read_io_rates</span>,
                             <span class="ident">write_io_rates</span>,
                         };
                         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">scheduler</span>.<span class="ident">schedule</span>(<span class="ident">task</span>) {
-                            <span class="macro">error</span><span class="macro">!</span>(
+                            <span class="macro">error!</span>(
                                 <span class="string">&quot;failed to send store infos to pd worker&quot;</span>;
                                 <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>,
                             );
                         }
                     }
                     <span class="kw">if</span> <span class="ident">timer_cnt</span> <span class="op">%</span> <span class="ident">qps_info_interval</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
-                        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">others</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[];
+                        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">others</span> <span class="op">=</span> <span class="macro">vec!</span>[];
                         <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">other</span>) <span class="op">=</span> <span class="ident">receiver</span>.<span class="ident">try_recv</span>() {
                             <span class="ident">others</span>.<span class="ident">push</span>(<span class="ident">other</span>);
                         }
                         <span class="kw">let</span> (<span class="ident">top</span>, <span class="ident">split_infos</span>) <span class="op">=</span> <span class="ident">auto_split_controller</span>.<span class="ident">flush</span>(<span class="ident">others</span>);
                         <span class="ident">auto_split_controller</span>.<span class="ident">clear</span>();
-                        <span class="kw">let</span> <span class="ident">task</span> <span class="op">=</span> <span class="ident">Task</span>::<span class="ident">AutoSplit</span> { <span class="ident">split_infos</span> };
+                        <span class="kw">let</span> <span class="ident">task</span> <span class="op">=</span> <span class="ident">Task::AutoSplit</span> { <span class="ident">split_infos</span> };
                         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">scheduler</span>.<span class="ident">schedule</span>(<span class="ident">task</span>) {
-                            <span class="macro">error</span><span class="macro">!</span>(
+                            <span class="macro">error!</span>(
                                 <span class="string">&quot;failed to send split infos to pd worker&quot;</span>;
                                 <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>,
                             );
@@ -1797,7 +1804,7 @@
                     <span class="ident">timer_cnt</span> <span class="op">=</span> (<span class="ident">timer_cnt</span> <span class="op">+</span> <span class="number">1</span>) <span class="op">%</span> (<span class="ident">qps_info_interval</span> <span class="op">*</span> <span class="ident">thread_info_interval</span>);
                     <span class="ident">auto_split_controller</span>.<span class="ident">refresh_cfg</span>();
                 }
-                <span class="ident">tikv_alloc</span>::<span class="ident">remove_thread_memory_accessor</span>();
+                <span class="ident">tikv_alloc::remove_thread_memory_accessor</span>();
             })<span class="question-mark">?</span>;
 
         <span class="self">self</span>.<span class="ident">handle</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">h</span>);
@@ -1809,7 +1816,7 @@
             <span class="ident">drop</span>(<span class="self">self</span>.<span class="ident">timer</span>.<span class="ident">take</span>());
             <span class="ident">drop</span>(<span class="self">self</span>.<span class="ident">sender</span>.<span class="ident">take</span>());
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">h</span>.<span class="ident">join</span>() {
-                <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;join stats collector failed&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
+                <span class="macro">error!</span>(<span class="string">&quot;join stats collector failed&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
             }
         }
     }
@@ -1841,6 +1848,7 @@
     <span class="ident">stats_monitor</span>: <span class="ident">StatsMonitor</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>,
 
     <span class="ident">concurrency_manager</span>: <span class="ident">ConcurrencyManager</span>,
+    <span class="ident">snap_mgr</span>: <span class="ident">SnapManager</span>,
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">T</span><span class="op">&gt;</span> <span class="ident">Runner</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">T</span><span class="op">&gt;</span>
@@ -1859,11 +1867,12 @@
         <span class="ident">store_heartbeat_interval</span>: <span class="ident">Duration</span>,
         <span class="ident">auto_split_controller</span>: <span class="ident">AutoSplitController</span>,
         <span class="ident">concurrency_manager</span>: <span class="ident">ConcurrencyManager</span>,
+        <span class="ident">snap_mgr</span>: <span class="ident">SnapManager</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Runner</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">interval</span> <span class="op">=</span> <span class="ident">store_heartbeat_interval</span> <span class="op">/</span> <span class="self">Self</span>::<span class="ident">INTERVAL_DIVISOR</span>;
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stats_monitor</span> <span class="op">=</span> <span class="ident">StatsMonitor</span>::<span class="ident">new</span>(<span class="ident">interval</span>, <span class="ident">scheduler</span>.<span class="ident">clone</span>());
+        <span class="kw">let</span> <span class="ident">interval</span> <span class="op">=</span> <span class="ident">store_heartbeat_interval</span> <span class="op">/</span> <span class="self">Self</span><span class="ident">::INTERVAL_DIVISOR</span>;
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stats_monitor</span> <span class="op">=</span> <span class="ident">StatsMonitor::new</span>(<span class="ident">interval</span>, <span class="ident">scheduler</span>.<span class="ident">clone</span>());
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">stats_monitor</span>.<span class="ident">start</span>(<span class="ident">auto_split_controller</span>) {
-            <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;failed to start stats collector, error = {:?}&quot;</span>, <span class="ident">e</span>);
+            <span class="macro">error!</span>(<span class="string">&quot;failed to start stats collector, error = {:?}&quot;</span>, <span class="ident">e</span>);
         }
 
         <span class="ident">Runner</span> {
@@ -1871,23 +1880,24 @@
             <span class="ident">pd_client</span>,
             <span class="ident">router</span>,
             <span class="ident">is_hb_receiver_scheduled</span>: <span class="bool-val">false</span>,
-            <span class="ident">region_peers</span>: <span class="ident">HashMap</span>::<span class="ident">default</span>(),
-            <span class="ident">store_stat</span>: <span class="ident">StoreStat</span>::<span class="ident">default</span>(),
-            <span class="ident">start_ts</span>: <span class="ident">UnixSecs</span>::<span class="ident">now</span>(),
+            <span class="ident">region_peers</span>: <span class="ident">HashMap::default</span>(),
+            <span class="ident">store_stat</span>: <span class="ident">StoreStat::default</span>(),
+            <span class="ident">start_ts</span>: <span class="ident">UnixSecs::now</span>(),
             <span class="ident">scheduler</span>,
             <span class="ident">stats_monitor</span>,
             <span class="ident">concurrency_manager</span>,
+            <span class="ident">snap_mgr</span>,
         }
     }
 
     <span class="comment">// Deprecate</span>
     <span class="kw">fn</span> <span class="ident">handle_ask_split</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="kw-2">mut</span> <span class="ident">region</span>: <span class="ident">metapb</span>::<span class="ident">Region</span>,
+        <span class="kw-2">mut</span> <span class="ident">region</span>: <span class="ident">metapb::Region</span>,
         <span class="ident">split_key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
-        <span class="ident">peer</span>: <span class="ident">metapb</span>::<span class="ident">Peer</span>,
+        <span class="ident">peer</span>: <span class="ident">metapb::Peer</span>,
         <span class="ident">right_derive</span>: <span class="ident">bool</span>,
-        <span class="ident">callback</span>: <span class="ident">Callback</span><span class="op">&lt;</span><span class="ident">EK</span>::<span class="ident">Snapshot</span><span class="op">&gt;</span>,
+        <span class="ident">callback</span>: <span class="ident">Callback</span><span class="op">&lt;</span><span class="ident">EK::Snapshot</span><span class="op">&gt;</span>,
         <span class="ident">task</span>: <span class="ident">String</span>,
     ) {
         <span class="kw">let</span> <span class="ident">router</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">router</span>.<span class="ident">clone</span>();
@@ -1895,7 +1905,7 @@
         <span class="kw">let</span> <span class="ident">f</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
             <span class="kw">match</span> <span class="ident">resp</span>.<span class="kw">await</span> {
                 <span class="prelude-val">Ok</span>(<span class="kw-2">mut</span> <span class="ident">resp</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="macro">info</span><span class="macro">!</span>(
+                    <span class="macro">info!</span>(
                         <span class="string">&quot;try to split region&quot;</span>;
                         <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region</span>.<span class="ident">get_id</span>(),
                         <span class="string">&quot;new_region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">resp</span>.<span class="ident">get_new_region_id</span>(),
@@ -1914,7 +1924,7 @@
                     <span class="ident">send_admin_request</span>(<span class="kw-2">&amp;</span><span class="ident">router</span>, <span class="ident">region_id</span>, <span class="ident">epoch</span>, <span class="ident">peer</span>, <span class="ident">req</span>, <span class="ident">callback</span>)
                 }
                 <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;failed to ask split&quot;</span>;
+                    <span class="macro">warn!</span>(<span class="string">&quot;failed to ask split&quot;</span>;
                     <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region</span>.<span class="ident">get_id</span>(),
                     <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>,
                     <span class="string">&quot;task&quot;</span><span class="op">=</span><span class="op">&gt;</span><span class="ident">task</span>);
@@ -1930,15 +1940,15 @@
         <span class="ident">router</span>: <span class="ident">RaftRouter</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>,
         <span class="ident">scheduler</span>: <span class="ident">Scheduler</span><span class="op">&lt;</span><span class="ident">Task</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">pd_client</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
-        <span class="kw-2">mut</span> <span class="ident">region</span>: <span class="ident">metapb</span>::<span class="ident">Region</span>,
+        <span class="kw-2">mut</span> <span class="ident">region</span>: <span class="ident">metapb::Region</span>,
         <span class="kw-2">mut</span> <span class="ident">split_keys</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-        <span class="ident">peer</span>: <span class="ident">metapb</span>::<span class="ident">Peer</span>,
+        <span class="ident">peer</span>: <span class="ident">metapb::Peer</span>,
         <span class="ident">right_derive</span>: <span class="ident">bool</span>,
-        <span class="ident">callback</span>: <span class="ident">Callback</span><span class="op">&lt;</span><span class="ident">EK</span>::<span class="ident">Snapshot</span><span class="op">&gt;</span>,
+        <span class="ident">callback</span>: <span class="ident">Callback</span><span class="op">&lt;</span><span class="ident">EK::Snapshot</span><span class="op">&gt;</span>,
         <span class="ident">task</span>: <span class="ident">String</span>,
     ) {
         <span class="kw">if</span> <span class="ident">split_keys</span>.<span class="ident">is_empty</span>() {
-            <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;empty split key, skip ask batch split&quot;</span>;
+            <span class="macro">info!</span>(<span class="string">&quot;empty split key, skip ask batch split&quot;</span>;
                 <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region</span>.<span class="ident">get_id</span>());
             <span class="kw">return</span>;
         }
@@ -1946,7 +1956,7 @@
         <span class="kw">let</span> <span class="ident">f</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
             <span class="kw">match</span> <span class="ident">resp</span>.<span class="kw">await</span> {
                 <span class="prelude-val">Ok</span>(<span class="kw-2">mut</span> <span class="ident">resp</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="macro">info</span><span class="macro">!</span>(
+                    <span class="macro">info!</span>(
                         <span class="string">&quot;try to batch split region&quot;</span>;
                         <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region</span>.<span class="ident">get_id</span>(),
                         <span class="string">&quot;new_region_ids&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">resp</span>.<span class="ident">get_ids</span>(),
@@ -1966,13 +1976,13 @@
                 <span class="comment">// When rolling update, there might be some old version tikvs that don&#39;t support batch split in cluster.</span>
                 <span class="comment">// In this situation, PD version check would refuse `ask_batch_split`.</span>
                 <span class="comment">// But if update time is long, it may cause large Regions, so call `ask_split` instead.</span>
-                <span class="prelude-val">Err</span>(<span class="ident">Error</span>::<span class="ident">Incompatible</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="prelude-val">Err</span>(<span class="ident">Error::Incompatible</span>) <span class="op">=</span><span class="op">&gt;</span> {
                     <span class="kw">let</span> (<span class="ident">region_id</span>, <span class="ident">peer_id</span>) <span class="op">=</span> (<span class="ident">region</span>.<span class="ident">id</span>, <span class="ident">peer</span>.<span class="ident">id</span>);
-                    <span class="macro">info</span><span class="macro">!</span>(
+                    <span class="macro">info!</span>(
                         <span class="string">&quot;ask_batch_split is incompatible, use ask_split instead&quot;</span>;
                         <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>
                     );
-                    <span class="kw">let</span> <span class="ident">task</span> <span class="op">=</span> <span class="ident">Task</span>::<span class="ident">AskSplit</span> {
+                    <span class="kw">let</span> <span class="ident">task</span> <span class="op">=</span> <span class="ident">Task::AskSplit</span> {
                         <span class="ident">region</span>,
                         <span class="ident">split_key</span>: <span class="ident">split_keys</span>.<span class="ident">pop</span>().<span class="ident">unwrap</span>(),
                         <span class="ident">peer</span>,
@@ -1980,23 +1990,23 @@
                         <span class="ident">callback</span>,
                     };
                     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">Stopped</span>(<span class="ident">t</span>)) <span class="op">=</span> <span class="ident">scheduler</span>.<span class="ident">schedule</span>(<span class="ident">task</span>) {
-                        <span class="macro">error</span><span class="macro">!</span>(
+                        <span class="macro">error!</span>(
                             <span class="string">&quot;failed to notify pd to split: Stopped&quot;</span>;
                             <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>,
                             <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span>  <span class="ident">peer_id</span>
                         );
                         <span class="kw">match</span> <span class="ident">t</span> {
-                            <span class="ident">Task</span>::<span class="ident">AskSplit</span> { <span class="ident">callback</span>, .. } <span class="op">=</span><span class="op">&gt;</span> {
-                                <span class="ident">callback</span>.<span class="ident">invoke_with_response</span>(<span class="ident">new_error</span>(<span class="macro">box_err</span><span class="macro">!</span>(
+                            <span class="ident">Task::AskSplit</span> { <span class="ident">callback</span>, .. } <span class="op">=</span><span class="op">&gt;</span> {
+                                <span class="ident">callback</span>.<span class="ident">invoke_with_response</span>(<span class="ident">new_error</span>(<span class="macro">box_err!</span>(
                                     <span class="string">&quot;failed to split: Stopped&quot;</span>
                                 )));
                             }
-                            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">unreachable</span><span class="macro">!</span>(),
+                            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">unreachable!</span>(),
                         }
                     }
                 }
                 <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="macro">warn</span><span class="macro">!</span>(
+                    <span class="macro">warn!</span>(
                         <span class="string">&quot;ask batch split failed&quot;</span>;
                         <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region</span>.<span class="ident">get_id</span>(),
                         <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>,
@@ -2010,8 +2020,8 @@
     <span class="kw">fn</span> <span class="ident">handle_heartbeat</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">term</span>: <span class="ident">u64</span>,
-        <span class="ident">region</span>: <span class="ident">metapb</span>::<span class="ident">Region</span>,
-        <span class="ident">peer</span>: <span class="ident">metapb</span>::<span class="ident">Peer</span>,
+        <span class="ident">region</span>: <span class="ident">metapb::Region</span>,
+        <span class="ident">peer</span>: <span class="ident">metapb::Peer</span>,
         <span class="ident">region_stat</span>: <span class="ident">RegionStat</span>,
         <span class="ident">replication_status</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RegionReplicationStatus</span><span class="op">&gt;</span>,
     ) {
@@ -2032,7 +2042,7 @@
             .<span class="ident">pd_client</span>
             .<span class="ident">region_heartbeat</span>(<span class="ident">term</span>, <span class="ident">region</span>.<span class="ident">clone</span>(), <span class="ident">peer</span>, <span class="ident">region_stat</span>, <span class="ident">replication_status</span>)
             .<span class="ident">map_err</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
-                <span class="macro">debug</span><span class="macro">!</span>(
+                <span class="macro">debug!</span>(
                     <span class="string">&quot;failed to send heartbeat&quot;</span>;
                     <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region</span>.<span class="ident">get_id</span>(),
                     <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>
@@ -2041,10 +2051,10 @@
         <span class="ident">spawn_local</span>(<span class="ident">f</span>);
     }
 
-    <span class="kw">fn</span> <span class="ident">handle_store_heartbeat</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="kw-2">mut</span> <span class="ident">stats</span>: <span class="ident">pdpb</span>::<span class="ident">StoreStats</span>, <span class="ident">store_info</span>: <span class="ident">StoreInfo</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>) {
-        <span class="kw">let</span> <span class="ident">disk_stats</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">fs2</span>::<span class="ident">statvfs</span>(<span class="ident">store_info</span>.<span class="ident">engine</span>.<span class="ident">path</span>()) {
+    <span class="kw">fn</span> <span class="ident">handle_store_heartbeat</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="kw-2">mut</span> <span class="ident">stats</span>: <span class="ident">pdpb::StoreStats</span>, <span class="ident">store_info</span>: <span class="ident">StoreInfo</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>) {
+        <span class="kw">let</span> <span class="ident">disk_stats</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">fs2::statvfs</span>(<span class="ident">store_info</span>.<span class="ident">engine</span>.<span class="ident">path</span>()) {
             <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="macro">error</span><span class="macro">!</span>(
+                <span class="macro">error!</span>(
                     <span class="string">&quot;get disk stat for rocksdb failed&quot;</span>;
                     <span class="string">&quot;engine_path&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">store_info</span>.<span class="ident">engine</span>.<span class="ident">path</span>(),
                     <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>
@@ -2062,16 +2072,15 @@
         };
         <span class="ident">stats</span>.<span class="ident">set_capacity</span>(<span class="ident">capacity</span>);
 
-        <span class="comment">// already include size of snapshot files</span>
-        <span class="kw">let</span> <span class="ident">used_size</span> <span class="op">=</span>
-            <span class="ident">stats</span>.<span class="ident">get_used_size</span>() <span class="op">+</span> <span class="ident">store_info</span>.<span class="ident">engine</span>.<span class="ident">get_engine_used_size</span>().<span class="ident">expect</span>(<span class="string">&quot;cf&quot;</span>);
+        <span class="kw">let</span> <span class="ident">used_size</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">snap_mgr</span>.<span class="ident">get_total_snap_size</span>().<span class="ident">unwrap</span>()
+            <span class="op">+</span> <span class="ident">store_info</span>.<span class="ident">engine</span>.<span class="ident">get_engine_used_size</span>().<span class="ident">expect</span>(<span class="string">&quot;cf&quot;</span>);
         <span class="ident">stats</span>.<span class="ident">set_used_size</span>(<span class="ident">used_size</span>);
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">available</span> <span class="op">=</span> <span class="ident">capacity</span>.<span class="ident">checked_sub</span>(<span class="ident">used_size</span>).<span class="ident">unwrap_or_default</span>();
         <span class="comment">// We only care about rocksdb SST file size, so we should check disk available here.</span>
-        <span class="ident">available</span> <span class="op">=</span> <span class="ident">cmp</span>::<span class="ident">min</span>(<span class="ident">available</span>, <span class="ident">disk_stats</span>.<span class="ident">available_space</span>());
+        <span class="ident">available</span> <span class="op">=</span> <span class="ident">cmp::min</span>(<span class="ident">available</span>, <span class="ident">disk_stats</span>.<span class="ident">available_space</span>());
         <span class="kw">if</span> <span class="ident">available</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
-            <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;no available space&quot;</span>);
+            <span class="macro">warn!</span>(<span class="string">&quot;no available space&quot;</span>);
         }
 
         <span class="ident">stats</span>.<span class="ident">set_available</span>(<span class="ident">available</span>);
@@ -2086,12 +2095,12 @@
         <span class="ident">stats</span>.<span class="ident">set_read_io_rates</span>(<span class="self">self</span>.<span class="ident">store_stat</span>.<span class="ident">store_read_io_rates</span>.<span class="ident">clone</span>().<span class="ident">into</span>());
         <span class="ident">stats</span>.<span class="ident">set_write_io_rates</span>(<span class="self">self</span>.<span class="ident">store_stat</span>.<span class="ident">store_write_io_rates</span>.<span class="ident">clone</span>().<span class="ident">into</span>());
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">interval</span> <span class="op">=</span> <span class="ident">pdpb</span>::<span class="ident">TimeInterval</span>::<span class="ident">default</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">interval</span> <span class="op">=</span> <span class="ident">pdpb::TimeInterval::default</span>();
         <span class="ident">interval</span>.<span class="ident">set_start_timestamp</span>(<span class="self">self</span>.<span class="ident">store_stat</span>.<span class="ident">last_report_ts</span>.<span class="ident">into_inner</span>());
         <span class="ident">stats</span>.<span class="ident">set_interval</span>(<span class="ident">interval</span>);
         <span class="self">self</span>.<span class="ident">store_stat</span>.<span class="ident">engine_last_total_bytes_read</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">store_stat</span>.<span class="ident">engine_total_bytes_read</span>;
         <span class="self">self</span>.<span class="ident">store_stat</span>.<span class="ident">engine_last_total_keys_read</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">store_stat</span>.<span class="ident">engine_total_keys_read</span>;
-        <span class="self">self</span>.<span class="ident">store_stat</span>.<span class="ident">last_report_ts</span> <span class="op">=</span> <span class="ident">UnixSecs</span>::<span class="ident">now</span>();
+        <span class="self">self</span>.<span class="ident">store_stat</span>.<span class="ident">last_report_ts</span> <span class="op">=</span> <span class="ident">UnixSecs::now</span>();
         <span class="self">self</span>.<span class="ident">store_stat</span>.<span class="ident">region_bytes_written</span>.<span class="ident">flush</span>();
         <span class="self">self</span>.<span class="ident">store_stat</span>.<span class="ident">region_keys_written</span>.<span class="ident">flush</span>();
         <span class="self">self</span>.<span class="ident">store_stat</span>.<span class="ident">region_bytes_read</span>.<span class="ident">flush</span>();
@@ -2110,25 +2119,25 @@
             <span class="kw">match</span> <span class="ident">resp</span>.<span class="kw">await</span> {
                 <span class="prelude-val">Ok</span>(<span class="kw-2">mut</span> <span class="ident">resp</span>) <span class="op">=</span><span class="op">&gt;</span> {
                     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">status</span>) <span class="op">=</span> <span class="ident">resp</span>.<span class="ident">replication_status</span>.<span class="ident">take</span>() {
-                        <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="ident">router</span>.<span class="ident">send_control</span>(<span class="ident">StoreMsg</span>::<span class="ident">UpdateReplicationMode</span>(<span class="ident">status</span>));
+                        <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="ident">router</span>.<span class="ident">send_control</span>(<span class="ident">StoreMsg::UpdateReplicationMode</span>(<span class="ident">status</span>));
                     }
                 }
                 <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;store heartbeat failed&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
+                    <span class="macro">error!</span>(<span class="string">&quot;store heartbeat failed&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
                 }
             }
         };
         <span class="ident">spawn_local</span>(<span class="ident">f</span>);
     }
 
-    <span class="kw">fn</span> <span class="ident">handle_report_batch_split</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">regions</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">metapb</span>::<span class="ident">Region</span><span class="op">&gt;</span>) {
+    <span class="kw">fn</span> <span class="ident">handle_report_batch_split</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">regions</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">metapb::Region</span><span class="op">&gt;</span>) {
         <span class="kw">let</span> <span class="ident">f</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pd_client</span>.<span class="ident">report_batch_split</span>(<span class="ident">regions</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
-            <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;report split failed&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
+            <span class="macro">warn!</span>(<span class="string">&quot;report split failed&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
         });
         <span class="ident">spawn_local</span>(<span class="ident">f</span>);
     }
 
-    <span class="kw">fn</span> <span class="ident">handle_validate_peer</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">local_region</span>: <span class="ident">metapb</span>::<span class="ident">Region</span>, <span class="ident">peer</span>: <span class="ident">metapb</span>::<span class="ident">Peer</span>) {
+    <span class="kw">fn</span> <span class="ident">handle_validate_peer</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">local_region</span>: <span class="ident">metapb::Region</span>, <span class="ident">peer</span>: <span class="ident">metapb::Peer</span>) {
         <span class="kw">let</span> <span class="ident">router</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">router</span>.<span class="ident">clone</span>();
         <span class="kw">let</span> <span class="ident">resp</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pd_client</span>.<span class="ident">get_region_by_id</span>(<span class="ident">local_region</span>.<span class="ident">get_id</span>());
         <span class="kw">let</span> <span class="ident">f</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
@@ -2142,7 +2151,7 @@
                         <span class="comment">// This means the Region info in PD is not updated to the latest even</span>
                         <span class="comment">// after `max_leader_missing_duration`. Something is wrong in the system.</span>
                         <span class="comment">// Just add a log here for this situation.</span>
-                        <span class="macro">info</span><span class="macro">!</span>(
+                        <span class="macro">info!</span>(
                             <span class="string">&quot;local region epoch is greater the \
                              region epoch in PD ignore validate peer&quot;</span>;
                             <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">local_region</span>.<span class="ident">get_id</span>(),
@@ -2163,7 +2172,7 @@
                     {
                         <span class="comment">// Peer is not a member of this Region anymore. Probably it&#39;s removed out.</span>
                         <span class="comment">// Send it a raft massage to destroy it since it&#39;s obsolete.</span>
-                        <span class="macro">info</span><span class="macro">!</span>(
+                        <span class="macro">info!</span>(
                             <span class="string">&quot;peer is not a valid member of region, to be \
                              destroyed soon&quot;</span>;
                             <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">local_region</span>.<span class="ident">get_id</span>(),
@@ -2175,7 +2184,7 @@
                             .<span class="ident">inc</span>();
                         <span class="ident">send_destroy_peer_message</span>(<span class="kw-2">&amp;</span><span class="ident">router</span>, <span class="ident">local_region</span>, <span class="ident">peer</span>, <span class="ident">pd_region</span>);
                     } <span class="kw">else</span> {
-                        <span class="macro">info</span><span class="macro">!</span>(
+                        <span class="macro">info!</span>(
                             <span class="string">&quot;peer is still a valid member of region&quot;</span>;
                             <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">local_region</span>.<span class="ident">get_id</span>(),
                             <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">peer</span>.<span class="ident">get_id</span>(),
@@ -2191,7 +2200,7 @@
                     <span class="comment">// TODO: handle merge</span>
                 }
                 <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;get region failed&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
+                    <span class="macro">error!</span>(<span class="string">&quot;get region failed&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
                 }
             }
         };
@@ -2214,7 +2223,7 @@
                         .<span class="ident">inc</span>();
 
                     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">change_peer</span> <span class="op">=</span> <span class="ident">resp</span>.<span class="ident">take_change_peer</span>();
-                    <span class="macro">info</span><span class="macro">!</span>(
+                    <span class="macro">info!</span>(
                         <span class="string">&quot;try to change peer&quot;</span>;
                         <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>,
                         <span class="string">&quot;change_type&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">change_peer</span>.<span class="ident">get_change_type</span>(),
@@ -2224,66 +2233,66 @@
                         <span class="ident">change_peer</span>.<span class="ident">get_change_type</span>(),
                         <span class="ident">change_peer</span>.<span class="ident">take_peer</span>(),
                     );
-                    <span class="ident">send_admin_request</span>(<span class="kw-2">&amp;</span><span class="ident">router</span>, <span class="ident">region_id</span>, <span class="ident">epoch</span>, <span class="ident">peer</span>, <span class="ident">req</span>, <span class="ident">Callback</span>::<span class="prelude-val">None</span>);
+                    <span class="ident">send_admin_request</span>(<span class="kw-2">&amp;</span><span class="ident">router</span>, <span class="ident">region_id</span>, <span class="ident">epoch</span>, <span class="ident">peer</span>, <span class="ident">req</span>, <span class="ident">Callback::None</span>);
                 } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">resp</span>.<span class="ident">has_change_peer_v2</span>() {
                     <span class="ident">PD_HEARTBEAT_COUNTER_VEC</span>
                         .<span class="ident">with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="string">&quot;change peer&quot;</span>])
                         .<span class="ident">inc</span>();
 
                     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">change_peer_v2</span> <span class="op">=</span> <span class="ident">resp</span>.<span class="ident">take_change_peer_v2</span>();
-                    <span class="macro">info</span><span class="macro">!</span>(
+                    <span class="macro">info!</span>(
                         <span class="string">&quot;try to change peer&quot;</span>;
                         <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>,
                         <span class="string">&quot;changes&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">change_peer_v2</span>.<span class="ident">get_changes</span>(),
-                        <span class="string">&quot;kind&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">ConfChangeKind</span>::<span class="ident">confchange_kind</span>(<span class="ident">change_peer_v2</span>.<span class="ident">get_changes</span>().<span class="ident">len</span>()),
+                        <span class="string">&quot;kind&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">ConfChangeKind::confchange_kind</span>(<span class="ident">change_peer_v2</span>.<span class="ident">get_changes</span>().<span class="ident">len</span>()),
                     );
                     <span class="kw">let</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">new_change_peer_v2_request</span>(<span class="ident">change_peer_v2</span>.<span class="ident">take_changes</span>().<span class="ident">into</span>());
-                    <span class="ident">send_admin_request</span>(<span class="kw-2">&amp;</span><span class="ident">router</span>, <span class="ident">region_id</span>, <span class="ident">epoch</span>, <span class="ident">peer</span>, <span class="ident">req</span>, <span class="ident">Callback</span>::<span class="prelude-val">None</span>);
+                    <span class="ident">send_admin_request</span>(<span class="kw-2">&amp;</span><span class="ident">router</span>, <span class="ident">region_id</span>, <span class="ident">epoch</span>, <span class="ident">peer</span>, <span class="ident">req</span>, <span class="ident">Callback::None</span>);
                 } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">resp</span>.<span class="ident">has_transfer_leader</span>() {
                     <span class="ident">PD_HEARTBEAT_COUNTER_VEC</span>
                         .<span class="ident">with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="string">&quot;transfer leader&quot;</span>])
                         .<span class="ident">inc</span>();
 
                     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">transfer_leader</span> <span class="op">=</span> <span class="ident">resp</span>.<span class="ident">take_transfer_leader</span>();
-                    <span class="macro">info</span><span class="macro">!</span>(
+                    <span class="macro">info!</span>(
                         <span class="string">&quot;try to transfer leader&quot;</span>;
                         <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>,
                         <span class="string">&quot;from_peer&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">peer</span>,
                         <span class="string">&quot;to_peer&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">transfer_leader</span>.<span class="ident">get_peer</span>()
                     );
                     <span class="kw">let</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">new_transfer_leader_request</span>(<span class="ident">transfer_leader</span>.<span class="ident">take_peer</span>());
-                    <span class="ident">send_admin_request</span>(<span class="kw-2">&amp;</span><span class="ident">router</span>, <span class="ident">region_id</span>, <span class="ident">epoch</span>, <span class="ident">peer</span>, <span class="ident">req</span>, <span class="ident">Callback</span>::<span class="prelude-val">None</span>);
+                    <span class="ident">send_admin_request</span>(<span class="kw-2">&amp;</span><span class="ident">router</span>, <span class="ident">region_id</span>, <span class="ident">epoch</span>, <span class="ident">peer</span>, <span class="ident">req</span>, <span class="ident">Callback::None</span>);
                 } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">resp</span>.<span class="ident">has_split_region</span>() {
                     <span class="ident">PD_HEARTBEAT_COUNTER_VEC</span>
                         .<span class="ident">with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="string">&quot;split region&quot;</span>])
                         .<span class="ident">inc</span>();
 
                     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">split_region</span> <span class="op">=</span> <span class="ident">resp</span>.<span class="ident">take_split_region</span>();
-                    <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;try to split&quot;</span>; <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>, <span class="string">&quot;region_epoch&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">epoch</span>);
-                    <span class="kw">let</span> <span class="ident">msg</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">split_region</span>.<span class="ident">get_policy</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">pdpb</span>::<span class="ident">CheckPolicy</span>::<span class="ident">Usekey</span> {
-                        <span class="ident">CasualMessage</span>::<span class="ident">SplitRegion</span> {
+                    <span class="macro">info!</span>(<span class="string">&quot;try to split&quot;</span>; <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>, <span class="string">&quot;region_epoch&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">epoch</span>);
+                    <span class="kw">let</span> <span class="ident">msg</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">split_region</span>.<span class="ident">get_policy</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">pdpb::CheckPolicy::Usekey</span> {
+                        <span class="ident">CasualMessage::SplitRegion</span> {
                             <span class="ident">region_epoch</span>: <span class="ident">epoch</span>,
                             <span class="ident">split_keys</span>: <span class="ident">split_region</span>.<span class="ident">take_keys</span>().<span class="ident">into</span>(),
-                            <span class="ident">callback</span>: <span class="ident">Callback</span>::<span class="prelude-val">None</span>,
+                            <span class="ident">callback</span>: <span class="ident">Callback::None</span>,
                             <span class="ident">source</span>: <span class="string">&quot;pd&quot;</span>.<span class="ident">into</span>(),
                         }
                     } <span class="kw">else</span> {
-                        <span class="ident">CasualMessage</span>::<span class="ident">HalfSplitRegion</span> {
+                        <span class="ident">CasualMessage::HalfSplitRegion</span> {
                             <span class="ident">region_epoch</span>: <span class="ident">epoch</span>,
                             <span class="ident">policy</span>: <span class="ident">split_region</span>.<span class="ident">get_policy</span>(),
                             <span class="ident">source</span>: <span class="string">&quot;pd&quot;</span>,
                         }
                     };
-                    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">router</span>.<span class="ident">send</span>(<span class="ident">region_id</span>, <span class="ident">PeerMsg</span>::<span class="ident">CasualMessage</span>(<span class="ident">msg</span>)) {
-                        <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;send halfsplit request failed&quot;</span>; <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>, <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
+                    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">router</span>.<span class="ident">send</span>(<span class="ident">region_id</span>, <span class="ident">PeerMsg::CasualMessage</span>(<span class="ident">msg</span>)) {
+                        <span class="macro">error!</span>(<span class="string">&quot;send halfsplit request failed&quot;</span>; <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>, <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
                     }
                 } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">resp</span>.<span class="ident">has_merge</span>() {
                     <span class="ident">PD_HEARTBEAT_COUNTER_VEC</span>.<span class="ident">with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="string">&quot;merge&quot;</span>]).<span class="ident">inc</span>();
 
                     <span class="kw">let</span> <span class="ident">merge</span> <span class="op">=</span> <span class="ident">resp</span>.<span class="ident">take_merge</span>();
-                    <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;try to merge&quot;</span>; <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>, <span class="string">&quot;merge&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">merge</span>);
+                    <span class="macro">info!</span>(<span class="string">&quot;try to merge&quot;</span>; <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>, <span class="string">&quot;merge&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">merge</span>);
                     <span class="kw">let</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">new_merge_request</span>(<span class="ident">merge</span>);
-                    <span class="ident">send_admin_request</span>(<span class="kw-2">&amp;</span><span class="ident">router</span>, <span class="ident">region_id</span>, <span class="ident">epoch</span>, <span class="ident">peer</span>, <span class="ident">req</span>, <span class="ident">Callback</span>::<span class="prelude-val">None</span>)
+                    <span class="ident">send_admin_request</span>(<span class="kw-2">&amp;</span><span class="ident">router</span>, <span class="ident">region_id</span>, <span class="ident">epoch</span>, <span class="ident">peer</span>, <span class="ident">req</span>, <span class="ident">Callback::None</span>)
                 } <span class="kw">else</span> {
                     <span class="ident">PD_HEARTBEAT_COUNTER_VEC</span>.<span class="ident">with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="string">&quot;noop&quot;</span>]).<span class="ident">inc</span>();
                 }
@@ -2291,12 +2300,12 @@
         <span class="kw">let</span> <span class="ident">f</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
             <span class="kw">match</span> <span class="ident">fut</span>.<span class="kw">await</span> {
                 <span class="prelude-val">Ok</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="macro">info</span><span class="macro">!</span>(
+                    <span class="macro">info!</span>(
                         <span class="string">&quot;region heartbeat response handler exit&quot;</span>;
                         <span class="string">&quot;store_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">store_id</span>,
                     );
                 }
-                <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;unexpected error: {:?}&quot;</span>, <span class="ident">e</span>),
+                <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic!</span>(<span class="string">&quot;unexpected error: {:?}&quot;</span>, <span class="ident">e</span>),
             }
         };
         <span class="ident">spawn_local</span>(<span class="ident">f</span>);
@@ -2308,7 +2317,7 @@
             <span class="kw">let</span> <span class="ident">peer_stat</span> <span class="op">=</span> <span class="self">self</span>
                 .<span class="ident">region_peers</span>
                 .<span class="ident">entry</span>(<span class="kw-2">*</span><span class="ident">region_id</span>)
-                .<span class="ident">or_insert_with</span>(<span class="ident">PeerStat</span>::<span class="ident">default</span>);
+                .<span class="ident">or_insert_with</span>(<span class="ident">PeerStat::default</span>);
             <span class="ident">peer_stat</span>.<span class="ident">read_bytes</span> <span class="op">+</span><span class="op">=</span> <span class="ident">region_info</span>.<span class="ident">flow</span>.<span class="ident">read_bytes</span> <span class="kw">as</span> <span class="ident">u64</span>;
             <span class="ident">peer_stat</span>.<span class="ident">read_keys</span> <span class="op">+</span><span class="op">=</span> <span class="ident">region_info</span>.<span class="ident">flow</span>.<span class="ident">read_keys</span> <span class="kw">as</span> <span class="ident">u64</span>;
             <span class="self">self</span>.<span class="ident">store_stat</span>.<span class="ident">engine_total_bytes_read</span> <span class="op">+</span><span class="op">=</span> <span class="ident">region_info</span>.<span class="ident">flow</span>.<span class="ident">read_bytes</span> <span class="kw">as</span> <span class="ident">u64</span>;
@@ -2317,7 +2326,7 @@
         <span class="kw">if</span> <span class="op">!</span><span class="ident">read_stats</span>.<span class="ident">region_infos</span>.<span class="ident">is_empty</span>() {
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">sender</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">stats_monitor</span>.<span class="ident">get_sender</span>() {
                 <span class="kw">if</span> <span class="ident">sender</span>.<span class="ident">send</span>(<span class="ident">read_stats</span>).<span class="ident">is_err</span>() {
-                    <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;send read_stats failed, are we shutting down?&quot;</span>)
+                    <span class="macro">warn!</span>(<span class="string">&quot;send read_stats failed, are we shutting down?&quot;</span>)
                 }
             }
         }
@@ -2326,7 +2335,7 @@
     <span class="kw">fn</span> <span class="ident">handle_destroy_peer</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">region_id</span>: <span class="ident">u64</span>) {
         <span class="kw">match</span> <span class="self">self</span>.<span class="ident">region_peers</span>.<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="ident">region_id</span>) {
             <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> {}
-            <span class="prelude-val">Some</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;remove peer statistic record in pd&quot;</span>; <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>),
+            <span class="prelude-val">Some</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">info!</span>(<span class="string">&quot;remove peer statistic record in pd&quot;</span>; <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>),
         }
     }
 
@@ -2351,7 +2360,7 @@
         <span class="kw">let</span> <span class="ident">concurrency_manager</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">concurrency_manager</span>.<span class="ident">clone</span>();
         <span class="kw">let</span> <span class="ident">f</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">success</span> <span class="op">=</span> <span class="bool-val">false</span>;
-            <span class="kw">while</span> <span class="ident">max_ts_sync_status</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>) <span class="op">=</span><span class="op">=</span> <span class="ident">initial_status</span> {
+            <span class="kw">while</span> <span class="ident">max_ts_sync_status</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>) <span class="op">=</span><span class="op">=</span> <span class="ident">initial_status</span> {
                 <span class="kw">match</span> <span class="ident">pd_client</span>.<span class="ident">get_tso</span>().<span class="kw">await</span> {
                     <span class="prelude-val">Ok</span>(<span class="ident">ts</span>) <span class="op">=</span><span class="op">&gt;</span> {
                         <span class="ident">concurrency_manager</span>.<span class="ident">update_max_ts</span>(<span class="ident">ts</span>);
@@ -2360,14 +2369,14 @@
                             .<span class="ident">compare_exchange</span>(
                                 <span class="ident">initial_status</span>,
                                 <span class="ident">initial_status</span> <span class="op">|</span> <span class="number">1</span>,
-                                <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>,
-                                <span class="ident">Ordering</span>::<span class="ident">SeqCst</span>,
+                                <span class="ident">Ordering::SeqCst</span>,
+                                <span class="ident">Ordering::SeqCst</span>,
                             )
                             .<span class="ident">is_ok</span>();
                         <span class="kw">break</span>;
                     }
                     <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                        <span class="macro">warn</span><span class="macro">!</span>(
+                        <span class="macro">warn!</span>(
                             <span class="string">&quot;failed to update max timestamp for region {}: {:?}&quot;</span>,
                             <span class="ident">region_id</span>, <span class="ident">e</span>
                         );
@@ -2375,16 +2384,31 @@
                 }
             }
             <span class="kw">if</span> <span class="ident">success</span> {
-                <span class="macro">info</span><span class="macro">!</span>(<span class="string">&quot;succeed to update max timestamp&quot;</span>; <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>);
+                <span class="macro">info!</span>(<span class="string">&quot;succeed to update max timestamp&quot;</span>; <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>);
             } <span class="kw">else</span> {
-                <span class="macro">info</span><span class="macro">!</span>(
+                <span class="macro">info!</span>(
                     <span class="string">&quot;updating max timestamp is stale&quot;</span>;
                     <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>,
                     <span class="string">&quot;initial_status&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">initial_status</span>,
                 );
             }
         };
-        <span class="ident">spawn_local</span>(<span class="ident">f</span>);
+
+        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;failpoints&quot;</span>)]</span>
+        <span class="kw">let</span> <span class="ident">delay</span> <span class="op">=</span> (<span class="op">|</span><span class="op">|</span> {
+            <span class="macro">fail_point!</span>(<span class="string">&quot;delay_update_max_ts&quot;</span>, <span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="bool-val">true</span>);
+            <span class="bool-val">false</span>
+        })();
+        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;failpoints&quot;</span>))]</span>
+        <span class="kw">let</span> <span class="ident">delay</span> <span class="op">=</span> <span class="bool-val">false</span>;
+
+        <span class="kw">if</span> <span class="ident">delay</span> {
+            <span class="macro">info!</span>(<span class="string">&quot;[failpoint] delay update max ts for 1s&quot;</span>; <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>);
+            <span class="kw">let</span> <span class="ident">deadline</span> <span class="op">=</span> <span class="ident">Instant::now</span>() <span class="op">+</span> <span class="ident">Duration::from_secs</span>(<span class="number">1</span>);
+            <span class="ident">spawn_local</span>(<span class="ident">GLOBAL_TIMER_HANDLE</span>.<span class="ident">delay</span>(<span class="ident">deadline</span>).<span class="ident">compat</span>().<span class="ident">then</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">f</span>));
+        } <span class="kw">else</span> {
+            <span class="ident">spawn_local</span>(<span class="ident">f</span>);
+        }
     }
 
     <span class="kw">fn</span> <span class="ident">handle_query_region_leader</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">region_id</span>: <span class="ident">u64</span>) {
@@ -2393,14 +2417,14 @@
         <span class="kw">let</span> <span class="ident">f</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
             <span class="kw">match</span> <span class="ident">resp</span>.<span class="kw">await</span> {
                 <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>((<span class="ident">region</span>, <span class="ident">leader</span>))) <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="kw">let</span> <span class="ident">msg</span> <span class="op">=</span> <span class="ident">CasualMessage</span>::<span class="ident">QueryRegionLeaderResp</span> { <span class="ident">region</span>, <span class="ident">leader</span> };
-                    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">router</span>.<span class="ident">send</span>(<span class="ident">region_id</span>, <span class="ident">PeerMsg</span>::<span class="ident">CasualMessage</span>(<span class="ident">msg</span>)) {
-                        <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;send region info message failed&quot;</span>; <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>, <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
+                    <span class="kw">let</span> <span class="ident">msg</span> <span class="op">=</span> <span class="ident">CasualMessage::QueryRegionLeaderResp</span> { <span class="ident">region</span>, <span class="ident">leader</span> };
+                    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">router</span>.<span class="ident">send</span>(<span class="ident">region_id</span>, <span class="ident">PeerMsg::CasualMessage</span>(<span class="ident">msg</span>)) {
+                        <span class="macro">error!</span>(<span class="string">&quot;send region info message failed&quot;</span>; <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>, <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
                     }
                 }
                 <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>) <span class="op">=</span><span class="op">&gt;</span> {}
                 <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;get region failed&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
+                    <span class="macro">error!</span>(<span class="string">&quot;get region failed&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
                 }
             }
         };
@@ -2415,7 +2439,7 @@
     <span class="ident">T</span>: <span class="ident">PdClient</span>,
 {
     <span class="kw">fn</span> <span class="ident">run</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">task</span>: <span class="ident">Task</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>) {
-        <span class="macro">debug</span><span class="macro">!</span>(<span class="string">&quot;executing task&quot;</span>; <span class="string">&quot;task&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">task</span>);
+        <span class="macro">debug!</span>(<span class="string">&quot;executing task&quot;</span>; <span class="string">&quot;task&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">task</span>);
 
         <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">is_hb_receiver_scheduled</span> {
             <span class="self">self</span>.<span class="ident">schedule_heartbeat_receiver</span>();
@@ -2423,7 +2447,7 @@
 
         <span class="kw">match</span> <span class="ident">task</span> {
             <span class="comment">// AskSplit has deprecated, use AskBatchSplit</span>
-            <span class="ident">Task</span>::<span class="ident">AskSplit</span> {
+            <span class="ident">Task::AskSplit</span> {
                 <span class="ident">region</span>,
                 <span class="ident">split_key</span>,
                 <span class="ident">peer</span>,
@@ -2435,15 +2459,15 @@
                 <span class="ident">peer</span>,
                 <span class="ident">right_derive</span>,
                 <span class="ident">callback</span>,
-                <span class="ident">String</span>::<span class="ident">from</span>(<span class="string">&quot;ask_split&quot;</span>),
+                <span class="ident">String::from</span>(<span class="string">&quot;ask_split&quot;</span>),
             ),
-            <span class="ident">Task</span>::<span class="ident">AskBatchSplit</span> {
+            <span class="ident">Task::AskBatchSplit</span> {
                 <span class="ident">region</span>,
                 <span class="ident">split_keys</span>,
                 <span class="ident">peer</span>,
                 <span class="ident">right_derive</span>,
                 <span class="ident">callback</span>,
-            } <span class="op">=</span><span class="op">&gt;</span> <span class="self">Self</span>::<span class="ident">handle_ask_batch_split</span>(
+            } <span class="op">=</span><span class="op">&gt;</span> <span class="self">Self</span><span class="ident">::handle_ask_batch_split</span>(
                 <span class="self">self</span>.<span class="ident">router</span>.<span class="ident">clone</span>(),
                 <span class="self">self</span>.<span class="ident">scheduler</span>.<span class="ident">clone</span>(),
                 <span class="self">self</span>.<span class="ident">pd_client</span>.<span class="ident">clone</span>(),
@@ -2452,9 +2476,9 @@
                 <span class="ident">peer</span>,
                 <span class="ident">right_derive</span>,
                 <span class="ident">callback</span>,
-                <span class="ident">String</span>::<span class="ident">from</span>(<span class="string">&quot;batch_split&quot;</span>),
+                <span class="ident">String::from</span>(<span class="string">&quot;batch_split&quot;</span>),
             ),
-            <span class="ident">Task</span>::<span class="ident">AutoSplit</span> { <span class="ident">split_infos</span> } <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">Task::AutoSplit</span> { <span class="ident">split_infos</span> } <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> <span class="ident">pd_client</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pd_client</span>.<span class="ident">clone</span>();
                 <span class="kw">let</span> <span class="ident">router</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">router</span>.<span class="ident">clone</span>();
                 <span class="kw">let</span> <span class="ident">scheduler</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">scheduler</span>.<span class="ident">clone</span>();
@@ -2464,16 +2488,16 @@
                         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">region</span>)) <span class="op">=</span>
                             <span class="ident">pd_client</span>.<span class="ident">get_region_by_id</span>(<span class="ident">split_info</span>.<span class="ident">region_id</span>).<span class="kw">await</span>
                         {
-                            <span class="self">Self</span>::<span class="ident">handle_ask_batch_split</span>(
+                            <span class="self">Self</span><span class="ident">::handle_ask_batch_split</span>(
                                 <span class="ident">router</span>.<span class="ident">clone</span>(),
                                 <span class="ident">scheduler</span>.<span class="ident">clone</span>(),
                                 <span class="ident">pd_client</span>.<span class="ident">clone</span>(),
                                 <span class="ident">region</span>,
-                                <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">split_info</span>.<span class="ident">split_key</span>],
+                                <span class="macro">vec!</span>[<span class="ident">split_info</span>.<span class="ident">split_key</span>],
                                 <span class="ident">split_info</span>.<span class="ident">peer</span>,
                                 <span class="bool-val">true</span>,
-                                <span class="ident">Callback</span>::<span class="prelude-val">None</span>,
-                                <span class="ident">String</span>::<span class="ident">from</span>(<span class="string">&quot;auto_split&quot;</span>),
+                                <span class="ident">Callback::None</span>,
+                                <span class="ident">String::from</span>(<span class="string">&quot;auto_split&quot;</span>),
                             );
                         }
                     }
@@ -2481,7 +2505,7 @@
                 <span class="ident">spawn_local</span>(<span class="ident">f</span>);
             }
 
-            <span class="ident">Task</span>::<span class="ident">Heartbeat</span>(<span class="ident">hb_task</span>) <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">Task::Heartbeat</span>(<span class="ident">hb_task</span>) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> (
                     <span class="ident">read_bytes_delta</span>,
                     <span class="ident">read_keys_delta</span>,
@@ -2492,7 +2516,7 @@
                     <span class="kw">let</span> <span class="ident">peer_stat</span> <span class="op">=</span> <span class="self">self</span>
                         .<span class="ident">region_peers</span>
                         .<span class="ident">entry</span>(<span class="ident">hb_task</span>.<span class="ident">region</span>.<span class="ident">get_id</span>())
-                        .<span class="ident">or_insert_with</span>(<span class="ident">PeerStat</span>::<span class="ident">default</span>);
+                        .<span class="ident">or_insert_with</span>(<span class="ident">PeerStat::default</span>);
                     <span class="ident">peer_stat</span>.<span class="ident">approximate_size</span> <span class="op">=</span> <span class="ident">hb_task</span>.<span class="ident">approximate_size</span>;
                     <span class="ident">peer_stat</span>.<span class="ident">approximate_keys</span> <span class="op">=</span> <span class="ident">hb_task</span>.<span class="ident">approximate_keys</span>;
                     <span class="kw">let</span> <span class="ident">read_bytes_delta</span> <span class="op">=</span> <span class="ident">peer_stat</span>.<span class="ident">read_bytes</span> <span class="op">-</span> <span class="ident">peer_stat</span>.<span class="ident">last_read_bytes</span>;
@@ -2504,7 +2528,7 @@
                     <span class="ident">peer_stat</span>.<span class="ident">last_written_keys</span> <span class="op">=</span> <span class="ident">hb_task</span>.<span class="ident">written_keys</span>;
                     <span class="ident">peer_stat</span>.<span class="ident">last_read_bytes</span> <span class="op">=</span> <span class="ident">peer_stat</span>.<span class="ident">read_bytes</span>;
                     <span class="ident">peer_stat</span>.<span class="ident">last_read_keys</span> <span class="op">=</span> <span class="ident">peer_stat</span>.<span class="ident">read_keys</span>;
-                    <span class="ident">peer_stat</span>.<span class="ident">last_report_ts</span> <span class="op">=</span> <span class="ident">UnixSecs</span>::<span class="ident">now</span>();
+                    <span class="ident">peer_stat</span>.<span class="ident">last_report_ts</span> <span class="op">=</span> <span class="ident">UnixSecs::now</span>();
                     <span class="kw">if</span> <span class="ident">last_report_ts</span>.<span class="ident">is_zero</span>() {
                         <span class="ident">last_report_ts</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">start_ts</span>;
                     }
@@ -2534,24 +2558,24 @@
                     <span class="ident">hb_task</span>.<span class="ident">replication_status</span>,
                 )
             }
-            <span class="ident">Task</span>::<span class="ident">StoreHeartbeat</span> { <span class="ident">stats</span>, <span class="ident">store_info</span> } <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">Task::StoreHeartbeat</span> { <span class="ident">stats</span>, <span class="ident">store_info</span> } <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="self">self</span>.<span class="ident">handle_store_heartbeat</span>(<span class="ident">stats</span>, <span class="ident">store_info</span>)
             }
-            <span class="ident">Task</span>::<span class="ident">ReportBatchSplit</span> { <span class="ident">regions</span> } <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">handle_report_batch_split</span>(<span class="ident">regions</span>),
-            <span class="ident">Task</span>::<span class="ident">ValidatePeer</span> { <span class="ident">region</span>, <span class="ident">peer</span> } <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">handle_validate_peer</span>(<span class="ident">region</span>, <span class="ident">peer</span>),
-            <span class="ident">Task</span>::<span class="ident">ReadStats</span> { <span class="ident">read_stats</span> } <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">handle_read_stats</span>(<span class="ident">read_stats</span>),
-            <span class="ident">Task</span>::<span class="ident">DestroyPeer</span> { <span class="ident">region_id</span> } <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">handle_destroy_peer</span>(<span class="ident">region_id</span>),
-            <span class="ident">Task</span>::<span class="ident">StoreInfos</span> {
+            <span class="ident">Task::ReportBatchSplit</span> { <span class="ident">regions</span> } <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">handle_report_batch_split</span>(<span class="ident">regions</span>),
+            <span class="ident">Task::ValidatePeer</span> { <span class="ident">region</span>, <span class="ident">peer</span> } <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">handle_validate_peer</span>(<span class="ident">region</span>, <span class="ident">peer</span>),
+            <span class="ident">Task::ReadStats</span> { <span class="ident">read_stats</span> } <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">handle_read_stats</span>(<span class="ident">read_stats</span>),
+            <span class="ident">Task::DestroyPeer</span> { <span class="ident">region_id</span> } <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">handle_destroy_peer</span>(<span class="ident">region_id</span>),
+            <span class="ident">Task::StoreInfos</span> {
                 <span class="ident">cpu_usages</span>,
                 <span class="ident">read_io_rates</span>,
                 <span class="ident">write_io_rates</span>,
             } <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">handle_store_infos</span>(<span class="ident">cpu_usages</span>, <span class="ident">read_io_rates</span>, <span class="ident">write_io_rates</span>),
-            <span class="ident">Task</span>::<span class="ident">UpdateMaxTimestamp</span> {
+            <span class="ident">Task::UpdateMaxTimestamp</span> {
                 <span class="ident">region_id</span>,
                 <span class="ident">initial_status</span>,
                 <span class="ident">max_ts_sync_status</span>,
             } <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">handle_update_max_timestamp</span>(<span class="ident">region_id</span>, <span class="ident">initial_status</span>, <span class="ident">max_ts_sync_status</span>),
-            <span class="ident">Task</span>::<span class="ident">QueryRegionLeader</span> { <span class="ident">region_id</span> } <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">handle_query_region_leader</span>(<span class="ident">region_id</span>),
+            <span class="ident">Task::QueryRegionLeader</span> { <span class="ident">region_id</span> } <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">handle_query_region_leader</span>(<span class="ident">region_id</span>),
         };
     }
 
@@ -2560,27 +2584,27 @@
     }
 }
 
-<span class="kw">fn</span> <span class="ident">new_change_peer_request</span>(<span class="ident">change_type</span>: <span class="ident">ConfChangeType</span>, <span class="ident">peer</span>: <span class="ident">metapb</span>::<span class="ident">Peer</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">AdminRequest</span> {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">AdminRequest</span>::<span class="ident">default</span>();
-    <span class="ident">req</span>.<span class="ident">set_cmd_type</span>(<span class="ident">AdminCmdType</span>::<span class="ident">ChangePeer</span>);
+<span class="kw">fn</span> <span class="ident">new_change_peer_request</span>(<span class="ident">change_type</span>: <span class="ident">ConfChangeType</span>, <span class="ident">peer</span>: <span class="ident">metapb::Peer</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">AdminRequest</span> {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">AdminRequest::default</span>();
+    <span class="ident">req</span>.<span class="ident">set_cmd_type</span>(<span class="ident">AdminCmdType::ChangePeer</span>);
     <span class="ident">req</span>.<span class="ident">mut_change_peer</span>().<span class="ident">set_change_type</span>(<span class="ident">change_type</span>);
     <span class="ident">req</span>.<span class="ident">mut_change_peer</span>().<span class="ident">set_peer</span>(<span class="ident">peer</span>);
     <span class="ident">req</span>
 }
 
-<span class="kw">fn</span> <span class="ident">new_change_peer_v2_request</span>(<span class="ident">changes</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">pdpb</span>::<span class="ident">ChangePeer</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">AdminRequest</span> {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">AdminRequest</span>::<span class="ident">default</span>();
-    <span class="ident">req</span>.<span class="ident">set_cmd_type</span>(<span class="ident">AdminCmdType</span>::<span class="ident">ChangePeerV2</span>);
+<span class="kw">fn</span> <span class="ident">new_change_peer_v2_request</span>(<span class="ident">changes</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">pdpb::ChangePeer</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">AdminRequest</span> {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">AdminRequest::default</span>();
+    <span class="ident">req</span>.<span class="ident">set_cmd_type</span>(<span class="ident">AdminCmdType::ChangePeerV2</span>);
     <span class="kw">let</span> <span class="ident">change_peer_reqs</span> <span class="op">=</span> <span class="ident">changes</span>
         .<span class="ident">into_iter</span>()
         .<span class="ident">map</span>(<span class="op">|</span><span class="kw-2">mut</span> <span class="ident">c</span><span class="op">|</span> {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cp</span> <span class="op">=</span> <span class="ident">ChangePeerRequest</span>::<span class="ident">default</span>();
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cp</span> <span class="op">=</span> <span class="ident">ChangePeerRequest::default</span>();
             <span class="ident">cp</span>.<span class="ident">set_change_type</span>(<span class="ident">c</span>.<span class="ident">get_change_type</span>());
             <span class="ident">cp</span>.<span class="ident">set_peer</span>(<span class="ident">c</span>.<span class="ident">take_peer</span>());
             <span class="ident">cp</span>
         })
         .<span class="ident">collect</span>();
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cp</span> <span class="op">=</span> <span class="ident">ChangePeerV2Request</span>::<span class="ident">default</span>();
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cp</span> <span class="op">=</span> <span class="ident">ChangePeerV2Request::default</span>();
     <span class="ident">cp</span>.<span class="ident">set_changes</span>(<span class="ident">change_peer_reqs</span>);
     <span class="ident">req</span>.<span class="ident">set_change_peer_v2</span>(<span class="ident">cp</span>);
     <span class="ident">req</span>
@@ -2592,8 +2616,8 @@
     <span class="ident">peer_ids</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>,
     <span class="ident">right_derive</span>: <span class="ident">bool</span>,
 ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">AdminRequest</span> {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">AdminRequest</span>::<span class="ident">default</span>();
-    <span class="ident">req</span>.<span class="ident">set_cmd_type</span>(<span class="ident">AdminCmdType</span>::<span class="ident">Split</span>);
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">AdminRequest::default</span>();
+    <span class="ident">req</span>.<span class="ident">set_cmd_type</span>(<span class="ident">AdminCmdType::Split</span>);
     <span class="ident">req</span>.<span class="ident">mut_split</span>().<span class="ident">set_split_key</span>(<span class="ident">split_key</span>);
     <span class="ident">req</span>.<span class="ident">mut_split</span>().<span class="ident">set_new_region_id</span>(<span class="ident">new_region_id</span>);
     <span class="ident">req</span>.<span class="ident">mut_split</span>().<span class="ident">set_new_peer_ids</span>(<span class="ident">peer_ids</span>);
@@ -2603,15 +2627,15 @@
 
 <span class="kw">fn</span> <span class="ident">new_batch_split_region_request</span>(
     <span class="ident">split_keys</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">ids</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">pdpb</span>::<span class="ident">SplitId</span><span class="op">&gt;</span>,
+    <span class="ident">ids</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">pdpb::SplitId</span><span class="op">&gt;</span>,
     <span class="ident">right_derive</span>: <span class="ident">bool</span>,
 ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">AdminRequest</span> {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">AdminRequest</span>::<span class="ident">default</span>();
-    <span class="ident">req</span>.<span class="ident">set_cmd_type</span>(<span class="ident">AdminCmdType</span>::<span class="ident">BatchSplit</span>);
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">AdminRequest::default</span>();
+    <span class="ident">req</span>.<span class="ident">set_cmd_type</span>(<span class="ident">AdminCmdType::BatchSplit</span>);
     <span class="ident">req</span>.<span class="ident">mut_splits</span>().<span class="ident">set_right_derive</span>(<span class="ident">right_derive</span>);
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">requests</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">with_capacity</span>(<span class="ident">ids</span>.<span class="ident">len</span>());
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">requests</span> <span class="op">=</span> <span class="ident">Vec::with_capacity</span>(<span class="ident">ids</span>.<span class="ident">len</span>());
     <span class="kw">for</span> (<span class="kw-2">mut</span> <span class="ident">id</span>, <span class="ident">key</span>) <span class="kw">in</span> <span class="ident">ids</span>.<span class="ident">into_iter</span>().<span class="ident">zip</span>(<span class="ident">split_keys</span>) {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">split</span> <span class="op">=</span> <span class="ident">SplitRequest</span>::<span class="ident">default</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">split</span> <span class="op">=</span> <span class="ident">SplitRequest::default</span>();
         <span class="ident">split</span>.<span class="ident">set_split_key</span>(<span class="ident">key</span>);
         <span class="ident">split</span>.<span class="ident">set_new_region_id</span>(<span class="ident">id</span>.<span class="ident">get_new_region_id</span>());
         <span class="ident">split</span>.<span class="ident">set_new_peer_ids</span>(<span class="ident">id</span>.<span class="ident">take_new_peer_ids</span>());
@@ -2621,16 +2645,16 @@
     <span class="ident">req</span>
 }
 
-<span class="kw">fn</span> <span class="ident">new_transfer_leader_request</span>(<span class="ident">peer</span>: <span class="ident">metapb</span>::<span class="ident">Peer</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">AdminRequest</span> {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">AdminRequest</span>::<span class="ident">default</span>();
-    <span class="ident">req</span>.<span class="ident">set_cmd_type</span>(<span class="ident">AdminCmdType</span>::<span class="ident">TransferLeader</span>);
+<span class="kw">fn</span> <span class="ident">new_transfer_leader_request</span>(<span class="ident">peer</span>: <span class="ident">metapb::Peer</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">AdminRequest</span> {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">AdminRequest::default</span>();
+    <span class="ident">req</span>.<span class="ident">set_cmd_type</span>(<span class="ident">AdminCmdType::TransferLeader</span>);
     <span class="ident">req</span>.<span class="ident">mut_transfer_leader</span>().<span class="ident">set_peer</span>(<span class="ident">peer</span>);
     <span class="ident">req</span>
 }
 
-<span class="kw">fn</span> <span class="ident">new_merge_request</span>(<span class="ident">merge</span>: <span class="ident">pdpb</span>::<span class="ident">Merge</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">AdminRequest</span> {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">AdminRequest</span>::<span class="ident">default</span>();
-    <span class="ident">req</span>.<span class="ident">set_cmd_type</span>(<span class="ident">AdminCmdType</span>::<span class="ident">PrepareMerge</span>);
+<span class="kw">fn</span> <span class="ident">new_merge_request</span>(<span class="ident">merge</span>: <span class="ident">pdpb::Merge</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">AdminRequest</span> {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">AdminRequest::default</span>();
+    <span class="ident">req</span>.<span class="ident">set_cmd_type</span>(<span class="ident">AdminCmdType::PrepareMerge</span>);
     <span class="ident">req</span>.<span class="ident">mut_prepare_merge</span>()
         .<span class="ident">set_target</span>(<span class="ident">merge</span>.<span class="ident">get_target</span>().<span class="ident">to_owned</span>());
     <span class="ident">req</span>
@@ -2639,25 +2663,25 @@
 <span class="kw">fn</span> <span class="ident">send_admin_request</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>(
     <span class="ident">router</span>: <span class="kw-2">&amp;</span><span class="ident">RaftRouter</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>,
     <span class="ident">region_id</span>: <span class="ident">u64</span>,
-    <span class="ident">epoch</span>: <span class="ident">metapb</span>::<span class="ident">RegionEpoch</span>,
-    <span class="ident">peer</span>: <span class="ident">metapb</span>::<span class="ident">Peer</span>,
+    <span class="ident">epoch</span>: <span class="ident">metapb::RegionEpoch</span>,
+    <span class="ident">peer</span>: <span class="ident">metapb::Peer</span>,
     <span class="ident">request</span>: <span class="ident">AdminRequest</span>,
-    <span class="ident">callback</span>: <span class="ident">Callback</span><span class="op">&lt;</span><span class="ident">EK</span>::<span class="ident">Snapshot</span><span class="op">&gt;</span>,
+    <span class="ident">callback</span>: <span class="ident">Callback</span><span class="op">&lt;</span><span class="ident">EK::Snapshot</span><span class="op">&gt;</span>,
 ) <span class="kw">where</span>
     <span class="ident">EK</span>: <span class="ident">KvEngine</span>,
     <span class="ident">ER</span>: <span class="ident">RaftEngine</span>,
 {
     <span class="kw">let</span> <span class="ident">cmd_type</span> <span class="op">=</span> <span class="ident">request</span>.<span class="ident">get_cmd_type</span>();
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">RaftCmdRequest</span>::<span class="ident">default</span>();
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">RaftCmdRequest::default</span>();
     <span class="ident">req</span>.<span class="ident">mut_header</span>().<span class="ident">set_region_id</span>(<span class="ident">region_id</span>);
     <span class="ident">req</span>.<span class="ident">mut_header</span>().<span class="ident">set_region_epoch</span>(<span class="ident">epoch</span>);
     <span class="ident">req</span>.<span class="ident">mut_header</span>().<span class="ident">set_peer</span>(<span class="ident">peer</span>);
 
     <span class="ident">req</span>.<span class="ident">set_admin_request</span>(<span class="ident">request</span>);
 
-    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">router</span>.<span class="ident">send_raft_command</span>(<span class="ident">RaftCommand</span>::<span class="ident">new</span>(<span class="ident">req</span>, <span class="ident">callback</span>)) {
-        <span class="macro">error</span><span class="macro">!</span>(
+    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">router</span>.<span class="ident">send_raft_command</span>(<span class="ident">RaftCommand::new</span>(<span class="ident">req</span>, <span class="ident">callback</span>)) {
+        <span class="macro">error!</span>(
             <span class="string">&quot;send request failed&quot;</span>;
             <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>, <span class="string">&quot;cmd_type&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">cmd_type</span>, <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>,
         );
@@ -2667,21 +2691,21 @@
 <span class="doccomment">/// Sends a raft message to destroy the specified stale Peer</span>
 <span class="kw">fn</span> <span class="ident">send_destroy_peer_message</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>(
     <span class="ident">router</span>: <span class="kw-2">&amp;</span><span class="ident">RaftRouter</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>,
-    <span class="ident">local_region</span>: <span class="ident">metapb</span>::<span class="ident">Region</span>,
-    <span class="ident">peer</span>: <span class="ident">metapb</span>::<span class="ident">Peer</span>,
-    <span class="ident">pd_region</span>: <span class="ident">metapb</span>::<span class="ident">Region</span>,
+    <span class="ident">local_region</span>: <span class="ident">metapb::Region</span>,
+    <span class="ident">peer</span>: <span class="ident">metapb::Peer</span>,
+    <span class="ident">pd_region</span>: <span class="ident">metapb::Region</span>,
 ) <span class="kw">where</span>
     <span class="ident">EK</span>: <span class="ident">KvEngine</span>,
     <span class="ident">ER</span>: <span class="ident">RaftEngine</span>,
 {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">message</span> <span class="op">=</span> <span class="ident">RaftMessage</span>::<span class="ident">default</span>();
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">message</span> <span class="op">=</span> <span class="ident">RaftMessage::default</span>();
     <span class="ident">message</span>.<span class="ident">set_region_id</span>(<span class="ident">local_region</span>.<span class="ident">get_id</span>());
     <span class="ident">message</span>.<span class="ident">set_from_peer</span>(<span class="ident">peer</span>.<span class="ident">clone</span>());
     <span class="ident">message</span>.<span class="ident">set_to_peer</span>(<span class="ident">peer</span>);
     <span class="ident">message</span>.<span class="ident">set_region_epoch</span>(<span class="ident">pd_region</span>.<span class="ident">get_region_epoch</span>().<span class="ident">clone</span>());
     <span class="ident">message</span>.<span class="ident">set_is_tombstone</span>(<span class="bool-val">true</span>);
     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">router</span>.<span class="ident">send_raft_message</span>(<span class="ident">message</span>) {
-        <span class="macro">error</span><span class="macro">!</span>(
+        <span class="macro">error!</span>(
             <span class="string">&quot;send gc peer request failed&quot;</span>;
             <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">local_region</span>.<span class="ident">get_id</span>(),
             <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>
@@ -2692,10 +2716,10 @@
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">target_os</span> <span class="op">=</span> <span class="string">&quot;macos&quot;</span>))]</span>
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
 <span class="kw">mod</span> <span class="ident">tests</span> {
-    <span class="kw">use</span> <span class="ident">engine_test</span>::<span class="ident">kv</span>::<span class="ident">KvTestEngine</span>;
-    <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">Mutex</span>;
-    <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">time</span>::<span class="ident">Instant</span>;
-    <span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">worker</span>::<span class="ident">FutureWorker</span>;
+    <span class="kw">use</span> <span class="ident">engine_test::kv::KvTestEngine</span>;
+    <span class="kw">use</span> <span class="ident">std::sync::Mutex</span>;
+    <span class="kw">use</span> <span class="ident">std::time::Instant</span>;
+    <span class="kw">use</span> <span class="ident">tikv_util::worker::FutureWorker</span>;
 
     <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 
@@ -2710,10 +2734,10 @@
             <span class="ident">scheduler</span>: <span class="ident">Scheduler</span><span class="op">&lt;</span><span class="ident">Task</span><span class="op">&lt;</span><span class="ident">KvTestEngine</span><span class="op">&gt;</span><span class="op">&gt;</span>,
             <span class="ident">store_stat</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">StoreStat</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">RunnerTest</span> {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stats_monitor</span> <span class="op">=</span> <span class="ident">StatsMonitor</span>::<span class="ident">new</span>(<span class="ident">Duration</span>::<span class="ident">from_secs</span>(<span class="ident">interval</span>), <span class="ident">scheduler</span>);
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stats_monitor</span> <span class="op">=</span> <span class="ident">StatsMonitor::new</span>(<span class="ident">Duration::from_secs</span>(<span class="ident">interval</span>), <span class="ident">scheduler</span>);
 
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">stats_monitor</span>.<span class="ident">start</span>(<span class="ident">AutoSplitController</span>::<span class="ident">default</span>()) {
-                <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;failed to start stats collector, error = {:?}&quot;</span>, <span class="ident">e</span>);
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">stats_monitor</span>.<span class="ident">start</span>(<span class="ident">AutoSplitController::default</span>()) {
+                <span class="macro">error!</span>(<span class="string">&quot;failed to start stats collector, error = {:?}&quot;</span>, <span class="ident">e</span>);
             }
 
             <span class="ident">RunnerTest</span> {
@@ -2737,7 +2761,7 @@
 
     <span class="kw">impl</span> <span class="ident">Runnable</span><span class="op">&lt;</span><span class="ident">Task</span><span class="op">&lt;</span><span class="ident">KvTestEngine</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">RunnerTest</span> {
         <span class="kw">fn</span> <span class="ident">run</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">task</span>: <span class="ident">Task</span><span class="op">&lt;</span><span class="ident">KvTestEngine</span><span class="op">&gt;</span>) {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="ident">Task</span>::<span class="ident">StoreInfos</span> {
+            <span class="kw">if</span> <span class="kw">let</span> <span class="ident">Task::StoreInfos</span> {
                 <span class="ident">cpu_usages</span>,
                 <span class="ident">read_io_rates</span>,
                 <span class="ident">write_io_rates</span>,
@@ -2752,7 +2776,7 @@
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">sum_record_pairs</span>(<span class="ident">pairs</span>: <span class="kw-2">&amp;</span>[<span class="ident">pdpb</span>::<span class="ident">RecordPair</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u64</span> {
+    <span class="kw">fn</span> <span class="ident">sum_record_pairs</span>(<span class="ident">pairs</span>: <span class="kw-2">&amp;</span>[<span class="ident">pdpb::RecordPair</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u64</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">sum</span> <span class="op">=</span> <span class="number">0</span>;
         <span class="kw">for</span> <span class="ident">record</span> <span class="kw">in</span> <span class="ident">pairs</span>.<span class="ident">iter</span>() {
             <span class="ident">sum</span> <span class="op">+</span><span class="op">=</span> <span class="ident">record</span>.<span class="ident">get_value</span>();
@@ -2762,24 +2786,24 @@
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_collect_stats</span>() {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">pd_worker</span> <span class="op">=</span> <span class="ident">FutureWorker</span>::<span class="ident">new</span>(<span class="string">&quot;test-pd-worker&quot;</span>);
-        <span class="kw">let</span> <span class="ident">store_stat</span> <span class="op">=</span> <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">StoreStat</span>::<span class="ident">default</span>()));
-        <span class="kw">let</span> <span class="ident">runner</span> <span class="op">=</span> <span class="ident">RunnerTest</span>::<span class="ident">new</span>(<span class="number">1</span>, <span class="ident">pd_worker</span>.<span class="ident">scheduler</span>(), <span class="ident">Arc</span>::<span class="ident">clone</span>(<span class="kw-2">&amp;</span><span class="ident">store_stat</span>));
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">pd_worker</span> <span class="op">=</span> <span class="ident">FutureWorker::new</span>(<span class="string">&quot;test-pd-worker&quot;</span>);
+        <span class="kw">let</span> <span class="ident">store_stat</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">Mutex::new</span>(<span class="ident">StoreStat::default</span>()));
+        <span class="kw">let</span> <span class="ident">runner</span> <span class="op">=</span> <span class="ident">RunnerTest::new</span>(<span class="number">1</span>, <span class="ident">pd_worker</span>.<span class="ident">scheduler</span>(), <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">store_stat</span>));
         <span class="ident">pd_worker</span>.<span class="ident">start</span>(<span class="ident">runner</span>).<span class="ident">unwrap</span>();
 
-        <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now</span>();
+        <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">Instant::now</span>();
         <span class="kw">loop</span> {
-            <span class="kw">if</span> (<span class="ident">Instant</span>::<span class="ident">now</span>() <span class="op">-</span> <span class="ident">start</span>).<span class="ident">as_secs</span>() <span class="op">&gt;</span> <span class="number">2</span> {
+            <span class="kw">if</span> (<span class="ident">Instant::now</span>() <span class="op">-</span> <span class="ident">start</span>).<span class="ident">as_secs</span>() <span class="op">&gt;</span> <span class="number">2</span> {
                 <span class="kw">break</span>;
             }
         }
 
         <span class="kw">let</span> <span class="ident">total_cpu_usages</span> <span class="op">=</span> <span class="ident">sum_record_pairs</span>(<span class="kw-2">&amp;</span><span class="ident">store_stat</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">store_cpu_usages</span>);
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">total_cpu_usages</span> <span class="op">&gt;</span> <span class="number">90</span>);
+        <span class="macro">assert!</span>(<span class="ident">total_cpu_usages</span> <span class="op">&gt;</span> <span class="number">90</span>);
 
         <span class="ident">pd_worker</span>.<span class="ident">stop</span>();
     }
 }
 </pre></div>
-</section><section id="search" class="content hidden"></section><section class="footer"></section><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="raftstore"></div>
-    <script src="../../../../main.js"></script><script src="../../../../source-script.js"></script><script src="../../../../source-files.js"></script><script defer src="../../../../search-index.js"></script></body></html>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="raftstore" data-search-js="../../../../search-index.js"></div>
+    <script src="../../../../main.js"></script><script src="../../../../source-script.js"></script><script src="../../../../source-files.js"></script></body></html>

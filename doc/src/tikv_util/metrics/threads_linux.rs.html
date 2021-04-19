@@ -1,7 +1,7 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `components/tikv_util/src/metrics/threads_linux.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>threads_linux.rs - source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../favicon.svg">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `components/tikv_util/src/metrics/threads_linux.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>threads_linux.rs - source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../favicon.svg">
 <link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../tikv_util/index.html'><div class='logo-container rust-logo'><img src='../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><script src="../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
-                <a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../../tikv_util/index.html'><div class='logo-container rust-logo'><img src='../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
+                <a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
 <span id="2">  2</span>
 <span id="3">  3</span>
 <span id="4">  4</span>
@@ -732,26 +732,28 @@
 <span id="729">729</span>
 <span id="730">730</span>
 <span id="731">731</span>
+<span id="732">732</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2017 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">fs</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::{<span class="ident">Error</span>, <span class="ident">ErrorKind</span>, <span class="prelude-ty">Result</span>};
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">Mutex</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">time</span>::{<span class="ident">Duration</span>, <span class="ident">Instant</span>};
+<span class="kw">use</span> <span class="ident">std::fs</span>;
+<span class="kw">use</span> <span class="ident">std::io</span>::{<span class="ident">Error</span>, <span class="ident">ErrorKind</span>, <span class="prelude-ty">Result</span>};
+<span class="kw">use</span> <span class="ident">std::sync::Mutex</span>;
+<span class="kw">use</span> <span class="ident">std::time</span>::{<span class="ident">Duration</span>, <span class="ident">Instant</span>};
 
-<span class="kw">use</span> <span class="ident">collections</span>::<span class="ident">HashMap</span>;
+<span class="kw">use</span> <span class="ident">collections::HashMap</span>;
+<span class="kw">use</span> <span class="ident">lazy_static::lazy_static</span>;
 <span class="kw">use</span> <span class="ident">libc</span>::{<span class="self">self</span>, <span class="ident">pid_t</span>};
-<span class="kw">use</span> <span class="ident">prometheus</span>::<span class="ident">core</span>::{<span class="ident">Collector</span>, <span class="ident">Desc</span>};
+<span class="kw">use</span> <span class="ident">prometheus::core</span>::{<span class="ident">Collector</span>, <span class="ident">Desc</span>};
 <span class="kw">use</span> <span class="ident">prometheus</span>::{<span class="self">self</span>, <span class="ident">proto</span>, <span class="ident">CounterVec</span>, <span class="ident">IntCounterVec</span>, <span class="ident">IntGaugeVec</span>, <span class="ident">Opts</span>};
 
-<span class="kw">use</span> <span class="ident">procinfo</span>::<span class="ident">pid</span>;
+<span class="kw">use</span> <span class="ident">procinfo::pid</span>;
 
 <span class="doccomment">/// Monitors threads of the current process.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">monitor_threads</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="ident">namespace</span>: <span class="ident">S</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">pid</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">libc</span>::<span class="ident">getpid</span>() };
-    <span class="kw">let</span> <span class="ident">tc</span> <span class="op">=</span> <span class="ident">ThreadsCollector</span>::<span class="ident">new</span>(<span class="ident">pid</span>, <span class="ident">namespace</span>);
-    <span class="ident">prometheus</span>::<span class="ident">register</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">tc</span>)).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">to_io_err</span>(<span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;{:?}&quot;</span>, <span class="ident">e</span>)))
+    <span class="kw">let</span> <span class="ident">pid</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">libc::getpid</span>() };
+    <span class="kw">let</span> <span class="ident">tc</span> <span class="op">=</span> <span class="ident">ThreadsCollector::new</span>(<span class="ident">pid</span>, <span class="ident">namespace</span>);
+    <span class="ident">prometheus::register</span>(<span class="ident">Box::new</span>(<span class="ident">tc</span>)).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">to_io_err</span>(<span class="macro">format!</span>(<span class="string">&quot;{:?}&quot;</span>, <span class="ident">e</span>)))
 }
 
 <span class="kw">struct</span> <span class="ident">Metrics</span> {
@@ -773,10 +775,10 @@
 
 <span class="kw">impl</span> <span class="ident">ThreadsCollector</span> {
     <span class="kw">fn</span> <span class="ident">new</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="ident">pid</span>: <span class="ident">pid_t</span>, <span class="ident">namespace</span>: <span class="ident">S</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ThreadsCollector</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">descs</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Desc</span><span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[];
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">descs</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Desc</span><span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec!</span>[];
         <span class="kw">let</span> <span class="ident">ns</span> <span class="op">=</span> <span class="ident">namespace</span>.<span class="ident">into</span>();
-        <span class="kw">let</span> <span class="ident">cpu_totals</span> <span class="op">=</span> <span class="ident">CounterVec</span>::<span class="ident">new</span>(
-            <span class="ident">Opts</span>::<span class="ident">new</span>(
+        <span class="kw">let</span> <span class="ident">cpu_totals</span> <span class="op">=</span> <span class="ident">CounterVec::new</span>(
+            <span class="ident">Opts::new</span>(
                 <span class="string">&quot;thread_cpu_seconds_total&quot;</span>,
                 <span class="string">&quot;Total user and system CPU time spent in \
                  seconds by threads.&quot;</span>,
@@ -786,14 +788,14 @@
         )
         .<span class="ident">unwrap</span>();
         <span class="ident">descs</span>.<span class="ident">extend</span>(<span class="ident">cpu_totals</span>.<span class="ident">desc</span>().<span class="ident">into_iter</span>().<span class="ident">cloned</span>());
-        <span class="kw">let</span> <span class="ident">threads_state</span> <span class="op">=</span> <span class="ident">IntGaugeVec</span>::<span class="ident">new</span>(
-            <span class="ident">Opts</span>::<span class="ident">new</span>(<span class="string">&quot;threads_state&quot;</span>, <span class="string">&quot;Number of threads in each state.&quot;</span>).<span class="ident">namespace</span>(<span class="ident">ns</span>.<span class="ident">clone</span>()),
+        <span class="kw">let</span> <span class="ident">threads_state</span> <span class="op">=</span> <span class="ident">IntGaugeVec::new</span>(
+            <span class="ident">Opts::new</span>(<span class="string">&quot;threads_state&quot;</span>, <span class="string">&quot;Number of threads in each state.&quot;</span>).<span class="ident">namespace</span>(<span class="ident">ns</span>.<span class="ident">clone</span>()),
             <span class="kw-2">&amp;</span>[<span class="string">&quot;state&quot;</span>],
         )
         .<span class="ident">unwrap</span>();
         <span class="ident">descs</span>.<span class="ident">extend</span>(<span class="ident">threads_state</span>.<span class="ident">desc</span>().<span class="ident">into_iter</span>().<span class="ident">cloned</span>());
-        <span class="kw">let</span> <span class="ident">io_totals</span> <span class="op">=</span> <span class="ident">CounterVec</span>::<span class="ident">new</span>(
-            <span class="ident">Opts</span>::<span class="ident">new</span>(
+        <span class="kw">let</span> <span class="ident">io_totals</span> <span class="op">=</span> <span class="ident">CounterVec::new</span>(
+            <span class="ident">Opts::new</span>(
                 <span class="string">&quot;threads_io_bytes_total&quot;</span>,
                 <span class="string">&quot;Total number of bytes which threads cause to be fetched from or sent to the storage layer.&quot;</span>,
             ).<span class="ident">namespace</span>(<span class="ident">ns</span>.<span class="ident">clone</span>()),
@@ -801,8 +803,8 @@
         )
         .<span class="ident">unwrap</span>();
         <span class="ident">descs</span>.<span class="ident">extend</span>(<span class="ident">io_totals</span>.<span class="ident">desc</span>().<span class="ident">into_iter</span>().<span class="ident">cloned</span>());
-        <span class="kw">let</span> <span class="ident">voluntary_ctxt_switches</span> <span class="op">=</span> <span class="ident">IntCounterVec</span>::<span class="ident">new</span>(
-            <span class="ident">Opts</span>::<span class="ident">new</span>(
+        <span class="kw">let</span> <span class="ident">voluntary_ctxt_switches</span> <span class="op">=</span> <span class="ident">IntCounterVec::new</span>(
+            <span class="ident">Opts::new</span>(
                 <span class="string">&quot;thread_voluntary_context_switches&quot;</span>,
                 <span class="string">&quot;Number of thread voluntary context switches.&quot;</span>,
             )
@@ -810,8 +812,8 @@
             <span class="kw-2">&amp;</span>[<span class="string">&quot;name&quot;</span>, <span class="string">&quot;tid&quot;</span>],
         )
         .<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">nonvoluntary_ctxt_switches</span> <span class="op">=</span> <span class="ident">IntCounterVec</span>::<span class="ident">new</span>(
-            <span class="ident">Opts</span>::<span class="ident">new</span>(
+        <span class="kw">let</span> <span class="ident">nonvoluntary_ctxt_switches</span> <span class="op">=</span> <span class="ident">IntCounterVec::new</span>(
+            <span class="ident">Opts::new</span>(
                 <span class="string">&quot;thread_nonvoluntary_context_switches&quot;</span>,
                 <span class="string">&quot;Number of thread nonvoluntary context switches.&quot;</span>,
             )
@@ -823,14 +825,14 @@
         <span class="ident">ThreadsCollector</span> {
             <span class="ident">pid</span>,
             <span class="ident">descs</span>,
-            <span class="ident">metrics</span>: <span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">Metrics</span> {
+            <span class="ident">metrics</span>: <span class="ident">Mutex::new</span>(<span class="ident">Metrics</span> {
                 <span class="ident">cpu_totals</span>,
                 <span class="ident">io_totals</span>,
                 <span class="ident">threads_state</span>,
                 <span class="ident">voluntary_ctxt_switches</span>,
                 <span class="ident">nonvoluntary_ctxt_switches</span>,
             }),
-            <span class="ident">tid_retriever</span>: <span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">TidRetriever</span>::<span class="ident">new</span>(<span class="ident">pid</span>)),
+            <span class="ident">tid_retriever</span>: <span class="ident">Mutex::new</span>(<span class="ident">TidRetriever::new</span>(<span class="ident">pid</span>)),
         }
     }
 }
@@ -840,7 +842,7 @@
         <span class="self">self</span>.<span class="ident">descs</span>.<span class="ident">iter</span>().<span class="ident">collect</span>()
     }
 
-    <span class="kw">fn</span> <span class="ident">collect</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">proto</span>::<span class="ident">MetricFamily</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">collect</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">proto::MetricFamily</span><span class="op">&gt;</span> {
         <span class="comment">// Synchronous collecting metrics.</span>
         <span class="kw">let</span> <span class="ident">metrics</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">metrics</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
         <span class="comment">// Clean previous threads state.</span>
@@ -850,14 +852,14 @@
         <span class="kw">let</span> <span class="ident">tids</span> <span class="op">=</span> <span class="ident">tid_retriever</span>.<span class="ident">get_tids</span>();
         <span class="kw">for</span> <span class="ident">tid</span> <span class="kw">in</span> <span class="ident">tids</span> {
             <span class="kw">let</span> <span class="ident">tid</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">tid</span>;
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">stat</span>) <span class="op">=</span> <span class="ident">pid</span>::<span class="ident">stat_task</span>(<span class="self">self</span>.<span class="ident">pid</span>, <span class="ident">tid</span>) {
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">stat</span>) <span class="op">=</span> <span class="ident">pid::stat_task</span>(<span class="self">self</span>.<span class="ident">pid</span>, <span class="ident">tid</span>) {
                 <span class="comment">// Threads CPU time.</span>
                 <span class="kw">let</span> <span class="ident">total</span> <span class="op">=</span> <span class="ident">cpu_total</span>(<span class="kw-2">&amp;</span><span class="ident">stat</span>);
                 <span class="comment">// sanitize thread name before push metrics.</span>
                 <span class="kw">let</span> <span class="ident">name</span> <span class="op">=</span> <span class="ident">sanitize_thread_name</span>(<span class="ident">tid</span>, <span class="kw-2">&amp;</span><span class="ident">stat</span>.<span class="ident">command</span>);
                 <span class="kw">let</span> <span class="ident">cpu_total</span> <span class="op">=</span> <span class="ident">metrics</span>
                     .<span class="ident">cpu_totals</span>
-                    .<span class="ident">get_metric_with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">name</span>, <span class="kw-2">&amp;</span><span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">tid</span>)])
+                    .<span class="ident">get_metric_with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">name</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">tid</span>)])
                     .<span class="ident">unwrap</span>();
                 <span class="kw">let</span> <span class="ident">past</span> <span class="op">=</span> <span class="ident">cpu_total</span>.<span class="ident">get</span>();
                 <span class="kw">let</span> <span class="ident">delta</span> <span class="op">=</span> <span class="ident">total</span> <span class="op">-</span> <span class="ident">past</span>;
@@ -872,13 +874,13 @@
                     .<span class="ident">unwrap</span>();
                 <span class="ident">state</span>.<span class="ident">inc</span>();
 
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">io</span>) <span class="op">=</span> <span class="ident">pid</span>::<span class="ident">io_task</span>(<span class="self">self</span>.<span class="ident">pid</span>, <span class="ident">tid</span>) {
+                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">io</span>) <span class="op">=</span> <span class="ident">pid::io_task</span>(<span class="self">self</span>.<span class="ident">pid</span>, <span class="ident">tid</span>) {
                     <span class="kw">let</span> <span class="ident">read_bytes</span> <span class="op">=</span> <span class="ident">io</span>.<span class="ident">read_bytes</span>;
                     <span class="kw">let</span> <span class="ident">write_bytes</span> <span class="op">=</span> <span class="ident">io</span>.<span class="ident">write_bytes</span>;
                     <span class="comment">// Threads IO.</span>
                     <span class="kw">let</span> <span class="ident">read_total</span> <span class="op">=</span> <span class="ident">metrics</span>
                         .<span class="ident">io_totals</span>
-                        .<span class="ident">get_metric_with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">name</span>, <span class="kw-2">&amp;</span><span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">tid</span>), <span class="string">&quot;read&quot;</span>])
+                        .<span class="ident">get_metric_with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">name</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">tid</span>), <span class="string">&quot;read&quot;</span>])
                         .<span class="ident">unwrap</span>();
                     <span class="kw">let</span> <span class="ident">read_past</span> <span class="op">=</span> <span class="ident">read_total</span>.<span class="ident">get</span>();
                     <span class="kw">let</span> <span class="ident">read_delta</span> <span class="op">=</span> <span class="ident">read_bytes</span> <span class="kw">as</span> <span class="ident">f64</span> <span class="op">-</span> <span class="ident">read_past</span>;
@@ -888,7 +890,7 @@
 
                     <span class="kw">let</span> <span class="ident">write_total</span> <span class="op">=</span> <span class="ident">metrics</span>
                         .<span class="ident">io_totals</span>
-                        .<span class="ident">get_metric_with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">name</span>, <span class="kw-2">&amp;</span><span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">tid</span>), <span class="string">&quot;write&quot;</span>])
+                        .<span class="ident">get_metric_with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">name</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">tid</span>), <span class="string">&quot;write&quot;</span>])
                         .<span class="ident">unwrap</span>();
                     <span class="kw">let</span> <span class="ident">write_past</span> <span class="op">=</span> <span class="ident">write_total</span>.<span class="ident">get</span>();
                     <span class="kw">let</span> <span class="ident">write_delta</span> <span class="op">=</span> <span class="ident">write_bytes</span> <span class="kw">as</span> <span class="ident">f64</span> <span class="op">-</span> <span class="ident">write_past</span>;
@@ -897,12 +899,12 @@
                     }
                 }
 
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">status</span>) <span class="op">=</span> <span class="ident">pid</span>::<span class="ident">status_task</span>(<span class="self">self</span>.<span class="ident">pid</span>, <span class="ident">tid</span>) {
+                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">status</span>) <span class="op">=</span> <span class="ident">pid::status_task</span>(<span class="self">self</span>.<span class="ident">pid</span>, <span class="ident">tid</span>) {
                     <span class="comment">// Thread voluntary context switches.</span>
                     <span class="kw">let</span> <span class="ident">voluntary_ctxt_switches</span> <span class="op">=</span> <span class="ident">status</span>.<span class="ident">voluntary_ctxt_switches</span>;
                     <span class="kw">let</span> <span class="ident">voluntary_total</span> <span class="op">=</span> <span class="ident">metrics</span>
                         .<span class="ident">voluntary_ctxt_switches</span>
-                        .<span class="ident">get_metric_with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">name</span>, <span class="kw-2">&amp;</span><span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">tid</span>)])
+                        .<span class="ident">get_metric_with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">name</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">tid</span>)])
                         .<span class="ident">unwrap</span>();
                     <span class="kw">let</span> <span class="ident">voluntary_past</span> <span class="op">=</span> <span class="ident">voluntary_total</span>.<span class="ident">get</span>();
                     <span class="kw">let</span> <span class="ident">voluntary_delta</span> <span class="op">=</span> <span class="ident">voluntary_ctxt_switches</span> <span class="kw">as</span> <span class="ident">i64</span> <span class="op">-</span> <span class="ident">voluntary_past</span>;
@@ -914,7 +916,7 @@
                     <span class="kw">let</span> <span class="ident">nonvoluntary_ctxt_switches</span> <span class="op">=</span> <span class="ident">status</span>.<span class="ident">nonvoluntary_ctxt_switches</span>;
                     <span class="kw">let</span> <span class="ident">nonvoluntary_total</span> <span class="op">=</span> <span class="ident">metrics</span>
                         .<span class="ident">nonvoluntary_ctxt_switches</span>
-                        .<span class="ident">get_metric_with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">name</span>, <span class="kw-2">&amp;</span><span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">tid</span>)])
+                        .<span class="ident">get_metric_with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span><span class="ident">name</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">tid</span>)])
                         .<span class="ident">unwrap</span>();
                     <span class="kw">let</span> <span class="ident">nonvoluntary_past</span> <span class="op">=</span> <span class="ident">nonvoluntary_total</span>.<span class="ident">get</span>();
                     <span class="kw">let</span> <span class="ident">nonvoluntary_delta</span> <span class="op">=</span> <span class="ident">nonvoluntary_ctxt_switches</span> <span class="kw">as</span> <span class="ident">i64</span> <span class="op">-</span> <span class="ident">nonvoluntary_past</span>;
@@ -936,12 +938,12 @@
 <span class="doccomment">/// Gets thread ids of the given process id.</span>
 <span class="doccomment">/// WARN: Don&#39;t call this function frequently. Otherwise there will be a lot of memory fragments.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_thread_ids</span>(<span class="ident">pid</span>: <span class="ident">pid_t</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">pid_t</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tids</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">i32</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">fs</span>::<span class="ident">read_dir</span>(<span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;/proc/{}/task&quot;</span>, <span class="ident">pid</span>))<span class="question-mark">?</span>
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tids</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">i32</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">fs::read_dir</span>(<span class="macro">format!</span>(<span class="string">&quot;/proc/{}/task&quot;</span>, <span class="ident">pid</span>))<span class="question-mark">?</span>
         .<span class="ident">filter_map</span>(<span class="op">|</span><span class="ident">task</span><span class="op">|</span> {
             <span class="kw">let</span> <span class="ident">file_name</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">task</span> {
                 <span class="prelude-val">Ok</span>(<span class="ident">t</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">t</span>.<span class="ident">file_name</span>(),
                 <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;read task failed&quot;</span>; <span class="string">&quot;pid&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">pid</span>, <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
+                    <span class="macro">error!</span>(<span class="string">&quot;read task failed&quot;</span>; <span class="string">&quot;pid&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">pid</span>, <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
                     <span class="kw">return</span> <span class="prelude-val">None</span>;
                 }
             };
@@ -950,12 +952,12 @@
                 <span class="prelude-val">Some</span>(<span class="ident">tid</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">match</span> <span class="ident">tid</span>.<span class="ident">parse</span>() {
                     <span class="prelude-val">Ok</span>(<span class="ident">tid</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Some</span>(<span class="ident">tid</span>),
                     <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                        <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;read task failed&quot;</span>; <span class="string">&quot;pid&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">pid</span>, <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
+                        <span class="macro">error!</span>(<span class="string">&quot;read task failed&quot;</span>; <span class="string">&quot;pid&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">pid</span>, <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
                         <span class="prelude-val">None</span>
                     }
                 },
                 <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="macro">error</span><span class="macro">!</span>(<span class="string">&quot;read task failed&quot;</span>; <span class="string">&quot;pid&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">pid</span>);
+                    <span class="macro">error!</span>(<span class="string">&quot;read task failed&quot;</span>; <span class="string">&quot;pid&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">pid</span>);
                     <span class="prelude-val">None</span>
                 }
             }
@@ -978,7 +980,7 @@
 <span class="doccomment">/// assert_eq!(sanitize_thread_name(1, &quot;@@@@&quot;), &quot;1&quot;);</span>
 <span class="doccomment">/// ```</span>
 <span class="kw">fn</span> <span class="ident">sanitize_thread_name</span>(<span class="ident">tid</span>: <span class="ident">pid_t</span>, <span class="ident">raw</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">String</span> {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">name</span> <span class="op">=</span> <span class="ident">String</span>::<span class="ident">with_capacity</span>(<span class="ident">raw</span>.<span class="ident">len</span>());
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">name</span> <span class="op">=</span> <span class="ident">String::with_capacity</span>(<span class="ident">raw</span>.<span class="ident">len</span>());
     <span class="comment">// sanitize thread name.</span>
     <span class="kw">for</span> <span class="ident">c</span> <span class="kw">in</span> <span class="ident">raw</span>.<span class="ident">chars</span>() {
         <span class="kw">match</span> <span class="ident">c</span> {
@@ -993,40 +995,40 @@
         }
     }
     <span class="kw">if</span> <span class="ident">name</span>.<span class="ident">is_empty</span>() {
-        <span class="ident">name</span> <span class="op">=</span> <span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">tid</span>)
+        <span class="ident">name</span> <span class="op">=</span> <span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">tid</span>)
     }
     <span class="ident">name</span>
 }
 
-<span class="kw">fn</span> <span class="ident">state_to_str</span>(<span class="ident">state</span>: <span class="kw-2">&amp;</span><span class="ident">pid</span>::<span class="ident">State</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">str</span> {
+<span class="kw">fn</span> <span class="ident">state_to_str</span>(<span class="ident">state</span>: <span class="kw-2">&amp;</span><span class="ident">pid::State</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">str</span> {
     <span class="kw">match</span> <span class="ident">state</span> {
-        <span class="ident">pid</span>::<span class="ident">State</span>::<span class="ident">Running</span> <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;R&quot;</span>,
-        <span class="ident">pid</span>::<span class="ident">State</span>::<span class="ident">Sleeping</span> <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;S&quot;</span>,
-        <span class="ident">pid</span>::<span class="ident">State</span>::<span class="ident">Waiting</span> <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;D&quot;</span>,
-        <span class="ident">pid</span>::<span class="ident">State</span>::<span class="ident">Zombie</span> <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;Z&quot;</span>,
-        <span class="ident">pid</span>::<span class="ident">State</span>::<span class="ident">Stopped</span> <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;T&quot;</span>,
-        <span class="ident">pid</span>::<span class="ident">State</span>::<span class="ident">TraceStopped</span> <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;t&quot;</span>,
-        <span class="ident">pid</span>::<span class="ident">State</span>::<span class="ident">Paging</span> <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;W&quot;</span>,
-        <span class="ident">pid</span>::<span class="ident">State</span>::<span class="ident">Dead</span> <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;X&quot;</span>,
-        <span class="ident">pid</span>::<span class="ident">State</span>::<span class="ident">Wakekill</span> <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;K&quot;</span>,
-        <span class="ident">pid</span>::<span class="ident">State</span>::<span class="ident">Waking</span> <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;W&quot;</span>,
-        <span class="ident">pid</span>::<span class="ident">State</span>::<span class="ident">Parked</span> <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;P&quot;</span>,
+        <span class="ident">pid::State::Running</span> <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;R&quot;</span>,
+        <span class="ident">pid::State::Sleeping</span> <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;S&quot;</span>,
+        <span class="ident">pid::State::Waiting</span> <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;D&quot;</span>,
+        <span class="ident">pid::State::Zombie</span> <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;Z&quot;</span>,
+        <span class="ident">pid::State::Stopped</span> <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;T&quot;</span>,
+        <span class="ident">pid::State::TraceStopped</span> <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;t&quot;</span>,
+        <span class="ident">pid::State::Paging</span> <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;W&quot;</span>,
+        <span class="ident">pid::State::Dead</span> <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;X&quot;</span>,
+        <span class="ident">pid::State::Wakekill</span> <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;K&quot;</span>,
+        <span class="ident">pid::State::Waking</span> <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;W&quot;</span>,
+        <span class="ident">pid::State::Parked</span> <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;P&quot;</span>,
     }
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">cpu_total</span>(<span class="ident">state</span>: <span class="kw-2">&amp;</span><span class="ident">pid</span>::<span class="ident">Stat</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">f64</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">cpu_total</span>(<span class="ident">state</span>: <span class="kw-2">&amp;</span><span class="ident">pid::Stat</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">f64</span> {
     (<span class="ident">state</span>.<span class="ident">utime</span> <span class="op">+</span> <span class="ident">state</span>.<span class="ident">stime</span>) <span class="kw">as</span> <span class="ident">f64</span> <span class="op">/</span> <span class="kw-2">*</span><span class="ident">CLK_TCK</span>
 }
 
 <span class="kw">fn</span> <span class="ident">to_io_err</span>(<span class="ident">s</span>: <span class="ident">String</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Error</span> {
-    <span class="ident">Error</span>::<span class="ident">new</span>(<span class="ident">ErrorKind</span>::<span class="ident">Other</span>, <span class="ident">s</span>)
+    <span class="ident">Error::new</span>(<span class="ident">ErrorKind::Other</span>, <span class="ident">s</span>)
 }
 
-<span class="macro">lazy_static</span><span class="macro">!</span> {
+<span class="macro">lazy_static!</span> {
     <span class="comment">// getconf CLK_TCK</span>
     <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">CLK_TCK</span>: <span class="ident">f64</span> <span class="op">=</span> {
         <span class="kw">unsafe</span> {
-            <span class="ident">libc</span>::<span class="ident">sysconf</span>(<span class="ident">libc</span>::<span class="ident">_SC_CLK_TCK</span>) <span class="kw">as</span> <span class="ident">f64</span>
+            <span class="ident">libc::sysconf</span>(<span class="ident">libc::_SC_CLK_TCK</span>) <span class="kw">as</span> <span class="ident">f64</span>
         }
     };
 }
@@ -1036,14 +1038,14 @@
     <span class="kw">if</span> <span class="op">!</span><span class="ident">command</span>.<span class="ident">is_empty</span>() {
         <span class="kw">return</span> <span class="ident">command</span>.<span class="ident">to_owned</span>();
     }
-    <span class="ident">String</span>::<span class="ident">from</span>(<span class="string">&quot;anony&quot;</span>)
+    <span class="ident">String::from</span>(<span class="string">&quot;anony&quot;</span>)
 }
 
 <span class="kw">fn</span> <span class="ident">collect_metrics_by_name</span>(
     <span class="ident">names</span>: <span class="kw-2">&amp;</span><span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">i32</span>, <span class="ident">String</span><span class="op">&gt;</span>,
     <span class="ident">values</span>: <span class="kw-2">&amp;</span><span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">i32</span>, <span class="ident">f64</span><span class="op">&gt;</span>,
 ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">u64</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_map</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">u64</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">HashMap</span>::<span class="ident">default</span>();
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_map</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">u64</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">HashMap::default</span>();
     <span class="kw">for</span> (<span class="ident">tid</span>, <span class="ident">name</span>) <span class="kw">in</span> <span class="ident">names</span> {
         <span class="kw">let</span> <span class="ident">new_value</span> <span class="op">=</span> <span class="ident">new_map</span>.<span class="ident">entry</span>(<span class="ident">name</span>.<span class="ident">to_string</span>()).<span class="ident">or_insert</span>(<span class="number">0</span>);
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">value</span>) <span class="op">=</span> <span class="ident">values</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">tid</span>) {
@@ -1098,15 +1100,15 @@
 
 <span class="kw">impl</span> <span class="ident">ThreadInfoStatistics</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="kw">let</span> <span class="ident">pid</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">libc</span>::<span class="ident">getpid</span>() };
+        <span class="kw">let</span> <span class="ident">pid</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">libc::getpid</span>() };
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">thread_stats</span> <span class="op">=</span> <span class="self">Self</span> {
             <span class="ident">pid</span>,
-            <span class="ident">last_instant</span>: <span class="ident">Instant</span>::<span class="ident">now</span>(),
-            <span class="ident">tid_names</span>: <span class="ident">HashMap</span>::<span class="ident">default</span>(),
-            <span class="ident">tid_retriever</span>: <span class="ident">TidRetriever</span>::<span class="ident">new</span>(<span class="ident">pid</span>),
-            <span class="ident">metrics_rate</span>: <span class="ident">ThreadMetrics</span>::<span class="ident">default</span>(),
-            <span class="ident">metrics_total</span>: <span class="ident">ThreadMetrics</span>::<span class="ident">default</span>(),
+            <span class="ident">last_instant</span>: <span class="ident">Instant::now</span>(),
+            <span class="ident">tid_names</span>: <span class="ident">HashMap::default</span>(),
+            <span class="ident">tid_retriever</span>: <span class="ident">TidRetriever::new</span>(<span class="ident">pid</span>),
+            <span class="ident">metrics_rate</span>: <span class="ident">ThreadMetrics::default</span>(),
+            <span class="ident">metrics_total</span>: <span class="ident">ThreadMetrics::default</span>(),
         };
 
         <span class="ident">thread_stats</span>.<span class="ident">record</span>();
@@ -1114,7 +1116,7 @@
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">record</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
-        <span class="kw">let</span> <span class="ident">current_instant</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now</span>();
+        <span class="kw">let</span> <span class="ident">current_instant</span> <span class="op">=</span> <span class="ident">Instant::now</span>();
         <span class="kw">let</span> <span class="ident">time_delta</span> <span class="op">=</span> (<span class="ident">current_instant</span> <span class="op">-</span> <span class="self">self</span>.<span class="ident">last_instant</span>).<span class="ident">as_millis</span>() <span class="kw">as</span> <span class="ident">f64</span> <span class="op">/</span> <span class="number">1000.0</span>;
         <span class="self">self</span>.<span class="ident">last_instant</span> <span class="op">=</span> <span class="ident">current_instant</span>;
         <span class="self">self</span>.<span class="ident">metrics_rate</span>.<span class="ident">clear</span>();
@@ -1124,7 +1126,7 @@
         <span class="kw">for</span> <span class="ident">tid</span> <span class="kw">in</span> <span class="ident">tids</span> {
             <span class="kw">let</span> <span class="ident">tid</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">tid</span>;
 
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">stat</span>) <span class="op">=</span> <span class="ident">pid</span>::<span class="ident">stat_task</span>(<span class="self">self</span>.<span class="ident">pid</span>, <span class="ident">tid</span>) {
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">stat</span>) <span class="op">=</span> <span class="ident">pid::stat_task</span>(<span class="self">self</span>.<span class="ident">pid</span>, <span class="ident">tid</span>) {
                 <span class="kw">let</span> <span class="ident">name</span> <span class="op">=</span> <span class="ident">get_name</span>(<span class="kw-2">&amp;</span><span class="ident">stat</span>.<span class="ident">command</span>);
                 <span class="self">self</span>.<span class="ident">tid_names</span>.<span class="ident">entry</span>(<span class="ident">tid</span>).<span class="ident">or_insert</span>(<span class="ident">name</span>);
 
@@ -1137,7 +1139,7 @@
                     <span class="ident">time_delta</span>,
                 );
 
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">io</span>) <span class="op">=</span> <span class="ident">pid</span>::<span class="ident">io_task</span>(<span class="self">self</span>.<span class="ident">pid</span>, <span class="ident">tid</span>) {
+                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">io</span>) <span class="op">=</span> <span class="ident">pid::io_task</span>(<span class="self">self</span>.<span class="ident">pid</span>, <span class="ident">tid</span>) {
                     <span class="comment">// Threads IO.</span>
                     <span class="kw">let</span> <span class="ident">read_bytes</span> <span class="op">=</span> <span class="ident">io</span>.<span class="ident">read_bytes</span>;
                     <span class="kw">let</span> <span class="ident">write_bytes</span> <span class="op">=</span> <span class="ident">io</span>.<span class="ident">write_bytes</span>;
@@ -1175,8 +1177,8 @@
     }
 }
 
-<span class="kw">const</span> <span class="ident">TID_MIN_UPDATE_INTERVAL</span>: <span class="ident">Duration</span> <span class="op">=</span> <span class="ident">Duration</span>::<span class="ident">from_secs</span>(<span class="number">15</span>);
-<span class="kw">const</span> <span class="ident">TID_MAX_UPDATE_INTERVAL</span>: <span class="ident">Duration</span> <span class="op">=</span> <span class="ident">Duration</span>::<span class="ident">from_secs</span>(<span class="number">10</span> <span class="op">*</span> <span class="number">60</span>);
+<span class="kw">const</span> <span class="ident">TID_MIN_UPDATE_INTERVAL</span>: <span class="ident">Duration</span> <span class="op">=</span> <span class="ident">Duration::from_secs</span>(<span class="number">15</span>);
+<span class="kw">const</span> <span class="ident">TID_MAX_UPDATE_INTERVAL</span>: <span class="ident">Duration</span> <span class="op">=</span> <span class="ident">Duration::from_secs</span>(<span class="number">10</span> <span class="op">*</span> <span class="number">60</span>);
 
 <span class="doccomment">/// A helper that buffers the thread id list internally.</span>
 <span class="kw">struct</span> <span class="ident">TidRetriever</span> {
@@ -1191,7 +1193,7 @@
         <span class="self">Self</span> {
             <span class="ident">pid</span>,
             <span class="ident">tid_buffer</span>: <span class="ident">get_thread_ids</span>(<span class="ident">pid</span>).<span class="ident">unwrap</span>(),
-            <span class="ident">tid_buffer_last_update</span>: <span class="ident">Instant</span>::<span class="ident">now</span>(),
+            <span class="ident">tid_buffer_last_update</span>: <span class="ident">Instant::now</span>(),
             <span class="ident">tid_buffer_update_interval</span>: <span class="ident">TID_MIN_UPDATE_INTERVAL</span>,
         }
     }
@@ -1210,7 +1212,7 @@
                 <span class="self">self</span>.<span class="ident">tid_buffer</span> <span class="op">=</span> <span class="ident">new_tid_buffer</span>;
                 <span class="self">self</span>.<span class="ident">tid_buffer_update_interval</span> <span class="op">=</span> <span class="ident">TID_MIN_UPDATE_INTERVAL</span>;
             }
-            <span class="self">self</span>.<span class="ident">tid_buffer_last_update</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now</span>();
+            <span class="self">self</span>.<span class="ident">tid_buffer_last_update</span> <span class="op">=</span> <span class="ident">Instant::now</span>();
         }
 
         <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">tid_buffer</span>
@@ -1219,9 +1221,9 @@
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
 <span class="kw">mod</span> <span class="ident">tests</span> {
-    <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">env</span>::<span class="ident">temp_dir</span>;
-    <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::<span class="ident">Write</span>;
-    <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">time</span>::<span class="ident">Duration</span>;
+    <span class="kw">use</span> <span class="ident">std::env::temp_dir</span>;
+    <span class="kw">use</span> <span class="ident">std::io::Write</span>;
+    <span class="kw">use</span> <span class="ident">std::time::Duration</span>;
     <span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">fs</span>, <span class="ident">sync</span>, <span class="ident">thread</span>};
 
     <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
@@ -1229,34 +1231,34 @@
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_thread_stat_io</span>() {
         <span class="kw">let</span> <span class="ident">name</span> <span class="op">=</span> <span class="string">&quot;testthreadio&quot;</span>;
-        <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">sync</span>::<span class="ident">mpsc</span>::<span class="ident">channel</span>();
-        <span class="kw">let</span> (<span class="ident">tx1</span>, <span class="ident">rx1</span>) <span class="op">=</span> <span class="ident">sync</span>::<span class="ident">mpsc</span>::<span class="ident">channel</span>();
-        <span class="kw">let</span> <span class="ident">h</span> <span class="op">=</span> <span class="ident">thread</span>::<span class="ident">Builder</span>::<span class="ident">new</span>()
+        <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">sync::mpsc::channel</span>();
+        <span class="kw">let</span> (<span class="ident">tx1</span>, <span class="ident">rx1</span>) <span class="op">=</span> <span class="ident">sync::mpsc::channel</span>();
+        <span class="kw">let</span> <span class="ident">h</span> <span class="op">=</span> <span class="ident">thread::Builder::new</span>()
             .<span class="ident">name</span>(<span class="ident">name</span>.<span class="ident">to_owned</span>())
             .<span class="ident">spawn</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
                 <span class="comment">// Make `io::write_bytes` &gt; 0</span>
                 <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tmp</span> <span class="op">=</span> <span class="ident">temp_dir</span>();
                 <span class="ident">tmp</span>.<span class="ident">push</span>(<span class="ident">name</span>);
                 <span class="ident">tmp</span>.<span class="ident">set_extension</span>(<span class="string">&quot;txt&quot;</span>);
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">f</span> <span class="op">=</span> <span class="ident">fs</span>::<span class="ident">File</span>::<span class="ident">create</span>(<span class="ident">tmp</span>.<span class="ident">as_path</span>()).<span class="ident">unwrap</span>();
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">f</span> <span class="op">=</span> <span class="ident">fs::File::create</span>(<span class="ident">tmp</span>.<span class="ident">as_path</span>()).<span class="ident">unwrap</span>();
                 <span class="ident">f</span>.<span class="ident">write_all</span>(<span class="ident">name</span>.<span class="ident">as_bytes</span>()).<span class="ident">unwrap</span>();
                 <span class="ident">f</span>.<span class="ident">sync_all</span>().<span class="ident">unwrap</span>();
-                <span class="ident">std</span>::<span class="ident">thread</span>::<span class="ident">sleep</span>(<span class="ident">Duration</span>::<span class="ident">from_secs</span>(<span class="number">1</span>));
+                <span class="ident">std::thread::sleep</span>(<span class="ident">Duration::from_secs</span>(<span class="number">1</span>));
                 <span class="ident">tx1</span>.<span class="ident">send</span>(()).<span class="ident">unwrap</span>();
                 <span class="ident">rx</span>.<span class="ident">recv</span>().<span class="ident">unwrap</span>();
-                <span class="ident">fs</span>::<span class="ident">remove_file</span>(<span class="ident">tmp</span>).<span class="ident">unwrap</span>();
+                <span class="ident">fs::remove_file</span>(<span class="ident">tmp</span>).<span class="ident">unwrap</span>();
             })
             .<span class="ident">unwrap</span>();
         <span class="ident">rx1</span>.<span class="ident">recv</span>().<span class="ident">unwrap</span>();
 
-        <span class="kw">let</span> <span class="ident">page_size</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">libc</span>::<span class="ident">sysconf</span>(<span class="ident">libc</span>::<span class="ident">_SC_PAGE_SIZE</span>) <span class="kw">as</span> <span class="ident">usize</span> };
-        <span class="kw">let</span> <span class="ident">pid</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">libc</span>::<span class="ident">getpid</span>() };
+        <span class="kw">let</span> <span class="ident">page_size</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">libc::sysconf</span>(<span class="ident">libc::_SC_PAGE_SIZE</span>) <span class="kw">as</span> <span class="ident">usize</span> };
+        <span class="kw">let</span> <span class="ident">pid</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">libc::getpid</span>() };
         <span class="kw">let</span> <span class="ident">tids</span> <span class="op">=</span> <span class="ident">get_thread_ids</span>(<span class="ident">pid</span>).<span class="ident">unwrap</span>();
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">tids</span>.<span class="ident">len</span>() <span class="op">&gt;</span><span class="op">=</span> <span class="number">2</span>);
+        <span class="macro">assert!</span>(<span class="ident">tids</span>.<span class="ident">len</span>() <span class="op">&gt;</span><span class="op">=</span> <span class="number">2</span>);
 
         <span class="ident">tids</span>.<span class="ident">iter</span>()
             .<span class="ident">find</span>(<span class="op">|</span><span class="ident">t</span><span class="op">|</span> {
-                <span class="ident">pid</span>::<span class="ident">stat_task</span>(<span class="ident">pid</span>, <span class="kw-2">*</span><span class="kw-2">*</span><span class="ident">t</span>)
+                <span class="ident">pid::stat_task</span>(<span class="ident">pid</span>, <span class="kw-2">*</span><span class="kw-2">*</span><span class="ident">t</span>)
                     .<span class="ident">map</span>(<span class="op">|</span><span class="ident">stat</span><span class="op">|</span> <span class="ident">stat</span>.<span class="ident">command</span> <span class="op">=</span><span class="op">=</span> <span class="ident">name</span>)
                     .<span class="ident">unwrap_or</span>(<span class="bool-val">false</span>)
             })
@@ -1264,7 +1266,7 @@
 
         <span class="ident">tids</span>.<span class="ident">iter</span>()
             .<span class="ident">find</span>(<span class="op">|</span><span class="ident">t</span><span class="op">|</span> {
-                <span class="ident">pid</span>::<span class="ident">io_task</span>(<span class="ident">pid</span>, <span class="kw-2">*</span><span class="kw-2">*</span><span class="ident">t</span>)
+                <span class="ident">pid::io_task</span>(<span class="ident">pid</span>, <span class="kw-2">*</span><span class="kw-2">*</span><span class="ident">t</span>)
                     .<span class="ident">map</span>(<span class="op">|</span><span class="ident">io</span><span class="op">|</span> <span class="ident">io</span>.<span class="ident">write_bytes</span> <span class="op">=</span><span class="op">=</span> <span class="ident">page_size</span>)
                     .<span class="ident">unwrap_or</span>(<span class="bool-val">false</span>)
             })
@@ -1277,10 +1279,10 @@
     <span class="kw">fn</span> <span class="ident">write_two_string</span>(
         <span class="ident">str1</span>: <span class="ident">String</span>,
         <span class="ident">str2</span>: <span class="ident">String</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> (<span class="ident">sync</span>::<span class="ident">mpsc</span>::<span class="ident">Sender</span><span class="op">&lt;</span>()<span class="op">&gt;</span>, <span class="ident">sync</span>::<span class="ident">mpsc</span>::<span class="ident">Receiver</span><span class="op">&lt;</span>()<span class="op">&gt;</span>) {
-        <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">sync</span>::<span class="ident">mpsc</span>::<span class="ident">channel</span>();
-        <span class="kw">let</span> (<span class="ident">tx1</span>, <span class="ident">rx1</span>) <span class="op">=</span> <span class="ident">sync</span>::<span class="ident">mpsc</span>::<span class="ident">channel</span>();
-        <span class="ident">thread</span>::<span class="ident">Builder</span>::<span class="ident">new</span>()
+    ) <span class="op">-</span><span class="op">&gt;</span> (<span class="ident">sync::mpsc::Sender</span><span class="op">&lt;</span>()<span class="op">&gt;</span>, <span class="ident">sync::mpsc::Receiver</span><span class="op">&lt;</span>()<span class="op">&gt;</span>) {
+        <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">sync::mpsc::channel</span>();
+        <span class="kw">let</span> (<span class="ident">tx1</span>, <span class="ident">rx1</span>) <span class="op">=</span> <span class="ident">sync::mpsc::channel</span>();
+        <span class="ident">thread::Builder::new</span>()
             .<span class="ident">name</span>(<span class="ident">str1</span>.<span class="ident">to_owned</span>())
             .<span class="ident">spawn</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
                 <span class="ident">tx1</span>.<span class="ident">send</span>(()).<span class="ident">unwrap</span>();
@@ -1289,20 +1291,20 @@
                 <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tmp</span> <span class="op">=</span> <span class="ident">temp_dir</span>();
                 <span class="ident">tmp</span>.<span class="ident">push</span>(<span class="ident">str1</span>.<span class="ident">clone</span>());
                 <span class="ident">tmp</span>.<span class="ident">set_extension</span>(<span class="string">&quot;txt&quot;</span>);
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">f</span> <span class="op">=</span> <span class="ident">fs</span>::<span class="ident">File</span>::<span class="ident">create</span>(<span class="ident">tmp</span>.<span class="ident">as_path</span>()).<span class="ident">unwrap</span>();
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">f</span> <span class="op">=</span> <span class="ident">fs::File::create</span>(<span class="ident">tmp</span>.<span class="ident">as_path</span>()).<span class="ident">unwrap</span>();
                 <span class="ident">f</span>.<span class="ident">write_all</span>(<span class="ident">str1</span>.<span class="ident">as_bytes</span>()).<span class="ident">unwrap</span>();
                 <span class="ident">f</span>.<span class="ident">sync_all</span>().<span class="ident">unwrap</span>();
-                <span class="ident">std</span>::<span class="ident">thread</span>::<span class="ident">sleep</span>(<span class="ident">Duration</span>::<span class="ident">from_secs</span>(<span class="number">1</span>));
+                <span class="ident">std::thread::sleep</span>(<span class="ident">Duration::from_secs</span>(<span class="number">1</span>));
                 <span class="ident">tx1</span>.<span class="ident">send</span>(()).<span class="ident">unwrap</span>();
                 <span class="ident">rx</span>.<span class="ident">recv</span>().<span class="ident">unwrap</span>();
 
                 <span class="ident">f</span>.<span class="ident">write_all</span>(<span class="ident">str2</span>.<span class="ident">as_bytes</span>()).<span class="ident">unwrap</span>();
                 <span class="ident">f</span>.<span class="ident">sync_all</span>().<span class="ident">unwrap</span>();
-                <span class="ident">std</span>::<span class="ident">thread</span>::<span class="ident">sleep</span>(<span class="ident">Duration</span>::<span class="ident">from_secs</span>(<span class="number">1</span>));
+                <span class="ident">std::thread::sleep</span>(<span class="ident">Duration::from_secs</span>(<span class="number">1</span>));
                 <span class="ident">tx1</span>.<span class="ident">send</span>(()).<span class="ident">unwrap</span>();
                 <span class="ident">rx</span>.<span class="ident">recv</span>().<span class="ident">unwrap</span>();
 
-                <span class="ident">fs</span>::<span class="ident">remove_file</span>(<span class="ident">tmp</span>).<span class="ident">unwrap</span>();
+                <span class="ident">fs::remove_file</span>(<span class="ident">tmp</span>).<span class="ident">unwrap</span>();
                 <span class="ident">tx1</span>.<span class="ident">send</span>(()).<span class="ident">unwrap</span>();
             })
             .<span class="ident">unwrap</span>();
@@ -1319,13 +1321,13 @@
         <span class="comment">// Wait for thread creation</span>
         <span class="ident">rx1</span>.<span class="ident">recv</span>().<span class="ident">unwrap</span>();
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">thread_info</span> <span class="op">=</span> <span class="ident">ThreadInfoStatistics</span>::<span class="ident">new</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">thread_info</span> <span class="op">=</span> <span class="ident">ThreadInfoStatistics::new</span>();
 
-        <span class="kw">let</span> <span class="ident">page_size</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">libc</span>::<span class="ident">sysconf</span>(<span class="ident">libc</span>::<span class="ident">_SC_PAGE_SIZE</span>) <span class="kw">as</span> <span class="ident">u64</span> };
-        <span class="kw">let</span> <span class="ident">pid</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">libc</span>::<span class="ident">getpid</span>() };
+        <span class="kw">let</span> <span class="ident">page_size</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">libc::sysconf</span>(<span class="ident">libc::_SC_PAGE_SIZE</span>) <span class="kw">as</span> <span class="ident">u64</span> };
+        <span class="kw">let</span> <span class="ident">pid</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">libc::getpid</span>() };
         <span class="kw">let</span> <span class="ident">tids</span> <span class="op">=</span> <span class="ident">get_thread_ids</span>(<span class="ident">pid</span>).<span class="ident">unwrap</span>();
         <span class="kw">for</span> <span class="ident">tid</span> <span class="kw">in</span> <span class="ident">tids</span> {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">stat</span>) <span class="op">=</span> <span class="ident">pid</span>::<span class="ident">stat_task</span>(<span class="ident">pid</span>, <span class="ident">tid</span>) {
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">stat</span>) <span class="op">=</span> <span class="ident">pid::stat_task</span>(<span class="ident">pid</span>, <span class="ident">tid</span>) {
                 <span class="kw">if</span> <span class="ident">stat</span>.<span class="ident">command</span>.<span class="ident">starts_with</span>(<span class="ident">s1</span>) {
                     <span class="ident">rx1</span>.<span class="ident">recv</span>().<span class="ident">unwrap</span>();
                     <span class="ident">thread_info</span>.<span class="ident">record</span>();
@@ -1335,7 +1337,7 @@
                             .<span class="ident">write_ios</span>
                             .<span class="ident">entry</span>(<span class="ident">tid</span>)
                             .<span class="ident">or_insert</span>(<span class="number">0.0</span>);
-                        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="kw-2">*</span><span class="ident">write_io</span> <span class="kw">as</span> <span class="ident">u64</span>, <span class="ident">page_size</span>);
+                        <span class="macro">assert_eq!</span>(<span class="kw-2">*</span><span class="ident">write_io</span> <span class="kw">as</span> <span class="ident">u64</span>, <span class="ident">page_size</span>);
                     }
 
                     <span class="ident">tx</span>.<span class="ident">send</span>(()).<span class="ident">unwrap</span>();
@@ -1348,7 +1350,7 @@
                             .<span class="ident">write_ios</span>
                             .<span class="ident">entry</span>(<span class="ident">tid</span>)
                             .<span class="ident">or_insert</span>(<span class="number">0.0</span>);
-                        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="kw-2">*</span><span class="ident">write_io</span> <span class="kw">as</span> <span class="ident">u64</span>, <span class="ident">page_size</span> <span class="op">*</span> <span class="number">2</span>);
+                        <span class="macro">assert_eq!</span>(<span class="kw-2">*</span><span class="ident">write_io</span> <span class="kw">as</span> <span class="ident">u64</span>, <span class="ident">page_size</span> <span class="op">*</span> <span class="number">2</span>);
                     }
 
                     <span class="ident">tx</span>.<span class="ident">send</span>(()).<span class="ident">unwrap</span>();
@@ -1357,23 +1359,23 @@
                 }
             }
         }
-        <span class="macro">panic</span><span class="macro">!</span>();
+        <span class="macro">panic!</span>();
     }
 
     <span class="kw">fn</span> <span class="ident">high_cpu_thread</span>(
         <span class="ident">name</span>: <span class="ident">String</span>,
         <span class="ident">duration_ms</span>: <span class="ident">u32</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> (<span class="ident">sync</span>::<span class="ident">mpsc</span>::<span class="ident">Sender</span><span class="op">&lt;</span>()<span class="op">&gt;</span>, <span class="ident">sync</span>::<span class="ident">mpsc</span>::<span class="ident">Receiver</span><span class="op">&lt;</span>()<span class="op">&gt;</span>) {
-        <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">sync</span>::<span class="ident">mpsc</span>::<span class="ident">channel</span>();
-        <span class="kw">let</span> (<span class="ident">tx1</span>, <span class="ident">rx1</span>) <span class="op">=</span> <span class="ident">sync</span>::<span class="ident">mpsc</span>::<span class="ident">channel</span>();
-        <span class="ident">thread</span>::<span class="ident">Builder</span>::<span class="ident">new</span>()
+    ) <span class="op">-</span><span class="op">&gt;</span> (<span class="ident">sync::mpsc::Sender</span><span class="op">&lt;</span>()<span class="op">&gt;</span>, <span class="ident">sync::mpsc::Receiver</span><span class="op">&lt;</span>()<span class="op">&gt;</span>) {
+        <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">sync::mpsc::channel</span>();
+        <span class="kw">let</span> (<span class="ident">tx1</span>, <span class="ident">rx1</span>) <span class="op">=</span> <span class="ident">sync::mpsc::channel</span>();
+        <span class="ident">thread::Builder::new</span>()
             .<span class="ident">name</span>(<span class="ident">name</span>)
             .<span class="ident">spawn</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
                 <span class="ident">tx1</span>.<span class="ident">send</span>(()).<span class="ident">unwrap</span>();
 
-                <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">Instant</span>::<span class="ident">now</span>();
+                <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">Instant::now</span>();
                 <span class="kw">loop</span> {
-                    <span class="kw">if</span> (<span class="ident">Instant</span>::<span class="ident">now</span>() <span class="op">-</span> <span class="ident">start</span>).<span class="ident">as_millis</span>() <span class="op">&gt;</span> <span class="ident">duration_ms</span>.<span class="ident">into</span>() {
+                    <span class="kw">if</span> (<span class="ident">Instant::now</span>() <span class="op">-</span> <span class="ident">start</span>).<span class="ident">as_millis</span>() <span class="op">&gt;</span> <span class="ident">duration_ms</span>.<span class="ident">into</span>() {
                         <span class="kw">break</span>;
                     }
                 }
@@ -1394,21 +1396,21 @@
         <span class="comment">// Wait for thread creation</span>
         <span class="ident">rx</span>.<span class="ident">recv</span>().<span class="ident">unwrap</span>();
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">thread_info</span> <span class="op">=</span> <span class="ident">ThreadInfoStatistics</span>::<span class="ident">new</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">thread_info</span> <span class="op">=</span> <span class="ident">ThreadInfoStatistics::new</span>();
 
-        <span class="kw">let</span> <span class="ident">pid</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">libc</span>::<span class="ident">getpid</span>() };
+        <span class="kw">let</span> <span class="ident">pid</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">libc::getpid</span>() };
         <span class="kw">let</span> <span class="ident">tids</span> <span class="op">=</span> <span class="ident">get_thread_ids</span>(<span class="ident">pid</span>).<span class="ident">unwrap</span>();
         <span class="kw">for</span> <span class="ident">tid</span> <span class="kw">in</span> <span class="ident">tids</span> {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">stat</span>) <span class="op">=</span> <span class="ident">pid</span>::<span class="ident">stat_task</span>(<span class="ident">pid</span>, <span class="ident">tid</span>) {
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">stat</span>) <span class="op">=</span> <span class="ident">pid::stat_task</span>(<span class="ident">pid</span>, <span class="ident">tid</span>) {
                 <span class="kw">if</span> <span class="ident">stat</span>.<span class="ident">command</span>.<span class="ident">starts_with</span>(<span class="ident">tn</span>) {
                     <span class="ident">rx</span>.<span class="ident">recv</span>().<span class="ident">unwrap</span>();
                     <span class="ident">thread_info</span>.<span class="ident">record</span>();
 
                     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cpu_usages</span> <span class="op">=</span> <span class="ident">thread_info</span>.<span class="ident">get_cpu_usages</span>();
                     <span class="kw">let</span> <span class="ident">cpu_usage</span> <span class="op">=</span> <span class="ident">cpu_usages</span>.<span class="ident">entry</span>(<span class="ident">stat</span>.<span class="ident">command</span>).<span class="ident">or_insert</span>(<span class="number">0</span>);
-                    <span class="macro">assert</span><span class="macro">!</span>(<span class="kw-2">*</span><span class="ident">cpu_usage</span> <span class="op">&lt;</span> <span class="number">110</span>); <span class="comment">// Consider the error of statistics</span>
+                    <span class="macro">assert!</span>(<span class="kw-2">*</span><span class="ident">cpu_usage</span> <span class="op">&lt;</span> <span class="number">110</span>); <span class="comment">// Consider the error of statistics</span>
                     <span class="kw">if</span> <span class="kw-2">*</span><span class="ident">cpu_usage</span> <span class="op">&lt;</span> <span class="number">80</span> {
-                        <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;the load must be heavy than 0.8, but got {}&quot;</span>, <span class="kw-2">*</span><span class="ident">cpu_usage</span>);
+                        <span class="macro">panic!</span>(<span class="string">&quot;the load must be heavy than 0.8, but got {}&quot;</span>, <span class="kw-2">*</span><span class="ident">cpu_usage</span>);
                     }
 
                     <span class="ident">tx</span>.<span class="ident">send</span>(()).<span class="ident">unwrap</span>();
@@ -1416,7 +1418,7 @@
                 }
             }
         }
-        <span class="macro">panic</span><span class="macro">!</span>();
+        <span class="macro">panic!</span>();
     }
 
     <span class="kw">fn</span> <span class="ident">get_thread_name</span>(<span class="ident">stat</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">usize</span>)<span class="op">&gt;</span> {
@@ -1426,7 +1428,7 @@
             <span class="kw">return</span> <span class="prelude-val">Ok</span>((<span class="kw-2">&amp;</span><span class="ident">stat</span>[<span class="ident">start</span> <span class="op">+</span> <span class="number">1</span>..<span class="ident">end</span>], <span class="ident">end</span>));
         }
 
-        <span class="prelude-val">Err</span>(<span class="ident">to_io_err</span>(<span class="macro">format</span><span class="macro">!</span>(
+        <span class="prelude-val">Err</span>(<span class="ident">to_io_err</span>(<span class="macro">format!</span>(
             <span class="string">&quot;can not find thread name, stat: {}&quot;</span>,
             <span class="ident">stat</span>
         )))
@@ -1446,24 +1448,24 @@
         <span class="kw">for</span> <span class="kw-2">&amp;</span>(<span class="ident">i</span>, <span class="ident">o</span>, <span class="ident">idx</span>) <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">cases</span> {
             <span class="kw">let</span> (<span class="ident">raw_name</span>, <span class="ident">end</span>) <span class="op">=</span> <span class="ident">get_thread_name</span>(<span class="ident">i</span>).<span class="ident">unwrap</span>();
             <span class="kw">let</span> <span class="ident">name</span> <span class="op">=</span> <span class="ident">sanitize_thread_name</span>(<span class="number">1</span>, <span class="ident">raw_name</span>);
-            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">name</span>, <span class="ident">o</span>);
-            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">end</span>, <span class="ident">idx</span>);
+            <span class="macro">assert_eq!</span>(<span class="ident">name</span>, <span class="ident">o</span>);
+            <span class="macro">assert_eq!</span>(<span class="ident">end</span>, <span class="ident">idx</span>);
         }
 
         <span class="kw">let</span> (<span class="ident">raw_name</span>, <span class="kw">_</span>) <span class="op">=</span> <span class="ident">get_thread_name</span>(<span class="string">&quot;(@#)&quot;</span>).<span class="ident">unwrap</span>();
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">sanitize_thread_name</span>(<span class="number">1</span>, <span class="ident">raw_name</span>), <span class="string">&quot;1&quot;</span>);
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">get_thread_name</span>(<span class="string">&quot;invalid_stat&quot;</span>).<span class="ident">is_err</span>());
+        <span class="macro">assert_eq!</span>(<span class="ident">sanitize_thread_name</span>(<span class="number">1</span>, <span class="ident">raw_name</span>), <span class="string">&quot;1&quot;</span>);
+        <span class="macro">assert!</span>(<span class="ident">get_thread_name</span>(<span class="string">&quot;invalid_stat&quot;</span>).<span class="ident">is_err</span>());
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_smoke</span>() {
-        <span class="kw">let</span> <span class="ident">pid</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">libc</span>::<span class="ident">getpid</span>() };
-        <span class="kw">let</span> <span class="ident">tc</span> <span class="op">=</span> <span class="ident">ThreadsCollector</span>::<span class="ident">new</span>(<span class="ident">pid</span>, <span class="string">&quot;smoke&quot;</span>);
+        <span class="kw">let</span> <span class="ident">pid</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">libc::getpid</span>() };
+        <span class="kw">let</span> <span class="ident">tc</span> <span class="op">=</span> <span class="ident">ThreadsCollector::new</span>(<span class="ident">pid</span>, <span class="string">&quot;smoke&quot;</span>);
         <span class="ident">tc</span>.<span class="ident">collect</span>();
         <span class="ident">tc</span>.<span class="ident">desc</span>();
         <span class="ident">monitor_threads</span>(<span class="string">&quot;smoke&quot;</span>).<span class="ident">unwrap</span>();
     }
 }
 </pre></div>
-</section><section id="search" class="content hidden"></section><section class="footer"></section><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="tikv_util"></div>
-    <script src="../../../main.js"></script><script src="../../../source-script.js"></script><script src="../../../source-files.js"></script><script defer src="../../../search-index.js"></script></body></html>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="tikv_util" data-search-js="../../../search-index.js"></div>
+    <script src="../../../main.js"></script><script src="../../../source-script.js"></script><script src="../../../source-files.js"></script></body></html>

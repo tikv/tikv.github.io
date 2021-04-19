@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["MvccCheckTxnStatusCounterVec",""]]});
+initSidebarItems({"struct":[["MvccConflictCounterVec",""]]});

@@ -1,7 +1,7 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `components/tidb_query_executors/src/simple_aggr_executor.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>simple_aggr_executor.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `components/tidb_query_executors/src/simple_aggr_executor.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>simple_aggr_executor.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><script src="../../crates.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
 <link rel="alternate icon" type="image/png" href="../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../tidb_query_executors/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
-                <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../tidb_query_executors/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
+                <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
 <span id="2">  2</span>
 <span id="3">  3</span>
 <span id="4">  4</span>
@@ -666,27 +666,27 @@
 <span class="doccomment">//! Simple aggregation is an aggregation that do not have `GROUP BY`s. It is more even more simpler</span>
 <span class="doccomment">//! than stream aggregation.</span>
 
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">Arc</span>;
+<span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
 
-<span class="kw">use</span> <span class="ident">tipb</span>::<span class="ident">Aggregation</span>;
+<span class="kw">use</span> <span class="ident">tipb::Aggregation</span>;
 <span class="kw">use</span> <span class="ident">tipb</span>::{<span class="ident">Expr</span>, <span class="ident">FieldType</span>};
 
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">interface</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">aggr_executor</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::interface</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::aggr_executor</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">tidb_query_aggr</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident">tidb_query_common</span>::<span class="ident">storage</span>::<span class="ident">IntervalRange</span>;
-<span class="kw">use</span> <span class="ident">tidb_query_common</span>::<span class="prelude-ty">Result</span>;
-<span class="kw">use</span> <span class="ident">tidb_query_datatype</span>::<span class="ident">codec</span>::<span class="ident">batch</span>::{<span class="ident">LazyBatchColumn</span>, <span class="ident">LazyBatchColumnVec</span>};
-<span class="kw">use</span> <span class="ident">tidb_query_datatype</span>::<span class="ident">codec</span>::<span class="ident">data_type</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident">tidb_query_datatype</span>::<span class="ident">expr</span>::<span class="ident">EvalConfig</span>;
-<span class="kw">use</span> <span class="ident">tidb_query_expr</span>::<span class="ident">RpnStackNode</span>;
+<span class="kw">use</span> <span class="ident">tidb_query_common::storage::IntervalRange</span>;
+<span class="kw">use</span> <span class="ident">tidb_query_common::Result</span>;
+<span class="kw">use</span> <span class="ident">tidb_query_datatype::codec::batch</span>::{<span class="ident">LazyBatchColumn</span>, <span class="ident">LazyBatchColumnVec</span>};
+<span class="kw">use</span> <span class="ident">tidb_query_datatype::codec::data_type</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident">tidb_query_datatype::expr::EvalConfig</span>;
+<span class="kw">use</span> <span class="ident">tidb_query_expr::RpnStackNode</span>;
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">BatchSimpleAggregationExecutor</span><span class="op">&lt;</span><span class="ident">Src</span>: <span class="ident">BatchExecutor</span><span class="op">&gt;</span>(
     <span class="ident">AggregationExecutor</span><span class="op">&lt;</span><span class="ident">Src</span>, <span class="ident">SimpleAggregationImpl</span><span class="op">&gt;</span>,
 );
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">Src</span>: <span class="ident">BatchExecutor</span><span class="op">&gt;</span> <span class="ident">BatchExecutor</span> <span class="kw">for</span> <span class="ident">BatchSimpleAggregationExecutor</span><span class="op">&lt;</span><span class="ident">Src</span><span class="op">&gt;</span> {
-    <span class="kw">type</span> <span class="ident">StorageStats</span> <span class="op">=</span> <span class="ident">Src</span>::<span class="ident">StorageStats</span>;
+    <span class="kw">type</span> <span class="ident">StorageStats</span> <span class="op">=</span> <span class="ident">Src::StorageStats</span>;
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">fn</span> <span class="ident">schema</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span>[<span class="ident">FieldType</span>] {
@@ -704,7 +704,7 @@
     }
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">collect_storage_stats</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">dest</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">Self</span>::<span class="ident">StorageStats</span>) {
+    <span class="kw">fn</span> <span class="ident">collect_storage_stats</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">dest</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">Self</span><span class="ident">::StorageStats</span>) {
         <span class="self">self</span>.<span class="number">0</span>.<span class="ident">collect_storage_stats</span>(<span class="ident">dest</span>);
     }
 
@@ -725,10 +725,10 @@
     <span class="doccomment">/// Checks whether this executor can be used.</span>
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">check_supported</span>(<span class="ident">descriptor</span>: <span class="kw-2">&amp;</span><span class="ident">Aggregation</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">descriptor</span>.<span class="ident">get_group_by</span>().<span class="ident">len</span>(), <span class="number">0</span>);
+        <span class="macro">assert_eq!</span>(<span class="ident">descriptor</span>.<span class="ident">get_group_by</span>().<span class="ident">len</span>(), <span class="number">0</span>);
         <span class="kw">let</span> <span class="ident">aggr_definitions</span> <span class="op">=</span> <span class="ident">descriptor</span>.<span class="ident">get_agg_func</span>();
         <span class="kw">if</span> <span class="ident">aggr_definitions</span>.<span class="ident">is_empty</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">other_err</span><span class="macro">!</span>(<span class="string">&quot;Aggregation expression is empty&quot;</span>));
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">other_err!</span>(<span class="string">&quot;Aggregation expression is empty&quot;</span>));
         }
 
         <span class="kw">for</span> <span class="ident">def</span> <span class="kw">in</span> <span class="ident">aggr_definitions</span> {
@@ -745,8 +745,8 @@
         <span class="ident">aggr_defs</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Expr</span><span class="op">&gt;</span>,
         <span class="ident">aggr_def_parser</span>: <span class="kw">impl</span> <span class="ident">AggrDefinitionParser</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="self">Self</span>::<span class="ident">new_impl</span>(
-            <span class="ident">Arc</span>::<span class="ident">new</span>(<span class="ident">EvalConfig</span>::<span class="ident">default</span>()),
+        <span class="self">Self</span><span class="ident">::new_impl</span>(
+            <span class="ident">Arc::new</span>(<span class="ident">EvalConfig::default</span>()),
             <span class="ident">src</span>,
             <span class="ident">aggr_defs</span>,
             <span class="ident">aggr_def_parser</span>,
@@ -755,7 +755,7 @@
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">config</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">EvalConfig</span><span class="op">&gt;</span>, <span class="ident">src</span>: <span class="ident">Src</span>, <span class="ident">aggr_defs</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Expr</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
-        <span class="self">Self</span>::<span class="ident">new_impl</span>(<span class="ident">config</span>, <span class="ident">src</span>, <span class="ident">aggr_defs</span>, <span class="ident">AllAggrDefinitionParser</span>)
+        <span class="self">Self</span><span class="ident">::new_impl</span>(<span class="ident">config</span>, <span class="ident">src</span>, <span class="ident">aggr_defs</span>, <span class="ident">AllAggrDefinitionParser</span>)
     }
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
@@ -767,9 +767,9 @@
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
         <span class="comment">// Empty states is fine because it will be re-initialized later according to the content</span>
         <span class="comment">// in entities.</span>
-        <span class="kw">let</span> <span class="ident">aggr_impl</span> <span class="op">=</span> <span class="ident">SimpleAggregationImpl</span> { <span class="ident">states</span>: <span class="ident">Vec</span>::<span class="ident">new</span>() };
+        <span class="kw">let</span> <span class="ident">aggr_impl</span> <span class="op">=</span> <span class="ident">SimpleAggregationImpl</span> { <span class="ident">states</span>: <span class="ident">Vec::new</span>() };
 
-        <span class="prelude-val">Ok</span>(<span class="self">Self</span>(<span class="ident">AggregationExecutor</span>::<span class="ident">new</span>(
+        <span class="prelude-val">Ok</span>(<span class="self">Self</span>(<span class="ident">AggregationExecutor::new</span>(
             <span class="ident">aggr_impl</span>,
             <span class="ident">src</span>,
             <span class="ident">config</span>,
@@ -802,7 +802,7 @@
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">rows_len</span> <span class="op">=</span> <span class="ident">input_logical_rows</span>.<span class="ident">len</span>();
 
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="self">self</span>.<span class="ident">states</span>.<span class="ident">len</span>(), <span class="ident">entities</span>.<span class="ident">each_aggr_exprs</span>.<span class="ident">len</span>());
+        <span class="macro">assert_eq!</span>(<span class="self">self</span>.<span class="ident">states</span>.<span class="ident">len</span>(), <span class="ident">entities</span>.<span class="ident">each_aggr_exprs</span>.<span class="ident">len</span>());
 
         <span class="kw">for</span> <span class="ident">idx</span> <span class="kw">in</span> <span class="number">0</span>..<span class="self">self</span>.<span class="ident">states</span>.<span class="ident">len</span>() {
             <span class="kw">let</span> <span class="ident">aggr_state</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">states</span>[<span class="ident">idx</span>];
@@ -816,11 +816,11 @@
             )<span class="question-mark">?</span>;
 
             <span class="kw">match</span> <span class="ident">aggr_fn_input</span> {
-                <span class="ident">RpnStackNode</span>::<span class="ident">Scalar</span> { <span class="ident">value</span>, .. } <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="macro">match_template_evaluable</span><span class="macro">!</span> {
+                <span class="ident">RpnStackNode::Scalar</span> { <span class="ident">value</span>, .. } <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="macro">match_template_evaluable!</span> {
                         <span class="ident">TT</span>, <span class="kw">match</span> <span class="ident">value</span>.<span class="ident">as_scalar_value_ref</span>() {
-                            <span class="ident">ScalarValueRef</span>::<span class="ident">TT</span>(<span class="ident">scalar_value</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                                <span class="macro">update_repeat</span><span class="macro">!</span>(
+                            <span class="ident">ScalarValueRef::TT</span>(<span class="ident">scalar_value</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                                <span class="macro">update_repeat!</span>(
                                     <span class="ident">aggr_state</span>,
                                     <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">entities</span>.<span class="ident">context</span>,
                                     <span class="ident">scalar_value</span>,
@@ -830,13 +830,13 @@
                         }
                     }
                 }
-                <span class="ident">RpnStackNode</span>::<span class="ident">Vector</span> { <span class="ident">value</span>, .. } <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="ident">RpnStackNode::Vector</span> { <span class="ident">value</span>, .. } <span class="op">=</span><span class="op">&gt;</span> {
                     <span class="kw">let</span> <span class="ident">physical_vec</span> <span class="op">=</span> <span class="ident">value</span>.<span class="ident">as_ref</span>();
                     <span class="kw">let</span> <span class="ident">logical_rows</span> <span class="op">=</span> <span class="ident">value</span>.<span class="ident">logical_rows</span>();
-                    <span class="macro">match_template_evaluable</span><span class="macro">!</span> {
+                    <span class="macro">match_template_evaluable!</span> {
                         <span class="ident">TT</span>, <span class="kw">match</span> <span class="ident">physical_vec</span> {
-                            <span class="ident">VectorValue</span>::<span class="ident">TT</span>(<span class="ident">vec</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                                <span class="macro">update_vector</span><span class="macro">!</span>(
+                            <span class="ident">VectorValue::TT</span>(<span class="ident">vec</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                                <span class="macro">update_vector!</span>(
                                     <span class="ident">aggr_state</span>,
                                     <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">entities</span>.<span class="ident">context</span>,
                                     <span class="ident">vec</span>,
@@ -864,9 +864,9 @@
         <span class="ident">src_is_drained</span>: <span class="ident">bool</span>,
         <span class="kw-2">mut</span> <span class="ident">iteratee</span>: <span class="kw">impl</span> <span class="ident">FnMut</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Entities</span><span class="op">&lt;</span><span class="ident">Src</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span>[<span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">AggrFunctionState</span><span class="op">&gt;</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">LazyBatchColumn</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">src_is_drained</span>);
+        <span class="macro">assert!</span>(<span class="ident">src_is_drained</span>);
         <span class="ident">iteratee</span>(<span class="ident">entities</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">states</span>)<span class="question-mark">?</span>;
-        <span class="prelude-val">Ok</span>(<span class="ident">Vec</span>::<span class="ident">new</span>())
+        <span class="prelude-val">Ok</span>(<span class="ident">Vec::new</span>())
     }
 
     <span class="doccomment">/// Simple aggregation can output aggregate results only if the source is drained.</span>
@@ -880,12 +880,12 @@
 <span class="kw">mod</span> <span class="ident">tests</span> {
     <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 
-    <span class="kw">use</span> <span class="ident">tidb_query_codegen</span>::<span class="ident">AggrFunction</span>;
-    <span class="kw">use</span> <span class="ident">tidb_query_datatype</span>::<span class="ident">FieldTypeTp</span>;
+    <span class="kw">use</span> <span class="ident">tidb_query_codegen::AggrFunction</span>;
+    <span class="kw">use</span> <span class="ident">tidb_query_datatype::FieldTypeTp</span>;
 
-    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">aggr_executor</span>::<span class="ident">tests</span>::<span class="kw-2">*</span>;
-    <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">util</span>::<span class="ident">mock_executor</span>::<span class="ident">MockExecutor</span>;
-    <span class="kw">use</span> <span class="ident">tidb_query_datatype</span>::<span class="ident">expr</span>::{<span class="ident">EvalContext</span>, <span class="ident">EvalWarnings</span>};
+    <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::aggr_executor::tests</span>::<span class="kw-2">*</span>;
+    <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::mock_executor::MockExecutor</span>;
+    <span class="kw">use</span> <span class="ident">tidb_query_datatype::expr</span>::{<span class="ident">EvalContext</span>, <span class="ident">EvalWarnings</span>};
     <span class="kw">use</span> <span class="ident">tidb_query_expr</span>::{<span class="ident">RpnExpression</span>, <span class="ident">RpnExpressionBuilder</span>};
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
@@ -894,7 +894,7 @@
         <span class="doccomment">///</span>
         <span class="doccomment">/// The returned data is the sum of the length of all accepted bytes datums.</span>
         <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">AggrFunction</span>)]</span>
-        <span class="attribute">#[<span class="ident">aggr_function</span>(<span class="ident">state</span> <span class="op">=</span> <span class="ident">AggrFnFooState</span>::<span class="ident">new</span>())]</span>
+        <span class="attribute">#[<span class="ident">aggr_function</span>(<span class="ident">state</span> <span class="op">=</span> <span class="ident">AggrFnFooState::new</span>())]</span>
         <span class="kw">struct</span> <span class="ident">AggrFnFoo</span>;
 
         <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
@@ -914,7 +914,7 @@
             <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">update_concrete_unsafe</span>(
                 <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
                 <span class="ident">_ctx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">EvalContext</span>,
-                <span class="ident">value</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">ParameterType</span><span class="op">&gt;</span>,
+                <span class="ident">value</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="ident">::ParameterType</span><span class="op">&gt;</span>,
             ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">value</span>) <span class="op">=</span> <span class="ident">value</span> {
                     <span class="self">self</span>.<span class="ident">len</span> <span class="op">+</span><span class="op">=</span> <span class="ident">value</span>.<span class="ident">len</span>();
@@ -934,14 +934,14 @@
 
         <span class="doccomment">/// `Foo` returns a Int datum.</span>
         <span class="kw">fn</span> <span class="ident">push_foo_output_schema</span>(<span class="ident">output</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FieldType</span><span class="op">&gt;</span>) {
-            <span class="ident">output</span>.<span class="ident">push</span>(<span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>.<span class="ident">into</span>());
+            <span class="ident">output</span>.<span class="ident">push</span>(<span class="ident">FieldTypeTp::LongLong</span>.<span class="ident">into</span>());
         }
 
         <span class="doccomment">/// Aggregate function `Bar` accepts a Real column, returns `(a: Int, b: Int, c: Real)`,</span>
         <span class="doccomment">/// where `a` is the number of rows including nulls, `b` is the number of rows excluding</span>
         <span class="doccomment">/// nulls, `c` is the sum of all values.</span>
         <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">AggrFunction</span>)]</span>
-        <span class="attribute">#[<span class="ident">aggr_function</span>(<span class="ident">state</span> <span class="op">=</span> <span class="ident">AggrFnBarState</span>::<span class="ident">new</span>())]</span>
+        <span class="attribute">#[<span class="ident">aggr_function</span>(<span class="ident">state</span> <span class="op">=</span> <span class="ident">AggrFnBarState::new</span>())]</span>
         <span class="kw">struct</span> <span class="ident">AggrFnBar</span>;
 
         <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
@@ -956,7 +956,7 @@
                 <span class="self">Self</span> {
                     <span class="ident">rows_with_null</span>: <span class="number">0</span>,
                     <span class="ident">rows_without_null</span>: <span class="number">0</span>,
-                    <span class="ident">sum</span>: <span class="ident">Real</span>::<span class="ident">from</span>(<span class="number">0.0</span>),
+                    <span class="ident">sum</span>: <span class="ident">Real::from</span>(<span class="number">0.0</span>),
                 }
             }
         }
@@ -967,7 +967,7 @@
             <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">update_concrete_unsafe</span>(
                 <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
                 <span class="ident">_ctx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">EvalContext</span>,
-                <span class="ident">value</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">ParameterType</span><span class="op">&gt;</span>,
+                <span class="ident">value</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="ident">::ParameterType</span><span class="op">&gt;</span>,
             ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
                 <span class="self">self</span>.<span class="ident">rows_with_null</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">value</span>) <span class="op">=</span> <span class="ident">value</span> {
@@ -991,9 +991,9 @@
 
         <span class="doccomment">/// `Bar` returns `(a: Int, b: Int, c: Real)`.</span>
         <span class="kw">fn</span> <span class="ident">push_bar_output_schema</span>(<span class="ident">output</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FieldType</span><span class="op">&gt;</span>) {
-            <span class="ident">output</span>.<span class="ident">push</span>(<span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>.<span class="ident">into</span>());
-            <span class="ident">output</span>.<span class="ident">push</span>(<span class="ident">FieldTypeTp</span>::<span class="ident">Long</span>.<span class="ident">into</span>());
-            <span class="ident">output</span>.<span class="ident">push</span>(<span class="ident">FieldTypeTp</span>::<span class="ident">Double</span>.<span class="ident">into</span>());
+            <span class="ident">output</span>.<span class="ident">push</span>(<span class="ident">FieldTypeTp::LongLong</span>.<span class="ident">into</span>());
+            <span class="ident">output</span>.<span class="ident">push</span>(<span class="ident">FieldTypeTp::Long</span>.<span class="ident">into</span>());
+            <span class="ident">output</span>.<span class="ident">push</span>(<span class="ident">FieldTypeTp::Double</span>.<span class="ident">into</span>());
         }
 
         <span class="comment">// This test creates a simple aggregation executor with the following aggregate functions:</span>
@@ -1012,7 +1012,7 @@
 
         <span class="kw">let</span> <span class="ident">aggr_definitions</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span> <span class="op">=</span> (<span class="number">0</span>..<span class="number">6</span>)
             .<span class="ident">map</span>(<span class="op">|</span><span class="ident">index</span><span class="op">|</span> {
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">exp</span> <span class="op">=</span> <span class="ident">Expr</span>::<span class="ident">default</span>();
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">exp</span> <span class="op">=</span> <span class="ident">Expr::default</span>();
                 <span class="ident">exp</span>.<span class="ident">mut_val</span>().<span class="ident">push</span>(<span class="ident">index</span> <span class="kw">as</span> <span class="ident">u8</span>);
                 <span class="ident">exp</span>
             })
@@ -1022,7 +1022,7 @@
 
         <span class="kw">impl</span> <span class="ident">AggrDefinitionParser</span> <span class="kw">for</span> <span class="ident">MyParser</span> {
             <span class="kw">fn</span> <span class="ident">check_supported</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_aggr_def</span>: <span class="kw-2">&amp;</span><span class="ident">Expr</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-                <span class="macro">unreachable</span><span class="macro">!</span>()
+                <span class="macro">unreachable!</span>()
             }
 
             <span class="kw">fn</span> <span class="ident">parse</span>(
@@ -1038,117 +1038,117 @@
                         <span class="comment">// Foo(&quot;abc&quot;) -&gt; Int</span>
                         <span class="ident">push_foo_output_schema</span>(<span class="ident">out_schema</span>);
                         <span class="ident">out_exp</span>.<span class="ident">push</span>(
-                            <span class="ident">RpnExpressionBuilder</span>::<span class="ident">new_for_test</span>()
+                            <span class="ident">RpnExpressionBuilder::new_for_test</span>()
                                 .<span class="ident">push_constant_for_test</span>(<span class="string">b&quot;abc&quot;</span>.<span class="ident">to_vec</span>())
                                 .<span class="ident">build_for_test</span>(),
                         );
-                        <span class="prelude-val">Ok</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">AggrFnFoo</span>))
+                        <span class="prelude-val">Ok</span>(<span class="ident">Box::new</span>(<span class="ident">AggrFnFoo</span>))
                     }
                     <span class="number">1</span> <span class="op">=</span><span class="op">&gt;</span> {
                         <span class="comment">// Foo(NULL) -&gt; Int</span>
                         <span class="ident">push_foo_output_schema</span>(<span class="ident">out_schema</span>);
                         <span class="ident">out_exp</span>.<span class="ident">push</span>(
-                            <span class="ident">RpnExpressionBuilder</span>::<span class="ident">new_for_test</span>()
-                                .<span class="ident">push_constant_for_test</span>(<span class="ident">ScalarValue</span>::<span class="ident">Bytes</span>(<span class="prelude-val">None</span>))
+                            <span class="ident">RpnExpressionBuilder::new_for_test</span>()
+                                .<span class="ident">push_constant_for_test</span>(<span class="ident">ScalarValue::Bytes</span>(<span class="prelude-val">None</span>))
                                 .<span class="ident">build_for_test</span>(),
                         );
-                        <span class="prelude-val">Ok</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">AggrFnFoo</span>))
+                        <span class="prelude-val">Ok</span>(<span class="ident">Box::new</span>(<span class="ident">AggrFnFoo</span>))
                     }
                     <span class="number">2</span> <span class="op">=</span><span class="op">&gt;</span> {
                         <span class="comment">// Bar(42.5) -&gt; (Int, Int, Real)</span>
                         <span class="ident">push_bar_output_schema</span>(<span class="ident">out_schema</span>);
                         <span class="ident">out_exp</span>.<span class="ident">push</span>(
-                            <span class="ident">RpnExpressionBuilder</span>::<span class="ident">new_for_test</span>()
+                            <span class="ident">RpnExpressionBuilder::new_for_test</span>()
                                 .<span class="ident">push_constant_for_test</span>(<span class="number">42.5f64</span>)
                                 .<span class="ident">build_for_test</span>(),
                         );
-                        <span class="prelude-val">Ok</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">AggrFnBar</span>))
+                        <span class="prelude-val">Ok</span>(<span class="ident">Box::new</span>(<span class="ident">AggrFnBar</span>))
                     }
                     <span class="number">3</span> <span class="op">=</span><span class="op">&gt;</span> {
                         <span class="comment">// Bar(NULL) -&gt; (Int, Int, Real)</span>
                         <span class="ident">push_bar_output_schema</span>(<span class="ident">out_schema</span>);
                         <span class="ident">out_exp</span>.<span class="ident">push</span>(
-                            <span class="ident">RpnExpressionBuilder</span>::<span class="ident">new_for_test</span>()
-                                .<span class="ident">push_constant_for_test</span>(<span class="ident">ScalarValue</span>::<span class="ident">Real</span>(<span class="prelude-val">None</span>))
+                            <span class="ident">RpnExpressionBuilder::new_for_test</span>()
+                                .<span class="ident">push_constant_for_test</span>(<span class="ident">ScalarValue::Real</span>(<span class="prelude-val">None</span>))
                                 .<span class="ident">build_for_test</span>(),
                         );
-                        <span class="prelude-val">Ok</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">AggrFnBar</span>))
+                        <span class="prelude-val">Ok</span>(<span class="ident">Box::new</span>(<span class="ident">AggrFnBar</span>))
                     }
                     <span class="number">4</span> <span class="op">=</span><span class="op">&gt;</span> {
                         <span class="comment">// Foo(col_2) -&gt; Int</span>
                         <span class="ident">push_foo_output_schema</span>(<span class="ident">out_schema</span>);
                         <span class="ident">out_exp</span>.<span class="ident">push</span>(
-                            <span class="ident">RpnExpressionBuilder</span>::<span class="ident">new_for_test</span>()
+                            <span class="ident">RpnExpressionBuilder::new_for_test</span>()
                                 .<span class="ident">push_column_ref_for_test</span>(<span class="number">2</span>)
                                 .<span class="ident">build_for_test</span>(),
                         );
-                        <span class="prelude-val">Ok</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">AggrFnFoo</span>))
+                        <span class="prelude-val">Ok</span>(<span class="ident">Box::new</span>(<span class="ident">AggrFnFoo</span>))
                     }
                     <span class="number">5</span> <span class="op">=</span><span class="op">&gt;</span> {
                         <span class="comment">// Bar(col_1) -&gt; (Int, Int, Real)</span>
                         <span class="ident">push_bar_output_schema</span>(<span class="ident">out_schema</span>);
                         <span class="ident">out_exp</span>.<span class="ident">push</span>(
-                            <span class="ident">RpnExpressionBuilder</span>::<span class="ident">new_for_test</span>()
+                            <span class="ident">RpnExpressionBuilder::new_for_test</span>()
                                 .<span class="ident">push_column_ref_for_test</span>(<span class="number">1</span>)
                                 .<span class="ident">build_for_test</span>(),
                         );
-                        <span class="prelude-val">Ok</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">AggrFnBar</span>))
+                        <span class="prelude-val">Ok</span>(<span class="ident">Box::new</span>(<span class="ident">AggrFnBar</span>))
                     }
-                    <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">unreachable</span><span class="macro">!</span>(),
+                    <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">unreachable!</span>(),
                 }
             }
         }
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">exec</span> <span class="op">=</span>
-            <span class="ident">BatchSimpleAggregationExecutor</span>::<span class="ident">new_for_test</span>(<span class="ident">src_exec</span>, <span class="ident">aggr_definitions</span>, <span class="ident">MyParser</span>);
+            <span class="ident">BatchSimpleAggregationExecutor::new_for_test</span>(<span class="ident">src_exec</span>, <span class="ident">aggr_definitions</span>, <span class="ident">MyParser</span>);
 
         <span class="comment">// The scan rows parameter has no effect for mock executor. We don&#39;t care.</span>
         <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="ident">exec</span>.<span class="ident">next_batch</span>(<span class="number">1</span>);
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">logical_rows</span>.<span class="ident">is_empty</span>());
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
+        <span class="macro">assert!</span>(<span class="ident">r</span>.<span class="ident">logical_rows</span>.<span class="ident">is_empty</span>());
+        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
 
         <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="ident">exec</span>.<span class="ident">next_batch</span>(<span class="number">1</span>);
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">logical_rows</span>.<span class="ident">is_empty</span>());
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
+        <span class="macro">assert!</span>(<span class="ident">r</span>.<span class="ident">logical_rows</span>.<span class="ident">is_empty</span>());
+        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
 
         <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="ident">exec</span>.<span class="ident">next_batch</span>(<span class="number">1</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="kw-2">&amp;</span><span class="ident">r</span>.<span class="ident">logical_rows</span>, <span class="kw-2">&amp;</span>[<span class="number">0</span>]);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">1</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">columns_len</span>(), <span class="number">12</span>);
+        <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span><span class="ident">r</span>.<span class="ident">logical_rows</span>, <span class="kw-2">&amp;</span>[<span class="number">0</span>]);
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">1</span>);
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">columns_len</span>(), <span class="number">12</span>);
         <span class="comment">// Foo(&quot;abc&quot;) for 5 rows, so it is 5*3.</span>
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">0</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(), <span class="kw-2">&amp;</span>[<span class="prelude-val">Some</span>(<span class="number">15</span>)]);
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">0</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(), <span class="kw-2">&amp;</span>[<span class="prelude-val">Some</span>(<span class="number">15</span>)]);
         <span class="comment">// Foo(NULL) for 5 rows, so it is 0.</span>
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">1</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(), <span class="kw-2">&amp;</span>[<span class="prelude-val">Some</span>(<span class="number">0</span>)]);
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">1</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(), <span class="kw-2">&amp;</span>[<span class="prelude-val">Some</span>(<span class="number">0</span>)]);
         <span class="comment">// Bar(42.5) for 5 rows, so it is (5, 5, 42.5*5).</span>
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">2</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(), <span class="kw-2">&amp;</span>[<span class="prelude-val">Some</span>(<span class="number">5</span>)]);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">3</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(), <span class="kw-2">&amp;</span>[<span class="prelude-val">Some</span>(<span class="number">5</span>)]);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">2</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(), <span class="kw-2">&amp;</span>[<span class="prelude-val">Some</span>(<span class="number">5</span>)]);
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">3</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(), <span class="kw-2">&amp;</span>[<span class="prelude-val">Some</span>(<span class="number">5</span>)]);
+        <span class="macro">assert_eq!</span>(
             <span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">4</span>].<span class="ident">decoded</span>().<span class="ident">to_real_vec</span>(),
-            <span class="kw-2">&amp;</span>[<span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">212.5</span>).<span class="ident">ok</span>()]
+            <span class="kw-2">&amp;</span>[<span class="ident">Real::new</span>(<span class="number">212.5</span>).<span class="ident">ok</span>()]
         );
         <span class="comment">// Bar(NULL) for 5 rows, so it is (5, 0, 0).</span>
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">5</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(), <span class="kw-2">&amp;</span>[<span class="prelude-val">Some</span>(<span class="number">5</span>)]);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">6</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(), <span class="kw-2">&amp;</span>[<span class="prelude-val">Some</span>(<span class="number">0</span>)]);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">5</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(), <span class="kw-2">&amp;</span>[<span class="prelude-val">Some</span>(<span class="number">5</span>)]);
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">6</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(), <span class="kw-2">&amp;</span>[<span class="prelude-val">Some</span>(<span class="number">0</span>)]);
+        <span class="macro">assert_eq!</span>(
             <span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">7</span>].<span class="ident">decoded</span>().<span class="ident">to_real_vec</span>(),
-            <span class="kw-2">&amp;</span>[<span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">0.0</span>).<span class="ident">ok</span>()]
+            <span class="kw-2">&amp;</span>[<span class="ident">Real::new</span>(<span class="number">0.0</span>).<span class="ident">ok</span>()]
         );
         <span class="comment">// Foo([abc, NULL, &quot;&quot;, HelloWorld, aaaaa]) =&gt; 3+0+0+10+5</span>
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">8</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(), <span class="kw-2">&amp;</span>[<span class="prelude-val">Some</span>(<span class="number">18</span>)]);
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">8</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(), <span class="kw-2">&amp;</span>[<span class="prelude-val">Some</span>(<span class="number">18</span>)]);
         <span class="comment">// Bar([1.0, 2.0, NULL, 4.5, 4.5]) =&gt; (5, 4, 12.0)</span>
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">9</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(), <span class="kw-2">&amp;</span>[<span class="prelude-val">Some</span>(<span class="number">5</span>)]);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">10</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(), <span class="kw-2">&amp;</span>[<span class="prelude-val">Some</span>(<span class="number">4</span>)]);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">9</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(), <span class="kw-2">&amp;</span>[<span class="prelude-val">Some</span>(<span class="number">5</span>)]);
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">10</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(), <span class="kw-2">&amp;</span>[<span class="prelude-val">Some</span>(<span class="number">4</span>)]);
+        <span class="macro">assert_eq!</span>(
             <span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">11</span>].<span class="ident">decoded</span>().<span class="ident">to_real_vec</span>(),
-            <span class="kw-2">&amp;</span>[<span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">12.0</span>).<span class="ident">ok</span>()]
+            <span class="kw-2">&amp;</span>[<span class="ident">Real::new</span>(<span class="number">12.0</span>).<span class="ident">ok</span>()]
         );
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
+        <span class="macro">assert!</span>(<span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_it_works_integration</span>() {
-        <span class="kw">use</span> <span class="ident">tipb</span>::<span class="ident">ExprType</span>;
-        <span class="kw">use</span> <span class="ident">tipb_helper</span>::<span class="ident">ExprDefBuilder</span>;
+        <span class="kw">use</span> <span class="ident">tipb::ExprType</span>;
+        <span class="kw">use</span> <span class="ident">tipb_helper::ExprDefBuilder</span>;
 
         <span class="comment">// This test creates a simple aggregation executor with the following aggregate functions:</span>
         <span class="comment">// - COUNT(1)</span>
@@ -1161,71 +1161,71 @@
         <span class="comment">// As a result, there should be 10 output columns.</span>
 
         <span class="kw">let</span> <span class="ident">src_exec</span> <span class="op">=</span> <span class="ident">make_src_executor_1</span>();
-        <span class="kw">let</span> <span class="ident">aggr_definitions</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
-            <span class="ident">ExprDefBuilder</span>::<span class="ident">aggr_func</span>(<span class="ident">ExprType</span>::<span class="ident">Count</span>, <span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>)
-                .<span class="ident">push_child</span>(<span class="ident">ExprDefBuilder</span>::<span class="ident">constant_int</span>(<span class="number">1</span>))
+        <span class="kw">let</span> <span class="ident">aggr_definitions</span> <span class="op">=</span> <span class="macro">vec!</span>[
+            <span class="ident">ExprDefBuilder::aggr_func</span>(<span class="ident">ExprType::Count</span>, <span class="ident">FieldTypeTp::LongLong</span>)
+                .<span class="ident">push_child</span>(<span class="ident">ExprDefBuilder::constant_int</span>(<span class="number">1</span>))
                 .<span class="ident">build</span>(),
-            <span class="ident">ExprDefBuilder</span>::<span class="ident">aggr_func</span>(<span class="ident">ExprType</span>::<span class="ident">Count</span>, <span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>)
-                .<span class="ident">push_child</span>(<span class="ident">ExprDefBuilder</span>::<span class="ident">constant_real</span>(<span class="number">4.5</span>))
+            <span class="ident">ExprDefBuilder::aggr_func</span>(<span class="ident">ExprType::Count</span>, <span class="ident">FieldTypeTp::LongLong</span>)
+                .<span class="ident">push_child</span>(<span class="ident">ExprDefBuilder::constant_real</span>(<span class="number">4.5</span>))
                 .<span class="ident">build</span>(),
-            <span class="ident">ExprDefBuilder</span>::<span class="ident">aggr_func</span>(<span class="ident">ExprType</span>::<span class="ident">Count</span>, <span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>)
-                .<span class="ident">push_child</span>(<span class="ident">ExprDefBuilder</span>::<span class="ident">constant_null</span>(<span class="ident">FieldTypeTp</span>::<span class="ident">NewDecimal</span>))
+            <span class="ident">ExprDefBuilder::aggr_func</span>(<span class="ident">ExprType::Count</span>, <span class="ident">FieldTypeTp::LongLong</span>)
+                .<span class="ident">push_child</span>(<span class="ident">ExprDefBuilder::constant_null</span>(<span class="ident">FieldTypeTp::NewDecimal</span>))
                 .<span class="ident">build</span>(),
-            <span class="ident">ExprDefBuilder</span>::<span class="ident">aggr_func</span>(<span class="ident">ExprType</span>::<span class="ident">Count</span>, <span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>)
-                .<span class="ident">push_child</span>(<span class="ident">ExprDefBuilder</span>::<span class="ident">column_ref</span>(<span class="number">1</span>, <span class="ident">FieldTypeTp</span>::<span class="ident">Double</span>))
+            <span class="ident">ExprDefBuilder::aggr_func</span>(<span class="ident">ExprType::Count</span>, <span class="ident">FieldTypeTp::LongLong</span>)
+                .<span class="ident">push_child</span>(<span class="ident">ExprDefBuilder::column_ref</span>(<span class="number">1</span>, <span class="ident">FieldTypeTp::Double</span>))
                 .<span class="ident">build</span>(),
-            <span class="ident">ExprDefBuilder</span>::<span class="ident">aggr_func</span>(<span class="ident">ExprType</span>::<span class="ident">Avg</span>, <span class="ident">FieldTypeTp</span>::<span class="ident">Double</span>)
-                .<span class="ident">push_child</span>(<span class="ident">ExprDefBuilder</span>::<span class="ident">constant_real</span>(<span class="number">42.5</span>))
+            <span class="ident">ExprDefBuilder::aggr_func</span>(<span class="ident">ExprType::Avg</span>, <span class="ident">FieldTypeTp::Double</span>)
+                .<span class="ident">push_child</span>(<span class="ident">ExprDefBuilder::constant_real</span>(<span class="number">42.5</span>))
                 .<span class="ident">build</span>(),
-            <span class="ident">ExprDefBuilder</span>::<span class="ident">aggr_func</span>(<span class="ident">ExprType</span>::<span class="ident">Avg</span>, <span class="ident">FieldTypeTp</span>::<span class="ident">NewDecimal</span>)
-                .<span class="ident">push_child</span>(<span class="ident">ExprDefBuilder</span>::<span class="ident">constant_null</span>(<span class="ident">FieldTypeTp</span>::<span class="ident">NewDecimal</span>))
+            <span class="ident">ExprDefBuilder::aggr_func</span>(<span class="ident">ExprType::Avg</span>, <span class="ident">FieldTypeTp::NewDecimal</span>)
+                .<span class="ident">push_child</span>(<span class="ident">ExprDefBuilder::constant_null</span>(<span class="ident">FieldTypeTp::NewDecimal</span>))
                 .<span class="ident">build</span>(),
-            <span class="ident">ExprDefBuilder</span>::<span class="ident">aggr_func</span>(<span class="ident">ExprType</span>::<span class="ident">Avg</span>, <span class="ident">FieldTypeTp</span>::<span class="ident">Double</span>)
-                .<span class="ident">push_child</span>(<span class="ident">ExprDefBuilder</span>::<span class="ident">column_ref</span>(<span class="number">0</span>, <span class="ident">FieldTypeTp</span>::<span class="ident">Double</span>))
+            <span class="ident">ExprDefBuilder::aggr_func</span>(<span class="ident">ExprType::Avg</span>, <span class="ident">FieldTypeTp::Double</span>)
+                .<span class="ident">push_child</span>(<span class="ident">ExprDefBuilder::column_ref</span>(<span class="number">0</span>, <span class="ident">FieldTypeTp::Double</span>))
                 .<span class="ident">build</span>(),
         ];
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">exec</span> <span class="op">=</span> <span class="ident">BatchSimpleAggregationExecutor</span>::<span class="ident">new_for_test</span>(
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">exec</span> <span class="op">=</span> <span class="ident">BatchSimpleAggregationExecutor::new_for_test</span>(
             <span class="ident">src_exec</span>,
             <span class="ident">aggr_definitions</span>,
             <span class="ident">AllAggrDefinitionParser</span>,
         );
 
         <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="ident">exec</span>.<span class="ident">next_batch</span>(<span class="number">1</span>);
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">logical_rows</span>.<span class="ident">is_empty</span>());
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
+        <span class="macro">assert!</span>(<span class="ident">r</span>.<span class="ident">logical_rows</span>.<span class="ident">is_empty</span>());
+        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
 
         <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="ident">exec</span>.<span class="ident">next_batch</span>(<span class="number">1</span>);
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">logical_rows</span>.<span class="ident">is_empty</span>());
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
+        <span class="macro">assert!</span>(<span class="ident">r</span>.<span class="ident">logical_rows</span>.<span class="ident">is_empty</span>());
+        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
 
         <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="ident">exec</span>.<span class="ident">next_batch</span>(<span class="number">1</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="kw-2">&amp;</span><span class="ident">r</span>.<span class="ident">logical_rows</span>, <span class="kw-2">&amp;</span>[<span class="number">0</span>]);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">1</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">columns_len</span>(), <span class="number">10</span>);
+        <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span><span class="ident">r</span>.<span class="ident">logical_rows</span>, <span class="kw-2">&amp;</span>[<span class="number">0</span>]);
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">1</span>);
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">columns_len</span>(), <span class="number">10</span>);
         <span class="comment">// COUNT(1) for 5 rows, so it is 5.</span>
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">0</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(), <span class="kw-2">&amp;</span>[<span class="prelude-val">Some</span>(<span class="number">5</span>)]);
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">0</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(), <span class="kw-2">&amp;</span>[<span class="prelude-val">Some</span>(<span class="number">5</span>)]);
         <span class="comment">// COUNT(4.5) for 5 rows, so it is 5.</span>
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">1</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(), <span class="kw-2">&amp;</span>[<span class="prelude-val">Some</span>(<span class="number">5</span>)]);
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">1</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(), <span class="kw-2">&amp;</span>[<span class="prelude-val">Some</span>(<span class="number">5</span>)]);
         <span class="comment">// COUNT(NULL) for 5 rows, so it is 0.</span>
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">2</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(), <span class="kw-2">&amp;</span>[<span class="prelude-val">Some</span>(<span class="number">0</span>)]);
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">2</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(), <span class="kw-2">&amp;</span>[<span class="prelude-val">Some</span>(<span class="number">0</span>)]);
         <span class="comment">// COUNT([1.0, 2.0, NULL, 4.5, 4.5]) =&gt; 4</span>
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">3</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(), <span class="kw-2">&amp;</span>[<span class="prelude-val">Some</span>(<span class="number">4</span>)]);
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">3</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(), <span class="kw-2">&amp;</span>[<span class="prelude-val">Some</span>(<span class="number">4</span>)]);
         <span class="comment">// AVG(42.5) for 5 rows, so it is (5, 212.5). Notice that AVG returns sum.</span>
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">4</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(), <span class="kw-2">&amp;</span>[<span class="prelude-val">Some</span>(<span class="number">5</span>)]);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">4</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(), <span class="kw-2">&amp;</span>[<span class="prelude-val">Some</span>(<span class="number">5</span>)]);
+        <span class="macro">assert_eq!</span>(
             <span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">5</span>].<span class="ident">decoded</span>().<span class="ident">to_real_vec</span>(),
-            <span class="kw-2">&amp;</span>[<span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">212.5</span>).<span class="ident">ok</span>()]
+            <span class="kw-2">&amp;</span>[<span class="ident">Real::new</span>(<span class="number">212.5</span>).<span class="ident">ok</span>()]
         );
         <span class="comment">// AVG(NULL) for 5 rows, so it is (0, NULL).</span>
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">6</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(), <span class="kw-2">&amp;</span>[<span class="prelude-val">Some</span>(<span class="number">0</span>)]);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">7</span>].<span class="ident">decoded</span>().<span class="ident">to_decimal_vec</span>(), <span class="kw-2">&amp;</span>[<span class="prelude-val">None</span>]);
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">6</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(), <span class="kw-2">&amp;</span>[<span class="prelude-val">Some</span>(<span class="number">0</span>)]);
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">7</span>].<span class="ident">decoded</span>().<span class="ident">to_decimal_vec</span>(), <span class="kw-2">&amp;</span>[<span class="prelude-val">None</span>]);
         <span class="comment">// Foo([NULL, 7.0, NULL, NULL, 1.5]) =&gt; (2, 8.5)</span>
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">8</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(), <span class="kw-2">&amp;</span>[<span class="prelude-val">Some</span>(<span class="number">2</span>)]);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">8</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(), <span class="kw-2">&amp;</span>[<span class="prelude-val">Some</span>(<span class="number">2</span>)]);
+        <span class="macro">assert_eq!</span>(
             <span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">9</span>].<span class="ident">decoded</span>().<span class="ident">to_real_vec</span>(),
-            <span class="kw-2">&amp;</span>[<span class="ident">Real</span>::<span class="ident">new</span>(<span class="number">8.5</span>).<span class="ident">ok</span>()]
+            <span class="kw-2">&amp;</span>[<span class="ident">Real::new</span>(<span class="number">8.5</span>).<span class="ident">ok</span>()]
         );
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
+        <span class="macro">assert!</span>(<span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
@@ -1243,10 +1243,10 @@
             <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">update_concrete_unsafe</span>(
                 <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
                 <span class="ident">_ctx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">EvalContext</span>,
-                <span class="ident">_value</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">ParameterType</span><span class="op">&gt;</span>,
+                <span class="ident">_value</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="ident">::ParameterType</span><span class="op">&gt;</span>,
             ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
                 <span class="comment">// Update should never be called since we are testing aggregate for no row.</span>
-                <span class="macro">unreachable</span><span class="macro">!</span>()
+                <span class="macro">unreachable!</span>()
             }
 
             <span class="kw">fn</span> <span class="ident">push_result</span>(
@@ -1259,21 +1259,21 @@
             }
         }
 
-        <span class="kw">let</span> <span class="ident">src_exec</span> <span class="op">=</span> <span class="ident">MockExecutor</span>::<span class="ident">new</span>(
-            <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>.<span class="ident">into</span>()],
-            <span class="macro">vec</span><span class="macro">!</span>[
+        <span class="kw">let</span> <span class="ident">src_exec</span> <span class="op">=</span> <span class="ident">MockExecutor::new</span>(
+            <span class="macro">vec!</span>[<span class="ident">FieldTypeTp::LongLong</span>.<span class="ident">into</span>()],
+            <span class="macro">vec!</span>[
                 <span class="ident">BatchExecuteResult</span> {
-                    <span class="ident">physical_columns</span>: <span class="ident">LazyBatchColumnVec</span>::<span class="ident">from</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">VectorValue</span>::<span class="ident">Int</span>(
-                        <span class="macro">vec</span><span class="macro">!</span>[<span class="prelude-val">Some</span>(<span class="number">5</span>)].<span class="ident">into</span>(),
+                    <span class="ident">physical_columns</span>: <span class="ident">LazyBatchColumnVec::from</span>(<span class="macro">vec!</span>[<span class="ident">VectorValue::Int</span>(
+                        <span class="macro">vec!</span>[<span class="prelude-val">Some</span>(<span class="number">5</span>)].<span class="ident">into</span>(),
                     )]),
-                    <span class="ident">logical_rows</span>: <span class="ident">Vec</span>::<span class="ident">new</span>(),
-                    <span class="ident">warnings</span>: <span class="ident">EvalWarnings</span>::<span class="ident">default</span>(),
+                    <span class="ident">logical_rows</span>: <span class="ident">Vec::new</span>(),
+                    <span class="ident">warnings</span>: <span class="ident">EvalWarnings::default</span>(),
                     <span class="ident">is_drained</span>: <span class="prelude-val">Ok</span>(<span class="bool-val">false</span>),
                 },
                 <span class="ident">BatchExecuteResult</span> {
-                    <span class="ident">physical_columns</span>: <span class="ident">LazyBatchColumnVec</span>::<span class="ident">empty</span>(),
-                    <span class="ident">logical_rows</span>: <span class="ident">Vec</span>::<span class="ident">new</span>(),
-                    <span class="ident">warnings</span>: <span class="ident">EvalWarnings</span>::<span class="ident">default</span>(),
+                    <span class="ident">physical_columns</span>: <span class="ident">LazyBatchColumnVec::empty</span>(),
+                    <span class="ident">logical_rows</span>: <span class="ident">Vec::new</span>(),
+                    <span class="ident">warnings</span>: <span class="ident">EvalWarnings::default</span>(),
                     <span class="ident">is_drained</span>: <span class="prelude-val">Ok</span>(<span class="bool-val">true</span>),
                 },
             ],
@@ -1283,7 +1283,7 @@
 
         <span class="kw">impl</span> <span class="ident">AggrDefinitionParser</span> <span class="kw">for</span> <span class="ident">MyParser</span> {
             <span class="kw">fn</span> <span class="ident">check_supported</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_aggr_def</span>: <span class="kw-2">&amp;</span><span class="ident">Expr</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-                <span class="macro">unreachable</span><span class="macro">!</span>()
+                <span class="macro">unreachable!</span>()
             }
 
             <span class="kw">fn</span> <span class="ident">parse</span>(
@@ -1294,32 +1294,32 @@
                 <span class="ident">out_schema</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FieldType</span><span class="op">&gt;</span>,
                 <span class="ident">out_exp</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">RpnExpression</span><span class="op">&gt;</span>,
             ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">AggrFunction</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-                <span class="ident">out_schema</span>.<span class="ident">push</span>(<span class="ident">FieldTypeTp</span>::<span class="ident">LongLong</span>.<span class="ident">into</span>());
+                <span class="ident">out_schema</span>.<span class="ident">push</span>(<span class="ident">FieldTypeTp::LongLong</span>.<span class="ident">into</span>());
                 <span class="ident">out_exp</span>.<span class="ident">push</span>(
-                    <span class="ident">RpnExpressionBuilder</span>::<span class="ident">new_for_test</span>()
+                    <span class="ident">RpnExpressionBuilder::new_for_test</span>()
                         .<span class="ident">push_constant_for_test</span>(<span class="number">5f64</span>)
                         .<span class="ident">build_for_test</span>(),
                 );
-                <span class="prelude-val">Ok</span>(<span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">AggrFnFoo</span>))
+                <span class="prelude-val">Ok</span>(<span class="ident">Box::new</span>(<span class="ident">AggrFnFoo</span>))
             }
         }
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">exec</span> <span class="op">=</span>
-            <span class="ident">BatchSimpleAggregationExecutor</span>::<span class="ident">new_for_test</span>(<span class="ident">src_exec</span>, <span class="macro">vec</span><span class="macro">!</span>[<span class="ident">Expr</span>::<span class="ident">default</span>()], <span class="ident">MyParser</span>);
+            <span class="ident">BatchSimpleAggregationExecutor::new_for_test</span>(<span class="ident">src_exec</span>, <span class="macro">vec!</span>[<span class="ident">Expr::default</span>()], <span class="ident">MyParser</span>);
 
         <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="ident">exec</span>.<span class="ident">next_batch</span>(<span class="number">1</span>);
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">logical_rows</span>.<span class="ident">is_empty</span>());
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
+        <span class="macro">assert!</span>(<span class="ident">r</span>.<span class="ident">logical_rows</span>.<span class="ident">is_empty</span>());
+        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
 
         <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="ident">exec</span>.<span class="ident">next_batch</span>(<span class="number">1</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="kw-2">&amp;</span><span class="ident">r</span>.<span class="ident">logical_rows</span>, <span class="kw-2">&amp;</span>[<span class="number">0</span>]);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">1</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">columns_len</span>(), <span class="number">1</span>);
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">0</span>].<span class="ident">is_decoded</span>());
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">0</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(), <span class="kw-2">&amp;</span>[<span class="prelude-val">Some</span>(<span class="number">42</span>)]);
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
+        <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span><span class="ident">r</span>.<span class="ident">logical_rows</span>, <span class="kw-2">&amp;</span>[<span class="number">0</span>]);
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">rows_len</span>(), <span class="number">1</span>);
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>.<span class="ident">columns_len</span>(), <span class="number">1</span>);
+        <span class="macro">assert!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">0</span>].<span class="ident">is_decoded</span>());
+        <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">physical_columns</span>[<span class="number">0</span>].<span class="ident">decoded</span>().<span class="ident">to_int_vec</span>(), <span class="kw-2">&amp;</span>[<span class="prelude-val">Some</span>(<span class="number">42</span>)]);
+        <span class="macro">assert!</span>(<span class="ident">r</span>.<span class="ident">is_drained</span>.<span class="ident">unwrap</span>());
     }
 }
 </pre></div>
-</section><section id="search" class="content hidden"></section><section class="footer"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="tidb_query_executors"></div>
-    <script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script><script defer src="../../search-index.js"></script></body></html>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="tidb_query_executors" data-search-js="../../search-index.js"></div>
+    <script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script></body></html>

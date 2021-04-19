@@ -1,4 +1,4 @@
 (function() {var implementors = {};
-implementors["engine_panic"] = [{"text":"impl Snapshot for PanicSnapshot","synthetic":false,"types":[]}];
-implementors["engine_rocks"] = [{"text":"impl Snapshot for RocksSnapshot","synthetic":false,"types":[]}];
+implementors["engine_panic"] = [{"text":"impl <a class=\"trait\" href=\"engine_traits/snapshot/trait.Snapshot.html\" title=\"trait engine_traits::snapshot::Snapshot\">Snapshot</a> for <a class=\"struct\" href=\"engine_panic/snapshot/struct.PanicSnapshot.html\" title=\"struct engine_panic::snapshot::PanicSnapshot\">PanicSnapshot</a>","synthetic":false,"types":["engine_panic::snapshot::PanicSnapshot"]}];
+implementors["engine_rocks"] = [{"text":"impl <a class=\"trait\" href=\"engine_traits/snapshot/trait.Snapshot.html\" title=\"trait engine_traits::snapshot::Snapshot\">Snapshot</a> for <a class=\"struct\" href=\"engine_rocks/snapshot/struct.RocksSnapshot.html\" title=\"struct engine_rocks::snapshot::RocksSnapshot\">RocksSnapshot</a>","synthetic":false,"types":["engine_rocks::snapshot::RocksSnapshot"]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

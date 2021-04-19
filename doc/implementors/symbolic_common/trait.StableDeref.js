@@ -1,3 +1,3 @@
 (function() {var implementors = {};
-implementors["symbolic_common"] = [{"text":"impl StableDeref for ByteView&lt;'_&gt;","synthetic":false,"types":[]}];
+implementors["symbolic_common"] = [{"text":"impl <a class=\"trait\" href=\"symbolic_common/trait.StableDeref.html\" title=\"trait symbolic_common::StableDeref\">StableDeref</a> for <a class=\"struct\" href=\"symbolic_common/struct.ByteView.html\" title=\"struct symbolic_common::ByteView\">ByteView</a>&lt;'_&gt;","synthetic":false,"types":["symbolic_common::byteview::ByteView"]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

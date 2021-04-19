@@ -1,1 +1,1 @@
-initSidebarItems({"trait":[["DBOptions","A handle to a database's options"],["DBOptionsExt","A trait for engines that support setting global options"],["TitanDBOptions","Titan-specefic options"]]});
+initSidebarItems({"trait":[["DBOptions","A handle to a database’s options"],["DBOptionsExt","A trait for engines that support setting global options"],["TitanDBOptions","Titan-specefic options"]]});

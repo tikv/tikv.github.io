@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["AsyncRequestsCounterVec",""],["AsyncRequestsCounterVec2Delegator",""],["AsyncRequestsCounterVec2Inner",""],["AsyncRequestsCounterVecDelegator",""],["AsyncRequestsCounterVecInner",""]]});
+initSidebarItems({"struct":[["AsyncRequestsDurationVec",""],["AsyncRequestsDurationVecDelegator",""],["AsyncRequestsDurationVecInner",""]]});

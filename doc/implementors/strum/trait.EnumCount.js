@@ -1,3 +1,3 @@
 (function() {var implementors = {};
-implementors["file_system"] = [{"text":"impl EnumCount for IOType","synthetic":false,"types":[]}];
+implementors["file_system"] = [{"text":"impl <a class=\"trait\" href=\"strum/trait.EnumCount.html\" title=\"trait strum::EnumCount\">EnumCount</a> for <a class=\"enum\" href=\"file_system/enum.IOType.html\" title=\"enum file_system::IOType\">IOType</a>","synthetic":false,"types":["file_system::IOType"]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["TxnCommitRecord","The result of `get_txn_commit_record`, which is used to get the status of a specified transaction from write cf."]],"fn":[["check_need_gc",""]],"struct":[["MvccReader",""],["OverlappedWrite",""]]});
+initSidebarItems({"struct":[["MvccReader",""],["SnapshotReader","Read from an MVCC snapshot, i.e., a logical view of the database at a specific timestamp (the start_ts)."]]});

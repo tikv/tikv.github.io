@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["NewerTsCheckState",""]],"mod":[["point_getter",""],["reader",""],["scanner",""]]});
+initSidebarItems({"enum":[["NewerTsCheckState",""],["TxnCommitRecord","The result of `get_txn_commit_record`, which is used to get the status of a specified transaction from write cf."]],"mod":[["point_getter",""],["reader",""],["scanner",""]],"struct":[["OverlappedWrite",""]]});

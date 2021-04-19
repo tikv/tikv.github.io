@@ -1,7 +1,7 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `components/raftstore/src/coprocessor/region_info_accessor.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>region_info_accessor.rs - source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../favicon.svg">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `components/raftstore/src/coprocessor/region_info_accessor.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>region_info_accessor.rs - source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../favicon.svg">
 <link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../raftstore/index.html'><div class='logo-container rust-logo'><img src='../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><script src="../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
-                <a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">   1</span>
+<link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../../raftstore/index.html'><div class='logo-container rust-logo'><img src='../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
+                <a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">   1</span>
 <span id="2">   2</span>
 <span id="3">   3</span>
 <span id="4">   4</span>
@@ -1133,26 +1133,31 @@
 <span id="1130">1130</span>
 <span id="1131">1131</span>
 <span id="1132">1132</span>
+<span id="1133">1133</span>
+<span id="1134">1134</span>
+<span id="1135">1135</span>
+<span id="1136">1136</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">collections</span>::<span class="ident">BTreeMap</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">collections</span>::<span class="ident">Bound</span>::{<span class="ident">Excluded</span>, <span class="ident">Included</span>, <span class="ident">Unbounded</span>};
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">fmt</span>::{<span class="ident">Display</span>, <span class="ident">Formatter</span>, <span class="prelude-ty">Result</span> <span class="kw">as</span> <span class="ident">FmtResult</span>};
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::{<span class="ident">mpsc</span>, <span class="ident">Mutex</span>};
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">time</span>::<span class="ident">Duration</span>;
+<span class="kw">use</span> <span class="ident">std::collections::BTreeMap</span>;
+<span class="kw">use</span> <span class="ident">std::collections::Bound</span>::{<span class="ident">Excluded</span>, <span class="ident">Included</span>, <span class="ident">Unbounded</span>};
+<span class="kw">use</span> <span class="ident">std::fmt</span>::{<span class="ident">Display</span>, <span class="ident">Formatter</span>, <span class="prelude-ty">Result</span> <span class="kw">as</span> <span class="ident">FmtResult</span>};
+<span class="kw">use</span> <span class="ident">std::sync</span>::{<span class="ident">mpsc</span>, <span class="ident">Mutex</span>};
+<span class="kw">use</span> <span class="ident">std::time::Duration</span>;
 
-<span class="kw">use</span> <span class="kw">super</span>::<span class="ident">metrics</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="kw">super</span><span class="ident">::metrics</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">super</span>::{
     <span class="ident">BoxRegionChangeObserver</span>, <span class="ident">BoxRoleObserver</span>, <span class="ident">Coprocessor</span>, <span class="ident">CoprocessorHost</span>, <span class="ident">ObserverContext</span>,
     <span class="ident">RegionChangeEvent</span>, <span class="ident">RegionChangeObserver</span>, <span class="prelude-ty">Result</span>, <span class="ident">RoleObserver</span>,
 };
-<span class="kw">use</span> <span class="ident">collections</span>::<span class="ident">HashMap</span>;
-<span class="kw">use</span> <span class="ident">engine_traits</span>::<span class="ident">KvEngine</span>;
+<span class="kw">use</span> <span class="ident">collections::HashMap</span>;
+<span class="kw">use</span> <span class="ident">engine_traits::KvEngine</span>;
 <span class="kw">use</span> <span class="ident">keys</span>::{<span class="ident">data_end_key</span>, <span class="ident">data_key</span>};
-<span class="kw">use</span> <span class="ident">kvproto</span>::<span class="ident">metapb</span>::<span class="ident">Region</span>;
-<span class="kw">use</span> <span class="ident">raft</span>::<span class="ident">StateRole</span>;
-<span class="kw">use</span> <span class="ident">tikv_util</span>::<span class="ident">worker</span>::{<span class="ident">Builder</span> <span class="kw">as</span> <span class="ident">WorkerBuilder</span>, <span class="ident">Runnable</span>, <span class="ident">RunnableWithTimer</span>, <span class="ident">Scheduler</span>, <span class="ident">Worker</span>};
+<span class="kw">use</span> <span class="ident">kvproto::metapb::Region</span>;
+<span class="kw">use</span> <span class="ident">raft::StateRole</span>;
+<span class="kw">use</span> <span class="ident">tikv_util::worker</span>::{<span class="ident">Builder</span> <span class="kw">as</span> <span class="ident">WorkerBuilder</span>, <span class="ident">Runnable</span>, <span class="ident">RunnableWithTimer</span>, <span class="ident">Scheduler</span>, <span class="ident">Worker</span>};
+<span class="kw">use</span> <span class="ident">tikv_util</span>::{<span class="ident">box_err</span>, <span class="ident">debug</span>, <span class="ident">info</span>, <span class="ident">warn</span>};
 
 <span class="doccomment">/// `RegionInfoAccessor` is used to collect all regions&#39; information on this TiKV into a collection</span>
 <span class="doccomment">/// so that other parts of TiKV can get region information from it. It registers a observer to</span>
@@ -1181,10 +1186,10 @@
 <span class="kw">impl</span> <span class="ident">RaftStoreEvent</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_region</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">Region</span> {
         <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">RaftStoreEvent</span>::<span class="ident">CreateRegion</span> { <span class="ident">region</span>, .. }
-            <span class="op">|</span> <span class="ident">RaftStoreEvent</span>::<span class="ident">UpdateRegion</span> { <span class="ident">region</span>, .. }
-            <span class="op">|</span> <span class="ident">RaftStoreEvent</span>::<span class="ident">DestroyRegion</span> { <span class="ident">region</span>, .. }
-            <span class="op">|</span> <span class="ident">RaftStoreEvent</span>::<span class="ident">RoleChange</span> { <span class="ident">region</span>, .. } <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region</span>,
+            <span class="ident">RaftStoreEvent::CreateRegion</span> { <span class="ident">region</span>, .. }
+            <span class="op">|</span> <span class="ident">RaftStoreEvent::UpdateRegion</span> { <span class="ident">region</span>, .. }
+            <span class="op">|</span> <span class="ident">RaftStoreEvent::DestroyRegion</span> { <span class="ident">region</span>, .. }
+            <span class="op">|</span> <span class="ident">RaftStoreEvent::RoleChange</span> { <span class="ident">region</span>, .. } <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region</span>,
         }
     }
 }
@@ -1225,28 +1230,28 @@
         <span class="ident">callback</span>: <span class="ident">Callback</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Region</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     },
     <span class="doccomment">/// Gets all contents from the collection. Only used for testing.</span>
-    <span class="ident">DebugDump</span>(<span class="ident">mpsc</span>::<span class="ident">Sender</span><span class="op">&lt;</span>(<span class="ident">RegionsMap</span>, <span class="ident">RegionRangesMap</span>)<span class="op">&gt;</span>),
+    <span class="ident">DebugDump</span>(<span class="ident">mpsc::Sender</span><span class="op">&lt;</span>(<span class="ident">RegionsMap</span>, <span class="ident">RegionRangesMap</span>)<span class="op">&gt;</span>),
 }
 
 <span class="kw">impl</span> <span class="ident">Display</span> <span class="kw">for</span> <span class="ident">RegionInfoQuery</span> {
     <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">FmtResult</span> {
         <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">RegionInfoQuery</span>::<span class="ident">RaftStoreEvent</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;RaftStoreEvent({:?})&quot;</span>, <span class="ident">e</span>),
-            <span class="ident">RegionInfoQuery</span>::<span class="ident">SeekRegion</span> { <span class="ident">from</span>, .. } <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;SeekRegion(from: {})&quot;</span>, <span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>(<span class="kw-2">&amp;</span><span class="ident">from</span>))
+            <span class="ident">RegionInfoQuery::RaftStoreEvent</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;RaftStoreEvent({:?})&quot;</span>, <span class="ident">e</span>),
+            <span class="ident">RegionInfoQuery::SeekRegion</span> { <span class="ident">from</span>, .. } <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;SeekRegion(from: {})&quot;</span>, <span class="ident">log_wrappers::Value::key</span>(<span class="kw-2">&amp;</span><span class="ident">from</span>))
             }
-            <span class="ident">RegionInfoQuery</span>::<span class="ident">FindRegionById</span> { <span class="ident">region_id</span>, .. } <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;FindRegionById(region_id: {})&quot;</span>, <span class="ident">region_id</span>)
+            <span class="ident">RegionInfoQuery::FindRegionById</span> { <span class="ident">region_id</span>, .. } <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;FindRegionById(region_id: {})&quot;</span>, <span class="ident">region_id</span>)
             }
-            <span class="ident">RegionInfoQuery</span>::<span class="ident">GetRegionsInRange</span> {
+            <span class="ident">RegionInfoQuery::GetRegionsInRange</span> {
                 <span class="ident">start_key</span>, <span class="ident">end_key</span>, ..
-            } <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write</span><span class="macro">!</span>(
+            } <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write!</span>(
                 <span class="ident">f</span>,
                 <span class="string">&quot;GetRegionsInRange(start_key: {}, end_key: {})&quot;</span>,
-                <span class="kw-2">&amp;</span><span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>(<span class="ident">start_key</span>),
-                <span class="kw-2">&amp;</span><span class="ident">log_wrappers</span>::<span class="ident">Value</span>::<span class="ident">key</span>(<span class="ident">end_key</span>)
+                <span class="kw-2">&amp;</span><span class="ident">log_wrappers::Value::key</span>(<span class="ident">start_key</span>),
+                <span class="kw-2">&amp;</span><span class="ident">log_wrappers::Value::key</span>(<span class="ident">end_key</span>)
             ),
-            <span class="ident">RegionInfoQuery</span>::<span class="ident">DebugDump</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;DebugDump&quot;</span>),
+            <span class="ident">RegionInfoQuery::DebugDump</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;DebugDump&quot;</span>),
         }
     }
 }
@@ -1269,12 +1274,12 @@
     ) {
         <span class="kw">let</span> <span class="ident">region</span> <span class="op">=</span> <span class="ident">context</span>.<span class="ident">region</span>().<span class="ident">clone</span>();
         <span class="kw">let</span> <span class="ident">event</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">event</span> {
-            <span class="ident">RegionChangeEvent</span>::<span class="ident">Create</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">RaftStoreEvent</span>::<span class="ident">CreateRegion</span> { <span class="ident">region</span>, <span class="ident">role</span> },
-            <span class="ident">RegionChangeEvent</span>::<span class="ident">Update</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">RaftStoreEvent</span>::<span class="ident">UpdateRegion</span> { <span class="ident">region</span>, <span class="ident">role</span> },
-            <span class="ident">RegionChangeEvent</span>::<span class="ident">Destroy</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">RaftStoreEvent</span>::<span class="ident">DestroyRegion</span> { <span class="ident">region</span> },
+            <span class="ident">RegionChangeEvent::Create</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">RaftStoreEvent::CreateRegion</span> { <span class="ident">region</span>, <span class="ident">role</span> },
+            <span class="ident">RegionChangeEvent::Update</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">RaftStoreEvent::UpdateRegion</span> { <span class="ident">region</span>, <span class="ident">role</span> },
+            <span class="ident">RegionChangeEvent::Destroy</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">RaftStoreEvent::DestroyRegion</span> { <span class="ident">region</span> },
         };
         <span class="self">self</span>.<span class="ident">scheduler</span>
-            .<span class="ident">schedule</span>(<span class="ident">RegionInfoQuery</span>::<span class="ident">RaftStoreEvent</span>(<span class="ident">event</span>))
+            .<span class="ident">schedule</span>(<span class="ident">RegionInfoQuery::RaftStoreEvent</span>(<span class="ident">event</span>))
             .<span class="ident">unwrap</span>();
     }
 }
@@ -1282,9 +1287,9 @@
 <span class="kw">impl</span> <span class="ident">RoleObserver</span> <span class="kw">for</span> <span class="ident">RegionEventListener</span> {
     <span class="kw">fn</span> <span class="ident">on_role_change</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">context</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ObserverContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>, <span class="ident">role</span>: <span class="ident">StateRole</span>) {
         <span class="kw">let</span> <span class="ident">region</span> <span class="op">=</span> <span class="ident">context</span>.<span class="ident">region</span>().<span class="ident">clone</span>();
-        <span class="kw">let</span> <span class="ident">event</span> <span class="op">=</span> <span class="ident">RaftStoreEvent</span>::<span class="ident">RoleChange</span> { <span class="ident">region</span>, <span class="ident">role</span> };
+        <span class="kw">let</span> <span class="ident">event</span> <span class="op">=</span> <span class="ident">RaftStoreEvent::RoleChange</span> { <span class="ident">region</span>, <span class="ident">role</span> };
         <span class="self">self</span>.<span class="ident">scheduler</span>
-            .<span class="ident">schedule</span>(<span class="ident">RegionInfoQuery</span>::<span class="ident">RaftStoreEvent</span>(<span class="ident">event</span>))
+            .<span class="ident">schedule</span>(<span class="ident">RegionInfoQuery::RaftStoreEvent</span>(<span class="ident">event</span>))
             .<span class="ident">unwrap</span>();
     }
 }
@@ -1297,9 +1302,9 @@
     <span class="kw">let</span> <span class="ident">listener</span> <span class="op">=</span> <span class="ident">RegionEventListener</span> { <span class="ident">scheduler</span> };
 
     <span class="ident">host</span>.<span class="ident">registry</span>
-        .<span class="ident">register_role_observer</span>(<span class="number">1</span>, <span class="ident">BoxRoleObserver</span>::<span class="ident">new</span>(<span class="ident">listener</span>.<span class="ident">clone</span>()));
+        .<span class="ident">register_role_observer</span>(<span class="number">1</span>, <span class="ident">BoxRoleObserver::new</span>(<span class="ident">listener</span>.<span class="ident">clone</span>()));
     <span class="ident">host</span>.<span class="ident">registry</span>
-        .<span class="ident">register_region_change_observer</span>(<span class="number">1</span>, <span class="ident">BoxRegionChangeObserver</span>::<span class="ident">new</span>(<span class="ident">listener</span>));
+        .<span class="ident">register_region_change_observer</span>(<span class="number">1</span>, <span class="ident">BoxRegionChangeObserver::new</span>(<span class="ident">listener</span>));
 }
 
 <span class="doccomment">/// `RegionCollector` is the place where we hold all region information we collected, and the</span>
@@ -1315,8 +1320,8 @@
 <span class="kw">impl</span> <span class="ident">RegionCollector</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="self">Self</span> {
-            <span class="ident">regions</span>: <span class="ident">HashMap</span>::<span class="ident">default</span>(),
-            <span class="ident">region_ranges</span>: <span class="ident">BTreeMap</span>::<span class="ident">default</span>(),
+            <span class="ident">regions</span>: <span class="ident">HashMap::default</span>(),
+            <span class="ident">region_ranges</span>: <span class="ident">BTreeMap::default</span>(),
         }
     }
 
@@ -1328,9 +1333,9 @@
         <span class="self">self</span>.<span class="ident">region_ranges</span>.<span class="ident">insert</span>(<span class="ident">end_key</span>, <span class="ident">region_id</span>);
 
         <span class="comment">// TODO: Should we set it follower?</span>
-        <span class="macro">assert</span><span class="macro">!</span>(
+        <span class="macro">assert!</span>(
             <span class="self">self</span>.<span class="ident">regions</span>
-                .<span class="ident">insert</span>(<span class="ident">region_id</span>, <span class="ident">RegionInfo</span>::<span class="ident">new</span>(<span class="ident">region</span>, <span class="ident">role</span>))
+                .<span class="ident">insert</span>(<span class="ident">region_id</span>, <span class="ident">RegionInfo::new</span>(<span class="ident">region</span>, <span class="ident">role</span>))
                 .<span class="ident">is_none</span>(),
             <span class="string">&quot;trying to create new region {} but it already exists.&quot;</span>,
             <span class="ident">region_id</span>
@@ -1341,7 +1346,7 @@
         <span class="kw">let</span> <span class="ident">existing_region_info</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">regions</span>.<span class="ident">get_mut</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>.<span class="ident">get_id</span>()).<span class="ident">unwrap</span>();
 
         <span class="kw">let</span> <span class="ident">old_region</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">existing_region_info</span>.<span class="ident">region</span>;
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">old_region</span>.<span class="ident">get_id</span>(), <span class="ident">region</span>.<span class="ident">get_id</span>());
+        <span class="macro">assert_eq!</span>(<span class="ident">old_region</span>.<span class="ident">get_id</span>(), <span class="ident">region</span>.<span class="ident">get_id</span>());
 
         <span class="comment">// If the end_key changed, the old entry in `region_ranges` should be removed.</span>
         <span class="kw">if</span> <span class="ident">old_region</span>.<span class="ident">get_end_key</span>() <span class="op">!</span><span class="op">=</span> <span class="ident">region</span>.<span class="ident">get_end_key</span>() {
@@ -1350,14 +1355,15 @@
             <span class="kw">let</span> <span class="ident">old_end_key</span> <span class="op">=</span> <span class="ident">data_end_key</span>(<span class="ident">old_region</span>.<span class="ident">get_end_key</span>());
 
             <span class="kw">let</span> <span class="ident">old_id</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">region_ranges</span>.<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="ident">old_end_key</span>).<span class="ident">unwrap</span>();
-            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">old_id</span>, <span class="ident">region</span>.<span class="ident">get_id</span>());
+            <span class="macro">assert_eq!</span>(<span class="ident">old_id</span>, <span class="ident">region</span>.<span class="ident">get_id</span>());
 
             <span class="comment">// Insert new entry to `region_ranges`.</span>
             <span class="kw">let</span> <span class="ident">end_key</span> <span class="op">=</span> <span class="ident">data_end_key</span>(<span class="ident">region</span>.<span class="ident">get_end_key</span>());
-            <span class="macro">assert</span><span class="macro">!</span>(<span class="self">self</span>
-                .<span class="ident">region_ranges</span>
-                .<span class="ident">insert</span>(<span class="ident">end_key</span>, <span class="ident">region</span>.<span class="ident">get_id</span>())
-                .<span class="ident">is_none</span>());
+            <span class="macro">assert!</span>(
+                <span class="self">self</span>.<span class="ident">region_ranges</span>
+                    .<span class="ident">insert</span>(<span class="ident">end_key</span>, <span class="ident">region</span>.<span class="ident">get_id</span>())
+                    .<span class="ident">is_none</span>()
+            );
         }
 
         <span class="comment">// If the region already exists, update it and keep the original role.</span>
@@ -1369,7 +1375,7 @@
         <span class="comment">// receive an `Update` message, the region may have been deleted for some reason. So we</span>
         <span class="comment">// handle it according to whether the region exists in the collection.</span>
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">regions</span>.<span class="ident">contains_key</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>.<span class="ident">get_id</span>()) {
-            <span class="macro">info</span><span class="macro">!</span>(
+            <span class="macro">info!</span>(
                 <span class="string">&quot;trying to create region but it already exists, try to update it&quot;</span>;
                 <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region</span>.<span class="ident">get_id</span>(),
             );
@@ -1383,7 +1389,7 @@
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">regions</span>.<span class="ident">contains_key</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>.<span class="ident">get_id</span>()) {
             <span class="self">self</span>.<span class="ident">update_region</span>(<span class="ident">region</span>);
         } <span class="kw">else</span> {
-            <span class="macro">info</span><span class="macro">!</span>(
+            <span class="macro">info!</span>(
                 <span class="string">&quot;trying to update region but it doesn&#39;t exist, try to create it&quot;</span>;
                 <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region</span>.<span class="ident">get_id</span>(),
             );
@@ -1394,16 +1400,16 @@
     <span class="kw">fn</span> <span class="ident">handle_destroy_region</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">region</span>: <span class="ident">Region</span>) {
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">removed_region_info</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">regions</span>.<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>.<span class="ident">get_id</span>()) {
             <span class="kw">let</span> <span class="ident">removed_region</span> <span class="op">=</span> <span class="ident">removed_region_info</span>.<span class="ident">region</span>;
-            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">removed_region</span>.<span class="ident">get_id</span>(), <span class="ident">region</span>.<span class="ident">get_id</span>());
+            <span class="macro">assert_eq!</span>(<span class="ident">removed_region</span>.<span class="ident">get_id</span>(), <span class="ident">region</span>.<span class="ident">get_id</span>());
 
             <span class="kw">let</span> <span class="ident">end_key</span> <span class="op">=</span> <span class="ident">data_end_key</span>(<span class="ident">removed_region</span>.<span class="ident">get_end_key</span>());
 
             <span class="kw">let</span> <span class="ident">removed_id</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">region_ranges</span>.<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="ident">end_key</span>).<span class="ident">unwrap</span>();
-            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">removed_id</span>, <span class="ident">region</span>.<span class="ident">get_id</span>());
+            <span class="macro">assert_eq!</span>(<span class="ident">removed_id</span>, <span class="ident">region</span>.<span class="ident">get_id</span>());
         } <span class="kw">else</span> {
             <span class="comment">// It&#39;s possible that the region is already removed because it&#39;s end_key is used by</span>
             <span class="comment">// another newer region.</span>
-            <span class="macro">debug</span><span class="macro">!</span>(
+            <span class="macro">debug!</span>(
                 <span class="string">&quot;destroying region but it doesn&#39;t exist&quot;</span>;
                 <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region</span>.<span class="ident">get_id</span>(),
             )
@@ -1418,7 +1424,7 @@
             <span class="kw">return</span>;
         }
 
-        <span class="macro">warn</span><span class="macro">!</span>(
+        <span class="macro">warn!</span>(
             <span class="string">&quot;role change on region but the region doesn&#39;t exist. create it.&quot;</span>;
             <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>,
         );
@@ -1455,7 +1461,7 @@
             }
         }
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stale_regions_in_range</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[];
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stale_regions_in_range</span> <span class="op">=</span> <span class="macro">vec!</span>[];
 
         <span class="kw">for</span> (<span class="ident">key</span>, <span class="ident">id</span>) <span class="kw">in</span> <span class="self">self</span>
             .<span class="ident">region_ranges</span>
@@ -1477,7 +1483,7 @@
                 <span class="kw">return</span> <span class="bool-val">false</span>;
             }
             <span class="comment">// They are impossible to equal, or they cannot overlap.</span>
-            <span class="macro">assert_ne</span><span class="macro">!</span>(
+            <span class="macro">assert_ne!</span>(
                 <span class="ident">region</span>.<span class="ident">get_region_epoch</span>().<span class="ident">get_version</span>(),
                 <span class="ident">current_region</span>.<span class="ident">get_region_epoch</span>().<span class="ident">get_version</span>()
             );
@@ -1515,7 +1521,7 @@
         <span class="ident">end_key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
         <span class="ident">callback</span>: <span class="ident">Callback</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Region</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     ) {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">regions</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[];
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">regions</span> <span class="op">=</span> <span class="macro">vec!</span>[];
         <span class="kw">for</span> (<span class="kw">_</span>, <span class="ident">region_id</span>) <span class="kw">in</span> <span class="self">self</span>
             .<span class="ident">region_ranges</span>
             .<span class="ident">range</span>((<span class="ident">Included</span>(<span class="ident">start_key</span>), <span class="ident">Included</span>(<span class="ident">end_key</span>)))
@@ -1542,7 +1548,7 @@
                 <span class="kw">return</span>;
             }
             <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">check_region_range</span>(<span class="ident">region</span>, <span class="bool-val">true</span>) {
-                <span class="macro">debug</span><span class="macro">!</span>(
+                <span class="macro">debug!</span>(
                     <span class="string">&quot;Received stale event&quot;</span>;
                     <span class="string">&quot;event&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">event</span>,
                 );
@@ -1551,16 +1557,16 @@
         }
 
         <span class="kw">match</span> <span class="ident">event</span> {
-            <span class="ident">RaftStoreEvent</span>::<span class="ident">CreateRegion</span> { <span class="ident">region</span>, <span class="ident">role</span> } <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">RaftStoreEvent::CreateRegion</span> { <span class="ident">region</span>, <span class="ident">role</span> } <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="self">self</span>.<span class="ident">handle_create_region</span>(<span class="ident">region</span>, <span class="ident">role</span>);
             }
-            <span class="ident">RaftStoreEvent</span>::<span class="ident">UpdateRegion</span> { <span class="ident">region</span>, <span class="ident">role</span> } <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">RaftStoreEvent::UpdateRegion</span> { <span class="ident">region</span>, <span class="ident">role</span> } <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="self">self</span>.<span class="ident">handle_update_region</span>(<span class="ident">region</span>, <span class="ident">role</span>);
             }
-            <span class="ident">RaftStoreEvent</span>::<span class="ident">DestroyRegion</span> { <span class="ident">region</span> } <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">RaftStoreEvent::DestroyRegion</span> { <span class="ident">region</span> } <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="self">self</span>.<span class="ident">handle_destroy_region</span>(<span class="ident">region</span>);
             }
-            <span class="ident">RaftStoreEvent</span>::<span class="ident">RoleChange</span> { <span class="ident">region</span>, <span class="ident">role</span> } <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">RaftStoreEvent::RoleChange</span> { <span class="ident">region</span>, <span class="ident">role</span> } <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="self">self</span>.<span class="ident">handle_role_change</span>(<span class="ident">region</span>, <span class="ident">role</span>);
             }
         }
@@ -1572,26 +1578,26 @@
 
     <span class="kw">fn</span> <span class="ident">run</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">task</span>: <span class="ident">RegionInfoQuery</span>) {
         <span class="kw">match</span> <span class="ident">task</span> {
-            <span class="ident">RegionInfoQuery</span>::<span class="ident">RaftStoreEvent</span>(<span class="ident">event</span>) <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">RegionInfoQuery::RaftStoreEvent</span>(<span class="ident">event</span>) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="self">self</span>.<span class="ident">handle_raftstore_event</span>(<span class="ident">event</span>);
             }
-            <span class="ident">RegionInfoQuery</span>::<span class="ident">SeekRegion</span> { <span class="ident">from</span>, <span class="ident">callback</span> } <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">RegionInfoQuery::SeekRegion</span> { <span class="ident">from</span>, <span class="ident">callback</span> } <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="self">self</span>.<span class="ident">handle_seek_region</span>(<span class="ident">from</span>, <span class="ident">callback</span>);
             }
-            <span class="ident">RegionInfoQuery</span>::<span class="ident">FindRegionById</span> {
+            <span class="ident">RegionInfoQuery::FindRegionById</span> {
                 <span class="ident">region_id</span>,
                 <span class="ident">callback</span>,
             } <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="self">self</span>.<span class="ident">handle_find_region_by_id</span>(<span class="ident">region_id</span>, <span class="ident">callback</span>);
             }
-            <span class="ident">RegionInfoQuery</span>::<span class="ident">GetRegionsInRange</span> {
+            <span class="ident">RegionInfoQuery::GetRegionsInRange</span> {
                 <span class="ident">start_key</span>,
                 <span class="ident">end_key</span>,
                 <span class="ident">callback</span>,
             } <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="self">self</span>.<span class="ident">handle_get_regions_in_range</span>(<span class="ident">start_key</span>, <span class="ident">end_key</span>, <span class="ident">callback</span>);
             }
-            <span class="ident">RegionInfoQuery</span>::<span class="ident">DebugDump</span>(<span class="ident">tx</span>) <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">RegionInfoQuery::DebugDump</span>(<span class="ident">tx</span>) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="ident">tx</span>.<span class="ident">send</span>((<span class="self">self</span>.<span class="ident">regions</span>.<span class="ident">clone</span>(), <span class="self">self</span>.<span class="ident">region_ranges</span>.<span class="ident">clone</span>()))
                     .<span class="ident">unwrap</span>();
             }
@@ -1607,7 +1613,7 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">leader</span> <span class="op">=</span> <span class="number">0</span>;
         <span class="kw">for</span> <span class="ident">r</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">regions</span>.<span class="ident">values</span>() {
             <span class="ident">count</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
-            <span class="kw">if</span> <span class="ident">r</span>.<span class="ident">role</span> <span class="op">=</span><span class="op">=</span> <span class="ident">StateRole</span>::<span class="ident">Leader</span> {
+            <span class="kw">if</span> <span class="ident">r</span>.<span class="ident">role</span> <span class="op">=</span><span class="op">=</span> <span class="ident">StateRole::Leader</span> {
                 <span class="ident">leader</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
             }
         }
@@ -1619,7 +1625,7 @@
             .<span class="ident">set</span>(<span class="ident">leader</span>);
     }
     <span class="kw">fn</span> <span class="ident">get_interval</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Duration</span> {
-        <span class="ident">Duration</span>::<span class="ident">from_millis</span>(<span class="ident">METRICS_FLUSH_INTERVAL</span>)
+        <span class="ident">Duration::from_millis</span>(<span class="ident">METRICS_FLUSH_INTERVAL</span>)
     }
 }
 
@@ -1640,8 +1646,8 @@
     <span class="doccomment">/// `RegionInfoAccessor` doesn&#39;t need, and should not be created more than once. If it&#39;s needed</span>
     <span class="doccomment">/// in different places, just clone it, and their contents are shared.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">host</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">CoprocessorHost</span><span class="op">&lt;</span><span class="kw">impl</span> <span class="ident">KvEngine</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="kw">let</span> <span class="ident">worker</span> <span class="op">=</span> <span class="ident">WorkerBuilder</span>::<span class="ident">new</span>(<span class="string">&quot;region-collector-worker&quot;</span>).<span class="ident">create</span>();
-        <span class="kw">let</span> <span class="ident">scheduler</span> <span class="op">=</span> <span class="ident">worker</span>.<span class="ident">start_with_timer</span>(<span class="string">&quot;region-collector-worker&quot;</span>, <span class="ident">RegionCollector</span>::<span class="ident">new</span>());
+        <span class="kw">let</span> <span class="ident">worker</span> <span class="op">=</span> <span class="ident">WorkerBuilder::new</span>(<span class="string">&quot;region-collector-worker&quot;</span>).<span class="ident">create</span>();
+        <span class="kw">let</span> <span class="ident">scheduler</span> <span class="op">=</span> <span class="ident">worker</span>.<span class="ident">start_with_timer</span>(<span class="string">&quot;region-collector-worker&quot;</span>, <span class="ident">RegionCollector::new</span>());
         <span class="ident">register_region_event_listener</span>(<span class="ident">host</span>, <span class="ident">scheduler</span>.<span class="ident">clone</span>());
 
         <span class="self">Self</span> { <span class="ident">worker</span>, <span class="ident">scheduler</span> }
@@ -1655,19 +1661,19 @@
 
     <span class="doccomment">/// Gets all content from the collection. Only used for testing.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">debug_dump</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> (<span class="ident">RegionsMap</span>, <span class="ident">RegionRangesMap</span>) {
-        <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">mpsc</span>::<span class="ident">channel</span>();
+        <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">mpsc::channel</span>();
         <span class="self">self</span>.<span class="ident">scheduler</span>
-            .<span class="ident">schedule</span>(<span class="ident">RegionInfoQuery</span>::<span class="ident">DebugDump</span>(<span class="ident">tx</span>))
+            .<span class="ident">schedule</span>(<span class="ident">RegionInfoQuery::DebugDump</span>(<span class="ident">tx</span>))
             .<span class="ident">unwrap</span>();
         <span class="ident">rx</span>.<span class="ident">recv</span>().<span class="ident">unwrap</span>()
     }
 }
 
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">RegionInfoProvider</span>: <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Clone</span> <span class="op">+</span> <span class="lifetime">&#39;static</span> {
+<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">RegionInfoProvider</span>: <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span> {
     <span class="doccomment">/// Get a iterator of regions that contains `from` or have keys larger than `from`, and invoke</span>
     <span class="doccomment">/// the callback to process the result.</span>
     <span class="kw">fn</span> <span class="ident">seek_region</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_from</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">_callback</span>: <span class="ident">SeekRegionCallback</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="macro">unimplemented</span><span class="macro">!</span>()
+        <span class="macro">unimplemented!</span>()
     }
 
     <span class="kw">fn</span> <span class="ident">find_region_by_id</span>(
@@ -1675,23 +1681,23 @@
         <span class="ident">_reigon_id</span>: <span class="ident">u64</span>,
         <span class="ident">_callback</span>: <span class="ident">Callback</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RegionInfo</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="macro">unimplemented</span><span class="macro">!</span>()
+        <span class="macro">unimplemented!</span>()
     }
 
     <span class="kw">fn</span> <span class="ident">get_regions_in_range</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_start_key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">_end_key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Region</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="macro">unimplemented</span><span class="macro">!</span>()
+        <span class="macro">unimplemented!</span>()
     }
 }
 
 <span class="kw">impl</span> <span class="ident">RegionInfoProvider</span> <span class="kw">for</span> <span class="ident">RegionInfoAccessor</span> {
     <span class="kw">fn</span> <span class="ident">seek_region</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">from</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">callback</span>: <span class="ident">SeekRegionCallback</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">msg</span> <span class="op">=</span> <span class="ident">RegionInfoQuery</span>::<span class="ident">SeekRegion</span> {
+        <span class="kw">let</span> <span class="ident">msg</span> <span class="op">=</span> <span class="ident">RegionInfoQuery::SeekRegion</span> {
             <span class="ident">from</span>: <span class="ident">from</span>.<span class="ident">to_vec</span>(),
             <span class="ident">callback</span>,
         };
         <span class="self">self</span>.<span class="ident">scheduler</span>
             .<span class="ident">schedule</span>(<span class="ident">msg</span>)
-            .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">box_err</span><span class="macro">!</span>(<span class="string">&quot;failed to send request to region collector: {:?}&quot;</span>, <span class="ident">e</span>))
+            .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">box_err!</span>(<span class="string">&quot;failed to send request to region collector: {:?}&quot;</span>, <span class="ident">e</span>))
     }
 
     <span class="kw">fn</span> <span class="ident">find_region_by_id</span>(
@@ -1699,32 +1705,32 @@
         <span class="ident">region_id</span>: <span class="ident">u64</span>,
         <span class="ident">callback</span>: <span class="ident">Callback</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RegionInfo</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">msg</span> <span class="op">=</span> <span class="ident">RegionInfoQuery</span>::<span class="ident">FindRegionById</span> {
+        <span class="kw">let</span> <span class="ident">msg</span> <span class="op">=</span> <span class="ident">RegionInfoQuery::FindRegionById</span> {
             <span class="ident">region_id</span>,
             <span class="ident">callback</span>,
         };
         <span class="self">self</span>.<span class="ident">scheduler</span>
             .<span class="ident">schedule</span>(<span class="ident">msg</span>)
-            .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">box_err</span><span class="macro">!</span>(<span class="string">&quot;failed to send request to region collector: {:?}&quot;</span>, <span class="ident">e</span>))
+            .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">box_err!</span>(<span class="string">&quot;failed to send request to region collector: {:?}&quot;</span>, <span class="ident">e</span>))
     }
 
     <span class="kw">fn</span> <span class="ident">get_regions_in_range</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">start_key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">end_key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Region</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">mpsc</span>::<span class="ident">channel</span>();
-        <span class="kw">let</span> <span class="ident">msg</span> <span class="op">=</span> <span class="ident">RegionInfoQuery</span>::<span class="ident">GetRegionsInRange</span> {
+        <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">mpsc::channel</span>();
+        <span class="kw">let</span> <span class="ident">msg</span> <span class="op">=</span> <span class="ident">RegionInfoQuery::GetRegionsInRange</span> {
             <span class="ident">start_key</span>: <span class="ident">start_key</span>.<span class="ident">to_vec</span>(),
             <span class="ident">end_key</span>: <span class="ident">end_key</span>.<span class="ident">to_vec</span>(),
-            <span class="ident">callback</span>: <span class="ident">Box</span>::<span class="ident">new</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">regions</span><span class="op">|</span> {
+            <span class="ident">callback</span>: <span class="ident">Box::new</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">regions</span><span class="op">|</span> {
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">tx</span>.<span class="ident">send</span>(<span class="ident">regions</span>) {
-                    <span class="macro">warn</span><span class="macro">!</span>(<span class="string">&quot;failed to send get_regions_in_range result: {:?}&quot;</span>, <span class="ident">e</span>);
+                    <span class="macro">warn!</span>(<span class="string">&quot;failed to send get_regions_in_range result: {:?}&quot;</span>, <span class="ident">e</span>);
                 }
             }),
         };
         <span class="self">self</span>.<span class="ident">scheduler</span>
             .<span class="ident">schedule</span>(<span class="ident">msg</span>)
-            .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">box_err</span><span class="macro">!</span>(<span class="string">&quot;failed to send request to region collector: {:?}&quot;</span>, <span class="ident">e</span>))
+            .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">box_err!</span>(<span class="string">&quot;failed to send request to region collector: {:?}&quot;</span>, <span class="ident">e</span>))
             .<span class="ident">and_then</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> {
                 <span class="ident">rx</span>.<span class="ident">recv</span>().<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
-                    <span class="macro">box_err</span><span class="macro">!</span>(
+                    <span class="macro">box_err!</span>(
                         <span class="string">&quot;failed to receive get_regions_in_range result from region collector: {:?}&quot;</span>,
                         <span class="ident">e</span>
                     )
@@ -1738,13 +1744,13 @@
 
 <span class="kw">impl</span> <span class="ident">MockRegionInfoProvider</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">regions</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Region</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="ident">MockRegionInfoProvider</span>(<span class="ident">Mutex</span>::<span class="ident">new</span>(<span class="ident">regions</span>))
+        <span class="ident">MockRegionInfoProvider</span>(<span class="ident">Mutex::new</span>(<span class="ident">regions</span>))
     }
 }
 
 <span class="kw">impl</span> <span class="ident">Clone</span> <span class="kw">for</span> <span class="ident">MockRegionInfoProvider</span> {
     <span class="kw">fn</span> <span class="ident">clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="ident">MockRegionInfoProvider</span>::<span class="ident">new</span>(<span class="self">self</span>.<span class="number">0</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">clone</span>())
+        <span class="ident">MockRegionInfoProvider::new</span>(<span class="self">self</span>.<span class="number">0</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">clone</span>())
     }
 }
 
@@ -1759,7 +1765,7 @@
     <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 
     <span class="kw">fn</span> <span class="ident">new_region</span>(<span class="ident">id</span>: <span class="ident">u64</span>, <span class="ident">start_key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">end_key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">version</span>: <span class="ident">u64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Region</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">region</span> <span class="op">=</span> <span class="ident">Region</span>::<span class="ident">default</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">region</span> <span class="op">=</span> <span class="ident">Region::default</span>();
         <span class="ident">region</span>.<span class="ident">set_id</span>(<span class="ident">id</span>);
         <span class="ident">region</span>.<span class="ident">set_start_key</span>(<span class="ident">start_key</span>.<span class="ident">to_vec</span>());
         <span class="ident">region</span>.<span class="ident">set_end_key</span>(<span class="ident">end_key</span>.<span class="ident">to_vec</span>());
@@ -1803,7 +1809,7 @@
             }
         }
         <span class="kw">if</span> <span class="op">!</span><span class="ident">is_regions_equal</span> {
-            <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;regions: expect {:?}, but got {:?}&quot;</span>, <span class="ident">regions</span>, <span class="ident">c</span>.<span class="ident">regions</span>);
+            <span class="macro">panic!</span>(<span class="string">&quot;regions: expect {:?}, but got {:?}&quot;</span>, <span class="ident">regions</span>, <span class="ident">c</span>.<span class="ident">regions</span>);
         }
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">is_ranges_equal</span> <span class="op">=</span> <span class="ident">c</span>.<span class="ident">region_ranges</span>.<span class="ident">len</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">region_ranges</span>.<span class="ident">len</span>();
@@ -1814,7 +1820,7 @@
                 },
             );
         <span class="kw">if</span> <span class="op">!</span><span class="ident">is_ranges_equal</span> {
-            <span class="macro">panic</span><span class="macro">!</span>(
+            <span class="macro">panic!</span>(
                 <span class="string">&quot;region_ranges: expect {:?}, but got {:?}&quot;</span>,
                 <span class="ident">region_ranges</span>, <span class="ident">c</span>.<span class="ident">region_ranges</span>
             );
@@ -1823,30 +1829,30 @@
 
     <span class="doccomment">/// Adds a set of regions to an empty collection and check if it&#39;s successfully loaded.</span>
     <span class="kw">fn</span> <span class="ident">must_load_regions</span>(<span class="ident">c</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">RegionCollector</span>, <span class="ident">regions</span>: <span class="kw-2">&amp;</span>[<span class="ident">Region</span>]) {
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">c</span>.<span class="ident">regions</span>.<span class="ident">is_empty</span>());
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">c</span>.<span class="ident">region_ranges</span>.<span class="ident">is_empty</span>());
+        <span class="macro">assert!</span>(<span class="ident">c</span>.<span class="ident">regions</span>.<span class="ident">is_empty</span>());
+        <span class="macro">assert!</span>(<span class="ident">c</span>.<span class="ident">region_ranges</span>.<span class="ident">is_empty</span>());
 
         <span class="kw">for</span> <span class="ident">region</span> <span class="kw">in</span> <span class="ident">regions</span> {
-            <span class="ident">must_create_region</span>(<span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="ident">StateRole</span>::<span class="ident">Follower</span>);
+            <span class="ident">must_create_region</span>(<span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="ident">StateRole::Follower</span>);
         }
 
         <span class="kw">let</span> <span class="ident">expected_regions</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">regions</span>
             .<span class="ident">iter</span>()
-            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">r</span><span class="op">|</span> (<span class="ident">r</span>.<span class="ident">clone</span>(), <span class="ident">StateRole</span>::<span class="ident">Follower</span>))
+            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">r</span><span class="op">|</span> (<span class="ident">r</span>.<span class="ident">clone</span>(), <span class="ident">StateRole::Follower</span>))
             .<span class="ident">collect</span>();
         <span class="ident">check_collection</span>(<span class="kw-2">&amp;</span><span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">expected_regions</span>);
     }
 
     <span class="kw">fn</span> <span class="ident">must_create_region</span>(<span class="ident">c</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">RegionCollector</span>, <span class="ident">region</span>: <span class="kw-2">&amp;</span><span class="ident">Region</span>, <span class="ident">role</span>: <span class="ident">StateRole</span>) {
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">c</span>.<span class="ident">regions</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>.<span class="ident">get_id</span>()).<span class="ident">is_none</span>());
+        <span class="macro">assert!</span>(<span class="ident">c</span>.<span class="ident">regions</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>.<span class="ident">get_id</span>()).<span class="ident">is_none</span>());
 
-        <span class="ident">c</span>.<span class="ident">handle_raftstore_event</span>(<span class="ident">RaftStoreEvent</span>::<span class="ident">CreateRegion</span> {
+        <span class="ident">c</span>.<span class="ident">handle_raftstore_event</span>(<span class="ident">RaftStoreEvent::CreateRegion</span> {
             <span class="ident">region</span>: <span class="ident">region</span>.<span class="ident">clone</span>(),
             <span class="ident">role</span>,
         });
 
-        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="kw-2">&amp;</span><span class="ident">c</span>.<span class="ident">regions</span>[<span class="kw-2">&amp;</span><span class="ident">region</span>.<span class="ident">get_id</span>()].<span class="ident">region</span>, <span class="ident">region</span>);
-        <span class="macro">assert_eq</span><span class="macro">!</span>(
+        <span class="macro">assert_eq!</span>(<span class="kw-2">&amp;</span><span class="ident">c</span>.<span class="ident">regions</span>[<span class="kw-2">&amp;</span><span class="ident">region</span>.<span class="ident">get_id</span>()].<span class="ident">region</span>, <span class="ident">region</span>);
+        <span class="macro">assert_eq!</span>(
             <span class="ident">c</span>.<span class="ident">region_ranges</span>[<span class="kw-2">&amp;</span><span class="ident">data_end_key</span>(<span class="ident">region</span>.<span class="ident">get_end_key</span>())],
             <span class="ident">region</span>.<span class="ident">get_id</span>()
         );
@@ -1858,14 +1864,14 @@
             .<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>.<span class="ident">get_id</span>())
             .<span class="ident">map</span>(<span class="op">|</span><span class="ident">r</span><span class="op">|</span> <span class="ident">r</span>.<span class="ident">region</span>.<span class="ident">get_end_key</span>().<span class="ident">to_vec</span>());
 
-        <span class="ident">c</span>.<span class="ident">handle_raftstore_event</span>(<span class="ident">RaftStoreEvent</span>::<span class="ident">UpdateRegion</span> {
+        <span class="ident">c</span>.<span class="ident">handle_raftstore_event</span>(<span class="ident">RaftStoreEvent::UpdateRegion</span> {
             <span class="ident">region</span>: <span class="ident">region</span>.<span class="ident">clone</span>(),
             <span class="ident">role</span>,
         });
 
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">r</span>) <span class="op">=</span> <span class="ident">c</span>.<span class="ident">regions</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>.<span class="ident">get_id</span>()) {
-            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">region</span>, <span class="kw-2">*</span><span class="ident">region</span>);
-            <span class="macro">assert_eq</span><span class="macro">!</span>(
+            <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">region</span>, <span class="kw-2">*</span><span class="ident">region</span>);
+            <span class="macro">assert_eq!</span>(
                 <span class="ident">c</span>.<span class="ident">region_ranges</span>[<span class="kw-2">&amp;</span><span class="ident">data_end_key</span>(<span class="ident">region</span>.<span class="ident">get_end_key</span>())],
                 <span class="ident">region</span>.<span class="ident">get_id</span>()
             );
@@ -1875,16 +1881,17 @@
                 .<span class="ident">region</span>
                 .<span class="ident">get_region_epoch</span>()
                 .<span class="ident">get_version</span>();
-            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">region</span>.<span class="ident">get_region_epoch</span>().<span class="ident">get_version</span>() <span class="op">&lt;</span> <span class="ident">version</span>);
+            <span class="macro">assert!</span>(<span class="ident">region</span>.<span class="ident">get_region_epoch</span>().<span class="ident">get_version</span>() <span class="op">&lt;</span> <span class="ident">version</span>);
         }
         <span class="comment">// If end_key is updated and the region_id corresponding to the `old_end_key` doesn&#39;t equals</span>
         <span class="comment">// to `region_id`, it shouldn&#39;t be removed since it was used by another region.</span>
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">old_end_key</span>) <span class="op">=</span> <span class="ident">old_end_key</span> {
             <span class="kw">if</span> <span class="ident">old_end_key</span>.<span class="ident">as_slice</span>() <span class="op">!</span><span class="op">=</span> <span class="ident">region</span>.<span class="ident">get_end_key</span>() {
-                <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">c</span>
-                    .<span class="ident">region_ranges</span>
-                    .<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">data_end_key</span>(<span class="kw-2">&amp;</span><span class="ident">old_end_key</span>))
-                    .<span class="ident">map_or</span>(<span class="bool-val">true</span>, <span class="op">|</span><span class="ident">id</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">id</span> <span class="op">!</span><span class="op">=</span> <span class="ident">region</span>.<span class="ident">get_id</span>()));
+                <span class="macro">assert!</span>(
+                    <span class="ident">c</span>.<span class="ident">region_ranges</span>
+                        .<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">data_end_key</span>(<span class="kw-2">&amp;</span><span class="ident">old_end_key</span>))
+                        .<span class="ident">map_or</span>(<span class="bool-val">true</span>, <span class="op">|</span><span class="ident">id</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">id</span> <span class="op">!</span><span class="op">=</span> <span class="ident">region</span>.<span class="ident">get_id</span>())
+                );
             }
         }
     }
@@ -1893,45 +1900,46 @@
         <span class="kw">let</span> <span class="ident">id</span> <span class="op">=</span> <span class="ident">region</span>.<span class="ident">get_id</span>();
         <span class="kw">let</span> <span class="ident">end_key</span> <span class="op">=</span> <span class="ident">c</span>.<span class="ident">regions</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">id</span>).<span class="ident">map</span>(<span class="op">|</span><span class="ident">r</span><span class="op">|</span> <span class="ident">r</span>.<span class="ident">region</span>.<span class="ident">get_end_key</span>().<span class="ident">to_vec</span>());
 
-        <span class="ident">c</span>.<span class="ident">handle_raftstore_event</span>(<span class="ident">RaftStoreEvent</span>::<span class="ident">DestroyRegion</span> { <span class="ident">region</span> });
+        <span class="ident">c</span>.<span class="ident">handle_raftstore_event</span>(<span class="ident">RaftStoreEvent::DestroyRegion</span> { <span class="ident">region</span> });
 
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">c</span>.<span class="ident">regions</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">id</span>).<span class="ident">is_none</span>());
+        <span class="macro">assert!</span>(<span class="ident">c</span>.<span class="ident">regions</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">id</span>).<span class="ident">is_none</span>());
         <span class="comment">// If the region_id corresponding to the end_key doesn&#39;t equals to `id`, it shouldn&#39;t be</span>
         <span class="comment">// removed since it was used by another region.</span>
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">end_key</span>) <span class="op">=</span> <span class="ident">end_key</span> {
-            <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">c</span>
-                .<span class="ident">region_ranges</span>
-                .<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">data_end_key</span>(<span class="kw-2">&amp;</span><span class="ident">end_key</span>))
-                .<span class="ident">map_or</span>(<span class="bool-val">true</span>, <span class="op">|</span><span class="ident">r</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">r</span> <span class="op">!</span><span class="op">=</span> <span class="ident">id</span>));
+            <span class="macro">assert!</span>(
+                <span class="ident">c</span>.<span class="ident">region_ranges</span>
+                    .<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">data_end_key</span>(<span class="kw-2">&amp;</span><span class="ident">end_key</span>))
+                    .<span class="ident">map_or</span>(<span class="bool-val">true</span>, <span class="op">|</span><span class="ident">r</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">r</span> <span class="op">!</span><span class="op">=</span> <span class="ident">id</span>)
+            );
         }
     }
 
     <span class="kw">fn</span> <span class="ident">must_change_role</span>(<span class="ident">c</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">RegionCollector</span>, <span class="ident">region</span>: <span class="kw-2">&amp;</span><span class="ident">Region</span>, <span class="ident">role</span>: <span class="ident">StateRole</span>) {
-        <span class="ident">c</span>.<span class="ident">handle_raftstore_event</span>(<span class="ident">RaftStoreEvent</span>::<span class="ident">RoleChange</span> {
+        <span class="ident">c</span>.<span class="ident">handle_raftstore_event</span>(<span class="ident">RaftStoreEvent::RoleChange</span> {
             <span class="ident">region</span>: <span class="ident">region</span>.<span class="ident">clone</span>(),
             <span class="ident">role</span>,
         });
 
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">r</span>) <span class="op">=</span> <span class="ident">c</span>.<span class="ident">regions</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>.<span class="ident">get_id</span>()) {
-            <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">r</span>.<span class="ident">role</span>, <span class="ident">role</span>);
+            <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">role</span>, <span class="ident">role</span>);
         }
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_ignore_invalid_version</span>() {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">c</span> <span class="op">=</span> <span class="ident">RegionCollector</span>::<span class="ident">new</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">c</span> <span class="op">=</span> <span class="ident">RegionCollector::new</span>();
 
-        <span class="ident">c</span>.<span class="ident">handle_raftstore_event</span>(<span class="ident">RaftStoreEvent</span>::<span class="ident">CreateRegion</span> {
+        <span class="ident">c</span>.<span class="ident">handle_raftstore_event</span>(<span class="ident">RaftStoreEvent::CreateRegion</span> {
             <span class="ident">region</span>: <span class="ident">new_region</span>(<span class="number">1</span>, <span class="string">b&quot;k1&quot;</span>, <span class="string">b&quot;k3&quot;</span>, <span class="number">0</span>),
-            <span class="ident">role</span>: <span class="ident">StateRole</span>::<span class="ident">Follower</span>,
+            <span class="ident">role</span>: <span class="ident">StateRole::Follower</span>,
         });
-        <span class="ident">c</span>.<span class="ident">handle_raftstore_event</span>(<span class="ident">RaftStoreEvent</span>::<span class="ident">UpdateRegion</span> {
+        <span class="ident">c</span>.<span class="ident">handle_raftstore_event</span>(<span class="ident">RaftStoreEvent::UpdateRegion</span> {
             <span class="ident">region</span>: <span class="ident">new_region</span>(<span class="number">2</span>, <span class="string">b&quot;k2&quot;</span>, <span class="string">b&quot;k4&quot;</span>, <span class="number">0</span>),
-            <span class="ident">role</span>: <span class="ident">StateRole</span>::<span class="ident">Follower</span>,
+            <span class="ident">role</span>: <span class="ident">StateRole::Follower</span>,
         });
-        <span class="ident">c</span>.<span class="ident">handle_raftstore_event</span>(<span class="ident">RaftStoreEvent</span>::<span class="ident">RoleChange</span> {
+        <span class="ident">c</span>.<span class="ident">handle_raftstore_event</span>(<span class="ident">RaftStoreEvent::RoleChange</span> {
             <span class="ident">region</span>: <span class="ident">new_region</span>(<span class="number">1</span>, <span class="string">b&quot;k1&quot;</span>, <span class="string">b&quot;k2&quot;</span>, <span class="number">0</span>),
-            <span class="ident">role</span>: <span class="ident">StateRole</span>::<span class="ident">Leader</span>,
+            <span class="ident">role</span>: <span class="ident">StateRole::Leader</span>,
         });
 
         <span class="ident">check_collection</span>(<span class="kw-2">&amp;</span><span class="ident">c</span>, <span class="kw-2">&amp;</span>[]);
@@ -1948,61 +1956,61 @@
             <span class="ident">region_with_conf</span>(<span class="number">6</span>, <span class="string">b&quot;k7&quot;</span>, <span class="string">b&quot;&quot;</span>, <span class="number">20</span>, <span class="number">10</span>),
         ];
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">c</span> <span class="op">=</span> <span class="ident">RegionCollector</span>::<span class="ident">new</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">c</span> <span class="op">=</span> <span class="ident">RegionCollector::new</span>();
         <span class="ident">must_load_regions</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="ident">regions</span>);
 
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">1</span>, <span class="string">b&quot;&quot;</span>, <span class="string">b&quot;k1&quot;</span>, <span class="number">10</span>, <span class="number">10</span>), <span class="bool-val">false</span>));
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">1</span>, <span class="string">b&quot;&quot;</span>, <span class="string">b&quot;k1&quot;</span>, <span class="number">12</span>, <span class="number">10</span>), <span class="bool-val">false</span>));
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">1</span>, <span class="string">b&quot;&quot;</span>, <span class="string">b&quot;k1&quot;</span>, <span class="number">10</span>, <span class="number">12</span>), <span class="bool-val">false</span>));
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">1</span>, <span class="string">b&quot;&quot;</span>, <span class="string">b&quot;k1&quot;</span>, <span class="number">8</span>, <span class="number">10</span>), <span class="bool-val">false</span>));
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">1</span>, <span class="string">b&quot;&quot;</span>, <span class="string">b&quot;k1&quot;</span>, <span class="number">10</span>, <span class="number">8</span>), <span class="bool-val">false</span>));
+        <span class="macro">assert!</span>(<span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">1</span>, <span class="string">b&quot;&quot;</span>, <span class="string">b&quot;k1&quot;</span>, <span class="number">10</span>, <span class="number">10</span>), <span class="bool-val">false</span>));
+        <span class="macro">assert!</span>(<span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">1</span>, <span class="string">b&quot;&quot;</span>, <span class="string">b&quot;k1&quot;</span>, <span class="number">12</span>, <span class="number">10</span>), <span class="bool-val">false</span>));
+        <span class="macro">assert!</span>(<span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">1</span>, <span class="string">b&quot;&quot;</span>, <span class="string">b&quot;k1&quot;</span>, <span class="number">10</span>, <span class="number">12</span>), <span class="bool-val">false</span>));
+        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">1</span>, <span class="string">b&quot;&quot;</span>, <span class="string">b&quot;k1&quot;</span>, <span class="number">8</span>, <span class="number">10</span>), <span class="bool-val">false</span>));
+        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">1</span>, <span class="string">b&quot;&quot;</span>, <span class="string">b&quot;k1&quot;</span>, <span class="number">10</span>, <span class="number">8</span>), <span class="bool-val">false</span>));
 
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">3</span>, <span class="string">b&quot;k3&quot;</span>, <span class="string">b&quot;k4&quot;</span>, <span class="number">12</span>, <span class="number">20</span>), <span class="bool-val">false</span>));
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">3</span>, <span class="string">b&quot;k3&quot;</span>, <span class="string">b&quot;k4&quot;</span>, <span class="number">8</span>, <span class="number">20</span>), <span class="bool-val">false</span>));
+        <span class="macro">assert!</span>(<span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">3</span>, <span class="string">b&quot;k3&quot;</span>, <span class="string">b&quot;k4&quot;</span>, <span class="number">12</span>, <span class="number">20</span>), <span class="bool-val">false</span>));
+        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">3</span>, <span class="string">b&quot;k3&quot;</span>, <span class="string">b&quot;k4&quot;</span>, <span class="number">8</span>, <span class="number">20</span>), <span class="bool-val">false</span>));
 
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">6</span>, <span class="string">b&quot;k7&quot;</span>, <span class="string">b&quot;&quot;</span>, <span class="number">20</span>, <span class="number">12</span>), <span class="bool-val">false</span>));
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">6</span>, <span class="string">b&quot;k7&quot;</span>, <span class="string">b&quot;&quot;</span>, <span class="number">20</span>, <span class="number">8</span>), <span class="bool-val">false</span>));
+        <span class="macro">assert!</span>(<span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">6</span>, <span class="string">b&quot;k7&quot;</span>, <span class="string">b&quot;&quot;</span>, <span class="number">20</span>, <span class="number">12</span>), <span class="bool-val">false</span>));
+        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">6</span>, <span class="string">b&quot;k7&quot;</span>, <span class="string">b&quot;&quot;</span>, <span class="number">20</span>, <span class="number">8</span>), <span class="bool-val">false</span>));
 
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">1</span>, <span class="string">b&quot;k7&quot;</span>, <span class="string">b&quot;&quot;</span>, <span class="number">15</span>, <span class="number">10</span>), <span class="bool-val">false</span>));
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">1</span>, <span class="string">b&quot;&quot;</span>, <span class="string">b&quot;&quot;</span>, <span class="number">19</span>, <span class="number">10</span>), <span class="bool-val">false</span>));
+        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">1</span>, <span class="string">b&quot;k7&quot;</span>, <span class="string">b&quot;&quot;</span>, <span class="number">15</span>, <span class="number">10</span>), <span class="bool-val">false</span>));
+        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">1</span>, <span class="string">b&quot;&quot;</span>, <span class="string">b&quot;&quot;</span>, <span class="number">19</span>, <span class="number">10</span>), <span class="bool-val">false</span>));
 
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">7</span>, <span class="string">b&quot;k2&quot;</span>, <span class="string">b&quot;k3&quot;</span>, <span class="number">1</span>, <span class="number">1</span>), <span class="bool-val">false</span>));
+        <span class="macro">assert!</span>(<span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">7</span>, <span class="string">b&quot;k2&quot;</span>, <span class="string">b&quot;k3&quot;</span>, <span class="number">1</span>, <span class="number">1</span>), <span class="bool-val">false</span>));
 
         <span class="ident">must_update_region</span>(
             <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>,
             <span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">1</span>, <span class="string">b&quot;&quot;</span>, <span class="string">b&quot;k1&quot;</span>, <span class="number">100</span>, <span class="number">100</span>),
-            <span class="ident">StateRole</span>::<span class="ident">Follower</span>,
+            <span class="ident">StateRole::Follower</span>,
         );
         <span class="ident">must_update_region</span>(
             <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>,
             <span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">6</span>, <span class="string">b&quot;k7&quot;</span>, <span class="string">b&quot;&quot;</span>, <span class="number">100</span>, <span class="number">100</span>),
-            <span class="ident">StateRole</span>::<span class="ident">Follower</span>,
+            <span class="ident">StateRole::Follower</span>,
         );
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">2</span>, <span class="string">b&quot;k1&quot;</span>, <span class="string">b&quot;k7&quot;</span>, <span class="number">30</span>, <span class="number">30</span>), <span class="bool-val">false</span>));
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">2</span>, <span class="string">b&quot;k11&quot;</span>, <span class="string">b&quot;k61&quot;</span>, <span class="number">30</span>, <span class="number">30</span>), <span class="bool-val">false</span>));
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">2</span>, <span class="string">b&quot;k0&quot;</span>, <span class="string">b&quot;k7&quot;</span>, <span class="number">30</span>, <span class="number">30</span>), <span class="bool-val">false</span>));
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">2</span>, <span class="string">b&quot;k1&quot;</span>, <span class="string">b&quot;k8&quot;</span>, <span class="number">30</span>, <span class="number">30</span>), <span class="bool-val">false</span>));
+        <span class="macro">assert!</span>(<span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">2</span>, <span class="string">b&quot;k1&quot;</span>, <span class="string">b&quot;k7&quot;</span>, <span class="number">30</span>, <span class="number">30</span>), <span class="bool-val">false</span>));
+        <span class="macro">assert!</span>(<span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">2</span>, <span class="string">b&quot;k11&quot;</span>, <span class="string">b&quot;k61&quot;</span>, <span class="number">30</span>, <span class="number">30</span>), <span class="bool-val">false</span>));
+        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">2</span>, <span class="string">b&quot;k0&quot;</span>, <span class="string">b&quot;k7&quot;</span>, <span class="number">30</span>, <span class="number">30</span>), <span class="bool-val">false</span>));
+        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">2</span>, <span class="string">b&quot;k1&quot;</span>, <span class="string">b&quot;k8&quot;</span>, <span class="number">30</span>, <span class="number">30</span>), <span class="bool-val">false</span>));
 
         <span class="ident">must_update_region</span>(
             <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>,
             <span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">2</span>, <span class="string">b&quot;k1&quot;</span>, <span class="string">b&quot;k2&quot;</span>, <span class="number">100</span>, <span class="number">100</span>),
-            <span class="ident">StateRole</span>::<span class="ident">Follower</span>,
+            <span class="ident">StateRole::Follower</span>,
         );
         <span class="ident">must_update_region</span>(
             <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>,
             <span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">5</span>, <span class="string">b&quot;k6&quot;</span>, <span class="string">b&quot;k7&quot;</span>, <span class="number">100</span>, <span class="number">100</span>),
-            <span class="ident">StateRole</span>::<span class="ident">Follower</span>,
+            <span class="ident">StateRole::Follower</span>,
         );
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">3</span>, <span class="string">b&quot;k2&quot;</span>, <span class="string">b&quot;k6&quot;</span>, <span class="number">30</span>, <span class="number">30</span>), <span class="bool-val">false</span>));
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">3</span>, <span class="string">b&quot;k21&quot;</span>, <span class="string">b&quot;k51&quot;</span>, <span class="number">30</span>, <span class="number">30</span>), <span class="bool-val">false</span>));
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">3</span>, <span class="string">b&quot;k3&quot;</span>, <span class="string">b&quot;k5&quot;</span>, <span class="number">30</span>, <span class="number">30</span>), <span class="bool-val">false</span>));
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">3</span>, <span class="string">b&quot;k11&quot;</span>, <span class="string">b&quot;k6&quot;</span>, <span class="number">30</span>, <span class="number">30</span>), <span class="bool-val">false</span>));
-        <span class="macro">assert</span><span class="macro">!</span>(<span class="op">!</span><span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">3</span>, <span class="string">b&quot;k2&quot;</span>, <span class="string">b&quot;k61&quot;</span>, <span class="number">30</span>, <span class="number">30</span>), <span class="bool-val">false</span>));
+        <span class="macro">assert!</span>(<span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">3</span>, <span class="string">b&quot;k2&quot;</span>, <span class="string">b&quot;k6&quot;</span>, <span class="number">30</span>, <span class="number">30</span>), <span class="bool-val">false</span>));
+        <span class="macro">assert!</span>(<span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">3</span>, <span class="string">b&quot;k21&quot;</span>, <span class="string">b&quot;k51&quot;</span>, <span class="number">30</span>, <span class="number">30</span>), <span class="bool-val">false</span>));
+        <span class="macro">assert!</span>(<span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">3</span>, <span class="string">b&quot;k3&quot;</span>, <span class="string">b&quot;k5&quot;</span>, <span class="number">30</span>, <span class="number">30</span>), <span class="bool-val">false</span>));
+        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">3</span>, <span class="string">b&quot;k11&quot;</span>, <span class="string">b&quot;k6&quot;</span>, <span class="number">30</span>, <span class="number">30</span>), <span class="bool-val">false</span>));
+        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">region_with_conf</span>(<span class="number">3</span>, <span class="string">b&quot;k2&quot;</span>, <span class="string">b&quot;k61&quot;</span>, <span class="number">30</span>, <span class="number">30</span>), <span class="bool-val">false</span>));
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_clear_overlapped_regions</span>() {
-        <span class="kw">let</span> <span class="ident">init_regions</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
+        <span class="kw">let</span> <span class="ident">init_regions</span> <span class="op">=</span> <span class="macro">vec!</span>[
             <span class="ident">new_region</span>(<span class="number">1</span>, <span class="string">b&quot;&quot;</span>, <span class="string">b&quot;k1&quot;</span>, <span class="number">1</span>),
             <span class="ident">new_region</span>(<span class="number">2</span>, <span class="string">b&quot;k1&quot;</span>, <span class="string">b&quot;k2&quot;</span>, <span class="number">1</span>),
             <span class="ident">new_region</span>(<span class="number">3</span>, <span class="string">b&quot;k3&quot;</span>, <span class="string">b&quot;k4&quot;</span>, <span class="number">1</span>),
@@ -2011,11 +2019,11 @@
             <span class="ident">new_region</span>(<span class="number">6</span>, <span class="string">b&quot;k7&quot;</span>, <span class="string">b&quot;&quot;</span>, <span class="number">1</span>),
         ];
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">c</span> <span class="op">=</span> <span class="ident">RegionCollector</span>::<span class="ident">new</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">c</span> <span class="op">=</span> <span class="ident">RegionCollector::new</span>();
         <span class="ident">must_load_regions</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">init_regions</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">regions</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">init_regions</span>
             .<span class="ident">iter</span>()
-            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">region</span><span class="op">|</span> (<span class="ident">region</span>.<span class="ident">clone</span>(), <span class="ident">StateRole</span>::<span class="ident">Follower</span>))
+            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">region</span><span class="op">|</span> (<span class="ident">region</span>.<span class="ident">clone</span>(), <span class="ident">StateRole::Follower</span>))
             .<span class="ident">collect</span>();
 
         <span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">new_region</span>(<span class="number">7</span>, <span class="string">b&quot;k2&quot;</span>, <span class="string">b&quot;k3&quot;</span>, <span class="number">2</span>), <span class="bool-val">true</span>);
@@ -2042,26 +2050,26 @@
         <span class="ident">check_collection</span>(<span class="kw-2">&amp;</span><span class="ident">c</span>, <span class="kw-2">&amp;</span>[]);
 
         <span class="comment">// Test that the region with the same id will be kept in the collection</span>
-        <span class="ident">c</span> <span class="op">=</span> <span class="ident">RegionCollector</span>::<span class="ident">new</span>();
+        <span class="ident">c</span> <span class="op">=</span> <span class="ident">RegionCollector::new</span>();
         <span class="ident">must_load_regions</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">init_regions</span>);
 
         <span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">new_region</span>(<span class="number">3</span>, <span class="string">b&quot;k1&quot;</span>, <span class="string">b&quot;k7&quot;</span>, <span class="number">2</span>), <span class="bool-val">true</span>);
         <span class="ident">check_collection</span>(
             <span class="kw-2">&amp;</span><span class="ident">c</span>,
             <span class="kw-2">&amp;</span>[
-                (<span class="ident">init_regions</span>[<span class="number">0</span>].<span class="ident">clone</span>(), <span class="ident">StateRole</span>::<span class="ident">Follower</span>),
-                (<span class="ident">init_regions</span>[<span class="number">2</span>].<span class="ident">clone</span>(), <span class="ident">StateRole</span>::<span class="ident">Follower</span>),
-                (<span class="ident">init_regions</span>[<span class="number">5</span>].<span class="ident">clone</span>(), <span class="ident">StateRole</span>::<span class="ident">Follower</span>),
+                (<span class="ident">init_regions</span>[<span class="number">0</span>].<span class="ident">clone</span>(), <span class="ident">StateRole::Follower</span>),
+                (<span class="ident">init_regions</span>[<span class="number">2</span>].<span class="ident">clone</span>(), <span class="ident">StateRole::Follower</span>),
+                (<span class="ident">init_regions</span>[<span class="number">5</span>].<span class="ident">clone</span>(), <span class="ident">StateRole::Follower</span>),
             ],
         );
 
         <span class="ident">c</span>.<span class="ident">check_region_range</span>(<span class="kw-2">&amp;</span><span class="ident">new_region</span>(<span class="number">1</span>, <span class="string">b&quot;&quot;</span>, <span class="string">b&quot;&quot;</span>, <span class="number">2</span>), <span class="bool-val">true</span>);
-        <span class="ident">check_collection</span>(<span class="kw-2">&amp;</span><span class="ident">c</span>, <span class="kw-2">&amp;</span>[(<span class="ident">init_regions</span>[<span class="number">0</span>].<span class="ident">clone</span>(), <span class="ident">StateRole</span>::<span class="ident">Follower</span>)]);
+        <span class="ident">check_collection</span>(<span class="kw-2">&amp;</span><span class="ident">c</span>, <span class="kw-2">&amp;</span>[(<span class="ident">init_regions</span>[<span class="number">0</span>].<span class="ident">clone</span>(), <span class="ident">StateRole::Follower</span>)]);
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_basic_updating</span>() {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">c</span> <span class="op">=</span> <span class="ident">RegionCollector</span>::<span class="ident">new</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">c</span> <span class="op">=</span> <span class="ident">RegionCollector::new</span>();
         <span class="kw">let</span> <span class="ident">init_regions</span> <span class="op">=</span> <span class="kw-2">&amp;</span>[
             <span class="ident">new_region</span>(<span class="number">1</span>, <span class="string">b&quot;&quot;</span>, <span class="string">b&quot;k1&quot;</span>, <span class="number">1</span>),
             <span class="ident">new_region</span>(<span class="number">2</span>, <span class="string">b&quot;k1&quot;</span>, <span class="string">b&quot;k9&quot;</span>, <span class="number">1</span>),
@@ -2071,41 +2079,41 @@
         <span class="ident">must_load_regions</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="ident">init_regions</span>);
 
         <span class="comment">// end_key changed</span>
-        <span class="ident">must_update_region</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">new_region</span>(<span class="number">2</span>, <span class="string">b&quot;k2&quot;</span>, <span class="string">b&quot;k8&quot;</span>, <span class="number">2</span>), <span class="ident">StateRole</span>::<span class="ident">Follower</span>);
+        <span class="ident">must_update_region</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">new_region</span>(<span class="number">2</span>, <span class="string">b&quot;k2&quot;</span>, <span class="string">b&quot;k8&quot;</span>, <span class="number">2</span>), <span class="ident">StateRole::Follower</span>);
         <span class="comment">// end_key changed (previous end_key is empty)</span>
         <span class="ident">must_update_region</span>(
             <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>,
             <span class="kw-2">&amp;</span><span class="ident">new_region</span>(<span class="number">3</span>, <span class="string">b&quot;k9&quot;</span>, <span class="string">b&quot;k99&quot;</span>, <span class="number">2</span>),
-            <span class="ident">StateRole</span>::<span class="ident">Follower</span>,
+            <span class="ident">StateRole::Follower</span>,
         );
         <span class="comment">// end_key not changed</span>
-        <span class="ident">must_update_region</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">new_region</span>(<span class="number">1</span>, <span class="string">b&quot;k0&quot;</span>, <span class="string">b&quot;k1&quot;</span>, <span class="number">2</span>), <span class="ident">StateRole</span>::<span class="ident">Follower</span>);
+        <span class="ident">must_update_region</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">new_region</span>(<span class="number">1</span>, <span class="string">b&quot;k0&quot;</span>, <span class="string">b&quot;k1&quot;</span>, <span class="number">2</span>), <span class="ident">StateRole::Follower</span>);
         <span class="ident">check_collection</span>(
             <span class="kw-2">&amp;</span><span class="ident">c</span>,
             <span class="kw-2">&amp;</span>[
-                (<span class="ident">new_region</span>(<span class="number">1</span>, <span class="string">b&quot;k0&quot;</span>, <span class="string">b&quot;k1&quot;</span>, <span class="number">2</span>), <span class="ident">StateRole</span>::<span class="ident">Follower</span>),
-                (<span class="ident">new_region</span>(<span class="number">2</span>, <span class="string">b&quot;k2&quot;</span>, <span class="string">b&quot;k8&quot;</span>, <span class="number">2</span>), <span class="ident">StateRole</span>::<span class="ident">Follower</span>),
-                (<span class="ident">new_region</span>(<span class="number">3</span>, <span class="string">b&quot;k9&quot;</span>, <span class="string">b&quot;k99&quot;</span>, <span class="number">2</span>), <span class="ident">StateRole</span>::<span class="ident">Follower</span>),
+                (<span class="ident">new_region</span>(<span class="number">1</span>, <span class="string">b&quot;k0&quot;</span>, <span class="string">b&quot;k1&quot;</span>, <span class="number">2</span>), <span class="ident">StateRole::Follower</span>),
+                (<span class="ident">new_region</span>(<span class="number">2</span>, <span class="string">b&quot;k2&quot;</span>, <span class="string">b&quot;k8&quot;</span>, <span class="number">2</span>), <span class="ident">StateRole::Follower</span>),
+                (<span class="ident">new_region</span>(<span class="number">3</span>, <span class="string">b&quot;k9&quot;</span>, <span class="string">b&quot;k99&quot;</span>, <span class="number">2</span>), <span class="ident">StateRole::Follower</span>),
             ],
         );
 
         <span class="ident">must_change_role</span>(
             <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>,
             <span class="kw-2">&amp;</span><span class="ident">new_region</span>(<span class="number">1</span>, <span class="string">b&quot;k0&quot;</span>, <span class="string">b&quot;k1&quot;</span>, <span class="number">2</span>),
-            <span class="ident">StateRole</span>::<span class="ident">Candidate</span>,
+            <span class="ident">StateRole::Candidate</span>,
         );
-        <span class="ident">must_create_region</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">new_region</span>(<span class="number">5</span>, <span class="string">b&quot;k99&quot;</span>, <span class="string">b&quot;&quot;</span>, <span class="number">2</span>), <span class="ident">StateRole</span>::<span class="ident">Follower</span>);
-        <span class="ident">must_change_role</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">new_region</span>(<span class="number">2</span>, <span class="string">b&quot;k2&quot;</span>, <span class="string">b&quot;k8&quot;</span>, <span class="number">2</span>), <span class="ident">StateRole</span>::<span class="ident">Leader</span>);
-        <span class="ident">must_update_region</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">new_region</span>(<span class="number">2</span>, <span class="string">b&quot;k3&quot;</span>, <span class="string">b&quot;k7&quot;</span>, <span class="number">3</span>), <span class="ident">StateRole</span>::<span class="ident">Leader</span>);
-        <span class="ident">must_create_region</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">new_region</span>(<span class="number">4</span>, <span class="string">b&quot;k1&quot;</span>, <span class="string">b&quot;k3&quot;</span>, <span class="number">3</span>), <span class="ident">StateRole</span>::<span class="ident">Follower</span>);
+        <span class="ident">must_create_region</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">new_region</span>(<span class="number">5</span>, <span class="string">b&quot;k99&quot;</span>, <span class="string">b&quot;&quot;</span>, <span class="number">2</span>), <span class="ident">StateRole::Follower</span>);
+        <span class="ident">must_change_role</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">new_region</span>(<span class="number">2</span>, <span class="string">b&quot;k2&quot;</span>, <span class="string">b&quot;k8&quot;</span>, <span class="number">2</span>), <span class="ident">StateRole::Leader</span>);
+        <span class="ident">must_update_region</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">new_region</span>(<span class="number">2</span>, <span class="string">b&quot;k3&quot;</span>, <span class="string">b&quot;k7&quot;</span>, <span class="number">3</span>), <span class="ident">StateRole::Leader</span>);
+        <span class="ident">must_create_region</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">new_region</span>(<span class="number">4</span>, <span class="string">b&quot;k1&quot;</span>, <span class="string">b&quot;k3&quot;</span>, <span class="number">3</span>), <span class="ident">StateRole::Follower</span>);
         <span class="ident">check_collection</span>(
             <span class="kw-2">&amp;</span><span class="ident">c</span>,
             <span class="kw-2">&amp;</span>[
-                (<span class="ident">new_region</span>(<span class="number">1</span>, <span class="string">b&quot;k0&quot;</span>, <span class="string">b&quot;k1&quot;</span>, <span class="number">2</span>), <span class="ident">StateRole</span>::<span class="ident">Candidate</span>),
-                (<span class="ident">new_region</span>(<span class="number">4</span>, <span class="string">b&quot;k1&quot;</span>, <span class="string">b&quot;k3&quot;</span>, <span class="number">3</span>), <span class="ident">StateRole</span>::<span class="ident">Follower</span>),
-                (<span class="ident">new_region</span>(<span class="number">2</span>, <span class="string">b&quot;k3&quot;</span>, <span class="string">b&quot;k7&quot;</span>, <span class="number">3</span>), <span class="ident">StateRole</span>::<span class="ident">Leader</span>),
-                (<span class="ident">new_region</span>(<span class="number">3</span>, <span class="string">b&quot;k9&quot;</span>, <span class="string">b&quot;k99&quot;</span>, <span class="number">2</span>), <span class="ident">StateRole</span>::<span class="ident">Follower</span>),
-                (<span class="ident">new_region</span>(<span class="number">5</span>, <span class="string">b&quot;k99&quot;</span>, <span class="string">b&quot;&quot;</span>, <span class="number">2</span>), <span class="ident">StateRole</span>::<span class="ident">Follower</span>),
+                (<span class="ident">new_region</span>(<span class="number">1</span>, <span class="string">b&quot;k0&quot;</span>, <span class="string">b&quot;k1&quot;</span>, <span class="number">2</span>), <span class="ident">StateRole::Candidate</span>),
+                (<span class="ident">new_region</span>(<span class="number">4</span>, <span class="string">b&quot;k1&quot;</span>, <span class="string">b&quot;k3&quot;</span>, <span class="number">3</span>), <span class="ident">StateRole::Follower</span>),
+                (<span class="ident">new_region</span>(<span class="number">2</span>, <span class="string">b&quot;k3&quot;</span>, <span class="string">b&quot;k7&quot;</span>, <span class="number">3</span>), <span class="ident">StateRole::Leader</span>),
+                (<span class="ident">new_region</span>(<span class="number">3</span>, <span class="string">b&quot;k9&quot;</span>, <span class="string">b&quot;k99&quot;</span>, <span class="number">2</span>), <span class="ident">StateRole::Follower</span>),
+                (<span class="ident">new_region</span>(<span class="number">5</span>, <span class="string">b&quot;k99&quot;</span>, <span class="string">b&quot;&quot;</span>, <span class="number">2</span>), <span class="ident">StateRole::Follower</span>),
             ],
         );
 
@@ -2114,9 +2122,9 @@
         <span class="ident">check_collection</span>(
             <span class="kw-2">&amp;</span><span class="ident">c</span>,
             <span class="kw-2">&amp;</span>[
-                (<span class="ident">new_region</span>(<span class="number">1</span>, <span class="string">b&quot;k0&quot;</span>, <span class="string">b&quot;k1&quot;</span>, <span class="number">2</span>), <span class="ident">StateRole</span>::<span class="ident">Candidate</span>),
-                (<span class="ident">new_region</span>(<span class="number">2</span>, <span class="string">b&quot;k3&quot;</span>, <span class="string">b&quot;k7&quot;</span>, <span class="number">3</span>), <span class="ident">StateRole</span>::<span class="ident">Leader</span>),
-                (<span class="ident">new_region</span>(<span class="number">5</span>, <span class="string">b&quot;k99&quot;</span>, <span class="string">b&quot;&quot;</span>, <span class="number">2</span>), <span class="ident">StateRole</span>::<span class="ident">Follower</span>),
+                (<span class="ident">new_region</span>(<span class="number">1</span>, <span class="string">b&quot;k0&quot;</span>, <span class="string">b&quot;k1&quot;</span>, <span class="number">2</span>), <span class="ident">StateRole::Candidate</span>),
+                (<span class="ident">new_region</span>(<span class="number">2</span>, <span class="string">b&quot;k3&quot;</span>, <span class="string">b&quot;k7&quot;</span>, <span class="number">3</span>), <span class="ident">StateRole::Leader</span>),
+                (<span class="ident">new_region</span>(<span class="number">5</span>, <span class="string">b&quot;k99&quot;</span>, <span class="string">b&quot;&quot;</span>, <span class="number">2</span>), <span class="ident">StateRole::Follower</span>),
             ],
         );
     }
@@ -2126,7 +2134,7 @@
     <span class="doccomment">/// This is to ensure the collection is correct, no matter what the events&#39; order to happen is.</span>
     <span class="doccomment">/// Values in `seq` and of `derive_index` start from 1.</span>
     <span class="kw">fn</span> <span class="ident">test_split_impl</span>(<span class="ident">derive_index</span>: <span class="ident">usize</span>, <span class="ident">seq</span>: <span class="kw-2">&amp;</span>[<span class="ident">usize</span>]) {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">c</span> <span class="op">=</span> <span class="ident">RegionCollector</span>::<span class="ident">new</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">c</span> <span class="op">=</span> <span class="ident">RegionCollector::new</span>();
         <span class="kw">let</span> <span class="ident">init_regions</span> <span class="op">=</span> <span class="kw-2">&amp;</span>[
             <span class="ident">new_region</span>(<span class="number">1</span>, <span class="string">b&quot;&quot;</span>, <span class="string">b&quot;k1&quot;</span>, <span class="number">1</span>),
             <span class="ident">new_region</span>(<span class="number">2</span>, <span class="string">b&quot;k1&quot;</span>, <span class="string">b&quot;k9&quot;</span>, <span class="number">1</span>),
@@ -2134,7 +2142,7 @@
         ];
         <span class="ident">must_load_regions</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="ident">init_regions</span>);
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">final_regions</span> <span class="op">=</span> <span class="macro">vec</span><span class="macro">!</span>[
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">final_regions</span> <span class="op">=</span> <span class="macro">vec!</span>[
             <span class="ident">new_region</span>(<span class="number">1</span>, <span class="string">b&quot;&quot;</span>, <span class="string">b&quot;k1&quot;</span>, <span class="number">1</span>),
             <span class="ident">new_region</span>(<span class="number">4</span>, <span class="string">b&quot;k1&quot;</span>, <span class="string">b&quot;k3&quot;</span>, <span class="number">2</span>),
             <span class="ident">new_region</span>(<span class="number">5</span>, <span class="string">b&quot;k3&quot;</span>, <span class="string">b&quot;k6&quot;</span>, <span class="number">2</span>),
@@ -2146,15 +2154,15 @@
 
         <span class="kw">for</span> <span class="ident">idx</span> <span class="kw">in</span> <span class="ident">seq</span> {
             <span class="kw">if</span> <span class="kw-2">*</span><span class="ident">idx</span> <span class="op">=</span><span class="op">=</span> <span class="ident">derive_index</span> {
-                <span class="ident">must_update_region</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">final_regions</span>[<span class="kw-2">*</span><span class="ident">idx</span>], <span class="ident">StateRole</span>::<span class="ident">Follower</span>);
+                <span class="ident">must_update_region</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">final_regions</span>[<span class="kw-2">*</span><span class="ident">idx</span>], <span class="ident">StateRole::Follower</span>);
             } <span class="kw">else</span> {
-                <span class="ident">must_create_region</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">final_regions</span>[<span class="kw-2">*</span><span class="ident">idx</span>], <span class="ident">StateRole</span>::<span class="ident">Follower</span>);
+                <span class="ident">must_create_region</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">final_regions</span>[<span class="kw-2">*</span><span class="ident">idx</span>], <span class="ident">StateRole::Follower</span>);
             }
         }
 
         <span class="kw">let</span> <span class="ident">final_regions</span> <span class="op">=</span> <span class="ident">final_regions</span>
             .<span class="ident">into_iter</span>()
-            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">r</span><span class="op">|</span> (<span class="ident">r</span>, <span class="ident">StateRole</span>::<span class="ident">Follower</span>))
+            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">r</span><span class="op">|</span> (<span class="ident">r</span>, <span class="ident">StateRole::Follower</span>))
             .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>();
         <span class="ident">check_collection</span>(<span class="kw-2">&amp;</span><span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">final_regions</span>);
     }
@@ -2179,7 +2187,7 @@
     }
 
     <span class="kw">fn</span> <span class="ident">test_merge_impl</span>(<span class="ident">to_left</span>: <span class="ident">bool</span>, <span class="ident">update_first</span>: <span class="ident">bool</span>) {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">c</span> <span class="op">=</span> <span class="ident">RegionCollector</span>::<span class="ident">new</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">c</span> <span class="op">=</span> <span class="ident">RegionCollector::new</span>();
         <span class="kw">let</span> <span class="ident">init_regions</span> <span class="op">=</span> <span class="kw-2">&amp;</span>[
             <span class="ident">region_with_conf</span>(<span class="number">1</span>, <span class="string">b&quot;&quot;</span>, <span class="string">b&quot;k1&quot;</span>, <span class="number">1</span>, <span class="number">1</span>),
             <span class="ident">region_with_conf</span>(<span class="number">2</span>, <span class="string">b&quot;k1&quot;</span>, <span class="string">b&quot;k2&quot;</span>, <span class="number">1</span>, <span class="number">100</span>),
@@ -2198,17 +2206,17 @@
         <span class="ident">updating_region</span>.<span class="ident">mut_region_epoch</span>().<span class="ident">set_version</span>(<span class="number">2</span>);
 
         <span class="kw">if</span> <span class="ident">update_first</span> {
-            <span class="ident">must_update_region</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">updating_region</span>, <span class="ident">StateRole</span>::<span class="ident">Follower</span>);
+            <span class="ident">must_update_region</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">updating_region</span>, <span class="ident">StateRole::Follower</span>);
             <span class="ident">must_destroy_region</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="ident">destroying_region</span>);
         } <span class="kw">else</span> {
             <span class="ident">must_destroy_region</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="ident">destroying_region</span>);
-            <span class="ident">must_update_region</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">updating_region</span>, <span class="ident">StateRole</span>::<span class="ident">Follower</span>);
+            <span class="ident">must_update_region</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">updating_region</span>, <span class="ident">StateRole::Follower</span>);
         }
 
         <span class="kw">let</span> <span class="ident">final_regions</span> <span class="op">=</span> <span class="kw-2">&amp;</span>[
-            (<span class="ident">region_with_conf</span>(<span class="number">1</span>, <span class="string">b&quot;&quot;</span>, <span class="string">b&quot;k1&quot;</span>, <span class="number">1</span>, <span class="number">1</span>), <span class="ident">StateRole</span>::<span class="ident">Follower</span>),
-            (<span class="ident">updating_region</span>, <span class="ident">StateRole</span>::<span class="ident">Follower</span>),
-            (<span class="ident">region_with_conf</span>(<span class="number">4</span>, <span class="string">b&quot;k3&quot;</span>, <span class="string">b&quot;&quot;</span>, <span class="number">1</span>, <span class="number">100</span>), <span class="ident">StateRole</span>::<span class="ident">Follower</span>),
+            (<span class="ident">region_with_conf</span>(<span class="number">1</span>, <span class="string">b&quot;&quot;</span>, <span class="string">b&quot;k1&quot;</span>, <span class="number">1</span>, <span class="number">1</span>), <span class="ident">StateRole::Follower</span>),
+            (<span class="ident">updating_region</span>, <span class="ident">StateRole::Follower</span>),
+            (<span class="ident">region_with_conf</span>(<span class="number">4</span>, <span class="string">b&quot;k3&quot;</span>, <span class="string">b&quot;&quot;</span>, <span class="number">1</span>, <span class="number">100</span>), <span class="ident">StateRole::Follower</span>),
         ];
         <span class="ident">check_collection</span>(<span class="kw-2">&amp;</span><span class="ident">c</span>, <span class="ident">final_regions</span>);
     }
@@ -2223,7 +2231,7 @@
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_extreme_cases</span>() {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">c</span> <span class="op">=</span> <span class="ident">RegionCollector</span>::<span class="ident">new</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">c</span> <span class="op">=</span> <span class="ident">RegionCollector::new</span>();
         <span class="kw">let</span> <span class="ident">init_regions</span> <span class="op">=</span> <span class="kw-2">&amp;</span>[
             <span class="ident">new_region</span>(<span class="number">1</span>, <span class="string">b&quot;&quot;</span>, <span class="string">b&quot;k1&quot;</span>, <span class="number">1</span>),
             <span class="ident">new_region</span>(<span class="number">2</span>, <span class="string">b&quot;k1&quot;</span>, <span class="string">b&quot;k9&quot;</span>, <span class="number">1</span>),
@@ -2233,39 +2241,39 @@
 
         <span class="comment">// While splitting, region 4 created but region 2 still has an `update` event which haven&#39;t</span>
         <span class="comment">// been handled.</span>
-        <span class="ident">must_create_region</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">new_region</span>(<span class="number">4</span>, <span class="string">b&quot;k5&quot;</span>, <span class="string">b&quot;k9&quot;</span>, <span class="number">2</span>), <span class="ident">StateRole</span>::<span class="ident">Follower</span>);
-        <span class="ident">must_update_region</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">new_region</span>(<span class="number">2</span>, <span class="string">b&quot;k1&quot;</span>, <span class="string">b&quot;k9&quot;</span>, <span class="number">1</span>), <span class="ident">StateRole</span>::<span class="ident">Follower</span>);
-        <span class="ident">must_change_role</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">new_region</span>(<span class="number">2</span>, <span class="string">b&quot;k1&quot;</span>, <span class="string">b&quot;k9&quot;</span>, <span class="number">1</span>), <span class="ident">StateRole</span>::<span class="ident">Leader</span>);
-        <span class="ident">must_update_region</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">new_region</span>(<span class="number">2</span>, <span class="string">b&quot;k1&quot;</span>, <span class="string">b&quot;k5&quot;</span>, <span class="number">2</span>), <span class="ident">StateRole</span>::<span class="ident">Leader</span>);
+        <span class="ident">must_create_region</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">new_region</span>(<span class="number">4</span>, <span class="string">b&quot;k5&quot;</span>, <span class="string">b&quot;k9&quot;</span>, <span class="number">2</span>), <span class="ident">StateRole::Follower</span>);
+        <span class="ident">must_update_region</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">new_region</span>(<span class="number">2</span>, <span class="string">b&quot;k1&quot;</span>, <span class="string">b&quot;k9&quot;</span>, <span class="number">1</span>), <span class="ident">StateRole::Follower</span>);
+        <span class="ident">must_change_role</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">new_region</span>(<span class="number">2</span>, <span class="string">b&quot;k1&quot;</span>, <span class="string">b&quot;k9&quot;</span>, <span class="number">1</span>), <span class="ident">StateRole::Leader</span>);
+        <span class="ident">must_update_region</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">new_region</span>(<span class="number">2</span>, <span class="string">b&quot;k1&quot;</span>, <span class="string">b&quot;k5&quot;</span>, <span class="number">2</span>), <span class="ident">StateRole::Leader</span>);
         <span class="comment">// TODO: In fact, region 2&#39;s role should be follower. However because it&#39;s previous state was</span>
         <span class="comment">// removed while creating updating region 4, it can&#39;t be successfully updated. Fortunately</span>
         <span class="comment">// this case may hardly happen so it can be fixed later.</span>
         <span class="ident">check_collection</span>(
             <span class="kw-2">&amp;</span><span class="ident">c</span>,
             <span class="kw-2">&amp;</span>[
-                (<span class="ident">new_region</span>(<span class="number">1</span>, <span class="string">b&quot;&quot;</span>, <span class="string">b&quot;k1&quot;</span>, <span class="number">1</span>), <span class="ident">StateRole</span>::<span class="ident">Follower</span>),
-                (<span class="ident">new_region</span>(<span class="number">2</span>, <span class="string">b&quot;k1&quot;</span>, <span class="string">b&quot;k5&quot;</span>, <span class="number">2</span>), <span class="ident">StateRole</span>::<span class="ident">Leader</span>),
-                (<span class="ident">new_region</span>(<span class="number">4</span>, <span class="string">b&quot;k5&quot;</span>, <span class="string">b&quot;k9&quot;</span>, <span class="number">2</span>), <span class="ident">StateRole</span>::<span class="ident">Follower</span>),
-                (<span class="ident">new_region</span>(<span class="number">3</span>, <span class="string">b&quot;k9&quot;</span>, <span class="string">b&quot;&quot;</span>, <span class="number">1</span>), <span class="ident">StateRole</span>::<span class="ident">Follower</span>),
+                (<span class="ident">new_region</span>(<span class="number">1</span>, <span class="string">b&quot;&quot;</span>, <span class="string">b&quot;k1&quot;</span>, <span class="number">1</span>), <span class="ident">StateRole::Follower</span>),
+                (<span class="ident">new_region</span>(<span class="number">2</span>, <span class="string">b&quot;k1&quot;</span>, <span class="string">b&quot;k5&quot;</span>, <span class="number">2</span>), <span class="ident">StateRole::Leader</span>),
+                (<span class="ident">new_region</span>(<span class="number">4</span>, <span class="string">b&quot;k5&quot;</span>, <span class="string">b&quot;k9&quot;</span>, <span class="number">2</span>), <span class="ident">StateRole::Follower</span>),
+                (<span class="ident">new_region</span>(<span class="number">3</span>, <span class="string">b&quot;k9&quot;</span>, <span class="string">b&quot;&quot;</span>, <span class="number">1</span>), <span class="ident">StateRole::Follower</span>),
             ],
         );
 
         <span class="comment">// While merging, region 2 expanded and covered region 4 (and their end key become the same)</span>
         <span class="comment">// but region 4 still has an `update` event which haven&#39;t been handled.</span>
-        <span class="ident">must_update_region</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">new_region</span>(<span class="number">2</span>, <span class="string">b&quot;k1&quot;</span>, <span class="string">b&quot;k9&quot;</span>, <span class="number">3</span>), <span class="ident">StateRole</span>::<span class="ident">Leader</span>);
-        <span class="ident">must_update_region</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">new_region</span>(<span class="number">4</span>, <span class="string">b&quot;k5&quot;</span>, <span class="string">b&quot;k9&quot;</span>, <span class="number">2</span>), <span class="ident">StateRole</span>::<span class="ident">Follower</span>);
-        <span class="ident">must_change_role</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">new_region</span>(<span class="number">4</span>, <span class="string">b&quot;k5&quot;</span>, <span class="string">b&quot;k9&quot;</span>, <span class="number">2</span>), <span class="ident">StateRole</span>::<span class="ident">Leader</span>);
+        <span class="ident">must_update_region</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">new_region</span>(<span class="number">2</span>, <span class="string">b&quot;k1&quot;</span>, <span class="string">b&quot;k9&quot;</span>, <span class="number">3</span>), <span class="ident">StateRole::Leader</span>);
+        <span class="ident">must_update_region</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">new_region</span>(<span class="number">4</span>, <span class="string">b&quot;k5&quot;</span>, <span class="string">b&quot;k9&quot;</span>, <span class="number">2</span>), <span class="ident">StateRole::Follower</span>);
+        <span class="ident">must_change_role</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="kw-2">&amp;</span><span class="ident">new_region</span>(<span class="number">4</span>, <span class="string">b&quot;k5&quot;</span>, <span class="string">b&quot;k9&quot;</span>, <span class="number">2</span>), <span class="ident">StateRole::Leader</span>);
         <span class="ident">must_destroy_region</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">c</span>, <span class="ident">new_region</span>(<span class="number">4</span>, <span class="string">b&quot;k5&quot;</span>, <span class="string">b&quot;k9&quot;</span>, <span class="number">2</span>));
         <span class="ident">check_collection</span>(
             <span class="kw-2">&amp;</span><span class="ident">c</span>,
             <span class="kw-2">&amp;</span>[
-                (<span class="ident">new_region</span>(<span class="number">1</span>, <span class="string">b&quot;&quot;</span>, <span class="string">b&quot;k1&quot;</span>, <span class="number">1</span>), <span class="ident">StateRole</span>::<span class="ident">Follower</span>),
-                (<span class="ident">new_region</span>(<span class="number">2</span>, <span class="string">b&quot;k1&quot;</span>, <span class="string">b&quot;k9&quot;</span>, <span class="number">3</span>), <span class="ident">StateRole</span>::<span class="ident">Leader</span>),
-                (<span class="ident">new_region</span>(<span class="number">3</span>, <span class="string">b&quot;k9&quot;</span>, <span class="string">b&quot;&quot;</span>, <span class="number">1</span>), <span class="ident">StateRole</span>::<span class="ident">Follower</span>),
+                (<span class="ident">new_region</span>(<span class="number">1</span>, <span class="string">b&quot;&quot;</span>, <span class="string">b&quot;k1&quot;</span>, <span class="number">1</span>), <span class="ident">StateRole::Follower</span>),
+                (<span class="ident">new_region</span>(<span class="number">2</span>, <span class="string">b&quot;k1&quot;</span>, <span class="string">b&quot;k9&quot;</span>, <span class="number">3</span>), <span class="ident">StateRole::Leader</span>),
+                (<span class="ident">new_region</span>(<span class="number">3</span>, <span class="string">b&quot;k9&quot;</span>, <span class="string">b&quot;&quot;</span>, <span class="number">1</span>), <span class="ident">StateRole::Follower</span>),
             ],
         );
     }
 }
 </pre></div>
-</section><section id="search" class="content hidden"></section><section class="footer"></section><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="raftstore"></div>
-    <script src="../../../main.js"></script><script src="../../../source-script.js"></script><script src="../../../source-files.js"></script><script defer src="../../../search-index.js"></script></body></html>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="raftstore" data-search-js="../../../search-index.js"></div>
+    <script src="../../../main.js"></script><script src="../../../source-script.js"></script><script src="../../../source-files.js"></script></body></html>

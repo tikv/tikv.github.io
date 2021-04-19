@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["TiKVStorage","A `Storage` implementation over TiKV's storage."]]});
+initSidebarItems({"struct":[["TiKVStorage","A `Storage` implementation over TiKV’s storage."]]});

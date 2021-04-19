@@ -1,1 +1,1 @@
-initSidebarItems({"mod":[["endpoint",""]],"struct":[["Endpoint","A pool to build and run Coprocessor request handlers."]]});
+initSidebarItems({"mod":[["endpoint",""],["plugin_registry",""],["raw_storage_impl",""]],"struct":[["Endpoint","A pool to build and run Coprocessor request handlers."]]});
