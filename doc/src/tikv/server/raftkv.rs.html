@@ -625,7 +625,6 @@
 <span id="622">622</span>
 <span id="623">623</span>
 <span id="624">624</span>
-<span id="625">625</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -637,7 +636,6 @@
 };
 <span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">sync::Arc</span>, <span class="ident">time::Duration</span>};
 
-<span class="kw">use</span> <span class="ident">bitflags::bitflags</span>;
 <span class="kw">use</span> <span class="ident">concurrency_manager::ConcurrencyManager</span>;
 <span class="kw">use</span> <span class="ident">engine_rocks</span>::{<span class="ident">RocksEngine</span>, <span class="ident">RocksSnapshot</span>};
 <span class="kw">use</span> <span class="ident">engine_traits::CF_DEFAULT</span>;
@@ -668,7 +666,9 @@
     <span class="ident">store</span>::{<span class="ident">Callback</span> <span class="kw">as</span> <span class="ident">StoreCallback</span>, <span class="ident">ReadIndexContext</span>, <span class="ident">ReadResponse</span>, <span class="ident">WriteResponse</span>},
 };
 <span class="kw">use</span> <span class="ident">raftstore</span>::{<span class="ident">coprocessor::ReadIndexObserver</span>, <span class="ident">errors::Error</span> <span class="kw">as</span> <span class="ident">RaftServerError</span>};
+<span class="kw">use</span> <span class="ident">tikv_util::codec::number::NumberEncoder</span>;
 <span class="kw">use</span> <span class="ident">tikv_util::time::Instant</span>;
+<span class="kw">use</span> <span class="ident">txn_types::WriteBatchFlags</span>;
 
 <span class="macro">quick_error!</span> {
     <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
@@ -838,7 +838,15 @@
         <span class="ident">req</span>: <span class="ident">Request</span>,
         <span class="ident">cb</span>: <span class="ident">Callback</span><span class="op">&lt;</span><span class="ident">CmdRes</span><span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">header</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">new_request_header</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">ctx</span>.<span class="ident">pb_ctx</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">header</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">new_request_header</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">ctx</span>.<span class="ident">pb_ctx</span>);
+        <span class="kw">if</span> <span class="ident">ctx</span>.<span class="ident">pb_ctx</span>.<span class="ident">get_stale_read</span>() <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="ident">ctx</span>.<span class="ident">start_ts</span>.<span class="ident">is_zero</span>() {
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">data</span> <span class="op">=</span> [<span class="number">0u8</span>; <span class="number">8</span>];
+            (<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">data</span>[..])
+                .<span class="ident">encode_u64</span>(<span class="ident">ctx</span>.<span class="ident">start_ts</span>.<span class="ident">into_inner</span>())
+                .<span class="ident">unwrap</span>();
+            <span class="ident">header</span>.<span class="ident">set_flags</span>(<span class="ident">WriteBatchFlags::STALE_READ</span>.<span class="ident">bits</span>());
+            <span class="ident">header</span>.<span class="ident">set_flag_data</span>(<span class="ident">data</span>.<span class="ident">into</span>());
+        }
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cmd</span> <span class="op">=</span> <span class="ident">RaftCmdRequest::default</span>();
         <span class="ident">cmd</span>.<span class="ident">set_header</span>(<span class="ident">header</span>);
         <span class="ident">cmd</span>.<span class="ident">set_requests</span>(<span class="macro">vec!</span>[<span class="ident">req</span>].<span class="ident">into</span>());
@@ -1049,7 +1057,7 @@
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">Request::default</span>();
         <span class="ident">req</span>.<span class="ident">set_cmd_type</span>(<span class="ident">CmdType::Snap</span>);
-        <span class="kw">if</span> <span class="op">!</span><span class="ident">ctx</span>.<span class="ident">start_ts</span>.<span class="ident">is_zero</span>() {
+        <span class="kw">if</span> <span class="op">!</span><span class="ident">ctx</span>.<span class="ident">key_ranges</span>.<span class="ident">is_empty</span>() <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="ident">ctx</span>.<span class="ident">start_ts</span>.<span class="ident">is_zero</span>() {
             <span class="ident">req</span>.<span class="ident">mut_read_index</span>().<span class="ident">set_start_ts</span>(<span class="ident">ctx</span>.<span class="ident">start_ts</span>.<span class="ident">into_inner</span>());
             <span class="ident">req</span>.<span class="ident">mut_read_index</span>()
                 .<span class="ident">set_key_ranges</span>(<span class="ident">mem::take</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>.<span class="ident">key_ranges</span>).<span class="ident">into</span>());
@@ -1179,16 +1187,6 @@
             }
             <span class="ident">msg</span>.<span class="ident">mut_entries</span>()[<span class="number">0</span>].<span class="ident">set_data</span>(<span class="ident">rctx</span>.<span class="ident">to_bytes</span>());
         }
-    }
-}
-
-<span class="macro">bitflags!</span> {
-    <span class="doccomment">/// Additional flags for a write batch.</span>
-    <span class="doccomment">/// They should be set in the `flags` field in `RaftRequestHeader`.</span>
-    <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">WriteBatchFlags</span>: <span class="ident">u64</span> {
-        <span class="doccomment">/// Indicates this request is from a 1PC transaction.</span>
-        <span class="doccomment">/// It helps CDC recognize 1PC transactions and handle them correctly.</span>
-        <span class="kw">const</span> <span class="ident">ONE_PC</span> <span class="op">=</span> <span class="number">0b00000001</span>;
     }
 }
 

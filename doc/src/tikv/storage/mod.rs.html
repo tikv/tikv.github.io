@@ -6416,7 +6416,6 @@
 <span id="6413">6413</span>
 <span id="6414">6414</span>
 <span id="6415">6415</span>
-<span id="6416">6416</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -6845,7 +6844,11 @@
                             <span class="ident">CMD</span>,
                         ) {
                             <span class="prelude-val">Ok</span>(<span class="kw-2">mut</span> <span class="ident">snap_ctx</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                                <span class="ident">snap_ctx</span>.<span class="ident">read_id</span> <span class="op">=</span> <span class="ident">read_id</span>.<span class="ident">clone</span>();
+                                <span class="ident">snap_ctx</span>.<span class="ident">read_id</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">ctx</span>.<span class="ident">get_stale_read</span>() {
+                                    <span class="prelude-val">None</span>
+                                } <span class="kw">else</span> {
+                                    <span class="ident">read_id</span>.<span class="ident">clone</span>()
+                                };
                                 <span class="ident">snap_ctx</span>
                             }
                             <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
@@ -7093,24 +7096,19 @@
                         .<span class="ident">observe</span>(<span class="ident">begin_instant</span>.<span class="ident">elapsed</span>().<span class="ident">as_secs_f64</span>());
                 }
 
-                <span class="kw">let</span> <span class="ident">snap_ctx</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">need_check_locks_in_replica_read</span>(<span class="kw-2">&amp;</span><span class="ident">ctx</span>) {
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">snap_ctx</span> <span class="op">=</span> <span class="ident">SnapContext</span> {
+                    <span class="ident">pb_ctx</span>: <span class="kw-2">&amp;</span><span class="ident">ctx</span>,
+                    <span class="ident">start_ts</span>,
+                    ..<span class="ident">Default::default</span>()
+                };
+                <span class="kw">if</span> <span class="ident">need_check_locks_in_replica_read</span>(<span class="kw-2">&amp;</span><span class="ident">ctx</span>) {
                     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">key_range</span> <span class="op">=</span> <span class="ident">KeyRange::default</span>();
                     <span class="ident">key_range</span>.<span class="ident">set_start_key</span>(<span class="ident">start_key</span>.<span class="ident">as_encoded</span>().<span class="ident">to_vec</span>());
                     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">end_key</span>) <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">end_key</span> {
                         <span class="ident">key_range</span>.<span class="ident">set_end_key</span>(<span class="ident">end_key</span>.<span class="ident">as_encoded</span>().<span class="ident">to_vec</span>());
                     }
-                    <span class="ident">SnapContext</span> {
-                        <span class="ident">pb_ctx</span>: <span class="kw-2">&amp;</span><span class="ident">ctx</span>,
-                        <span class="ident">read_id</span>: <span class="prelude-val">None</span>,
-                        <span class="ident">start_ts</span>,
-                        <span class="ident">key_ranges</span>: <span class="macro">vec!</span>[<span class="ident">key_range</span>],
-                    }
-                } <span class="kw">else</span> {
-                    <span class="ident">SnapContext</span> {
-                        <span class="ident">pb_ctx</span>: <span class="kw-2">&amp;</span><span class="ident">ctx</span>,
-                        ..<span class="ident">Default::default</span>()
-                    }
-                };
+                    <span class="ident">snap_ctx</span>.<span class="ident">key_ranges</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="ident">key_range</span>];
+                }
 
                 <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span>
                     <span class="self">Self</span><span class="ident">::with_tls_engine</span>(<span class="op">|</span><span class="ident">engine</span><span class="op">|</span> <span class="self">Self</span><span class="ident">::snapshot</span>(<span class="ident">engine</span>, <span class="ident">snap_ctx</span>)).<span class="kw">await</span><span class="question-mark">?</span>;

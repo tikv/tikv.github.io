@@ -4185,6 +4185,54 @@
 <span id="4182">4182</span>
 <span id="4183">4183</span>
 <span id="4184">4184</span>
+<span id="4185">4185</span>
+<span id="4186">4186</span>
+<span id="4187">4187</span>
+<span id="4188">4188</span>
+<span id="4189">4189</span>
+<span id="4190">4190</span>
+<span id="4191">4191</span>
+<span id="4192">4192</span>
+<span id="4193">4193</span>
+<span id="4194">4194</span>
+<span id="4195">4195</span>
+<span id="4196">4196</span>
+<span id="4197">4197</span>
+<span id="4198">4198</span>
+<span id="4199">4199</span>
+<span id="4200">4200</span>
+<span id="4201">4201</span>
+<span id="4202">4202</span>
+<span id="4203">4203</span>
+<span id="4204">4204</span>
+<span id="4205">4205</span>
+<span id="4206">4206</span>
+<span id="4207">4207</span>
+<span id="4208">4208</span>
+<span id="4209">4209</span>
+<span id="4210">4210</span>
+<span id="4211">4211</span>
+<span id="4212">4212</span>
+<span id="4213">4213</span>
+<span id="4214">4214</span>
+<span id="4215">4215</span>
+<span id="4216">4216</span>
+<span id="4217">4217</span>
+<span id="4218">4218</span>
+<span id="4219">4219</span>
+<span id="4220">4220</span>
+<span id="4221">4221</span>
+<span id="4222">4222</span>
+<span id="4223">4223</span>
+<span id="4224">4224</span>
+<span id="4225">4225</span>
+<span id="4226">4226</span>
+<span id="4227">4227</span>
+<span id="4228">4228</span>
+<span id="4229">4229</span>
+<span id="4230">4230</span>
+<span id="4231">4231</span>
+<span id="4232">4232</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -4241,11 +4289,13 @@
 <span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">Error</span>, <span class="prelude-ty">Result</span>};
 <span class="kw">use</span> <span class="ident">collections</span>::{<span class="ident">HashMap</span>, <span class="ident">HashSet</span>};
 <span class="kw">use</span> <span class="ident">pd_client::INVALID_ID</span>;
+<span class="kw">use</span> <span class="ident">tikv_util::codec::number::decode_u64</span>;
 <span class="kw">use</span> <span class="ident">tikv_util::time</span>::{<span class="ident">duration_to_sec</span>, <span class="ident">monotonic_raw_now</span>};
 <span class="kw">use</span> <span class="ident">tikv_util::time</span>::{<span class="ident">Instant</span> <span class="kw">as</span> <span class="ident">UtilInstant</span>, <span class="ident">ThreadReadId</span>};
 <span class="kw">use</span> <span class="ident">tikv_util::worker</span>::{<span class="ident">FutureScheduler</span>, <span class="ident">Scheduler</span>};
 <span class="kw">use</span> <span class="ident">tikv_util::Either</span>;
 <span class="kw">use</span> <span class="ident">tikv_util</span>::{<span class="ident">box_err</span>, <span class="ident">debug</span>, <span class="ident">error</span>, <span class="ident">info</span>, <span class="ident">warn</span>};
+<span class="kw">use</span> <span class="ident">txn_types::WriteBatchFlags</span>;
 
 <span class="kw">use</span> <span class="kw">super</span><span class="ident">::cmd_resp</span>;
 <span class="kw">use</span> <span class="kw">super</span><span class="ident">::local_metrics</span>::{<span class="ident">RaftReadyMetrics</span>, <span class="ident">RaftSendMessageMetrics</span>};
@@ -4695,6 +4745,9 @@
     <span class="doccomment">/// reading rocksdb. To avoid unnecessary io operations, we always let the later</span>
     <span class="doccomment">/// task run when there are more than 1 pending tasks.</span>
     <span class="kw">pub</span> <span class="ident">pending_pd_heartbeat_tasks</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicU64</span><span class="op">&gt;</span>,
+
+    <span class="comment">// TODO: `safe_ts` serve as a placehodler, should remove it later</span>
+    <span class="kw">pub</span> <span class="ident">safe_ts</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicU64</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span> <span class="ident">Peer</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>
@@ -4788,6 +4841,7 @@
             <span class="ident">cmd_epoch_checker</span>: <span class="ident">Default::default</span>(),
             <span class="ident">last_unpersisted_number</span>: <span class="number">0</span>,
             <span class="ident">pending_pd_heartbeat_tasks</span>: <span class="ident">Arc::new</span>(<span class="ident">AtomicU64::new</span>(<span class="number">0</span>)),
+            <span class="ident">safe_ts</span>: <span class="ident">Arc::new</span>(<span class="ident">AtomicU64::new</span>(<span class="number">0</span>)),
         };
 
         <span class="comment">// If this region has only one peer and I am the one, campaign directly.</span>
@@ -6450,7 +6504,7 @@
 
         <span class="kw">let</span> <span class="ident">policy</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">inspect</span>(<span class="kw-2">&amp;</span><span class="ident">req</span>);
         <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">policy</span> {
-            <span class="prelude-val">Ok</span>(<span class="ident">RequestPolicy::ReadLocal</span>) <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="prelude-val">Ok</span>(<span class="ident">RequestPolicy::ReadLocal</span>) <span class="op">|</span> <span class="prelude-val">Ok</span>(<span class="ident">RequestPolicy::StaleRead</span>) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="self">self</span>.<span class="ident">read_local</span>(<span class="ident">ctx</span>, <span class="ident">req</span>, <span class="ident">cb</span>);
                 <span class="kw">return</span> <span class="bool-val">false</span>;
             }
@@ -7391,6 +7445,31 @@
                 };
             }
         }
+        <span class="kw">let</span> <span class="ident">flags</span> <span class="op">=</span> <span class="ident">WriteBatchFlags::from_bits_check</span>(<span class="ident">req</span>.<span class="ident">get_header</span>().<span class="ident">get_flags</span>());
+        <span class="kw">if</span> <span class="ident">flags</span>.<span class="ident">contains</span>(<span class="ident">WriteBatchFlags::STALE_READ</span>) {
+            <span class="kw">let</span> <span class="ident">read_ts</span> <span class="op">=</span> <span class="ident">decode_u64</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">req</span>.<span class="ident">get_header</span>().<span class="ident">get_flag_data</span>()).<span class="ident">unwrap</span>();
+            <span class="kw">let</span> <span class="ident">safe_ts</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">safe_ts</span>.<span class="ident">load</span>(<span class="ident">Ordering::Acquire</span>);
+            <span class="kw">if</span> <span class="ident">safe_ts</span> <span class="op">&lt;</span> <span class="ident">read_ts</span> {
+                <span class="macro">warn!</span>(
+                    <span class="string">&quot;read rejected by safe timestamp&quot;</span>;
+                    <span class="string">&quot;safe ts&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">safe_ts</span>,
+                    <span class="string">&quot;read ts&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">read_ts</span>,
+                    <span class="string">&quot;tag&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">tag</span>
+                );
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">response</span> <span class="op">=</span> <span class="ident">cmd_resp::new_error</span>(<span class="ident">Error::DataIsNotReady</span>(
+                    <span class="ident">region</span>.<span class="ident">get_id</span>(),
+                    <span class="self">self</span>.<span class="ident">peer_id</span>(),
+                    <span class="ident">safe_ts</span>,
+                ));
+                <span class="ident">cmd_resp::bind_term</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">response</span>, <span class="self">self</span>.<span class="ident">term</span>());
+                <span class="kw">return</span> <span class="ident">ReadResponse</span> {
+                    <span class="ident">response</span>,
+                    <span class="ident">snapshot</span>: <span class="prelude-val">None</span>,
+                    <span class="ident">txn_extra_op</span>: <span class="ident">TxnExtraOp::Noop</span>,
+                };
+            }
+        }
+
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">ctx</span>.<span class="ident">execute</span>(<span class="kw-2">&amp;</span><span class="ident">req</span>, <span class="kw-2">&amp;</span><span class="ident">Arc::new</span>(<span class="ident">region</span>), <span class="ident">read_index</span>, <span class="prelude-val">None</span>);
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">snap</span>) <span class="op">=</span> <span class="ident">resp</span>.<span class="ident">snapshot</span>.<span class="ident">as_mut</span>() {
             <span class="ident">snap</span>.<span class="ident">max_ts_sync_status</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="self">self</span>.<span class="ident">max_ts_sync_status</span>.<span class="ident">clone</span>());
@@ -7780,6 +7859,7 @@
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">RequestPolicy</span> {
     <span class="comment">// Handle the read request directly without dispatch.</span>
     <span class="ident">ReadLocal</span>,
+    <span class="ident">StaleRead</span>,
     <span class="comment">// Handle the read request via raft&#39;s SafeReadIndex mechanism.</span>
     <span class="ident">ReadIndex</span>,
     <span class="ident">ProposeNormal</span>,
@@ -7830,6 +7910,11 @@
 
         <span class="kw">if</span> <span class="ident">has_write</span> {
             <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">RequestPolicy::ProposeNormal</span>);
+        }
+
+        <span class="kw">let</span> <span class="ident">flags</span> <span class="op">=</span> <span class="ident">WriteBatchFlags::from_bits_check</span>(<span class="ident">req</span>.<span class="ident">get_header</span>().<span class="ident">get_flags</span>());
+        <span class="kw">if</span> <span class="ident">flags</span>.<span class="ident">contains</span>(<span class="ident">WriteBatchFlags::STALE_READ</span>) {
+            <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">RequestPolicy::StaleRead</span>);
         }
 
         <span class="kw">if</span> <span class="ident">req</span>.<span class="ident">get_header</span>().<span class="ident">get_read_quorum</span>() {
@@ -8104,6 +8189,17 @@
             <span class="ident">request</span>.<span class="ident">set_cmd_type</span>(<span class="ident">op</span>);
             <span class="ident">req</span>.<span class="ident">set_requests</span>(<span class="macro">vec!</span>[<span class="ident">request</span>].<span class="ident">into</span>());
             <span class="ident">table</span>.<span class="ident">push</span>((<span class="ident">req</span>.<span class="ident">clone</span>(), <span class="ident">policy</span>));
+        }
+
+        <span class="comment">// Stale read</span>
+        <span class="kw">for</span> <span class="ident">op</span> <span class="kw">in</span> <span class="kw-2">&amp;</span>[<span class="ident">CmdType::Get</span>, <span class="ident">CmdType::Snap</span>] {
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">req</span>.<span class="ident">clone</span>();
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">request</span> <span class="op">=</span> <span class="ident">raft_cmdpb::Request::default</span>();
+            <span class="ident">request</span>.<span class="ident">set_cmd_type</span>(<span class="kw-2">*</span><span class="ident">op</span>);
+            <span class="ident">req</span>.<span class="ident">set_requests</span>(<span class="macro">vec!</span>[<span class="ident">request</span>].<span class="ident">into</span>());
+            <span class="ident">req</span>.<span class="ident">mut_header</span>()
+                .<span class="ident">set_flags</span>(<span class="ident">txn_types::WriteBatchFlags::STALE_READ</span>.<span class="ident">bits</span>());
+            <span class="ident">table</span>.<span class="ident">push</span>((<span class="ident">req</span>, <span class="ident">RequestPolicy::StaleRead</span>));
         }
 
         <span class="kw">for</span> <span class="kw-2">&amp;</span><span class="ident">applied_to_index_term</span> <span class="kw">in</span> <span class="kw-2">&amp;</span>[<span class="bool-val">true</span>, <span class="bool-val">false</span>] {
