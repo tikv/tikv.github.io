@@ -2275,6 +2275,11 @@
 <span id="2272">2272</span>
 <span id="2273">2273</span>
 <span id="2274">2274</span>
+<span id="2275">2275</span>
+<span id="2276">2276</span>
+<span id="2277">2277</span>
+<span id="2278">2278</span>
+<span id="2279">2279</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -3528,6 +3533,8 @@
             <span class="comment">// unlock incremental_scan_state</span>
         }
 
+        <span class="macro">fail_point!</span>(<span class="string">&quot;cdc_after_incremental_scan_blocks_regional_errors&quot;</span>);
+
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">done</span> <span class="op">=</span> <span class="bool-val">false</span>;
         <span class="kw">while</span> <span class="op">!</span><span class="ident">done</span> {
             <span class="kw">if</span> <span class="self">self</span>.<span class="ident">downstream_state</span>.<span class="ident">load</span>() <span class="op">!</span><span class="op">=</span> <span class="ident">DownstreamState::Normal</span> {
@@ -3535,6 +3542,7 @@
                     <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>,
                     <span class="string">&quot;downstream_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">downstream_id</span>,
                     <span class="string">&quot;observe_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="self">self</span>.<span class="ident">observe_id</span>);
+                <span class="self">self</span>.<span class="ident">deregister_downstream</span>(<span class="prelude-val">None</span>);
                 <span class="kw">return</span>;
             }
             <span class="kw">let</span> <span class="ident">scan_context</span> <span class="op">=</span> <span class="ident">scan_context</span>.<span class="ident">clone</span>();
@@ -3564,8 +3572,6 @@
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="prelude-val">None</span>) <span class="op">=</span> <span class="ident">entries</span>.<span class="ident">last</span>() {
                 <span class="ident">done</span> <span class="op">=</span> <span class="bool-val">true</span>;
             }
-
-            <span class="macro">fail_point!</span>(<span class="string">&quot;before_schedule_incremental_scan&quot;</span>);
 
             <span class="kw">let</span> <span class="ident">downstream</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">downstream</span>.<span class="ident">as_ref</span>().<span class="ident">unwrap</span>();
             <span class="kw">let</span> <span class="ident">events</span> <span class="op">=</span>
@@ -3633,6 +3639,7 @@
                     <span class="macro">info!</span>(<span class="string">&quot;cdc incremental scan finished after region error, sending error&quot;</span>; <span class="string">&quot;err_event&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">err_event</span>);
                     <span class="self">self</span>.<span class="ident">downstream_state</span>.<span class="ident">store</span>(<span class="ident">DownstreamState::Stopped</span>);
                     <span class="self">self</span>.<span class="ident">downstream</span>.<span class="ident">as_ref</span>().<span class="ident">unwrap</span>().<span class="ident">sink_error</span>(<span class="ident">err_event</span>);
+                    <span class="kw">return</span>;
                 }
                 <span class="ident">other</span> <span class="op">=</span><span class="op">&gt;</span> {
                     <span class="macro">panic!</span>(<span class="string">&quot;unexpected incremental scan state {:?}&quot;</span>, <span class="ident">other</span>);
@@ -4175,8 +4182,11 @@
         <span class="kw">loop</span> {
             <span class="kw">let</span> <span class="ident">task</span> <span class="op">=</span> <span class="ident">rx</span>.<span class="ident">recv_timeout</span>(<span class="ident">Duration::from_secs</span>(<span class="number">1</span>));
             <span class="kw">match</span> <span class="ident">task</span> {
-                <span class="prelude-val">Ok</span>(<span class="ident">t</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic!</span>(<span class="string">&quot;unepxected task {} received&quot;</span>, <span class="ident">t</span>),
-                <span class="prelude-val">Err</span>(<span class="ident">RecvTimeoutError::Timeout</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">break</span>,
+                <span class="prelude-val">Ok</span>(<span class="ident">Task::Deregister</span>(<span class="ident">Deregister::Downstream</span> { <span class="ident">region_id</span>, .. })) <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="macro">assert_eq!</span>(<span class="ident">region_id</span>, <span class="ident">initializer</span>.<span class="ident">region_id</span>);
+                    <span class="kw">break</span>;
+                }
+                <span class="prelude-val">Ok</span>(<span class="ident">other</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic!</span>(<span class="string">&quot;unexpected task {:?}&quot;</span>, <span class="ident">other</span>),
                 <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic!</span>(<span class="string">&quot;unexpected err {:?}&quot;</span>, <span class="ident">e</span>),
             }
         }
