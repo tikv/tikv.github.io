@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["TEMP_DIR",""]],"enum":[["Task",""]],"fn":[["write_modifies","Write modifications into a `BaseRocksEngine` instance."]],"struct":[["RocksEngine","The RocksEngine is based on `RocksDB`."],["RocksEngineCore",""],["RocksSnapshot",""],["Runner",""]]});
+initSidebarItems({"constant":[["TEMP_DIR",""]],"enum":[["Task",""]],"struct":[["RocksEngine","The RocksEngine is based on `RocksDB`."],["RocksEngineCore",""],["RocksSnapshot",""],["Runner",""]]});
