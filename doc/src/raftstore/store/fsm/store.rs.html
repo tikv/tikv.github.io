@@ -2456,6 +2456,12 @@
 <span id="2453">2453</span>
 <span id="2454">2454</span>
 <span id="2455">2455</span>
+<span id="2456">2456</span>
+<span id="2457">2457</span>
+<span id="2458">2458</span>
+<span id="2459">2459</span>
+<span id="2460">2460</span>
+<span id="2461">2461</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -2463,7 +2469,7 @@
 <span class="kw">use</span> <span class="ident">std::collections::BTreeMap</span>;
 <span class="kw">use</span> <span class="ident">std::collections::Bound</span>::{<span class="ident">Excluded</span>, <span class="ident">Included</span>, <span class="ident">Unbounded</span>};
 <span class="kw">use</span> <span class="ident">std::ops::Deref</span>;
-<span class="kw">use</span> <span class="ident">std::sync::atomic</span>::{<span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>};
+<span class="kw">use</span> <span class="ident">std::sync::atomic</span>::{<span class="ident">AtomicU64</span>, <span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>};
 <span class="kw">use</span> <span class="ident">std::sync</span>::{<span class="ident">Arc</span>, <span class="ident">Mutex</span>};
 <span class="kw">use</span> <span class="ident">std::time</span>::{<span class="ident">Duration</span>, <span class="ident">Instant</span>};
 <span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">mem</span>, <span class="ident">u64</span>};
@@ -2580,6 +2586,9 @@
     <span class="doccomment">/// source_region_id -&gt; need_atomic</span>
     <span class="doccomment">/// Used for reminding the source peer to switch to ready in `atomic_snap_regions`.</span>
     <span class="kw">pub</span> <span class="ident">destroyed_region_for_snap</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">u64</span>, <span class="ident">bool</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// region-id -&gt; peer_property</span>
+    <span class="doccomment">/// TODO: for now simply put the safe ts here, need to add more information here later.</span>
+    <span class="kw">pub</span> <span class="ident">peer_properties</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">u64</span>, <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicU64</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">StoreMeta</span> {
@@ -2596,6 +2605,7 @@
             <span class="ident">targets_map</span>: <span class="ident">HashMap::default</span>(),
             <span class="ident">atomic_snap_regions</span>: <span class="ident">HashMap::default</span>(),
             <span class="ident">destroyed_region_for_snap</span>: <span class="ident">HashMap::default</span>(),
+            <span class="ident">peer_properties</span>: <span class="ident">HashMap::default</span>(),
         }
     }
 
@@ -3741,6 +3751,8 @@
                 <span class="kw">let</span> <span class="ident">peer</span> <span class="op">=</span> <span class="ident">peer_fsm</span>.<span class="ident">get_peer</span>();
                 <span class="ident">meta</span>.<span class="ident">readers</span>
                     .<span class="ident">insert</span>(<span class="ident">peer_fsm</span>.<span class="ident">region_id</span>(), <span class="ident">ReadDelegate::from_peer</span>(<span class="ident">peer</span>));
+                <span class="ident">meta</span>.<span class="ident">peer_properties</span>
+                    .<span class="ident">insert</span>(<span class="ident">peer_fsm</span>.<span class="ident">region_id</span>(), <span class="ident">Arc::default</span>());
             }
         }
 

@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["SinkCmd",""]],"trait":[["CmdSinker",""]]});
+initSidebarItems({"struct":[["DummySinker",""],["SinkCmd",""]],"trait":[["CmdSinker",""]]});

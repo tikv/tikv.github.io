@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["Task",""]]});
+initSidebarItems({"enum":[["PendingLock",""],["ResolverStatus",""],["Task",""]],"struct":[["Endpoint",""],["ObserveRegion",""]]});

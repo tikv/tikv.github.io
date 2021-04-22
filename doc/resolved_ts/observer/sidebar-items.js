@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["ChangeDataObserver",""]]});
+initSidebarItems({"struct":[["Observer",""]]});

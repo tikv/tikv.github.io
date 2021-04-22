@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["AdvanceTsWorker",""]]});
+initSidebarItems({"constant":[["FEATURE_RESOLVED_TS_STORE",""]],"fn":[["find_store_id",""],["region_has_quorum",""]],"struct":[["AdvanceTsWorker",""]]});

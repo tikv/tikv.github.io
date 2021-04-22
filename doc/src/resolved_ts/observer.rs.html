@@ -105,6 +105,19 @@
 <span id="102">102</span>
 <span id="103">103</span>
 <span id="104">104</span>
+<span id="105">105</span>
+<span id="106">106</span>
+<span id="107">107</span>
+<span id="108">108</span>
+<span id="109">109</span>
+<span id="110">110</span>
+<span id="111">111</span>
+<span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2021 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -121,38 +134,61 @@
 
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::endpoint::Task</span>;
 
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ChangeDataObserver</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">KvEngine</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Observer</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">KvEngine</span><span class="op">&gt;</span> {
     <span class="ident">cmd_batches</span>: <span class="ident">RefCell</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">CmdBatch</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">scheduler</span>: <span class="ident">Scheduler</span><span class="op">&lt;</span><span class="ident">Task</span><span class="op">&lt;</span><span class="ident">E::Snapshot</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">KvEngine</span><span class="op">&gt;</span> <span class="ident">ChangeDataObserver</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">KvEngine</span><span class="op">&gt;</span> <span class="ident">Observer</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">scheduler</span>: <span class="ident">Scheduler</span><span class="op">&lt;</span><span class="ident">Task</span><span class="op">&lt;</span><span class="ident">E::Snapshot</span><span class="op">&gt;</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="ident">ChangeDataObserver</span> {
+        <span class="ident">Observer</span> {
             <span class="ident">cmd_batches</span>: <span class="ident">RefCell::default</span>(),
             <span class="ident">scheduler</span>,
         }
     }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">register_to</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">coprocessor_host</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">CoprocessorHost</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>) {
+        <span class="comment">// 100 is the priority of the observer. CDC should have a high priority.</span>
+        <span class="ident">coprocessor_host</span>
+            .<span class="ident">registry</span>
+            .<span class="ident">register_cmd_observer</span>(<span class="number">100</span>, <span class="ident">BoxCmdObserver::new</span>(<span class="self">self</span>.<span class="ident">clone</span>()));
+        <span class="ident">coprocessor_host</span>
+            .<span class="ident">registry</span>
+            .<span class="ident">register_role_observer</span>(<span class="number">100</span>, <span class="ident">BoxRoleObserver::new</span>(<span class="self">self</span>.<span class="ident">clone</span>()));
+        <span class="ident">coprocessor_host</span>
+            .<span class="ident">registry</span>
+            .<span class="ident">register_region_change_observer</span>(<span class="number">100</span>, <span class="ident">BoxRegionChangeObserver::new</span>(<span class="self">self</span>.<span class="ident">clone</span>()));
+    }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">KvEngine</span><span class="op">&gt;</span> <span class="ident">Coprocessor</span> <span class="kw">for</span> <span class="ident">ChangeDataObserver</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {}
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">KvEngine</span><span class="op">&gt;</span> <span class="ident">Clone</span> <span class="kw">for</span> <span class="ident">Observer</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+        <span class="self">Self</span> {
+            <span class="ident">cmd_batches</span>: <span class="self">self</span>.<span class="ident">cmd_batches</span>.<span class="ident">clone</span>(),
+            <span class="ident">scheduler</span>: <span class="self">self</span>.<span class="ident">scheduler</span>.<span class="ident">clone</span>(),
+        }
+    }
+}
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">KvEngine</span><span class="op">&gt;</span> <span class="ident">CmdObserver</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ChangeDataObserver</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">on_prepare_for_apply</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">observe_id</span>: <span class="ident">ObserveID</span>, <span class="ident">region_id</span>: <span class="ident">u64</span>) {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">KvEngine</span><span class="op">&gt;</span> <span class="ident">Coprocessor</span> <span class="kw">for</span> <span class="ident">Observer</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">KvEngine</span><span class="op">&gt;</span> <span class="ident">CmdObserver</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Observer</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">on_prepare_for_apply</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">cdc_id</span>: <span class="ident">ObserveID</span>, <span class="ident">rts_id</span>: <span class="ident">ObserveID</span>, <span class="ident">region_id</span>: <span class="ident">u64</span>) {
         <span class="self">self</span>.<span class="ident">cmd_batches</span>
             .<span class="ident">borrow_mut</span>()
-            .<span class="ident">push</span>(<span class="ident">CmdBatch::new</span>(<span class="ident">observe_id</span>, <span class="ident">region_id</span>));
+            .<span class="ident">push</span>(<span class="ident">CmdBatch::new</span>(<span class="ident">cdc_id</span>, <span class="ident">rts_id</span>, <span class="ident">region_id</span>));
     }
 
-    <span class="kw">fn</span> <span class="ident">on_apply_cmd</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">observe_id</span>: <span class="ident">ObserveID</span>, <span class="ident">region_id</span>: <span class="ident">u64</span>, <span class="ident">cmd</span>: <span class="ident">Cmd</span>) {
+    <span class="kw">fn</span> <span class="ident">on_apply_cmd</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">cdc_id</span>: <span class="ident">ObserveID</span>, <span class="ident">rts_id</span>: <span class="ident">ObserveID</span>, <span class="ident">region_id</span>: <span class="ident">u64</span>, <span class="ident">cmd</span>: <span class="ident">Cmd</span>) {
         <span class="self">self</span>.<span class="ident">cmd_batches</span>
             .<span class="ident">borrow_mut</span>()
             .<span class="ident">last_mut</span>()
             .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="macro">panic!</span>(<span class="string">&quot;region {} should exist some cmd batch&quot;</span>, <span class="ident">region_id</span>))
-            .<span class="ident">push</span>(<span class="ident">observe_id</span>, <span class="ident">region_id</span>, <span class="ident">cmd</span>);
+            .<span class="ident">push</span>(<span class="ident">cdc_id</span>, <span class="ident">rts_id</span>, <span class="ident">region_id</span>, <span class="ident">cmd</span>);
     }
 
     <span class="kw">fn</span> <span class="ident">on_flush_apply</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">engine</span>: <span class="ident">E</span>) {
+        <span class="self">self</span>.<span class="ident">cmd_batches</span>.<span class="ident">borrow_mut</span>().<span class="ident">retain</span>(<span class="op">|</span><span class="ident">b</span><span class="op">|</span> <span class="op">!</span><span class="ident">b</span>.<span class="ident">is_empty</span>());
         <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">cmd_batches</span>.<span class="ident">borrow</span>().<span class="ident">is_empty</span>() {
             <span class="kw">let</span> <span class="ident">batches</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">cmd_batches</span>.<span class="ident">replace</span>(<span class="ident">Vec::default</span>());
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">region</span> <span class="op">=</span> <span class="ident">Region::default</span>();
@@ -171,7 +207,7 @@
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">KvEngine</span><span class="op">&gt;</span> <span class="ident">RoleObserver</span> <span class="kw">for</span> <span class="ident">ChangeDataObserver</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">KvEngine</span><span class="op">&gt;</span> <span class="ident">RoleObserver</span> <span class="kw">for</span> <span class="ident">Observer</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
     <span class="kw">fn</span> <span class="ident">on_role_change</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ObserverContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>, <span class="ident">role</span>: <span class="ident">StateRole</span>) {
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">scheduler</span>.<span class="ident">schedule</span>(<span class="ident">Task::RegionRoleChanged</span> {
             <span class="ident">role</span>,
@@ -182,31 +218,21 @@
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">KvEngine</span><span class="op">&gt;</span> <span class="ident">RegionChangeObserver</span> <span class="kw">for</span> <span class="ident">ChangeDataObserver</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">KvEngine</span><span class="op">&gt;</span> <span class="ident">RegionChangeObserver</span> <span class="kw">for</span> <span class="ident">Observer</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
     <span class="kw">fn</span> <span class="ident">on_region_changed</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ObserverContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>,
         <span class="ident">event</span>: <span class="ident">RegionChangeEvent</span>,
         <span class="kw">_</span>: <span class="ident">StateRole</span>,
     ) {
-        <span class="kw">match</span> <span class="ident">event</span> {
-            <span class="ident">RegionChangeEvent::Destroy</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="self">self</span>
-                    .<span class="ident">scheduler</span>
-                    .<span class="ident">schedule</span>(<span class="ident">Task::RegionDestroyed</span>(<span class="ident">ctx</span>.<span class="ident">region</span>().<span class="ident">clone</span>()))
-                {
-                    <span class="macro">info!</span>(<span class="string">&quot;failed to schedule region destroyed event&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
-                }
+        <span class="comment">// TODO: handle region update event</span>
+        <span class="kw">if</span> <span class="kw">let</span> <span class="ident">RegionChangeEvent::Destroy</span> <span class="op">=</span> <span class="ident">event</span> {
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="self">self</span>
+                .<span class="ident">scheduler</span>
+                .<span class="ident">schedule</span>(<span class="ident">Task::RegionDestroyed</span>(<span class="ident">ctx</span>.<span class="ident">region</span>().<span class="ident">clone</span>()))
+            {
+                <span class="macro">info!</span>(<span class="string">&quot;failed to schedule region destroyed event&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
             }
-            <span class="ident">RegionChangeEvent::Update</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="self">self</span>
-                    .<span class="ident">scheduler</span>
-                    .<span class="ident">schedule</span>(<span class="ident">Task::RegionUpdated</span>(<span class="ident">ctx</span>.<span class="ident">region</span>().<span class="ident">clone</span>()))
-                {
-                    <span class="macro">info!</span>(<span class="string">&quot;failed to schedule region updated event&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
-                }
-            }
-            <span class="ident">RegionChangeEvent::Create</span> <span class="op">=</span><span class="op">&gt;</span> (),
         }
     }
 }

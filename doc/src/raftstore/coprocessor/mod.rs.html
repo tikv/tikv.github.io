@@ -246,6 +246,9 @@
 <span id="243">243</span>
 <span id="244">244</span>
 <span id="245">245</span>
+<span id="246">246</span>
+<span id="247">247</span>
+<span id="248">248</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -426,23 +429,26 @@
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Debug</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CmdBatch</span> {
-    <span class="kw">pub</span> <span class="ident">observe_id</span>: <span class="ident">ObserveID</span>,
+    <span class="kw">pub</span> <span class="ident">cdc_id</span>: <span class="ident">ObserveID</span>,
+    <span class="kw">pub</span> <span class="ident">rts_id</span>: <span class="ident">ObserveID</span>,
     <span class="kw">pub</span> <span class="ident">region_id</span>: <span class="ident">u64</span>,
     <span class="kw">pub</span> <span class="ident">cmds</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Cmd</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">CmdBatch</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">observe_id</span>: <span class="ident">ObserveID</span>, <span class="ident">region_id</span>: <span class="ident">u64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">CmdBatch</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">cdc_id</span>: <span class="ident">ObserveID</span>, <span class="ident">rts_id</span>: <span class="ident">ObserveID</span>, <span class="ident">region_id</span>: <span class="ident">u64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">CmdBatch</span> {
         <span class="ident">CmdBatch</span> {
-            <span class="ident">observe_id</span>,
+            <span class="ident">cdc_id</span>,
+            <span class="ident">rts_id</span>,
             <span class="ident">region_id</span>,
             <span class="ident">cmds</span>: <span class="ident">Vec::new</span>(),
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">push</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">observe_id</span>: <span class="ident">ObserveID</span>, <span class="ident">region_id</span>: <span class="ident">u64</span>, <span class="ident">cmd</span>: <span class="ident">Cmd</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">push</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">cdc_id</span>: <span class="ident">ObserveID</span>, <span class="ident">rts_id</span>: <span class="ident">ObserveID</span>, <span class="ident">region_id</span>: <span class="ident">u64</span>, <span class="ident">cmd</span>: <span class="ident">Cmd</span>) {
         <span class="macro">assert_eq!</span>(<span class="ident">region_id</span>, <span class="self">self</span>.<span class="ident">region_id</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">observe_id</span>, <span class="self">self</span>.<span class="ident">observe_id</span>);
+        <span class="macro">assert_eq!</span>(<span class="ident">cdc_id</span>, <span class="self">self</span>.<span class="ident">cdc_id</span>);
+        <span class="macro">assert_eq!</span>(<span class="ident">rts_id</span>, <span class="self">self</span>.<span class="ident">rts_id</span>);
         <span class="self">self</span>.<span class="ident">cmds</span>.<span class="ident">push</span>(<span class="ident">cmd</span>)
     }
 
@@ -481,9 +487,9 @@
 
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">CmdObserver</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>: <span class="ident">Coprocessor</span> {
     <span class="doccomment">/// Hook to call after preparing for applying write requests.</span>
-    <span class="kw">fn</span> <span class="ident">on_prepare_for_apply</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">observe_id</span>: <span class="ident">ObserveID</span>, <span class="ident">region_id</span>: <span class="ident">u64</span>);
+    <span class="kw">fn</span> <span class="ident">on_prepare_for_apply</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">cdc_id</span>: <span class="ident">ObserveID</span>, <span class="ident">rts_id</span>: <span class="ident">ObserveID</span>, <span class="ident">region_id</span>: <span class="ident">u64</span>);
     <span class="doccomment">/// Hook to call after applying a write request.</span>
-    <span class="kw">fn</span> <span class="ident">on_apply_cmd</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">observe_id</span>: <span class="ident">ObserveID</span>, <span class="ident">region_id</span>: <span class="ident">u64</span>, <span class="ident">cmd</span>: <span class="ident">Cmd</span>);
+    <span class="kw">fn</span> <span class="ident">on_apply_cmd</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">cdc_id</span>: <span class="ident">ObserveID</span>, <span class="ident">rts_id</span>: <span class="ident">ObserveID</span>, <span class="ident">region_id</span>: <span class="ident">u64</span>, <span class="ident">cmd</span>: <span class="ident">Cmd</span>);
     <span class="doccomment">/// Hook to call after flushing writes to db.</span>
     <span class="kw">fn</span> <span class="ident">on_flush_apply</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">engine</span>: <span class="ident">E</span>);
 }
