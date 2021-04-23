@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["ChunkedVecEnum","`ChunkedVecEnum` stores enum in a compact way."]]});
+initSidebarItems({"struct":[["ChunkedVecEnum","`ChunkedVecEnum` is a vector storing `Option<Enum>`."]]});

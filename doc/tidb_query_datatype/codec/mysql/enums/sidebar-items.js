@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["Enum",""],["EnumRef",""]]});
+initSidebarItems({"struct":[["Enum",""],["EnumRef",""]],"trait":[["EnumDatumPayloadChunkEncoder",""],["EnumDecoder",""],["EnumEncoder",""]]});
