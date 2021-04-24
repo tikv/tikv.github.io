@@ -231,13 +231,15 @@
 <span id="228">228</span>
 <span id="229">229</span>
 <span id="230">230</span>
+<span id="231">231</span>
+<span id="232">232</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
 <span class="kw">use</span> <span class="kw">super</span><span class="ident">::bit_vec::BitVec</span>;
 <span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">ChunkRef</span>, <span class="ident">ChunkedVec</span>, <span class="ident">UnsafeRefInto</span>};
 <span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">Enum</span>, <span class="ident">EnumRef</span>};
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::codec::data_type</span>::{<span class="ident">ChunkedVecBytes</span>, <span class="ident">ChunkedVecSized</span>, <span class="ident">Int</span>};
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::codec::data_type</span>::{<span class="ident">retain_lifetime_transmute</span>, <span class="ident">ChunkedVecBytes</span>, <span class="ident">ChunkedVecSized</span>, <span class="ident">Int</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::impl_chunked_vec_common</span>;
 
 <span class="doccomment">/// `ChunkedVecEnum` is a vector storing `Option&lt;Enum&gt;`.</span>
@@ -269,7 +271,9 @@
         <span class="macro">assert!</span>(<span class="ident">idx</span> <span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">len</span>());
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">value</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">values</span>.<span class="ident">get_option_ref</span>(<span class="ident">idx</span>) {
             <span class="kw">let</span> <span class="ident">name</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">names</span>.<span class="ident">get</span>(<span class="ident">idx</span>).<span class="ident">unwrap</span>();
-            <span class="prelude-val">Some</span>(<span class="ident">EnumRef::new</span>(<span class="ident">name</span>, <span class="kw-2">*</span><span class="ident">value</span> <span class="kw">as</span> <span class="ident">u64</span>))
+            <span class="prelude-val">Some</span>(<span class="ident">EnumRef::new</span>(<span class="ident">name</span>, <span class="kw">unsafe</span> {
+                <span class="ident">retain_lifetime_transmute</span>(<span class="ident">value</span>)
+            }))
         } <span class="kw">else</span> {
             <span class="prelude-val">None</span>
         }
@@ -406,10 +410,10 @@
         <span class="ident">x</span>.<span class="ident">push</span>(<span class="prelude-val">Some</span>(<span class="ident">Enum::new</span>(<span class="string">&quot;我成功了&quot;</span>.<span class="ident">as_bytes</span>().<span class="ident">to_vec</span>(), <span class="number">3</span>)));
 
         <span class="macro">assert_eq!</span>(<span class="ident">x</span>.<span class="ident">get</span>(<span class="number">0</span>), <span class="prelude-val">None</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">x</span>.<span class="ident">get</span>(<span class="number">1</span>), <span class="prelude-val">Some</span>(<span class="ident">EnumRef::new</span>(<span class="string">&quot;我强爆啊&quot;</span>.<span class="ident">as_bytes</span>(), <span class="number">2</span>)));
+        <span class="macro">assert_eq!</span>(<span class="ident">x</span>.<span class="ident">get</span>(<span class="number">1</span>), <span class="prelude-val">Some</span>(<span class="ident">EnumRef::new</span>(<span class="string">&quot;我强爆啊&quot;</span>.<span class="ident">as_bytes</span>(), <span class="kw-2">&amp;</span><span class="number">2</span>)));
         <span class="macro">assert_eq!</span>(<span class="ident">x</span>.<span class="ident">get</span>(<span class="number">2</span>), <span class="prelude-val">None</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">x</span>.<span class="ident">get</span>(<span class="number">3</span>), <span class="prelude-val">Some</span>(<span class="ident">EnumRef::new</span>(<span class="string">&quot;我好强啊&quot;</span>.<span class="ident">as_bytes</span>(), <span class="number">1</span>)));
-        <span class="macro">assert_eq!</span>(<span class="ident">x</span>.<span class="ident">get</span>(<span class="number">4</span>), <span class="prelude-val">Some</span>(<span class="ident">EnumRef::new</span>(<span class="string">&quot;我成功了&quot;</span>.<span class="ident">as_bytes</span>(), <span class="number">3</span>)));
+        <span class="macro">assert_eq!</span>(<span class="ident">x</span>.<span class="ident">get</span>(<span class="number">3</span>), <span class="prelude-val">Some</span>(<span class="ident">EnumRef::new</span>(<span class="string">&quot;我好强啊&quot;</span>.<span class="ident">as_bytes</span>(), <span class="kw-2">&amp;</span><span class="number">1</span>)));
+        <span class="macro">assert_eq!</span>(<span class="ident">x</span>.<span class="ident">get</span>(<span class="number">4</span>), <span class="prelude-val">Some</span>(<span class="ident">EnumRef::new</span>(<span class="string">&quot;我成功了&quot;</span>.<span class="ident">as_bytes</span>(), <span class="kw-2">&amp;</span><span class="number">3</span>)));
         <span class="macro">assert_eq!</span>(<span class="ident">x</span>.<span class="ident">len</span>(), <span class="number">5</span>);
         <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">x</span>.<span class="ident">is_empty</span>());
     }
@@ -429,7 +433,7 @@
         <span class="ident">x</span>.<span class="ident">truncate</span>(<span class="number">3</span>);
         <span class="macro">assert_eq!</span>(<span class="ident">x</span>.<span class="ident">len</span>(), <span class="number">3</span>);
         <span class="macro">assert_eq!</span>(<span class="ident">x</span>.<span class="ident">get</span>(<span class="number">0</span>), <span class="prelude-val">None</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">x</span>.<span class="ident">get</span>(<span class="number">1</span>), <span class="prelude-val">Some</span>(<span class="ident">EnumRef::new</span>(<span class="string">&quot;我强爆啊&quot;</span>.<span class="ident">as_bytes</span>(), <span class="number">2</span>)));
+        <span class="macro">assert_eq!</span>(<span class="ident">x</span>.<span class="ident">get</span>(<span class="number">1</span>), <span class="prelude-val">Some</span>(<span class="ident">EnumRef::new</span>(<span class="string">&quot;我强爆啊&quot;</span>.<span class="ident">as_bytes</span>(), <span class="kw-2">&amp;</span><span class="number">2</span>)));
         <span class="macro">assert_eq!</span>(<span class="ident">x</span>.<span class="ident">get</span>(<span class="number">2</span>), <span class="prelude-val">None</span>);
 
         <span class="ident">x</span>.<span class="ident">truncate</span>(<span class="number">1</span>);
@@ -456,10 +460,10 @@
         <span class="macro">assert!</span>(<span class="ident">y</span>.<span class="ident">is_empty</span>());
 
         <span class="macro">assert_eq!</span>(<span class="ident">x</span>.<span class="ident">get</span>(<span class="number">0</span>), <span class="prelude-val">None</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">x</span>.<span class="ident">get</span>(<span class="number">1</span>), <span class="prelude-val">Some</span>(<span class="ident">EnumRef::new</span>(<span class="string">&quot;我强爆啊&quot;</span>.<span class="ident">as_bytes</span>(), <span class="number">2</span>)));
+        <span class="macro">assert_eq!</span>(<span class="ident">x</span>.<span class="ident">get</span>(<span class="number">1</span>), <span class="prelude-val">Some</span>(<span class="ident">EnumRef::new</span>(<span class="string">&quot;我强爆啊&quot;</span>.<span class="ident">as_bytes</span>(), <span class="kw-2">&amp;</span><span class="number">2</span>)));
         <span class="macro">assert_eq!</span>(<span class="ident">x</span>.<span class="ident">get</span>(<span class="number">2</span>), <span class="prelude-val">None</span>);
-        <span class="macro">assert_eq!</span>(<span class="ident">x</span>.<span class="ident">get</span>(<span class="number">3</span>), <span class="prelude-val">Some</span>(<span class="ident">EnumRef::new</span>(<span class="string">&quot;我好强啊&quot;</span>.<span class="ident">as_bytes</span>(), <span class="number">1</span>)));
-        <span class="macro">assert_eq!</span>(<span class="ident">x</span>.<span class="ident">get</span>(<span class="number">4</span>), <span class="prelude-val">Some</span>(<span class="ident">EnumRef::new</span>(<span class="string">&quot;我成功了&quot;</span>.<span class="ident">as_bytes</span>(), <span class="number">3</span>)));
+        <span class="macro">assert_eq!</span>(<span class="ident">x</span>.<span class="ident">get</span>(<span class="number">3</span>), <span class="prelude-val">Some</span>(<span class="ident">EnumRef::new</span>(<span class="string">&quot;我好强啊&quot;</span>.<span class="ident">as_bytes</span>(), <span class="kw-2">&amp;</span><span class="number">1</span>)));
+        <span class="macro">assert_eq!</span>(<span class="ident">x</span>.<span class="ident">get</span>(<span class="number">4</span>), <span class="prelude-val">Some</span>(<span class="ident">EnumRef::new</span>(<span class="string">&quot;我成功了&quot;</span>.<span class="ident">as_bytes</span>(), <span class="kw-2">&amp;</span><span class="number">3</span>)));
     }
 }
 </pre></div>
