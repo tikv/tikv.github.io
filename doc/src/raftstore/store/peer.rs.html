@@ -4234,6 +4234,13 @@
 <span id="4231">4231</span>
 <span id="4232">4232</span>
 <span id="4233">4233</span>
+<span id="4234">4234</span>
+<span id="4235">4235</span>
+<span id="4236">4236</span>
+<span id="4237">4237</span>
+<span id="4238">4238</span>
+<span id="4239">4239</span>
+<span id="4240">4240</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -4282,6 +4289,7 @@
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::store::fsm</span>::{<span class="ident">apply</span>, <span class="ident">Apply</span>, <span class="ident">ApplyMetrics</span>, <span class="ident">ApplyTask</span>, <span class="ident">CollectedReady</span>, <span class="ident">Proposal</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::store::hibernate_state::GroupState</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::store::msg::RaftCommand</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::store::util::RegionReadProgress</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::store::worker</span>::{<span class="ident">HeartbeatTask</span>, <span class="ident">ReadDelegate</span>, <span class="ident">ReadExecutor</span>, <span class="ident">ReadProgress</span>, <span class="ident">RegionTask</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::store</span>::{
     <span class="ident">Callback</span>, <span class="ident">Config</span>, <span class="ident">GlobalReplicationState</span>, <span class="ident">PdTask</span>, <span class="ident">ReadIndexContext</span>, <span class="ident">ReadResponse</span>,
@@ -4314,6 +4322,7 @@
 
 <span class="kw">const</span> <span class="ident">SHRINK_CACHE_CAPACITY</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">64</span>;
 <span class="kw">const</span> <span class="ident">MIN_BCAST_WAKE_UP_INTERVAL</span>: <span class="ident">u64</span> <span class="op">=</span> <span class="number">1_000</span>; <span class="comment">// 1s</span>
+<span class="kw">const</span> <span class="ident">REGION_READ_PROGRESS_CAP</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">128</span>;
 
 <span class="doccomment">/// The returned states of the peer after checking whether it is stale</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
@@ -4747,8 +4756,7 @@
     <span class="doccomment">/// task run when there are more than 1 pending tasks.</span>
     <span class="kw">pub</span> <span class="ident">pending_pd_heartbeat_tasks</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicU64</span><span class="op">&gt;</span>,
 
-    <span class="comment">// TODO: `safe_ts` serve as a placehodler, should remove it later</span>
-    <span class="kw">pub</span> <span class="ident">safe_ts</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicU64</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">read_progress</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">RegionReadProgress</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span> <span class="ident">Peer</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>
@@ -4842,7 +4850,10 @@
             <span class="ident">cmd_epoch_checker</span>: <span class="ident">Default::default</span>(),
             <span class="ident">last_unpersisted_number</span>: <span class="number">0</span>,
             <span class="ident">pending_pd_heartbeat_tasks</span>: <span class="ident">Arc::new</span>(<span class="ident">AtomicU64::new</span>(<span class="number">0</span>)),
-            <span class="ident">safe_ts</span>: <span class="ident">Arc::new</span>(<span class="ident">AtomicU64::new</span>(<span class="number">0</span>)),
+            <span class="ident">read_progress</span>: <span class="ident">Arc::new</span>(<span class="ident">RegionReadProgress::new</span>(
+                <span class="ident">applied_index</span>,
+                <span class="ident">REGION_READ_PROGRESS_CAP</span>,
+            )),
         };
 
         <span class="comment">// If this region has only one peer and I am the one, campaign directly.</span>
@@ -5865,6 +5876,7 @@
                     );
                 }
                 <span class="self">self</span>.<span class="ident">post_pending_read_index_on_replica</span>(<span class="ident">ctx</span>);
+                <span class="self">self</span>.<span class="ident">read_progress</span>.<span class="ident">update_applied</span>(<span class="self">self</span>.<span class="ident">last_applying_idx</span>);
             }
             <span class="ident">CheckApplyingSnapStatus::Idle</span> <span class="op">=</span><span class="op">&gt;</span> {}
         }
@@ -6040,7 +6052,6 @@
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">meta</span> <span class="op">=</span> <span class="ident">ctx</span>.<span class="ident">store_meta</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
             <span class="ident">meta</span>.<span class="ident">readers</span>
                 .<span class="ident">insert</span>(<span class="self">self</span>.<span class="ident">region_id</span>, <span class="ident">ReadDelegate::from_peer</span>(<span class="self">self</span>));
-            <span class="ident">meta</span>.<span class="ident">peer_properties</span>.<span class="ident">insert</span>(<span class="self">self</span>.<span class="ident">region_id</span>, <span class="ident">Arc::default</span>());
         }
 
         <span class="ident">apply_snap_result</span>
@@ -6356,11 +6367,11 @@
             <span class="macro">panic!</span>(<span class="string">&quot;{} should not applying snapshot.&quot;</span>, <span class="self">self</span>.<span class="ident">tag</span>);
         }
 
-        <span class="self">self</span>.<span class="ident">raft_group</span>
-            .<span class="ident">advance_apply_to</span>(<span class="ident">apply_state</span>.<span class="ident">get_applied_index</span>());
+        <span class="kw">let</span> <span class="ident">applied_index</span> <span class="op">=</span> <span class="ident">apply_state</span>.<span class="ident">get_applied_index</span>();
+        <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">advance_apply_to</span>(<span class="ident">applied_index</span>);
 
         <span class="self">self</span>.<span class="ident">cmd_epoch_checker</span>.<span class="ident">advance_apply</span>(
-            <span class="ident">apply_state</span>.<span class="ident">get_applied_index</span>(),
+            <span class="ident">applied_index</span>,
             <span class="self">self</span>.<span class="ident">term</span>(),
             <span class="self">self</span>.<span class="ident">raft_group</span>.<span class="ident">store</span>().<span class="ident">region</span>(),
         );
@@ -6386,6 +6397,8 @@
             }
         }
         <span class="self">self</span>.<span class="ident">pending_reads</span>.<span class="ident">gc</span>();
+
+        <span class="self">self</span>.<span class="ident">read_progress</span>.<span class="ident">update_applied</span>(<span class="ident">applied_index</span>);
 
         <span class="comment">// Only leaders need to update applied_index_term.</span>
         <span class="kw">if</span> <span class="ident">progress_to_be_updated</span> <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">is_leader</span>() {
@@ -7450,7 +7463,7 @@
         <span class="kw">let</span> <span class="ident">flags</span> <span class="op">=</span> <span class="ident">WriteBatchFlags::from_bits_check</span>(<span class="ident">req</span>.<span class="ident">get_header</span>().<span class="ident">get_flags</span>());
         <span class="kw">if</span> <span class="ident">flags</span>.<span class="ident">contains</span>(<span class="ident">WriteBatchFlags::STALE_READ</span>) {
             <span class="kw">let</span> <span class="ident">read_ts</span> <span class="op">=</span> <span class="ident">decode_u64</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">req</span>.<span class="ident">get_header</span>().<span class="ident">get_flag_data</span>()).<span class="ident">unwrap</span>();
-            <span class="kw">let</span> <span class="ident">safe_ts</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">safe_ts</span>.<span class="ident">load</span>(<span class="ident">Ordering::Acquire</span>);
+            <span class="kw">let</span> <span class="ident">safe_ts</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">read_progress</span>.<span class="ident">safe_ts</span>();
             <span class="kw">if</span> <span class="ident">safe_ts</span> <span class="op">&lt;</span> <span class="ident">read_ts</span> {
                 <span class="macro">warn!</span>(
                     <span class="string">&quot;read rejected by safe timestamp&quot;</span>;
@@ -7733,6 +7746,7 @@
             <span class="ident">send_msg</span>.<span class="ident">set_start_key</span>(<span class="ident">region</span>.<span class="ident">get_start_key</span>().<span class="ident">to_vec</span>());
             <span class="ident">send_msg</span>.<span class="ident">set_end_key</span>(<span class="ident">region</span>.<span class="ident">get_end_key</span>().<span class="ident">to_vec</span>());
         }
+
         <span class="ident">send_msg</span>.<span class="ident">set_message</span>(<span class="ident">msg</span>);
 
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">trans</span>.<span class="ident">send</span>(<span class="ident">send_msg</span>) {

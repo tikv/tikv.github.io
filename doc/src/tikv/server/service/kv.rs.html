@@ -1948,6 +1948,22 @@
 <span id="1945">1945</span>
 <span id="1946">1946</span>
 <span id="1947">1947</span>
+<span id="1948">1948</span>
+<span id="1949">1949</span>
+<span id="1950">1950</span>
+<span id="1951">1951</span>
+<span id="1952">1952</span>
+<span id="1953">1953</span>
+<span id="1954">1954</span>
+<span id="1955">1955</span>
+<span id="1956">1956</span>
+<span id="1957">1957</span>
+<span id="1958">1958</span>
+<span id="1959">1959</span>
+<span id="1960">1960</span>
+<span id="1961">1961</span>
+<span id="1962">1962</span>
+<span id="1963">1963</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2017 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -2985,11 +3001,27 @@
 
     <span class="kw">fn</span> <span class="ident">get_store_safe_ts</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
-        <span class="kw">_</span>: <span class="ident">RpcContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>,
-        <span class="kw">_</span>: <span class="ident">StoreSafeTsRequest</span>,
-        <span class="kw">_</span>: <span class="ident">UnarySink</span><span class="op">&lt;</span><span class="ident">StoreSafeTsResponse</span><span class="op">&gt;</span>,
+        <span class="ident">ctx</span>: <span class="ident">RpcContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>,
+        <span class="kw-2">mut</span> <span class="ident">request</span>: <span class="ident">StoreSafeTsRequest</span>,
+        <span class="ident">sink</span>: <span class="ident">UnarySink</span><span class="op">&lt;</span><span class="ident">StoreSafeTsResponse</span><span class="op">&gt;</span>,
     ) {
-        <span class="macro">unimplemented!</span>()
+        <span class="kw">let</span> <span class="ident">key_range</span> <span class="op">=</span> <span class="ident">request</span>.<span class="ident">take_key_range</span>();
+        <span class="kw">let</span> (<span class="ident">cb</span>, <span class="ident">resp</span>) <span class="op">=</span> <span class="ident">paired_future_callback</span>();
+        <span class="kw">let</span> <span class="ident">ch</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">ch</span>.<span class="ident">clone</span>();
+        <span class="kw">let</span> <span class="ident">task</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
+            <span class="ident">ch</span>.<span class="ident">send_store_msg</span>(<span class="ident">StoreMsg::GetStoreSafeTS</span> { <span class="ident">key_range</span>, <span class="ident">cb</span> })<span class="question-mark">?</span>;
+            <span class="kw">let</span> <span class="ident">store_safe_ts</span> <span class="op">=</span> <span class="ident">resp</span>.<span class="kw">await</span><span class="question-mark">?</span>;
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">StoreSafeTsResponse::default</span>();
+            <span class="ident">resp</span>.<span class="ident">set_safe_ts</span>(<span class="ident">store_safe_ts</span>);
+            <span class="ident">sink</span>.<span class="ident">success</span>(<span class="ident">resp</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+            <span class="ident">ServerResult::Ok</span>(())
+        }
+        .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
+            <span class="macro">warn!</span>(<span class="string">&quot;call GetStoreSafeTS failed&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
+        })
+        .<span class="ident">map</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> ());
+
+        <span class="ident">ctx</span>.<span class="ident">spawn</span>(<span class="ident">task</span>);
     }
 }
 
