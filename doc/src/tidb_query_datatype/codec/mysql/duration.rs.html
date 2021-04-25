@@ -1287,6 +1287,36 @@
 <span id="1284">1284</span>
 <span id="1285">1285</span>
 <span id="1286">1286</span>
+<span id="1287">1287</span>
+<span id="1288">1288</span>
+<span id="1289">1289</span>
+<span id="1290">1290</span>
+<span id="1291">1291</span>
+<span id="1292">1292</span>
+<span id="1293">1293</span>
+<span id="1294">1294</span>
+<span id="1295">1295</span>
+<span id="1296">1296</span>
+<span id="1297">1297</span>
+<span id="1298">1298</span>
+<span id="1299">1299</span>
+<span id="1300">1300</span>
+<span id="1301">1301</span>
+<span id="1302">1302</span>
+<span id="1303">1303</span>
+<span id="1304">1304</span>
+<span id="1305">1305</span>
+<span id="1306">1306</span>
+<span id="1307">1307</span>
+<span id="1308">1308</span>
+<span id="1309">1309</span>
+<span id="1310">1310</span>
+<span id="1311">1311</span>
+<span id="1312">1312</span>
+<span id="1313">1313</span>
+<span id="1314">1314</span>
+<span id="1315">1315</span>
+<span id="1316">1316</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1490,6 +1520,7 @@
         <span class="ident">input</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
         <span class="ident">fsp</span>: <span class="ident">u8</span>,
         <span class="ident">fallback_to_daytime</span>: <span class="ident">bool</span>,
+        <span class="ident">overflow_as_null</span>: <span class="ident">bool</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Duration</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">input</span> <span class="op">=</span> <span class="ident">input</span>.<span class="ident">trim</span>();
         <span class="kw">if</span> <span class="ident">input</span>.<span class="ident">is_empty</span>() {
@@ -1521,6 +1552,9 @@
         <span class="kw">match</span> <span class="ident">duration</span> {
             <span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(<span class="ident">duration</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Some</span>(<span class="ident">duration</span>),
             <span class="prelude-val">Some</span>(<span class="prelude-val">Err</span>(<span class="ident">err</span>)) <span class="kw">if</span> <span class="ident">err</span>.<span class="ident">is_overflow</span>() <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="kw">if</span> <span class="ident">overflow_as_null</span> {
+                    <span class="kw">return</span> <span class="prelude-val">None</span>;
+                }
                 <span class="ident">ctx</span>.<span class="ident">handle_overflow_err</span>(<span class="ident">err</span>).<span class="ident">map_or</span>(<span class="prelude-val">None</span>, <span class="op">|</span><span class="kw">_</span><span class="op">|</span> {
                     <span class="kw">let</span> <span class="ident">nanos</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">neg</span> { <span class="op">-</span><span class="ident">MAX_NANOS</span> } <span class="kw">else</span> { <span class="ident">MAX_NANOS</span> };
                     <span class="prelude-val">Some</span>(<span class="ident">Duration</span> { <span class="ident">nanos</span>, <span class="ident">fsp</span> })
@@ -1719,14 +1753,25 @@
     <span class="doccomment">/// See: &lt;http://dev.mysql.com/doc/refman/5.7/en/fractional-seconds.html&gt;</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">parse</span>(<span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">EvalContext</span>, <span class="ident">input</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">fsp</span>: <span class="ident">i8</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Duration</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">fsp</span> <span class="op">=</span> <span class="ident">check_fsp</span>(<span class="ident">fsp</span>)<span class="question-mark">?</span>;
-        <span class="ident">parser::parse</span>(<span class="ident">ctx</span>, <span class="ident">input</span>, <span class="ident">fsp</span>, <span class="bool-val">true</span>)
+        <span class="ident">parser::parse</span>(<span class="ident">ctx</span>, <span class="ident">input</span>, <span class="ident">fsp</span>, <span class="bool-val">true</span>, <span class="bool-val">false</span>)
+            .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">Error::truncated_wrong_val</span>(<span class="string">&quot;TIME&quot;</span>, <span class="ident">input</span>))
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">parse_consider_overflow</span>(
+        <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">EvalContext</span>,
+        <span class="ident">input</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
+        <span class="ident">fsp</span>: <span class="ident">i8</span>,
+        <span class="ident">overflow_as_null</span>: <span class="ident">bool</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Duration</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="ident">fsp</span> <span class="op">=</span> <span class="ident">check_fsp</span>(<span class="ident">fsp</span>)<span class="question-mark">?</span>;
+        <span class="ident">parser::parse</span>(<span class="ident">ctx</span>, <span class="ident">input</span>, <span class="ident">fsp</span>, <span class="bool-val">true</span>, <span class="ident">overflow_as_null</span>)
             .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">Error::truncated_wrong_val</span>(<span class="string">&quot;TIME&quot;</span>, <span class="ident">input</span>))
     }
 
     <span class="doccomment">/// Parses the input exactly as duration and will not fallback to datetime.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">parse_exactly</span>(<span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">EvalContext</span>, <span class="ident">input</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">fsp</span>: <span class="ident">i8</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Duration</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">fsp</span> <span class="op">=</span> <span class="ident">check_fsp</span>(<span class="ident">fsp</span>)<span class="question-mark">?</span>;
-        <span class="ident">parser::parse</span>(<span class="ident">ctx</span>, <span class="ident">input</span>, <span class="ident">fsp</span>, <span class="bool-val">false</span>)
+        <span class="ident">parser::parse</span>(<span class="ident">ctx</span>, <span class="ident">input</span>, <span class="ident">fsp</span>, <span class="bool-val">false</span>, <span class="bool-val">false</span>)
             .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">Error::truncated_wrong_val</span>(<span class="string">&quot;TIME&quot;</span>, <span class="ident">input</span>))
     }
 
@@ -2124,6 +2169,21 @@
 
         <span class="kw">for</span> (<span class="ident">input</span>, <span class="ident">fsp</span>, <span class="ident">expect</span>) <span class="kw">in</span> <span class="ident">cases</span> {
             <span class="kw">let</span> <span class="ident">got</span> <span class="op">=</span> <span class="ident">Duration::parse</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">EvalContext::default</span>(), <span class="ident">input</span>, <span class="ident">fsp</span>);
+            <span class="macro">assert_eq!</span>(<span class="ident">got</span>.<span class="ident">ok</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">d</span><span class="op">|</span> <span class="ident">d</span>.<span class="ident">to_string</span>()), <span class="ident">expect</span>.<span class="ident">map</span>(<span class="ident">str::to_string</span>));
+        }
+    }
+
+    <span class="attribute">#[<span class="ident">test</span>]</span>
+    <span class="kw">fn</span> <span class="ident">test_parse_consider_overflow</span>() {
+        <span class="kw">let</span> <span class="ident">cases</span>: <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">i8</span>, <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span>, <span class="ident">bool</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec!</span>[
+            (<span class="string">&quot;-790822912&quot;</span>, <span class="number">0</span>, <span class="prelude-val">None</span>, <span class="bool-val">true</span>),
+            (<span class="string">&quot;-790822912&quot;</span>, <span class="number">0</span>, <span class="prelude-val">Some</span>(<span class="string">&quot;-838:59:59&quot;</span>), <span class="bool-val">false</span>),
+        ];
+
+        <span class="kw">for</span> (<span class="ident">input</span>, <span class="ident">fsp</span>, <span class="ident">expect</span>, <span class="ident">return_null</span>) <span class="kw">in</span> <span class="ident">cases</span> {
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ctx</span> <span class="op">=</span>
+                <span class="ident">EvalContext::new</span>(<span class="ident">Arc::new</span>(<span class="ident">EvalConfig::from_flag</span>(<span class="ident">Flag::OVERFLOW_AS_WARNING</span>)));
+            <span class="kw">let</span> <span class="ident">got</span> <span class="op">=</span> <span class="ident">Duration::parse_consider_overflow</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>, <span class="ident">input</span>, <span class="ident">fsp</span>, <span class="ident">return_null</span>);
             <span class="macro">assert_eq!</span>(<span class="ident">got</span>.<span class="ident">ok</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">d</span><span class="op">|</span> <span class="ident">d</span>.<span class="ident">to_string</span>()), <span class="ident">expect</span>.<span class="ident">map</span>(<span class="ident">str::to_string</span>));
         }
     }
