@@ -4239,6 +4239,8 @@
 <span id="4236">4236</span>
 <span id="4237">4237</span>
 <span id="4238">4238</span>
+<span id="4239">4239</span>
+<span id="4240">4240</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -4350,7 +4352,7 @@
         <span class="self">self</span>.<span class="ident">queue</span>
             .<span class="ident">binary_search_by_key</span>(<span class="kw-2">&amp;</span>(<span class="ident">term</span>, <span class="ident">index</span>), <span class="op">|</span><span class="ident">p</span>: <span class="kw-2">&amp;</span><span class="ident">Proposal</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">|</span> (<span class="ident">p</span>.<span class="ident">term</span>, <span class="ident">p</span>.<span class="ident">index</span>))
             .<span class="ident">ok</span>()
-            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">i</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">queue</span>[<span class="ident">i</span>].<span class="ident">renew_lease_time</span>)
+            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">i</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">queue</span>[<span class="ident">i</span>].<span class="ident">propose_time</span>)
             .<span class="ident">flatten</span>()
     }
 
@@ -6324,7 +6326,7 @@
             <span class="self">self</span>.<span class="ident">post_pending_read_index_on_replica</span>(<span class="ident">ctx</span>);
         } <span class="kw">else</span> {
             <span class="self">self</span>.<span class="ident">pending_reads</span>.<span class="ident">advance_leader_reads</span>(<span class="ident">states</span>);
-            <span class="ident">propose_time</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pending_reads</span>.<span class="ident">last_ready</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">r</span><span class="op">|</span> <span class="ident">r</span>.<span class="ident">renew_lease_time</span>);
+            <span class="ident">propose_time</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pending_reads</span>.<span class="ident">last_ready</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">r</span><span class="op">|</span> <span class="ident">r</span>.<span class="ident">propose_time</span>);
             <span class="kw">if</span> <span class="self">self</span>.<span class="ident">ready_to_handle_read</span>() {
                 <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">mut</span> <span class="ident">read</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">pending_reads</span>.<span class="ident">pop_front</span>() {
                     <span class="self">self</span>.<span class="ident">response_read</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">read</span>, <span class="ident">ctx</span>, <span class="bool-val">false</span>);
@@ -6561,7 +6563,7 @@
                     <span class="ident">index</span>: <span class="ident">idx</span>,
                     <span class="ident">term</span>: <span class="self">self</span>.<span class="ident">term</span>(),
                     <span class="ident">cb</span>,
-                    <span class="ident">renew_lease_time</span>: <span class="prelude-val">None</span>,
+                    <span class="ident">propose_time</span>: <span class="prelude-val">None</span>,
                     <span class="ident">must_pass_epoch_check</span>: <span class="ident">has_applied_to_current_term</span>,
                 };
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">cmd_type</span>) <span class="op">=</span> <span class="ident">req_admin_cmd_type</span> {
@@ -6583,7 +6585,7 @@
         <span class="kw">if</span> <span class="ident">poll_ctx</span>.<span class="ident">current_time</span>.<span class="ident">is_none</span>() {
             <span class="ident">poll_ctx</span>.<span class="ident">current_time</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">monotonic_raw_now</span>());
         }
-        <span class="ident">p</span>.<span class="ident">renew_lease_time</span> <span class="op">=</span> <span class="ident">poll_ctx</span>.<span class="ident">current_time</span>;
+        <span class="ident">p</span>.<span class="ident">propose_time</span> <span class="op">=</span> <span class="ident">poll_ctx</span>.<span class="ident">current_time</span>;
 
         <span class="self">self</span>.<span class="ident">proposals</span>.<span class="ident">push</span>(<span class="ident">p</span>);
     }
@@ -6891,7 +6893,7 @@
             <span class="kw">return</span> <span class="bool-val">false</span>;
         }
 
-        <span class="kw">let</span> <span class="ident">renew_lease_time</span> <span class="op">=</span> <span class="ident">monotonic_raw_now</span>();
+        <span class="kw">let</span> <span class="ident">now</span> <span class="op">=</span> <span class="ident">monotonic_raw_now</span>();
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">is_leader</span>() {
             <span class="kw">match</span> <span class="self">self</span>.<span class="ident">inspect_lease</span>() {
                 <span class="comment">// Here combine the new read request with the previous one even if the lease expired is</span>
@@ -6906,7 +6908,9 @@
                     <span class="kw">let</span> <span class="ident">commit_index</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_store</span>().<span class="ident">commit_index</span>();
                     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">read</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">pending_reads</span>.<span class="ident">back_mut</span>() {
                         <span class="kw">let</span> <span class="ident">max_lease</span> <span class="op">=</span> <span class="ident">poll_ctx</span>.<span class="ident">cfg</span>.<span class="ident">raft_store_max_leader_lease</span>();
-                        <span class="kw">if</span> <span class="ident">read</span>.<span class="ident">renew_lease_time</span> <span class="op">+</span> <span class="ident">max_lease</span> <span class="op">&gt;</span> <span class="ident">renew_lease_time</span> {
+                        <span class="kw">if</span> <span class="ident">read</span>.<span class="ident">propose_time</span> <span class="op">+</span> <span class="ident">max_lease</span> <span class="op">&gt;</span> <span class="ident">now</span> {
+                            <span class="comment">// A read request proposed in the current lease is found; combine the new</span>
+                            <span class="comment">// read request to that previous one, so that no proposing needed.</span>
                             <span class="ident">read</span>.<span class="ident">push_command</span>(<span class="ident">req</span>, <span class="ident">cb</span>, <span class="ident">commit_index</span>);
                             <span class="kw">return</span> <span class="bool-val">false</span>;
                         }
@@ -6983,7 +6987,7 @@
             <span class="kw">return</span> <span class="bool-val">false</span>;
         }
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">read</span> <span class="op">=</span> <span class="ident">ReadIndexRequest::with_command</span>(<span class="ident">id</span>, <span class="ident">req</span>, <span class="ident">cb</span>, <span class="ident">renew_lease_time</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">read</span> <span class="op">=</span> <span class="ident">ReadIndexRequest::with_command</span>(<span class="ident">id</span>, <span class="ident">req</span>, <span class="ident">cb</span>, <span class="ident">now</span>);
         <span class="ident">read</span>.<span class="ident">addition_request</span> <span class="op">=</span> <span class="ident">request</span>.<span class="ident">map</span>(<span class="ident">Box::new</span>);
         <span class="self">self</span>.<span class="ident">pending_reads</span>.<span class="ident">push_back</span>(<span class="ident">read</span>, <span class="self">self</span>.<span class="ident">is_leader</span>());
         <span class="self">self</span>.<span class="ident">should_wake_up</span> <span class="op">=</span> <span class="bool-val">true</span>;
@@ -6998,7 +7002,7 @@
 
         <span class="comment">// TimeoutNow has been sent out, so we need to propose explicitly to</span>
         <span class="comment">// update leader lease.</span>
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">leader_lease</span>.<span class="ident">inspect</span>(<span class="prelude-val">Some</span>(<span class="ident">renew_lease_time</span>)) <span class="op">=</span><span class="op">=</span> <span class="ident">LeaseState::Suspect</span> {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">leader_lease</span>.<span class="ident">inspect</span>(<span class="prelude-val">Some</span>(<span class="ident">now</span>)) <span class="op">=</span><span class="op">=</span> <span class="ident">LeaseState::Suspect</span> {
             <span class="kw">let</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">RaftCmdRequest::default</span>();
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">Either::Left</span>(<span class="ident">index</span>)) <span class="op">=</span> <span class="self">self</span>.<span class="ident">propose_normal</span>(<span class="ident">poll_ctx</span>, <span class="ident">req</span>) {
                 <span class="kw">let</span> <span class="ident">p</span> <span class="op">=</span> <span class="ident">Proposal</span> {
@@ -7006,7 +7010,7 @@
                     <span class="ident">index</span>,
                     <span class="ident">term</span>: <span class="self">self</span>.<span class="ident">term</span>(),
                     <span class="ident">cb</span>: <span class="ident">Callback::None</span>,
-                    <span class="ident">renew_lease_time</span>: <span class="prelude-val">Some</span>(<span class="ident">renew_lease_time</span>),
+                    <span class="ident">propose_time</span>: <span class="prelude-val">Some</span>(<span class="ident">now</span>),
                     <span class="ident">must_pass_epoch_check</span>: <span class="bool-val">false</span>,
                 };
                 <span class="self">self</span>.<span class="ident">post_propose</span>(<span class="ident">poll_ctx</span>, <span class="ident">p</span>);
@@ -8280,7 +8284,7 @@
                 <span class="ident">index</span>,
                 <span class="ident">term</span>: <span class="ident">gen_term</span>(<span class="ident">index</span>),
                 <span class="ident">cb</span>: <span class="ident">Callback::write</span>(<span class="ident">Box::new</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> {})),
-                <span class="ident">renew_lease_time</span>: <span class="prelude-val">Some</span>(<span class="ident">u64_to_timespec</span>(<span class="ident">index</span>)),
+                <span class="ident">propose_time</span>: <span class="prelude-val">Some</span>(<span class="ident">u64_to_timespec</span>(<span class="ident">index</span>)),
                 <span class="ident">must_pass_epoch_check</span>: <span class="bool-val">false</span>,
             });
         };
@@ -8354,7 +8358,7 @@
                 <span class="ident">term</span>,
                 <span class="ident">cb</span>,
                 <span class="ident">is_conf_change</span>: <span class="bool-val">false</span>,
-                <span class="ident">renew_lease_time</span>: <span class="prelude-val">None</span>,
+                <span class="ident">propose_time</span>: <span class="prelude-val">None</span>,
                 <span class="ident">must_pass_epoch_check</span>: <span class="bool-val">false</span>,
             });
         }
