@@ -2270,6 +2270,10 @@
 <span id="2267">2267</span>
 <span id="2268">2268</span>
 <span id="2269">2269</span>
+<span id="2270">2270</span>
+<span id="2271">2271</span>
+<span id="2272">2272</span>
+<span id="2273">2273</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -2379,17 +2383,19 @@
     <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Fn</span>(<span class="ident">Key</span>, <span class="ident">TimeStamp</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">OldValueCache</span>) <span class="op">-</span><span class="op">&gt;</span> (<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span>, <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Statistics</span><span class="op">&gt;</span>) <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span>;
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">OldValueCache</span> {
-    <span class="kw">pub</span> <span class="ident">cache</span>: <span class="ident">LruCache</span><span class="op">&lt;</span><span class="ident">Key</span>, (<span class="ident">OldValue</span>, <span class="ident">MutationType</span>)<span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">miss_count</span>: <span class="ident">usize</span>,
+    <span class="kw">pub</span> <span class="ident">cache</span>: <span class="ident">LruCache</span><span class="op">&lt;</span><span class="ident">Key</span>, (<span class="ident">OldValue</span>, <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">MutationType</span><span class="op">&gt;</span>)<span class="op">&gt;</span>,
     <span class="kw">pub</span> <span class="ident">access_count</span>: <span class="ident">usize</span>,
+    <span class="kw">pub</span> <span class="ident">miss_count</span>: <span class="ident">usize</span>,
+    <span class="kw">pub</span> <span class="ident">miss_none_count</span>: <span class="ident">usize</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">OldValueCache</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">size</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">OldValueCache</span> {
         <span class="ident">OldValueCache</span> {
             <span class="ident">cache</span>: <span class="ident">LruCache::with_capacity</span>(<span class="ident">size</span>),
-            <span class="ident">miss_count</span>: <span class="number">0</span>,
             <span class="ident">access_count</span>: <span class="number">0</span>,
+            <span class="ident">miss_count</span>: <span class="number">0</span>,
+            <span class="ident">miss_none_count</span>: <span class="number">0</span>,
         }
     }
 }
@@ -3816,9 +3822,11 @@
         <span class="ident">CDC_OLD_VALUE_CACHE_BYTES</span>.<span class="ident">set</span>(<span class="ident">cache_size</span> <span class="kw">as</span> <span class="ident">i64</span>);
         <span class="ident">CDC_OLD_VALUE_CACHE_ACCESS</span>.<span class="ident">add</span>(<span class="self">self</span>.<span class="ident">old_value_cache</span>.<span class="ident">access_count</span> <span class="kw">as</span> <span class="ident">i64</span>);
         <span class="ident">CDC_OLD_VALUE_CACHE_MISS</span>.<span class="ident">add</span>(<span class="self">self</span>.<span class="ident">old_value_cache</span>.<span class="ident">miss_count</span> <span class="kw">as</span> <span class="ident">i64</span>);
+        <span class="ident">CDC_OLD_VALUE_CACHE_MISS_NONE</span>.<span class="ident">add</span>(<span class="self">self</span>.<span class="ident">old_value_cache</span>.<span class="ident">miss_none_count</span> <span class="kw">as</span> <span class="ident">i64</span>);
         <span class="ident">CDC_OLD_VALUE_CACHE_LEN</span>.<span class="ident">set</span>(<span class="self">self</span>.<span class="ident">old_value_cache</span>.<span class="ident">cache</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">i64</span>);
         <span class="self">self</span>.<span class="ident">old_value_cache</span>.<span class="ident">access_count</span> <span class="op">=</span> <span class="number">0</span>;
         <span class="self">self</span>.<span class="ident">old_value_cache</span>.<span class="ident">miss_count</span> <span class="op">=</span> <span class="number">0</span>;
+        <span class="self">self</span>.<span class="ident">old_value_cache</span>.<span class="ident">miss_none_count</span> <span class="op">=</span> <span class="number">0</span>;
     }
 
     <span class="kw">fn</span> <span class="ident">get_interval</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Duration</span> {

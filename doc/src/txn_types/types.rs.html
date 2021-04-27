@@ -555,15 +555,6 @@
 <span id="552">552</span>
 <span id="553">553</span>
 <span id="554">554</span>
-<span id="555">555</span>
-<span id="556">556</span>
-<span id="557">557</span>
-<span id="558">558</span>
-<span id="559">559</span>
-<span id="560">560</span>
-<span id="561">561</span>
-<span id="562">562</span>
-<span id="563">563</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2021 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -890,10 +881,9 @@
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">PartialEq</span>)]</span>
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">OldValue</span> {
     <span class="doccomment">/// A real `OldValue`</span>
-    <span class="ident">Value</span> {
-        <span class="ident">short_value</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Value</span><span class="op">&gt;</span>,
-        <span class="ident">start_ts</span>: <span class="ident">TimeStamp</span>,
-    },
+    <span class="ident">Value</span> { <span class="ident">value</span>: <span class="ident">Value</span> },
+    <span class="doccomment">/// A timestamp of an old value in case a value is not inlined in Write</span>
+    <span class="ident">ValueTimeStamp</span> { <span class="ident">start_ts</span>: <span class="ident">TimeStamp</span> },
     <span class="doccomment">/// `None` means we don&#39;t found a previous value</span>
     <span class="prelude-val">None</span>,
     <span class="doccomment">/// `Unspecified` means one of the following:</span>
@@ -915,10 +905,7 @@
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">size</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
         <span class="kw">let</span> <span class="ident">value_size</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">OldValue::Value</span> {
-                <span class="ident">short_value</span>: <span class="prelude-val">Some</span>(<span class="ident">v</span>),
-                ..
-            } <span class="op">=</span><span class="op">&gt;</span> <span class="ident">v</span>.<span class="ident">len</span>(),
+            <span class="ident">OldValue::Value</span> { <span class="ident">value</span> } <span class="op">=</span><span class="op">&gt;</span> <span class="ident">value</span>.<span class="ident">len</span>(),
             <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0</span>,
         };
         <span class="ident">value_size</span> <span class="op">+</span> <span class="ident">std::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">OldValue</span><span class="op">&gt;</span>()
@@ -929,7 +916,7 @@
 <span class="comment">// key with current ts -&gt; (short value of the prev txn, start ts of the prev txn).</span>
 <span class="comment">// The value of the map will be None when the mutation is `Insert`.</span>
 <span class="comment">// MutationType is the type of mutation of the current write.</span>
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">OldValues</span> <span class="op">=</span> <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">Key</span>, (<span class="ident">OldValue</span>, <span class="ident">MutationType</span>)<span class="op">&gt;</span>;
+<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">OldValues</span> <span class="op">=</span> <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">Key</span>, (<span class="ident">OldValue</span>, <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">MutationType</span><span class="op">&gt;</span>)<span class="op">&gt;</span>;
 
 <span class="comment">// Extra data fields filled by kvrpcpb::ExtraOp.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Default</span>, <span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
@@ -1115,13 +1102,8 @@
         <span class="kw">let</span> <span class="ident">cases</span> <span class="op">=</span> <span class="macro">vec!</span>[
             (<span class="ident">OldValue::Unspecified</span>, <span class="bool-val">false</span>),
             (<span class="ident">OldValue::None</span>, <span class="bool-val">true</span>),
-            (
-                <span class="ident">OldValue::Value</span> {
-                    <span class="ident">short_value</span>: <span class="prelude-val">None</span>,
-                    <span class="ident">start_ts</span>: <span class="number">0</span>.<span class="ident">into</span>(),
-                },
-                <span class="bool-val">true</span>,
-            ),
+            (<span class="ident">OldValue::Value</span> { <span class="ident">value</span>: <span class="macro">vec!</span>[] }, <span class="bool-val">true</span>),
+            (<span class="ident">OldValue::ValueTimeStamp</span> { <span class="ident">start_ts</span>: <span class="number">0</span>.<span class="ident">into</span>() }, <span class="bool-val">true</span>),
         ];
         <span class="kw">for</span> (<span class="ident">old_value</span>, <span class="ident">v</span>) <span class="kw">in</span> <span class="ident">cases</span> {
             <span class="macro">assert_eq!</span>(<span class="ident">old_value</span>.<span class="ident">valid</span>(), <span class="ident">v</span>);

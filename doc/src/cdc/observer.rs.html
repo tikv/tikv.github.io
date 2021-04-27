@@ -542,6 +542,11 @@
 <span id="539">539</span>
 <span id="540">540</span>
 <span id="541">541</span>
+<span id="542">542</span>
+<span id="543">543</span>
+<span id="544">544</span>
+<span id="545">545</span>
+<span id="546">546</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -676,32 +681,34 @@
                 <span class="ident">old_value_cache</span>.<span class="ident">access_count</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="ident">old_value</span>, <span class="ident">mutation_type</span>)) <span class="op">=</span> <span class="ident">old_value_cache</span>.<span class="ident">cache</span>.<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>) {
                     <span class="kw">return</span> <span class="kw">match</span> <span class="ident">mutation_type</span> {
-                        <span class="ident">MutationType::Insert</span> <span class="op">=</span><span class="op">&gt;</span> (<span class="prelude-val">None</span>, <span class="prelude-val">None</span>),
-                        <span class="ident">MutationType::Put</span> <span class="op">|</span> <span class="ident">MutationType::Delete</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">match</span> <span class="ident">old_value</span> {
-                            <span class="ident">OldValue::None</span> <span class="op">=</span><span class="op">&gt;</span> (<span class="prelude-val">None</span>, <span class="prelude-val">None</span>),
-                            <span class="ident">OldValue::Value</span> {
-                                <span class="ident">start_ts</span>,
-                                <span class="ident">short_value</span>,
-                            } <span class="op">=</span><span class="op">&gt;</span> {
-                                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">statistics</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-                                <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">short_value</span>.<span class="ident">or_else</span>(<span class="op">|</span><span class="op">|</span> {
-                                    <span class="ident">statistics</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">Statistics::default</span>());
+                        <span class="comment">// Old value of an Insert is guaranteed to be None.</span>
+                        <span class="prelude-val">Some</span>(<span class="ident">MutationType::Insert</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                            <span class="macro">assert_eq!</span>(<span class="ident">old_value</span>, <span class="ident">OldValue::None</span>);
+                            (<span class="prelude-val">None</span>, <span class="prelude-val">None</span>)
+                        }
+                        <span class="comment">// For Put, Delete or a mutation type we do not know,</span>
+                        <span class="comment">// we read old value from the cache.</span>
+                        <span class="prelude-val">Some</span>(<span class="ident">MutationType::Put</span>) <span class="op">|</span> <span class="prelude-val">Some</span>(<span class="ident">MutationType::Delete</span>) <span class="op">|</span> <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> {
+                            <span class="kw">match</span> <span class="ident">old_value</span> {
+                                <span class="ident">OldValue::None</span> <span class="op">=</span><span class="op">&gt;</span> (<span class="prelude-val">None</span>, <span class="prelude-val">None</span>),
+                                <span class="ident">OldValue::Value</span> { <span class="ident">value</span> } <span class="op">=</span><span class="op">&gt;</span> (<span class="prelude-val">Some</span>(<span class="ident">value</span>), <span class="prelude-val">None</span>),
+                                <span class="ident">OldValue::ValueTimeStamp</span> { <span class="ident">start_ts</span> } <span class="op">=</span><span class="op">&gt;</span> {
+                                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">statistics</span> <span class="op">=</span> <span class="ident">Statistics::default</span>();
                                     <span class="kw">let</span> <span class="ident">prev_key</span> <span class="op">=</span> <span class="ident">key</span>.<span class="ident">truncate_ts</span>().<span class="ident">unwrap</span>().<span class="ident">append_ts</span>(<span class="ident">start_ts</span>);
                                     <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">Instant::now</span>();
                                     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">opts</span> <span class="op">=</span> <span class="ident">ReadOptions::new</span>();
                                     <span class="ident">opts</span>.<span class="ident">set_fill_cache</span>(<span class="bool-val">false</span>);
-                                    <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">reader</span>
-                                        .<span class="ident">get_value_default</span>(<span class="kw-2">&amp;</span><span class="ident">prev_key</span>, <span class="ident">statistics</span>.<span class="ident">as_mut</span>().<span class="ident">unwrap</span>());
+                                    <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span>
+                                        <span class="ident">reader</span>.<span class="ident">get_value_default</span>(<span class="kw-2">&amp;</span><span class="ident">prev_key</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">statistics</span>);
                                     <span class="ident">CDC_OLD_VALUE_DURATION_HISTOGRAM</span>
                                         .<span class="ident">with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="string">&quot;get&quot;</span>])
                                         .<span class="ident">observe</span>(<span class="ident">start</span>.<span class="ident">elapsed</span>().<span class="ident">as_secs_f64</span>());
-                                    <span class="ident">value</span>
-                                });
-                                (<span class="ident">value</span>, <span class="ident">statistics</span>)
+                                    (<span class="ident">value</span>, <span class="prelude-val">Some</span>(<span class="ident">statistics</span>))
+                                }
+                                <span class="comment">// Unspecified should not be added into cache.</span>
+                                <span class="ident">OldValue::Unspecified</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">unreachable!</span>(),
                             }
-                            <span class="comment">// Unspecified should not be added into cache.</span>
-                            <span class="ident">OldValue::Unspecified</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">unreachable!</span>(),
-                        },
+                        }
                         <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">unreachable!</span>(),
                     };
                 }
@@ -716,6 +723,9 @@
                 <span class="ident">CDC_OLD_VALUE_DURATION_HISTOGRAM</span>
                     .<span class="ident">with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="string">&quot;seek&quot;</span>])
                     .<span class="ident">observe</span>(<span class="ident">start</span>.<span class="ident">elapsed</span>().<span class="ident">as_secs_f64</span>());
+                <span class="kw">if</span> <span class="ident">value</span>.<span class="ident">is_none</span>() {
+                    <span class="ident">old_value_cache</span>.<span class="ident">miss_none_count</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+                }
                 (<span class="ident">value</span>, <span class="prelude-val">Some</span>(<span class="ident">statistics</span>))
             };
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">sched</span>.<span class="ident">schedule</span>(<span class="ident">Task::MultiBatch</span> {
