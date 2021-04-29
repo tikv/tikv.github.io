@@ -106,25 +106,70 @@
 <span id="103">103</span>
 <span id="104">104</span>
 <span id="105">105</span>
+<span id="106">106</span>
+<span id="107">107</span>
+<span id="108">108</span>
+<span id="109">109</span>
+<span id="110">110</span>
+<span id="111">111</span>
+<span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
+<span id="118">118</span>
+<span id="119">119</span>
+<span id="120">120</span>
+<span id="121">121</span>
+<span id="122">122</span>
+<span id="123">123</span>
+<span id="124">124</span>
+<span id="125">125</span>
+<span id="126">126</span>
+<span id="127">127</span>
+<span id="128">128</span>
+<span id="129">129</span>
+<span id="130">130</span>
+<span id="131">131</span>
+<span id="132">132</span>
+<span id="133">133</span>
+<span id="134">134</span>
+<span id="135">135</span>
+<span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
+<span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
+<span id="144">144</span>
+<span id="145">145</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2021 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
 <span class="kw">use</span> <span class="kw">super</span><span class="ident">::allocator::HostAllocatorPtr</span>;
 <span class="kw">use</span> <span class="kw">super</span><span class="ident">::plugin_api::CoprocessorPlugin</span>;
 
-<span class="doccomment">/// Name of the exported constructor function for the plugin in the `dylib`.</span>
+<span class="doccomment">/// Name of the exported constructor with signature [`PluginConstructorSignature`] for the plugin.</span>
 <span class="kw">pub</span> <span class="kw">static</span> <span class="ident">PLUGIN_CONSTRUCTOR_SYMBOL</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>] <span class="op">=</span> <span class="string">b&quot;_plugin_create&quot;</span>;
-<span class="doccomment">/// Name of the exported function to get build information about the plugin.</span>
+<span class="doccomment">/// Name of the exported function with signature [`PluginGetBuildInfoSignature`] to get build</span>
+<span class="doccomment">/// information about the plugin.</span>
 <span class="kw">pub</span> <span class="kw">static</span> <span class="ident">PLUGIN_GET_BUILD_INFO_SYMBOL</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>] <span class="op">=</span> <span class="string">b&quot;_plugin_get_build_info&quot;</span>;
+<span class="doccomment">/// Name of the exported function with signature [`PluginGetPluginInfoSignature`] to get some</span>
+<span class="doccomment">/// information about the plugin.</span>
+<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">PLUGIN_GET_PLUGIN_INFO_SYMBOL</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>] <span class="op">=</span> <span class="string">b&quot;_plugin_get_plugin_info&quot;</span>;
 
-<span class="doccomment">/// Type signature of the exported constructor function for the plugin in the `dylib`.</span>
-<span class="doccomment">/// See also [`PLUGIN_CONSTRUCTOR_SYMBOL`].</span>
+<span class="doccomment">/// Type signature of the exported function with symbol [`PLUGIN_CONSTRUCTOR_SYMBOL`].</span>
 <span class="kw">pub</span> <span class="kw">type</span> <span class="ident">PluginConstructorSignature</span> <span class="op">=</span>
     <span class="kw">unsafe</span> <span class="kw">fn</span>(<span class="ident">host_allocator</span>: <span class="ident">HostAllocatorPtr</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="kw">dyn</span> <span class="ident">CoprocessorPlugin</span>;
 
-<span class="doccomment">/// Type signature of the exported function to get build information about the plugin.</span>
-<span class="doccomment">/// See also [`PLUGIN_GET_BUILD_INFO_SYMBOL`].</span>
+<span class="doccomment">/// Type signature of the exported function with symbol [`PLUGIN_GET_BUILD_INFO_SYMBOL`].</span>
 <span class="kw">pub</span> <span class="kw">type</span> <span class="ident">PluginGetBuildInfoSignature</span> <span class="op">=</span> <span class="kw">extern</span> <span class="string">&quot;C&quot;</span> <span class="kw">fn</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">BuildInfo</span>;
+
+<span class="doccomment">/// Type signature of the exported function with symbol [`PLUGIN_GET_PLUGIN_INFO_SYMBOL`].</span>
+<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">PluginGetPluginInfoSignature</span> <span class="op">=</span> <span class="kw">extern</span> <span class="string">&quot;C&quot;</span> <span class="kw">fn</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PluginInfo</span>;
 
 <span class="doccomment">/// Automatically collected build information about the plugin that is exposed from the library.</span>
 <span class="doccomment">///</span>
@@ -151,7 +196,24 @@
     }
 }
 
+<span class="doccomment">/// Information about the plugin, like its name and version.</span>
+<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">PluginInfo</span> {
+    <span class="doccomment">/// The name of the plugin.</span>
+    <span class="kw">pub</span> <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>,
+    <span class="doccomment">/// The version string of the plugin. Should follow semantic versioning.</span>
+    <span class="kw">pub</span> <span class="ident">version</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>,
+}
+
 <span class="doccomment">/// Declare a plugin for the library so that it can be loaded by TiKV.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// The macro has three different versions:</span>
+<span class="doccomment">/// * `declare_plugin!(plugin_name, plugin_version, plugin_ctor)` which gives you full control.</span>
+<span class="doccomment">/// * `declare_plugin!(plugin_name, plugin_ctor)` automatically fetches the version from `Cargo.toml`.</span>
+<span class="doccomment">/// * `declare_plugin!(plugin_ctor)` automatically fetches plugin name and version from `Cargo.toml`.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// The types of `plugin_name` and `plugin_version` have to be `&amp;&#39;static str` literals.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// # Notes</span>
 <span class="doccomment">/// This works by automatically generating an `extern &quot;C&quot;` function with a</span>
@@ -164,6 +226,16 @@
 <span class="attribute">#[<span class="ident">macro_export</span>]</span>
 <span class="macro">macro_rules!</span> <span class="ident">declare_plugin</span> {
     (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">plugin_ctor</span>:<span class="ident">expr</span>) <span class="op">=</span><span class="op">&gt;</span> {
+        <span class="macro">declare_plugin!</span>(
+            <span class="macro">env!</span>(<span class="string">&quot;CARGO_PKG_NAME&quot;</span>),
+            <span class="macro">env!</span>(<span class="string">&quot;CARGO_PKG_VERSION&quot;</span>),
+            <span class="macro-nonterminal">$</span><span class="macro-nonterminal">plugin_ctor</span>
+        );
+    };
+    (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">plugin_name</span>:<span class="ident">expr</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">plugin_ctor</span>:<span class="ident">expr</span>) <span class="op">=</span><span class="op">&gt;</span> {
+        <span class="macro">declare_plugin!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">plugin_name</span>, <span class="macro">env!</span>(<span class="string">&quot;CARGO_PKG_VERSION&quot;</span>), <span class="macro-nonterminal">$</span><span class="macro-nonterminal">plugin_ctor</span>);
+    };
+    (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">plugin_name</span>:<span class="ident">expr</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">plugin_version</span>:<span class="ident">expr</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">plugin_ctor</span>:<span class="ident">expr</span>) <span class="op">=</span><span class="op">&gt;</span> {
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">test</span>))]</span>
         <span class="attribute">#[<span class="ident">global_allocator</span>]</span>
         <span class="kw">static</span> <span class="ident">HOST_ALLOCATOR</span>: <span class="macro-nonterminal">$</span><span class="kw">crate</span><span class="macro-nonterminal">::allocator::HostAllocator</span> <span class="op">=</span>
@@ -172,6 +244,14 @@
         <span class="attribute">#[<span class="ident">no_mangle</span>]</span>
         <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">extern</span> <span class="string">&quot;C&quot;</span> <span class="kw">fn</span> <span class="ident">_plugin_get_build_info</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="macro-nonterminal">$</span><span class="kw">crate</span><span class="macro-nonterminal">::BuildInfo</span> {
             <span class="macro-nonterminal">$</span><span class="kw">crate</span><span class="macro-nonterminal">::BuildInfo::get</span>()
+        }
+
+        <span class="attribute">#[<span class="ident">no_mangle</span>]</span>
+        <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">extern</span> <span class="string">&quot;C&quot;</span> <span class="kw">fn</span> <span class="ident">_plugin_get_plugin_info</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="macro-nonterminal">$</span><span class="kw">crate</span><span class="macro-nonterminal">::PluginInfo</span> {
+            <span class="macro-nonterminal">$</span><span class="kw">crate</span><span class="macro-nonterminal">::PluginInfo</span> {
+                <span class="ident">name</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">plugin_name</span>,
+                <span class="ident">version</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">plugin_version</span>,
+            }
         }
 
         <span class="attribute">#[<span class="ident">no_mangle</span>]</span>
