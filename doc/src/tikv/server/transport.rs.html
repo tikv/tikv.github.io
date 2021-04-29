@@ -60,6 +60,18 @@
 <span id="57">57</span>
 <span id="58">58</span>
 <span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -67,43 +79,55 @@
 
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::server::raft_client::RaftClient</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::server::resolve::StoreAddrResolver</span>;
-<span class="kw">use</span> <span class="ident">engine_rocks::RocksEngine</span>;
+<span class="kw">use</span> <span class="ident">engine_traits::KvEngine</span>;
 <span class="kw">use</span> <span class="ident">raftstore::router::RaftStoreRouter</span>;
 <span class="kw">use</span> <span class="ident">raftstore::store::Transport</span>;
 <span class="kw">use</span> <span class="ident">raftstore::Result</span> <span class="kw">as</span> <span class="ident">RaftStoreResult</span>;
+<span class="kw">use</span> <span class="ident">std::marker::PhantomData</span>;
 
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ServerTransport</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">S</span><span class="op">&gt;</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ServerTransport</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">S</span>, <span class="ident">E</span><span class="op">&gt;</span>
 <span class="kw">where</span>
-    <span class="ident">T</span>: <span class="ident">RaftStoreRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+    <span class="ident">T</span>: <span class="ident">RaftStoreRouter</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
     <span class="ident">S</span>: <span class="ident">StoreAddrResolver</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+    <span class="ident">E</span>: <span class="ident">KvEngine</span>,
 {
-    <span class="ident">raft_client</span>: <span class="ident">RaftClient</span><span class="op">&lt;</span><span class="ident">S</span>, <span class="ident">T</span><span class="op">&gt;</span>,
+    <span class="ident">raft_client</span>: <span class="ident">RaftClient</span><span class="op">&lt;</span><span class="ident">S</span>, <span class="ident">T</span>, <span class="ident">E</span><span class="op">&gt;</span>,
+    <span class="ident">engine</span>: <span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">S</span><span class="op">&gt;</span> <span class="ident">Clone</span> <span class="kw">for</span> <span class="ident">ServerTransport</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">S</span><span class="op">&gt;</span>
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">S</span>, <span class="ident">E</span><span class="op">&gt;</span> <span class="ident">Clone</span> <span class="kw">for</span> <span class="ident">ServerTransport</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">S</span>, <span class="ident">E</span><span class="op">&gt;</span>
 <span class="kw">where</span>
-    <span class="ident">T</span>: <span class="ident">RaftStoreRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+    <span class="ident">T</span>: <span class="ident">RaftStoreRouter</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
     <span class="ident">S</span>: <span class="ident">StoreAddrResolver</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+    <span class="ident">E</span>: <span class="ident">KvEngine</span>,
 {
     <span class="kw">fn</span> <span class="ident">clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="ident">ServerTransport</span> {
             <span class="ident">raft_client</span>: <span class="self">self</span>.<span class="ident">raft_client</span>.<span class="ident">clone</span>(),
+            <span class="ident">engine</span>: <span class="ident">PhantomData</span>,
         }
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">RaftStoreRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>, <span class="ident">S</span>: <span class="ident">StoreAddrResolver</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span>
-    <span class="ident">ServerTransport</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">S</span><span class="op">&gt;</span>
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">S</span>, <span class="ident">E</span><span class="op">&gt;</span> <span class="ident">ServerTransport</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">S</span>, <span class="ident">E</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">E</span>: <span class="ident">KvEngine</span>,
+    <span class="ident">T</span>: <span class="ident">RaftStoreRouter</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+    <span class="ident">S</span>: <span class="ident">StoreAddrResolver</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
 {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">raft_client</span>: <span class="ident">RaftClient</span><span class="op">&lt;</span><span class="ident">S</span>, <span class="ident">T</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ServerTransport</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">S</span><span class="op">&gt;</span> {
-        <span class="ident">ServerTransport</span> { <span class="ident">raft_client</span> }
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">raft_client</span>: <span class="ident">RaftClient</span><span class="op">&lt;</span><span class="ident">S</span>, <span class="ident">T</span>, <span class="ident">E</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ServerTransport</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">S</span>, <span class="ident">E</span><span class="op">&gt;</span> {
+        <span class="ident">ServerTransport</span> {
+            <span class="ident">raft_client</span>,
+            <span class="ident">engine</span>: <span class="ident">PhantomData</span>,
+        }
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">S</span><span class="op">&gt;</span> <span class="ident">Transport</span> <span class="kw">for</span> <span class="ident">ServerTransport</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">S</span><span class="op">&gt;</span>
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">S</span>, <span class="ident">E</span><span class="op">&gt;</span> <span class="ident">Transport</span> <span class="kw">for</span> <span class="ident">ServerTransport</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">S</span>, <span class="ident">E</span><span class="op">&gt;</span>
 <span class="kw">where</span>
-    <span class="ident">T</span>: <span class="ident">RaftStoreRouter</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Unpin</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+    <span class="ident">T</span>: <span class="ident">RaftStoreRouter</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Unpin</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
     <span class="ident">S</span>: <span class="ident">StoreAddrResolver</span> <span class="op">+</span> <span class="ident">Unpin</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+    <span class="ident">E</span>: <span class="ident">KvEngine</span>,
 {
     <span class="kw">fn</span> <span class="ident">send</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">msg</span>: <span class="ident">RaftMessage</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">RaftStoreResult</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">match</span> <span class="self">self</span>.<span class="ident">raft_client</span>.<span class="ident">send</span>(<span class="ident">msg</span>) {
