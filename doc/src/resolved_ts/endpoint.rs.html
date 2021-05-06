@@ -562,13 +562,14 @@
 <span id="559">559</span>
 <span id="560">560</span>
 <span id="561">561</span>
+<span id="562">562</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2021 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
 <span class="kw">use</span> <span class="ident">std::collections::HashMap</span>;
 <span class="kw">use</span> <span class="ident">std::fmt</span>;
 <span class="kw">use</span> <span class="ident">std::marker::PhantomData</span>;
-<span class="kw">use</span> <span class="ident">std::sync::atomic</span>::{<span class="ident">AtomicBool</span>, <span class="ident">AtomicU64</span>, <span class="ident">Ordering</span>};
+<span class="kw">use</span> <span class="ident">std::sync::atomic</span>::{<span class="ident">AtomicBool</span>, <span class="ident">Ordering</span>};
 <span class="kw">use</span> <span class="ident">std::sync</span>::{<span class="ident">Arc</span>, <span class="ident">Mutex</span>};
 
 <span class="kw">use</span> <span class="ident">concurrency_manager::ConcurrencyManager</span>;
@@ -581,7 +582,7 @@
 <span class="kw">use</span> <span class="ident">raftstore::coprocessor::CmdBatch</span>;
 <span class="kw">use</span> <span class="ident">raftstore::router::RaftStoreRouter</span>;
 <span class="kw">use</span> <span class="ident">raftstore::store::fsm</span>::{<span class="ident">ObserveID</span>, <span class="ident">StoreMeta</span>};
-<span class="kw">use</span> <span class="ident">raftstore::store::util</span>;
+<span class="kw">use</span> <span class="ident">raftstore::store::util</span>::{<span class="self">self</span>, <span class="ident">RegionReadProgress</span>};
 <span class="kw">use</span> <span class="ident">raftstore::store::RegionSnapshot</span>;
 <span class="kw">use</span> <span class="ident">security::SecurityManager</span>;
 <span class="kw">use</span> <span class="ident">tikv::config::CdcConfig</span>;
@@ -629,7 +630,7 @@
 }
 
 <span class="kw">impl</span> <span class="ident">ObserveRegion</span> {
-    <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">meta</span>: <span class="ident">Region</span>, <span class="ident">resolved_ts</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicU64</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">meta</span>: <span class="ident">Region</span>, <span class="ident">resolved_ts</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">RegionReadProgress</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="ident">ObserveRegion</span> {
             <span class="ident">resolver</span>: <span class="ident">Resolver::from_shared</span>(<span class="ident">meta</span>.<span class="ident">id</span>, <span class="ident">resolved_ts</span>),
             <span class="ident">meta</span>,
@@ -784,15 +785,13 @@
         <span class="macro">assert!</span>(<span class="self">self</span>.<span class="ident">regions</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">region_id</span>).<span class="ident">is_none</span>());
         <span class="kw">let</span> <span class="ident">observe_region</span> <span class="op">=</span> {
             <span class="kw">let</span> <span class="ident">store_meta</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">store_meta</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">_read_progress</span>) <span class="op">=</span> <span class="ident">store_meta</span>.<span class="ident">region_read_progress</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">region_id</span>) {
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">read_progress</span>) <span class="op">=</span> <span class="ident">store_meta</span>.<span class="ident">region_read_progress</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">region_id</span>) {
                 <span class="macro">info!</span>(
                     <span class="string">&quot;register observe region&quot;</span>;
                     <span class="string">&quot;store id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">store_meta</span>.<span class="ident">store_id</span>.<span class="ident">clone</span>(),
                     <span class="string">&quot;region&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">region</span>
                 );
-                <span class="comment">// FIXME: should use `read_progress` to initialize the `ObserveRegion::resolver`</span>
-                <span class="comment">// hence the resolver can update the `safe_ts`</span>
-                <span class="ident">ObserveRegion::new</span>(<span class="ident">region</span>.<span class="ident">clone</span>(), <span class="ident">Arc::default</span>())
+                <span class="ident">ObserveRegion::new</span>(<span class="ident">region</span>.<span class="ident">clone</span>(), <span class="ident">Arc::clone</span>(<span class="ident">read_progress</span>))
             } <span class="kw">else</span> {
                 <span class="macro">warn!</span>(
                     <span class="string">&quot;try register unexit region&quot;</span>;
@@ -951,14 +950,14 @@
     <span class="kw">fn</span> <span class="ident">handle_change_log</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
         <span class="ident">cmd_batch</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">CmdBatch</span><span class="op">&gt;</span>,
-        <span class="ident">snapshot</span>: <span class="ident">RegionSnapshot</span><span class="op">&lt;</span><span class="ident">E::Snapshot</span><span class="op">&gt;</span>,
+        <span class="ident">snapshot</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RegionSnapshot</span><span class="op">&lt;</span><span class="ident">E::Snapshot</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     ) {
         <span class="kw">let</span> <span class="ident">logs</span> <span class="op">=</span> <span class="ident">cmd_batch</span>
             .<span class="ident">into_iter</span>()
             .<span class="ident">filter_map</span>(<span class="op">|</span><span class="ident">batch</span><span class="op">|</span> {
                 <span class="kw">if</span> <span class="op">!</span><span class="ident">batch</span>.<span class="ident">is_empty</span>() {
                     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">observe_region</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">regions</span>.<span class="ident">get_mut</span>(<span class="kw-2">&amp;</span><span class="ident">batch</span>.<span class="ident">region_id</span>) {
-                        <span class="kw">let</span> <span class="ident">observe_id</span> <span class="op">=</span> <span class="ident">batch</span>.<span class="ident">cdc_id</span>;
+                        <span class="kw">let</span> <span class="ident">observe_id</span> <span class="op">=</span> <span class="ident">batch</span>.<span class="ident">rts_id</span>;
                         <span class="kw">let</span> <span class="ident">region_id</span> <span class="op">=</span> <span class="ident">observe_region</span>.<span class="ident">meta</span>.<span class="ident">id</span>;
                         <span class="kw">if</span> <span class="ident">observe_region</span>.<span class="ident">observe_id</span> <span class="op">=</span><span class="op">=</span> <span class="ident">observe_id</span> {
                             <span class="kw">let</span> <span class="ident">logs</span> <span class="op">=</span> <span class="ident">ChangeLog::encode_change_log</span>(<span class="ident">region_id</span>, <span class="ident">batch</span>);
@@ -974,7 +973,7 @@
                         } <span class="kw">else</span> {
                             <span class="macro">debug!</span>(<span class="string">&quot;resolved ts CmdBatch discarded&quot;</span>;
                                 <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">batch</span>.<span class="ident">region_id</span>,
-                                <span class="string">&quot;observe_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">batch</span>.<span class="ident">cdc_id</span>,
+                                <span class="string">&quot;observe_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">batch</span>.<span class="ident">rts_id</span>,
                                 <span class="string">&quot;current&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">observe_region</span>.<span class="ident">observe_id</span>,
                             );
                         }
@@ -983,7 +982,10 @@
                 <span class="prelude-val">None</span>
             })
             .<span class="ident">collect</span>();
-        <span class="self">self</span>.<span class="ident">sinker</span>.<span class="ident">sink_cmd</span>(<span class="ident">logs</span>, <span class="ident">snapshot</span>);
+        <span class="kw">match</span> <span class="ident">snapshot</span> {
+            <span class="prelude-val">Some</span>(<span class="ident">snap</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">sinker</span>.<span class="ident">sink_cmd_with_old_value</span>(<span class="ident">logs</span>, <span class="ident">snap</span>),
+            <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">sinker</span>.<span class="ident">sink_cmd</span>(<span class="ident">logs</span>),
+        }
     }
 
     <span class="kw">fn</span> <span class="ident">handle_scan_locks</span>(
@@ -1028,7 +1030,7 @@
     },
     <span class="ident">ChangeLog</span> {
         <span class="ident">cmd_batch</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">CmdBatch</span><span class="op">&gt;</span>,
-        <span class="ident">snapshot</span>: <span class="ident">RegionSnapshot</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>,
+        <span class="ident">snapshot</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RegionSnapshot</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     },
     <span class="ident">ScanLocks</span> {
         <span class="ident">region_id</span>: <span class="ident">u64</span>,

@@ -195,13 +195,22 @@
 <span id="192">192</span>
 <span id="193">193</span>
 <span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
 <span class="kw">use</span> <span class="ident">collections</span>::{<span class="ident">HashMap</span>, <span class="ident">HashSet</span>};
+<span class="kw">use</span> <span class="ident">raftstore::store::util::RegionReadProgress</span>;
 <span class="kw">use</span> <span class="ident">std::cmp</span>;
 <span class="kw">use</span> <span class="ident">std::collections::BTreeMap</span>;
-<span class="kw">use</span> <span class="ident">std::sync::atomic</span>::{<span class="ident">AtomicU64</span>, <span class="ident">Ordering</span>};
 <span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
 <span class="kw">use</span> <span class="ident">txn_types::TimeStamp</span>;
 
@@ -214,7 +223,9 @@
     <span class="comment">// start_ts -&gt; locked keys.</span>
     <span class="ident">lock_ts_heap</span>: <span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">TimeStamp</span>, <span class="ident">HashSet</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span>[<span class="ident">u8</span>]<span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="comment">// The timestamps that guarantees no more commit will happen before.</span>
-    <span class="ident">resolved_ts</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicU64</span><span class="op">&gt;</span>,
+    <span class="ident">resolved_ts</span>: <span class="ident">TimeStamp</span>,
+    <span class="comment">// The region read progress is used to utilize `resolved_ts` to serve stale read request</span>
+    <span class="ident">read_progress</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">RegionReadProgress</span><span class="op">&gt;</span>,
     <span class="comment">// The timestamps that advance the resolved_ts when there is no more write.</span>
     <span class="ident">min_ts</span>: <span class="ident">TimeStamp</span>,
 }
@@ -224,10 +235,11 @@
         <span class="ident">Resolver::from_shared</span>(<span class="ident">region_id</span>, <span class="ident">Arc::default</span>())
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_shared</span>(<span class="ident">region_id</span>: <span class="ident">u64</span>, <span class="ident">resolved_ts</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicU64</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Resolver</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_shared</span>(<span class="ident">region_id</span>: <span class="ident">u64</span>, <span class="ident">read_progress</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">RegionReadProgress</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Resolver</span> {
         <span class="ident">Resolver</span> {
             <span class="ident">region_id</span>,
-            <span class="ident">resolved_ts</span>,
+            <span class="ident">resolved_ts</span>: <span class="ident">TimeStamp::zero</span>(),
+            <span class="ident">read_progress</span>,
             <span class="ident">locks_by_key</span>: <span class="ident">HashMap::default</span>(),
             <span class="ident">lock_ts_heap</span>: <span class="ident">BTreeMap::new</span>(),
             <span class="ident">min_ts</span>: <span class="ident">TimeStamp::zero</span>(),
@@ -235,7 +247,7 @@
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">resolved_ts</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">TimeStamp</span> {
-        <span class="self">self</span>.<span class="ident">resolved_ts</span>.<span class="ident">load</span>(<span class="ident">Ordering::Acquire</span>).<span class="ident">into</span>()
+        <span class="self">self</span>.<span class="ident">resolved_ts</span>
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">locks</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">TimeStamp</span>, <span class="ident">HashSet</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span>[<span class="ident">u8</span>]<span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> {
@@ -289,9 +301,15 @@
 
         <span class="comment">// No more commit happens before the ts.</span>
         <span class="kw">let</span> <span class="ident">new_resolved_ts</span> <span class="op">=</span> <span class="ident">cmp::min</span>(<span class="ident">min_start_ts</span>, <span class="ident">min_ts</span>);
-        <span class="kw">let</span> <span class="ident">prev_ts</span> <span class="op">=</span> <span class="self">self</span>
-            .<span class="ident">resolved_ts</span>
-            .<span class="ident">fetch_max</span>(<span class="ident">new_resolved_ts</span>.<span class="ident">into_inner</span>(), <span class="ident">Ordering::Relaxed</span>);
+
+        <span class="comment">// Resolved ts never decrease.</span>
+        <span class="self">self</span>.<span class="ident">resolved_ts</span> <span class="op">=</span> <span class="ident">cmp::max</span>(<span class="self">self</span>.<span class="ident">resolved_ts</span>, <span class="ident">new_resolved_ts</span>);
+
+        <span class="comment">// Update region read progress</span>
+        <span class="comment">// TODO: should use `RegionReadProgress::update_safe_ts` to avoid direct</span>
+        <span class="comment">// write to `safe_ts`</span>
+        <span class="self">self</span>.<span class="ident">read_progress</span>
+            .<span class="ident">fetch_max_safe_ts</span>(<span class="self">self</span>.<span class="ident">resolved_ts</span>.<span class="ident">into_inner</span>());
 
         <span class="kw">let</span> <span class="ident">new_min_ts</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">has_lock</span> {
             <span class="comment">// If there are some lock, the min_ts must be smaller than</span>
@@ -304,7 +322,7 @@
         <span class="comment">// Min ts never decrease.</span>
         <span class="self">self</span>.<span class="ident">min_ts</span> <span class="op">=</span> <span class="ident">cmp::max</span>(<span class="self">self</span>.<span class="ident">min_ts</span>, <span class="ident">new_min_ts</span>);
 
-        <span class="ident">cmp::max</span>(<span class="ident">TimeStamp::new</span>(<span class="ident">prev_ts</span>), <span class="ident">new_resolved_ts</span>)
+        <span class="self">self</span>.<span class="ident">resolved_ts</span>
     }
 }
 
