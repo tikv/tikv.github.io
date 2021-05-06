@@ -4335,6 +4335,33 @@
 <span id="4332">4332</span>
 <span id="4333">4333</span>
 <span id="4334">4334</span>
+<span id="4335">4335</span>
+<span id="4336">4336</span>
+<span id="4337">4337</span>
+<span id="4338">4338</span>
+<span id="4339">4339</span>
+<span id="4340">4340</span>
+<span id="4341">4341</span>
+<span id="4342">4342</span>
+<span id="4343">4343</span>
+<span id="4344">4344</span>
+<span id="4345">4345</span>
+<span id="4346">4346</span>
+<span id="4347">4347</span>
+<span id="4348">4348</span>
+<span id="4349">4349</span>
+<span id="4350">4350</span>
+<span id="4351">4351</span>
+<span id="4352">4352</span>
+<span id="4353">4353</span>
+<span id="4354">4354</span>
+<span id="4355">4355</span>
+<span id="4356">4356</span>
+<span id="4357">4357</span>
+<span id="4358">4358</span>
+<span id="4359">4359</span>
+<span id="4360">4360</span>
+<span id="4361">4361</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -4354,6 +4381,7 @@
 <span class="kw">use</span> <span class="ident">error_code::ErrorCodeExt</span>;
 <span class="kw">use</span> <span class="ident">fail::fail_point</span>;
 <span class="kw">use</span> <span class="ident">kvproto::errorpb</span>;
+<span class="kw">use</span> <span class="ident">kvproto::import_sstpb::SwitchMode</span>;
 <span class="kw">use</span> <span class="ident">kvproto::metapb</span>::{<span class="self">self</span>, <span class="ident">Region</span>, <span class="ident">RegionEpoch</span>};
 <span class="kw">use</span> <span class="ident">kvproto::pdpb::CheckPolicy</span>;
 <span class="kw">use</span> <span class="ident">kvproto::raft_cmdpb</span>::{
@@ -4861,6 +4889,19 @@
                 }
                 <span class="ident">PeerMsg::Noop</span> <span class="op">=</span><span class="op">&gt;</span> {}
                 <span class="ident">PeerMsg::UpdateReplicationMode</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">on_update_replication_mode</span>(),
+                <span class="ident">PeerMsg::SplitCheck</span> <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="comment">// If the current `approximate_size` is larger than `region_max_size`, this region</span>
+                    <span class="comment">// may ingest a large file which is imported by `BR` or `lightning`, we shall check it</span>
+                    <span class="kw">let</span> <span class="ident">check_size</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">approximate_size</span>.<span class="ident">map_or</span>(<span class="bool-val">true</span>, <span class="op">|</span><span class="ident">size</span><span class="op">|</span> {
+                        <span class="ident">size</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">coprocessor_host</span>.<span class="ident">cfg</span>.<span class="ident">region_max_size</span>.<span class="number">0</span>
+                    });
+                    <span class="kw">let</span> <span class="ident">check_keys</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">approximate_keys</span>.<span class="ident">map_or</span>(<span class="bool-val">true</span>, <span class="op">|</span><span class="ident">keys</span><span class="op">|</span> {
+                        <span class="ident">keys</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">coprocessor_host</span>.<span class="ident">cfg</span>.<span class="ident">region_max_keys</span>
+                    });
+                    <span class="kw">if</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">is_leader</span>() <span class="op">&amp;&amp;</span> (<span class="ident">check_size</span> <span class="op">|</span><span class="op">|</span> <span class="ident">check_keys</span>) {
+                        <span class="self">self</span>.<span class="ident">schedule_check_split</span>();
+                    }
+                }
             }
         }
         <span class="comment">// Propose batch request which may be still waiting for more raft-command</span>
@@ -7910,6 +7951,19 @@
             <span class="kw">return</span>;
         }
 
+        <span class="comment">// When Lightning or BR is importing data to TiKV, their ingest-request may fail because of</span>
+        <span class="comment">// region-epoch not matched. So we hope TiKV do not check region size and split region during</span>
+        <span class="comment">// importing.</span>
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">importer</span>.<span class="ident">get_mode</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">SwitchMode::Import</span> {
+            <span class="kw">return</span>;
+        }
+
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">schedule_check_split</span>() {
+            <span class="self">self</span>.<span class="ident">register_split_region_check_tick</span>();
+        }
+    }
+
+    <span class="kw">fn</span> <span class="ident">schedule_check_split</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
         <span class="comment">// bulk insert too fast may cause snapshot stale very soon, worst case it stale before</span>
         <span class="comment">// sending. so when snapshot is generating or sending, skip split check at most 3 times.</span>
         <span class="comment">// There is a trade off between region size and snapshot success rate. Split check is</span>
@@ -7920,7 +7974,7 @@
             <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">skip_split_count</span> <span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">region_split_skip_max_count</span>()
         {
             <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">skip_split_count</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
-            <span class="kw">return</span>;
+            <span class="kw">return</span> <span class="bool-val">false</span>;
         }
         <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">skip_split_count</span> <span class="op">=</span> <span class="number">0</span>;
 
@@ -7936,7 +7990,7 @@
         }
         <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">size_diff_hint</span> <span class="op">=</span> <span class="number">0</span>;
         <span class="self">self</span>.<span class="ident">fsm</span>.<span class="ident">peer</span>.<span class="ident">compaction_declined_bytes</span> <span class="op">=</span> <span class="number">0</span>;
-        <span class="self">self</span>.<span class="ident">register_split_region_check_tick</span>();
+        <span class="bool-val">true</span>
     }
 
     <span class="kw">fn</span> <span class="ident">on_prepare_split_region</span>(
