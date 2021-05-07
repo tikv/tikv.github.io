@@ -5211,6 +5211,29 @@
 <span id="5208">5208</span>
 <span id="5209">5209</span>
 <span id="5210">5210</span>
+<span id="5211">5211</span>
+<span id="5212">5212</span>
+<span id="5213">5213</span>
+<span id="5214">5214</span>
+<span id="5215">5215</span>
+<span id="5216">5216</span>
+<span id="5217">5217</span>
+<span id="5218">5218</span>
+<span id="5219">5219</span>
+<span id="5220">5220</span>
+<span id="5221">5221</span>
+<span id="5222">5222</span>
+<span id="5223">5223</span>
+<span id="5224">5224</span>
+<span id="5225">5225</span>
+<span id="5226">5226</span>
+<span id="5227">5227</span>
+<span id="5228">5228</span>
+<span id="5229">5229</span>
+<span id="5230">5230</span>
+<span id="5231">5231</span>
+<span id="5232">5232</span>
+<span id="5233">5233</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2017 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -5220,7 +5243,7 @@
 <span class="kw">use</span> <span class="ident">std::fmt</span>::{<span class="self">self</span>, <span class="ident">Debug</span>, <span class="ident">Formatter</span>};
 <span class="kw">use</span> <span class="ident">std::marker::PhantomData</span>;
 <span class="kw">use</span> <span class="ident">std::ops</span>::{<span class="ident">Deref</span>, <span class="ident">DerefMut</span>};
-<span class="kw">use</span> <span class="ident">std::sync::atomic</span>::{<span class="ident">AtomicU64</span>, <span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>};
+<span class="kw">use</span> <span class="ident">std::sync::atomic</span>::{<span class="ident">AtomicBool</span>, <span class="ident">AtomicU64</span>, <span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>};
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
 <span class="kw">use</span> <span class="ident">std::sync::mpsc::Sender</span>;
 <span class="kw">use</span> <span class="ident">std::sync::mpsc::SyncSender</span>;
@@ -8037,15 +8060,27 @@
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">GenSnapTask</span> {
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">region_id</span>: <span class="ident">u64</span>,
+    <span class="comment">// Fill it after the RocksDB snapshot is taken.</span>
+    <span class="kw">pub</span> <span class="ident">index</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicU64</span><span class="op">&gt;</span>,
+    <span class="comment">// Fetch it to cancel the task if necessary.</span>
+    <span class="kw">pub</span> <span class="ident">canceled</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicBool</span><span class="op">&gt;</span>,
+
     <span class="ident">snap_notifier</span>: <span class="ident">SyncSender</span><span class="op">&lt;</span><span class="ident">RaftSnapshot</span><span class="op">&gt;</span>,
     <span class="comment">// indicates whether the snapshot is triggered due to load balance</span>
     <span class="ident">for_balance</span>: <span class="ident">bool</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">GenSnapTask</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">region_id</span>: <span class="ident">u64</span>, <span class="ident">snap_notifier</span>: <span class="ident">SyncSender</span><span class="op">&lt;</span><span class="ident">RaftSnapshot</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">GenSnapTask</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
+        <span class="ident">region_id</span>: <span class="ident">u64</span>,
+        <span class="ident">index</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicU64</span><span class="op">&gt;</span>,
+        <span class="ident">canceled</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicBool</span><span class="op">&gt;</span>,
+        <span class="ident">snap_notifier</span>: <span class="ident">SyncSender</span><span class="op">&lt;</span><span class="ident">RaftSnapshot</span><span class="op">&gt;</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">GenSnapTask</span> {
         <span class="ident">GenSnapTask</span> {
             <span class="ident">region_id</span>,
+            <span class="ident">index</span>,
+            <span class="ident">canceled</span>,
             <span class="ident">snap_notifier</span>,
             <span class="ident">for_balance</span>: <span class="bool-val">false</span>,
         }
@@ -8065,12 +8100,15 @@
     <span class="kw">where</span>
         <span class="ident">EK</span>: <span class="ident">KvEngine</span>,
     {
+        <span class="self">self</span>.<span class="ident">index</span>
+            .<span class="ident">store</span>(<span class="ident">last_applied_state</span>.<span class="ident">applied_index</span>, <span class="ident">Ordering::SeqCst</span>);
         <span class="kw">let</span> <span class="ident">snapshot</span> <span class="op">=</span> <span class="ident">RegionTask::Gen</span> {
             <span class="ident">region_id</span>: <span class="self">self</span>.<span class="ident">region_id</span>,
             <span class="ident">notifier</span>: <span class="self">self</span>.<span class="ident">snap_notifier</span>,
             <span class="ident">for_balance</span>: <span class="self">self</span>.<span class="ident">for_balance</span>,
             <span class="ident">last_applied_index_term</span>,
             <span class="ident">last_applied_state</span>,
+            <span class="ident">canceled</span>: <span class="self">self</span>.<span class="ident">canceled</span>,
             <span class="comment">// This snapshot may be held for a long time, which may cause too many</span>
             <span class="comment">// open files in rocksdb.</span>
             <span class="ident">kv_snap</span>,
@@ -9057,6 +9095,14 @@
 
     <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 
+    <span class="kw">impl</span> <span class="ident">GenSnapTask</span> {
+        <span class="kw">fn</span> <span class="ident">new_for_test</span>(<span class="ident">region_id</span>: <span class="ident">u64</span>, <span class="ident">snap_notifier</span>: <span class="ident">SyncSender</span><span class="op">&lt;</span><span class="ident">RaftSnapshot</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">GenSnapTask</span> {
+            <span class="kw">let</span> <span class="ident">index</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">AtomicU64::new</span>(<span class="number">0</span>));
+            <span class="kw">let</span> <span class="ident">canceled</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">AtomicBool::new</span>(<span class="bool-val">false</span>));
+            <span class="self">Self</span><span class="ident">::new</span>(<span class="ident">region_id</span>, <span class="ident">index</span>, <span class="ident">canceled</span>, <span class="ident">snap_notifier</span>)
+        }
+    }
+
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create_tmp_engine</span>(<span class="ident">path</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> (<span class="ident">TempDir</span>, <span class="ident">KvTestEngine</span>) {
         <span class="kw">let</span> <span class="ident">path</span> <span class="op">=</span> <span class="ident">Builder::new</span>().<span class="ident">prefix</span>(<span class="ident">path</span>).<span class="ident">tempdir</span>().<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span> <span class="ident">new_engine</span>(
@@ -9331,7 +9377,7 @@
             <span class="number">2</span>,
             <span class="macro">vec!</span>[
                 <span class="ident">Msg::apply</span>(<span class="ident">apply</span>(<span class="number">1</span>, <span class="number">2</span>, <span class="number">11</span>, <span class="macro">vec!</span>[<span class="ident">new_entry</span>(<span class="number">5</span>, <span class="number">5</span>, <span class="bool-val">false</span>)], <span class="macro">vec!</span>[])),
-                <span class="ident">Msg::Snapshot</span>(<span class="ident">GenSnapTask::new</span>(<span class="number">2</span>, <span class="ident">snap_tx</span>)),
+                <span class="ident">Msg::Snapshot</span>(<span class="ident">GenSnapTask::new_for_test</span>(<span class="number">2</span>, <span class="ident">snap_tx</span>)),
             ],
         );
         <span class="kw">let</span> <span class="ident">apply_res</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">rx</span>.<span class="ident">recv_timeout</span>(<span class="ident">Duration::from_secs</span>(<span class="number">3</span>)) {

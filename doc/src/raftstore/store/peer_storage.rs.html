@@ -2644,13 +2644,64 @@
 <span id="2641">2641</span>
 <span id="2642">2642</span>
 <span id="2643">2643</span>
+<span id="2644">2644</span>
+<span id="2645">2645</span>
+<span id="2646">2646</span>
+<span id="2647">2647</span>
+<span id="2648">2648</span>
+<span id="2649">2649</span>
+<span id="2650">2650</span>
+<span id="2651">2651</span>
+<span id="2652">2652</span>
+<span id="2653">2653</span>
+<span id="2654">2654</span>
+<span id="2655">2655</span>
+<span id="2656">2656</span>
+<span id="2657">2657</span>
+<span id="2658">2658</span>
+<span id="2659">2659</span>
+<span id="2660">2660</span>
+<span id="2661">2661</span>
+<span id="2662">2662</span>
+<span id="2663">2663</span>
+<span id="2664">2664</span>
+<span id="2665">2665</span>
+<span id="2666">2666</span>
+<span id="2667">2667</span>
+<span id="2668">2668</span>
+<span id="2669">2669</span>
+<span id="2670">2670</span>
+<span id="2671">2671</span>
+<span id="2672">2672</span>
+<span id="2673">2673</span>
+<span id="2674">2674</span>
+<span id="2675">2675</span>
+<span id="2676">2676</span>
+<span id="2677">2677</span>
+<span id="2678">2678</span>
+<span id="2679">2679</span>
+<span id="2680">2680</span>
+<span id="2681">2681</span>
+<span id="2682">2682</span>
+<span id="2683">2683</span>
+<span id="2684">2684</span>
+<span id="2685">2685</span>
+<span id="2686">2686</span>
+<span id="2687">2687</span>
+<span id="2688">2688</span>
+<span id="2689">2689</span>
+<span id="2690">2690</span>
+<span id="2691">2691</span>
+<span id="2692">2692</span>
+<span id="2693">2693</span>
+<span id="2694">2694</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
 <span class="kw">use</span> <span class="ident">fail::fail_point</span>;
 <span class="kw">use</span> <span class="ident">std::cell</span>::{<span class="ident">Cell</span>, <span class="ident">RefCell</span>};
 <span class="kw">use</span> <span class="ident">std::collections::VecDeque</span>;
-<span class="kw">use</span> <span class="ident">std::sync::atomic</span>::{<span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>};
+<span class="kw">use</span> <span class="ident">std::sync::atomic</span>::{<span class="ident">AtomicBool</span>, <span class="ident">AtomicU64</span>, <span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>};
 <span class="kw">use</span> <span class="ident">std::sync::mpsc</span>::{<span class="self">self</span>, <span class="ident">Receiver</span>, <span class="ident">TryRecvError</span>};
 <span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
 <span class="kw">use</span> <span class="ident">std::time::Instant</span>;
@@ -2709,14 +2760,18 @@
     <span class="ident">Success</span>,
     <span class="doccomment">/// A snapshot is being applied.</span>
     <span class="ident">Applying</span>,
-    <span class="doccomment">/// No snapshot is being applied at all or the snapshot is cancelled</span>
+    <span class="doccomment">/// No snapshot is being applied at all or the snapshot is canceled</span>
     <span class="ident">Idle</span>,
 }
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">SnapState</span> {
     <span class="ident">Relax</span>,
-    <span class="ident">Generating</span>(<span class="ident">Receiver</span><span class="op">&lt;</span><span class="ident">Snapshot</span><span class="op">&gt;</span>),
+    <span class="ident">Generating</span> {
+        <span class="ident">canceled</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicBool</span><span class="op">&gt;</span>,
+        <span class="ident">index</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicU64</span><span class="op">&gt;</span>,
+        <span class="ident">receiver</span>: <span class="ident">Receiver</span><span class="op">&lt;</span><span class="ident">Snapshot</span><span class="op">&gt;</span>,
+    },
     <span class="ident">Applying</span>(<span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicUsize</span><span class="op">&gt;</span>),
     <span class="ident">ApplyAborted</span>,
 }
@@ -2726,7 +2781,7 @@
         <span class="kw">match</span> (<span class="self">self</span>, <span class="ident">other</span>) {
             (<span class="kw-2">&amp;</span><span class="ident">SnapState::Relax</span>, <span class="kw-2">&amp;</span><span class="ident">SnapState::Relax</span>)
             <span class="op">|</span> (<span class="kw-2">&amp;</span><span class="ident">SnapState::ApplyAborted</span>, <span class="kw-2">&amp;</span><span class="ident">SnapState::ApplyAborted</span>)
-            <span class="op">|</span> (<span class="kw-2">&amp;</span><span class="ident">SnapState::Generating</span>(<span class="kw">_</span>), <span class="kw-2">&amp;</span><span class="ident">SnapState::Generating</span>(<span class="kw">_</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="bool-val">true</span>,
+            <span class="op">|</span> (<span class="kw-2">&amp;</span><span class="ident">SnapState::Generating</span> { .. }, <span class="kw-2">&amp;</span><span class="ident">SnapState::Generating</span> { .. }) <span class="op">=</span><span class="op">&gt;</span> <span class="bool-val">true</span>,
             (<span class="kw-2">&amp;</span><span class="ident">SnapState::Applying</span>(<span class="kw-2">ref</span> <span class="ident">b1</span>), <span class="kw-2">&amp;</span><span class="ident">SnapState::Applying</span>(<span class="kw-2">ref</span> <span class="ident">b2</span>)) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="ident">b1</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>) <span class="op">=</span><span class="op">=</span> <span class="ident">b2</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>)
             }
@@ -3585,17 +3640,22 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">snap_state</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">snap_state</span>.<span class="ident">borrow_mut</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tried_cnt</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">snap_tried_cnt</span>.<span class="ident">borrow_mut</span>();
 
-        <span class="kw">let</span> (<span class="kw-2">mut</span> <span class="ident">tried</span>, <span class="kw-2">mut</span> <span class="ident">snap</span>) <span class="op">=</span> (<span class="bool-val">false</span>, <span class="prelude-val">None</span>);
-        <span class="kw">if</span> <span class="kw">let</span> <span class="ident">SnapState::Generating</span>(<span class="kw-2">ref</span> <span class="ident">recv</span>) <span class="op">=</span> <span class="kw-2">*</span><span class="ident">snap_state</span> {
+        <span class="kw">let</span> (<span class="kw-2">mut</span> <span class="ident">tried</span>, <span class="kw-2">mut</span> <span class="ident">last_canceled</span>, <span class="kw-2">mut</span> <span class="ident">snap</span>) <span class="op">=</span> (<span class="bool-val">false</span>, <span class="bool-val">false</span>, <span class="prelude-val">None</span>);
+        <span class="kw">if</span> <span class="kw">let</span> <span class="ident">SnapState::Generating</span> {
+            <span class="kw-2">ref</span> <span class="ident">canceled</span>,
+            <span class="kw-2">ref</span> <span class="ident">receiver</span>,
+            ..
+        } <span class="op">=</span> <span class="kw-2">*</span><span class="ident">snap_state</span>
+        {
             <span class="ident">tried</span> <span class="op">=</span> <span class="bool-val">true</span>;
-            <span class="kw">match</span> <span class="ident">recv</span>.<span class="ident">try_recv</span>() {
-                <span class="prelude-val">Err</span>(<span class="ident">TryRecvError::Disconnected</span>) <span class="op">=</span><span class="op">&gt;</span> {}
+            <span class="ident">last_canceled</span> <span class="op">=</span> <span class="ident">canceled</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>);
+            <span class="kw">match</span> <span class="ident">receiver</span>.<span class="ident">try_recv</span>() {
                 <span class="prelude-val">Err</span>(<span class="ident">TryRecvError::Empty</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">raft::Error::Store</span>(
-                        <span class="ident">raft::StorageError::SnapshotTemporarilyUnavailable</span>,
-                    ));
+                    <span class="kw">let</span> <span class="ident">e</span> <span class="op">=</span> <span class="ident">raft::StorageError::SnapshotTemporarilyUnavailable</span>;
+                    <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">raft::Error::Store</span>(<span class="ident">e</span>));
                 }
-                <span class="prelude-val">Ok</span>(<span class="ident">s</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">snap</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">s</span>),
+                <span class="prelude-val">Ok</span>(<span class="ident">s</span>) <span class="kw">if</span> <span class="op">!</span><span class="ident">last_canceled</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">snap</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">s</span>),
+                <span class="prelude-val">Err</span>(<span class="ident">TryRecvError::Disconnected</span>) <span class="op">|</span> <span class="prelude-val">Ok</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> {}
             }
         }
 
@@ -3638,11 +3698,21 @@
             <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">peer_id</span>,
             <span class="string">&quot;request_index&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">request_index</span>,
         );
-        <span class="kw-2">*</span><span class="ident">tried_cnt</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
-        <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">mpsc::sync_channel</span>(<span class="number">1</span>);
-        <span class="kw-2">*</span><span class="ident">snap_state</span> <span class="op">=</span> <span class="ident">SnapState::Generating</span>(<span class="ident">rx</span>);
 
-        <span class="kw">let</span> <span class="ident">task</span> <span class="op">=</span> <span class="ident">GenSnapTask::new</span>(<span class="self">self</span>.<span class="ident">region</span>.<span class="ident">get_id</span>(), <span class="ident">tx</span>);
+        <span class="kw">if</span> <span class="op">!</span><span class="ident">tried</span> <span class="op">|</span><span class="op">|</span> <span class="op">!</span><span class="ident">last_canceled</span> {
+            <span class="kw-2">*</span><span class="ident">tried_cnt</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+        }
+
+        <span class="kw">let</span> (<span class="ident">sender</span>, <span class="ident">receiver</span>) <span class="op">=</span> <span class="ident">mpsc::sync_channel</span>(<span class="number">1</span>);
+        <span class="kw">let</span> <span class="ident">canceled</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">AtomicBool::new</span>(<span class="bool-val">false</span>));
+        <span class="kw">let</span> <span class="ident">index</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">AtomicU64::new</span>(<span class="number">0</span>));
+        <span class="kw-2">*</span><span class="ident">snap_state</span> <span class="op">=</span> <span class="ident">SnapState::Generating</span> {
+            <span class="ident">canceled</span>: <span class="ident">canceled</span>.<span class="ident">clone</span>(),
+            <span class="ident">index</span>: <span class="ident">index</span>.<span class="ident">clone</span>(),
+            <span class="ident">receiver</span>,
+        };
+
+        <span class="kw">let</span> <span class="ident">task</span> <span class="op">=</span> <span class="ident">GenSnapTask::new</span>(<span class="self">self</span>.<span class="ident">region</span>.<span class="ident">get_id</span>(), <span class="ident">index</span>, <span class="ident">canceled</span>, <span class="ident">sender</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">gen_snap_task</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">gen_snap_task</span>.<span class="ident">borrow_mut</span>();
         <span class="macro">assert!</span>(<span class="ident">gen_snap_task</span>.<span class="ident">is_none</span>());
         <span class="kw-2">*</span><span class="ident">gen_snap_task</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">task</span>);
@@ -3721,6 +3791,8 @@
             <span class="kw">let</span> <span class="ident">rid</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_region_id</span>();
             <span class="self">self</span>.<span class="ident">engines</span>.<span class="ident">raft</span>.<span class="ident">gc_entry_cache</span>(<span class="ident">rid</span>, <span class="ident">idx</span>);
         }
+
+        <span class="self">self</span>.<span class="ident">cancel_generating_snap</span>(<span class="prelude-val">Some</span>(<span class="ident">idx</span>));
     }
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
@@ -3905,7 +3977,7 @@
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_generating_snapshot</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
         <span class="macro">fail_point!</span>(<span class="string">&quot;is_generating_snapshot&quot;</span>, <span class="op">|</span><span class="kw">_</span><span class="op">|</span> { <span class="bool-val">true</span> });
-        <span class="macro">matches!</span>(<span class="kw-2">*</span><span class="self">self</span>.<span class="ident">snap_state</span>.<span class="ident">borrow</span>(), <span class="ident">SnapState::Generating</span>(<span class="kw">_</span>))
+        <span class="macro">matches!</span>(<span class="kw-2">*</span><span class="self">self</span>.<span class="ident">snap_state</span>.<span class="ident">borrow</span>(), <span class="ident">SnapState::Generating</span> { .. })
     }
 
     <span class="doccomment">/// Check if the storage is applying a snapshot.</span>
@@ -3933,19 +4005,9 @@
         <span class="ident">res</span>
     }
 
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_canceling_snap</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="kw">match</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">snap_state</span>.<span class="ident">borrow</span>() {
-            <span class="ident">SnapState::Applying</span>(<span class="kw-2">ref</span> <span class="ident">status</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="ident">status</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>) <span class="op">=</span><span class="op">=</span> <span class="ident">JOB_STATUS_CANCELLING</span>
-            }
-            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="bool-val">false</span>,
-        }
-    }
-
     <span class="doccomment">/// Cancel applying snapshot, return true if the job can be considered not be run again.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">cancel_applying_snap</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="kw">let</span> <span class="ident">is_cancelled</span> <span class="op">=</span> <span class="kw">match</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">snap_state</span>.<span class="ident">borrow</span>() {
+        <span class="kw">let</span> <span class="ident">is_canceled</span> <span class="op">=</span> <span class="kw">match</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">snap_state</span>.<span class="ident">borrow</span>() {
             <span class="ident">SnapState::Applying</span>(<span class="kw-2">ref</span> <span class="ident">status</span>) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">if</span> <span class="ident">status</span>
                     .<span class="ident">compare_exchange</span>(
@@ -3973,13 +4035,34 @@
             }
             <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="bool-val">false</span>,
         };
-        <span class="kw">if</span> <span class="ident">is_cancelled</span> {
+        <span class="kw">if</span> <span class="ident">is_canceled</span> {
             <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">snap_state</span>.<span class="ident">borrow_mut</span>() <span class="op">=</span> <span class="ident">SnapState::ApplyAborted</span>;
             <span class="kw">return</span> <span class="bool-val">true</span>;
         }
         <span class="comment">// now status can only be JOB_STATUS_CANCELLING, JOB_STATUS_CANCELLED,</span>
         <span class="comment">// JOB_STATUS_FAILED and JOB_STATUS_FINISHED.</span>
         <span class="self">self</span>.<span class="ident">check_applying_snap</span>() <span class="op">!</span><span class="op">=</span> <span class="ident">CheckApplyingSnapStatus::Applying</span>
+    }
+
+    <span class="doccomment">/// Cancel generating snapshot.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">cancel_generating_snap</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">compact_to</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>) {
+        <span class="kw">let</span> <span class="ident">snap_state</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">snap_state</span>.<span class="ident">borrow</span>();
+        <span class="kw">if</span> <span class="kw">let</span> <span class="ident">SnapState::Generating</span> {
+            <span class="kw-2">ref</span> <span class="ident">canceled</span>,
+            <span class="kw-2">ref</span> <span class="ident">index</span>,
+            ..
+        } <span class="op">=</span> <span class="kw-2">*</span><span class="ident">snap_state</span>
+        {
+            <span class="kw">if</span> <span class="op">!</span><span class="ident">canceled</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>) {
+                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">idx</span>) <span class="op">=</span> <span class="ident">compact_to</span> {
+                    <span class="kw">let</span> <span class="ident">snap_index</span> <span class="op">=</span> <span class="ident">index</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>);
+                    <span class="kw">if</span> <span class="ident">snap_index</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> <span class="op">|</span><span class="op">|</span> <span class="ident">idx</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">snap_index</span> <span class="op">+</span> <span class="number">1</span> {
+                        <span class="kw">return</span>;
+                    }
+                }
+                <span class="ident">canceled</span>.<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering::SeqCst</span>);
+            }
+        }
     }
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
@@ -4693,7 +4776,9 @@
         <span class="kw">let</span> <span class="ident">gen_task</span> <span class="op">=</span> <span class="ident">s</span>.<span class="ident">gen_snap_task</span>.<span class="ident">borrow_mut</span>().<span class="ident">take</span>().<span class="ident">unwrap</span>();
         <span class="ident">generate_and_schedule_snapshot</span>(<span class="ident">gen_task</span>, <span class="kw-2">&amp;</span><span class="ident">s</span>.<span class="ident">engines</span>, <span class="kw-2">&amp;</span><span class="ident">sched</span>).<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">snap</span> <span class="op">=</span> <span class="kw">match</span> <span class="kw-2">*</span><span class="ident">s</span>.<span class="ident">snap_state</span>.<span class="ident">borrow</span>() {
-            <span class="ident">SnapState::Generating</span>(<span class="kw-2">ref</span> <span class="ident">rx</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">rx</span>.<span class="ident">recv_timeout</span>(<span class="ident">Duration::from_secs</span>(<span class="number">3</span>)).<span class="ident">unwrap</span>(),
+            <span class="ident">SnapState::Generating</span> { <span class="kw-2">ref</span> <span class="ident">receiver</span>, .. } <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="ident">receiver</span>.<span class="ident">recv_timeout</span>(<span class="ident">Duration::from_secs</span>(<span class="number">3</span>)).<span class="ident">unwrap</span>()
+            }
             <span class="kw-2">ref</span> <span class="ident">s</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic!</span>(<span class="string">&quot;unexpected state: {:?}&quot;</span>, <span class="ident">s</span>),
         };
         <span class="macro">assert_eq!</span>(<span class="ident">snap</span>.<span class="ident">get_metadata</span>().<span class="ident">get_index</span>(), <span class="number">5</span>);
@@ -4706,7 +4791,7 @@
         <span class="macro">assert_eq!</span>(<span class="ident">data</span>.<span class="ident">get_region</span>().<span class="ident">get_peers</span>().<span class="ident">len</span>(), <span class="number">1</span>);
 
         <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">channel</span>();
-        <span class="ident">s</span>.<span class="ident">set_snap_state</span>(<span class="ident">SnapState::Generating</span>(<span class="ident">rx</span>));
+        <span class="ident">s</span>.<span class="ident">set_snap_state</span>(<span class="ident">gen_snap_for_test</span>(<span class="ident">rx</span>));
         <span class="comment">// Empty channel should cause snapshot call to wait.</span>
         <span class="macro">assert_eq!</span>(<span class="ident">s</span>.<span class="ident">snapshot</span>(<span class="number">0</span>).<span class="ident">unwrap_err</span>(), <span class="ident">unavailable</span>);
         <span class="macro">assert_eq!</span>(<span class="kw-2">*</span><span class="ident">s</span>.<span class="ident">snap_tried_cnt</span>.<span class="ident">borrow</span>(), <span class="number">1</span>);
@@ -4717,7 +4802,7 @@
 
         <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">channel</span>();
         <span class="ident">tx</span>.<span class="ident">send</span>(<span class="ident">snap</span>.<span class="ident">clone</span>()).<span class="ident">unwrap</span>();
-        <span class="ident">s</span>.<span class="ident">set_snap_state</span>(<span class="ident">SnapState::Generating</span>(<span class="ident">rx</span>));
+        <span class="ident">s</span>.<span class="ident">set_snap_state</span>(<span class="ident">gen_snap_for_test</span>(<span class="ident">rx</span>));
         <span class="comment">// stale snapshot should be abandoned, snapshot index &lt; request index.</span>
         <span class="macro">assert_eq!</span>(
             <span class="ident">s</span>.<span class="ident">snapshot</span>(<span class="ident">snap</span>.<span class="ident">get_metadata</span>().<span class="ident">get_index</span>() <span class="op">+</span> <span class="number">1</span>).<span class="ident">unwrap_err</span>(),
@@ -4758,7 +4843,7 @@
 
         <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">channel</span>();
         <span class="ident">tx</span>.<span class="ident">send</span>(<span class="ident">snap</span>).<span class="ident">unwrap</span>();
-        <span class="ident">s</span>.<span class="ident">set_snap_state</span>(<span class="ident">SnapState::Generating</span>(<span class="ident">rx</span>));
+        <span class="ident">s</span>.<span class="ident">set_snap_state</span>(<span class="ident">gen_snap_for_test</span>(<span class="ident">rx</span>));
         <span class="kw-2">*</span><span class="ident">s</span>.<span class="ident">snap_tried_cnt</span>.<span class="ident">borrow_mut</span>() <span class="op">=</span> <span class="number">1</span>;
         <span class="comment">// stale snapshot should be abandoned, snapshot index &lt; truncated index.</span>
         <span class="macro">assert_eq!</span>(<span class="ident">s</span>.<span class="ident">snapshot</span>(<span class="number">0</span>).<span class="ident">unwrap_err</span>(), <span class="ident">unavailable</span>);
@@ -4767,10 +4852,10 @@
         <span class="kw">let</span> <span class="ident">gen_task</span> <span class="op">=</span> <span class="ident">s</span>.<span class="ident">gen_snap_task</span>.<span class="ident">borrow_mut</span>().<span class="ident">take</span>().<span class="ident">unwrap</span>();
         <span class="ident">generate_and_schedule_snapshot</span>(<span class="ident">gen_task</span>, <span class="kw-2">&amp;</span><span class="ident">s</span>.<span class="ident">engines</span>, <span class="kw-2">&amp;</span><span class="ident">sched</span>).<span class="ident">unwrap</span>();
         <span class="kw">match</span> <span class="kw-2">*</span><span class="ident">s</span>.<span class="ident">snap_state</span>.<span class="ident">borrow</span>() {
-            <span class="ident">SnapState::Generating</span>(<span class="kw-2">ref</span> <span class="ident">rx</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="ident">rx</span>.<span class="ident">recv_timeout</span>(<span class="ident">Duration::from_secs</span>(<span class="number">3</span>)).<span class="ident">unwrap</span>();
+            <span class="ident">SnapState::Generating</span> { <span class="kw-2">ref</span> <span class="ident">receiver</span>, .. } <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="ident">receiver</span>.<span class="ident">recv_timeout</span>(<span class="ident">Duration::from_secs</span>(<span class="number">3</span>)).<span class="ident">unwrap</span>();
                 <span class="ident">worker</span>.<span class="ident">stop</span>();
-                <span class="kw">match</span> <span class="ident">rx</span>.<span class="ident">recv_timeout</span>(<span class="ident">Duration::from_secs</span>(<span class="number">3</span>)) {
+                <span class="kw">match</span> <span class="ident">receiver</span>.<span class="ident">recv_timeout</span>(<span class="ident">Duration::from_secs</span>(<span class="number">3</span>)) {
                     <span class="prelude-val">Err</span>(<span class="ident">RecvTimeoutError::Disconnected</span>) <span class="op">=</span><span class="op">&gt;</span> {}
                     <span class="ident">res</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic!</span>(<span class="string">&quot;unexpected result: {:?}&quot;</span>, <span class="ident">res</span>),
                 }
@@ -4783,12 +4868,19 @@
         <span class="ident">generate_and_schedule_snapshot</span>(<span class="ident">gen_task</span>, <span class="kw-2">&amp;</span><span class="ident">s</span>.<span class="ident">engines</span>, <span class="kw-2">&amp;</span><span class="ident">sched</span>).<span class="ident">unwrap_err</span>();
         <span class="macro">assert_eq!</span>(<span class="kw-2">*</span><span class="ident">s</span>.<span class="ident">snap_tried_cnt</span>.<span class="ident">borrow</span>(), <span class="number">2</span>);
 
-        <span class="kw">for</span> <span class="ident">cnt</span> <span class="kw">in</span> <span class="number">2</span>..<span class="kw">super</span><span class="ident">::MAX_SNAP_TRY_CNT</span> {
+        <span class="kw">for</span> <span class="ident">cnt</span> <span class="kw">in</span> <span class="number">2</span>..<span class="kw">super</span><span class="ident">::MAX_SNAP_TRY_CNT</span> <span class="op">+</span> <span class="number">10</span> {
+            <span class="kw">if</span> <span class="ident">cnt</span> <span class="op">&lt;</span> <span class="number">12</span> {
+                <span class="comment">// Canceled generating won&#39;t be counted in `snap_tried_cnt`.</span>
+                <span class="ident">s</span>.<span class="ident">cancel_generating_snap</span>(<span class="prelude-val">None</span>);
+                <span class="macro">assert_eq!</span>(<span class="kw-2">*</span><span class="ident">s</span>.<span class="ident">snap_tried_cnt</span>.<span class="ident">borrow</span>(), <span class="number">2</span>);
+            } <span class="kw">else</span> {
+                <span class="macro">assert_eq!</span>(<span class="kw-2">*</span><span class="ident">s</span>.<span class="ident">snap_tried_cnt</span>.<span class="ident">borrow</span>(), <span class="ident">cnt</span> <span class="op">-</span> <span class="number">10</span>);
+            }
+
             <span class="comment">// Scheduled job failed should trigger .</span>
             <span class="macro">assert_eq!</span>(<span class="ident">s</span>.<span class="ident">snapshot</span>(<span class="number">0</span>).<span class="ident">unwrap_err</span>(), <span class="ident">unavailable</span>);
             <span class="kw">let</span> <span class="ident">gen_task</span> <span class="op">=</span> <span class="ident">s</span>.<span class="ident">gen_snap_task</span>.<span class="ident">borrow_mut</span>().<span class="ident">take</span>().<span class="ident">unwrap</span>();
             <span class="ident">generate_and_schedule_snapshot</span>(<span class="ident">gen_task</span>, <span class="kw-2">&amp;</span><span class="ident">s</span>.<span class="ident">engines</span>, <span class="kw-2">&amp;</span><span class="ident">sched</span>).<span class="ident">unwrap_err</span>();
-            <span class="macro">assert_eq!</span>(<span class="kw-2">*</span><span class="ident">s</span>.<span class="ident">snap_tried_cnt</span>.<span class="ident">borrow</span>(), <span class="ident">cnt</span> <span class="op">+</span> <span class="number">1</span>);
         }
 
         <span class="comment">// When retry too many times, it should report a different error.</span>
@@ -5007,7 +5099,9 @@
         <span class="ident">generate_and_schedule_snapshot</span>(<span class="ident">gen_task</span>, <span class="kw-2">&amp;</span><span class="ident">s1</span>.<span class="ident">engines</span>, <span class="kw-2">&amp;</span><span class="ident">sched</span>).<span class="ident">unwrap</span>();
 
         <span class="kw">let</span> <span class="ident">snap1</span> <span class="op">=</span> <span class="kw">match</span> <span class="kw-2">*</span><span class="ident">s1</span>.<span class="ident">snap_state</span>.<span class="ident">borrow</span>() {
-            <span class="ident">SnapState::Generating</span>(<span class="kw-2">ref</span> <span class="ident">rx</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">rx</span>.<span class="ident">recv_timeout</span>(<span class="ident">Duration::from_secs</span>(<span class="number">3</span>)).<span class="ident">unwrap</span>(),
+            <span class="ident">SnapState::Generating</span> { <span class="kw-2">ref</span> <span class="ident">receiver</span>, .. } <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="ident">receiver</span>.<span class="ident">recv_timeout</span>(<span class="ident">Duration::from_secs</span>(<span class="number">3</span>)).<span class="ident">unwrap</span>()
+            }
             <span class="kw-2">ref</span> <span class="ident">s</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic!</span>(<span class="string">&quot;unexpected state: {:?}&quot;</span>, <span class="ident">s</span>),
         };
         <span class="macro">assert_eq!</span>(<span class="ident">s1</span>.<span class="ident">truncated_index</span>(), <span class="number">3</span>);
@@ -5050,7 +5144,7 @@
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_canceling_snapshot</span>() {
+    <span class="kw">fn</span> <span class="ident">test_canceling_apply_snapshot</span>() {
         <span class="kw">let</span> <span class="ident">td</span> <span class="op">=</span> <span class="ident">Builder::new</span>().<span class="ident">prefix</span>(<span class="string">&quot;tikv-store-test&quot;</span>).<span class="ident">tempdir</span>().<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">worker</span> <span class="op">=</span> <span class="ident">LazyWorker::new</span>(<span class="string">&quot;snap-manager&quot;</span>);
         <span class="kw">let</span> <span class="ident">sched</span> <span class="op">=</span> <span class="ident">worker</span>.<span class="ident">scheduler</span>();
@@ -5286,6 +5380,14 @@
             .<span class="ident">unwrap</span>();
         <span class="ident">engines</span>.<span class="ident">raft</span>.<span class="ident">put_msg</span>(<span class="kw-2">&amp;</span><span class="ident">raft_state_key</span>, <span class="kw-2">&amp;</span><span class="ident">raft_state</span>).<span class="ident">unwrap</span>();
         <span class="macro">assert!</span>(<span class="ident">build_storage</span>().<span class="ident">is_err</span>());
+    }
+
+    <span class="kw">fn</span> <span class="ident">gen_snap_for_test</span>(<span class="ident">rx</span>: <span class="ident">Receiver</span><span class="op">&lt;</span><span class="ident">Snapshot</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">SnapState</span> {
+        <span class="ident">SnapState::Generating</span> {
+            <span class="ident">canceled</span>: <span class="ident">Arc::new</span>(<span class="ident">AtomicBool::new</span>(<span class="bool-val">false</span>)),
+            <span class="ident">index</span>: <span class="ident">Arc::new</span>(<span class="ident">AtomicU64::new</span>(<span class="number">0</span>)),
+            <span class="ident">receiver</span>: <span class="ident">rx</span>,
+        }
     }
 }
 </pre></div>
