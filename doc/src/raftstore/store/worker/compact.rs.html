@@ -417,22 +417,19 @@
 <span id="414">414</span>
 <span id="415">415</span>
 <span id="416">416</span>
-<span id="417">417</span>
-<span id="418">418</span>
-<span id="419">419</span>
-<span id="420">420</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
 <span class="kw">use</span> <span class="ident">std::collections::VecDeque</span>;
-<span class="kw">use</span> <span class="ident">std::error</span>;
+<span class="kw">use</span> <span class="ident">std::error::Error</span> <span class="kw">as</span> <span class="ident">StdError</span>;
 <span class="kw">use</span> <span class="ident">std::fmt</span>::{<span class="self">self</span>, <span class="ident">Display</span>, <span class="ident">Formatter</span>};
 <span class="kw">use</span> <span class="ident">std::time::Instant</span>;
 
+<span class="kw">use</span> <span class="ident">fail::fail_point</span>;
+<span class="kw">use</span> <span class="ident">thiserror::Error</span>;
+
 <span class="kw">use</span> <span class="ident">engine_traits::KvEngine</span>;
 <span class="kw">use</span> <span class="ident">engine_traits::CF_WRITE</span>;
-<span class="kw">use</span> <span class="ident">fail::fail_point</span>;
-<span class="kw">use</span> <span class="ident">quick_error::quick_error</span>;
 <span class="kw">use</span> <span class="ident">tikv_util::worker::Runnable</span>;
 <span class="kw">use</span> <span class="ident">tikv_util</span>::{<span class="ident">box_try</span>, <span class="ident">error</span>, <span class="ident">info</span>, <span class="ident">warn</span>};
 
@@ -499,15 +496,10 @@
     }
 }
 
-<span class="macro">quick_error!</span> {
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Error</span> {
-        <span class="ident">Other</span>(<span class="ident">err</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">error::Error</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span>) {
-            <span class="ident">from</span>()
-            <span class="ident">cause</span>(<span class="ident">err</span>.<span class="ident">as_ref</span>())
-            <span class="ident">display</span>(<span class="string">&quot;compact failed {:?}&quot;</span>, <span class="ident">err</span>)
-        }
-    }
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Error</span>)]</span>
+<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Error</span> {
+    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;compact failed {0:?}&quot;</span>)]</span>
+    <span class="ident">Other</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">StdError</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span>),
 }
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Runner</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {

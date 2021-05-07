@@ -635,35 +635,45 @@
 <span id="632">632</span>
 <span id="633">633</span>
 <span id="634">634</span>
-<span id="635">635</span>
-<span id="636">636</span>
-<span id="637">637</span>
-<span id="638">638</span>
-<span id="639">639</span>
-<span id="640">640</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
-<span class="kw">use</span> <span class="ident">std::result</span>;
-<span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">borrow::Cow</span>, <span class="ident">io::Error</span> <span class="kw">as</span> <span class="ident">IoError</span>};
 <span class="kw">use</span> <span class="ident">std</span>::{
+    <span class="ident">borrow::Cow</span>,
     <span class="ident">fmt</span>::{<span class="self">self</span>, <span class="ident">Debug</span>, <span class="ident">Display</span>, <span class="ident">Formatter</span>},
-    <span class="ident">mem</span>,
+    <span class="ident">io::Error</span> <span class="kw">as</span> <span class="ident">IoError</span>,
+    <span class="ident">mem</span>, <span class="ident">result</span>,
+    <span class="ident">sync::Arc</span>,
+    <span class="ident">time::Duration</span>,
 };
-<span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">sync::Arc</span>, <span class="ident">time::Duration</span>};
+
+<span class="kw">use</span> <span class="ident">raft::eraftpb</span>::{<span class="self">self</span>, <span class="ident">MessageType</span>};
+<span class="kw">use</span> <span class="ident">thiserror::Error</span>;
 
 <span class="kw">use</span> <span class="ident">concurrency_manager::ConcurrencyManager</span>;
-<span class="kw">use</span> <span class="ident">engine_traits::CF_DEFAULT</span>;
-<span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">CfName</span>, <span class="ident">KvEngine</span>};
-<span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">MvccProperties</span>, <span class="ident">Snapshot</span>};
-<span class="kw">use</span> <span class="ident">kvproto::kvrpcpb::Context</span>;
-<span class="kw">use</span> <span class="ident">kvproto::raft_cmdpb</span>::{
-    <span class="ident">CmdType</span>, <span class="ident">DeleteRangeRequest</span>, <span class="ident">DeleteRequest</span>, <span class="ident">PutRequest</span>, <span class="ident">RaftCmdRequest</span>, <span class="ident">RaftCmdResponse</span>,
-    <span class="ident">RaftRequestHeader</span>, <span class="ident">Request</span>, <span class="ident">Response</span>,
+<span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">CfName</span>, <span class="ident">KvEngine</span>, <span class="ident">MvccProperties</span>, <span class="ident">Snapshot</span>, <span class="ident">CF_DEFAULT</span>};
+<span class="kw">use</span> <span class="ident">kvproto</span>::{
+    <span class="ident">errorpb</span>,
+    <span class="ident">kvrpcpb::Context</span>,
+    <span class="ident">metapb</span>,
+    <span class="ident">raft_cmdpb</span>::{
+        <span class="ident">CmdType</span>, <span class="ident">DeleteRangeRequest</span>, <span class="ident">DeleteRequest</span>, <span class="ident">PutRequest</span>, <span class="ident">RaftCmdRequest</span>, <span class="ident">RaftCmdResponse</span>,
+        <span class="ident">RaftRequestHeader</span>, <span class="ident">Request</span>, <span class="ident">Response</span>,
+    },
 };
-<span class="kw">use</span> <span class="ident">kvproto</span>::{<span class="ident">errorpb</span>, <span class="ident">metapb</span>};
-<span class="kw">use</span> <span class="ident">raft::eraftpb</span>::{<span class="self">self</span>, <span class="ident">MessageType</span>};
-<span class="kw">use</span> <span class="ident">txn_types</span>::{<span class="ident">Key</span>, <span class="ident">TimeStamp</span>, <span class="ident">TxnExtra</span>, <span class="ident">TxnExtraScheduler</span>};
+<span class="kw">use</span> <span class="ident">raftstore</span>::{
+    <span class="ident">coprocessor</span>::{
+        <span class="ident">dispatcher::BoxReadIndexObserver</span>, <span class="ident">Coprocessor</span>, <span class="ident">CoprocessorHost</span>, <span class="ident">ReadIndexObserver</span>,
+    },
+    <span class="ident">errors::Error</span> <span class="kw">as</span> <span class="ident">RaftServerError</span>,
+    <span class="ident">router</span>::{<span class="ident">LocalReadRouter</span>, <span class="ident">RaftStoreRouter</span>},
+    <span class="ident">store</span>::{
+        <span class="ident">Callback</span> <span class="kw">as</span> <span class="ident">StoreCallback</span>, <span class="ident">ReadIndexContext</span>, <span class="ident">ReadResponse</span>, <span class="ident">RegionSnapshot</span>, <span class="ident">WriteResponse</span>,
+    },
+};
+<span class="kw">use</span> <span class="ident">tikv_util::codec::number::NumberEncoder</span>;
+<span class="kw">use</span> <span class="ident">tikv_util::time::Instant</span>;
+<span class="kw">use</span> <span class="ident">txn_types</span>::{<span class="ident">Key</span>, <span class="ident">TimeStamp</span>, <span class="ident">TxnExtra</span>, <span class="ident">TxnExtraScheduler</span>, <span class="ident">WriteBatchFlags</span>};
 
 <span class="kw">use</span> <span class="kw">super</span><span class="ident">::metrics</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::storage::kv</span>::{
@@ -671,48 +681,26 @@
     <span class="ident">ExtCallback</span>, <span class="ident">Modify</span>, <span class="ident">SnapContext</span>, <span class="ident">WriteData</span>,
 };
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::storage</span>::{<span class="self">self</span>, <span class="ident">kv</span>};
-<span class="kw">use</span> <span class="ident">raftstore</span>::{<span class="ident">coprocessor::dispatcher::BoxReadIndexObserver</span>, <span class="ident">store::RegionSnapshot</span>};
-<span class="kw">use</span> <span class="ident">raftstore</span>::{
-    <span class="ident">coprocessor::Coprocessor</span>,
-    <span class="ident">router</span>::{<span class="ident">LocalReadRouter</span>, <span class="ident">RaftStoreRouter</span>},
-};
-<span class="kw">use</span> <span class="ident">raftstore</span>::{
-    <span class="ident">coprocessor::CoprocessorHost</span>,
-    <span class="ident">store</span>::{<span class="ident">Callback</span> <span class="kw">as</span> <span class="ident">StoreCallback</span>, <span class="ident">ReadIndexContext</span>, <span class="ident">ReadResponse</span>, <span class="ident">WriteResponse</span>},
-};
-<span class="kw">use</span> <span class="ident">raftstore</span>::{<span class="ident">coprocessor::ReadIndexObserver</span>, <span class="ident">errors::Error</span> <span class="kw">as</span> <span class="ident">RaftServerError</span>};
-<span class="kw">use</span> <span class="ident">tikv_util::codec::number::NumberEncoder</span>;
-<span class="kw">use</span> <span class="ident">tikv_util::time::Instant</span>;
-<span class="kw">use</span> <span class="ident">txn_types::WriteBatchFlags</span>;
 
-<span class="macro">quick_error!</span> {
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Error</span> {
-        <span class="ident">RequestFailed</span>(<span class="ident">e</span>: <span class="ident">errorpb::Error</span>) {
-            <span class="ident">from</span>()
-            <span class="ident">display</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">e</span>.<span class="ident">get_message</span>())
-        }
-        <span class="ident">Io</span>(<span class="ident">e</span>: <span class="ident">IoError</span>) {
-            <span class="ident">from</span>()
-            <span class="ident">cause</span>(<span class="ident">e</span>)
-            <span class="ident">display</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">e</span>)
-        }
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Error</span>)]</span>
+<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Error</span> {
+    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;{}&quot;</span>, .<span class="number">0</span>.<span class="ident">get_message</span>())]</span>
+    <span class="ident">RequestFailed</span>(<span class="ident">errorpb::Error</span>),
 
-        <span class="ident">Server</span>(<span class="ident">e</span>: <span class="ident">RaftServerError</span>) {
-            <span class="ident">from</span>()
-            <span class="ident">cause</span>(<span class="ident">e</span>)
-            <span class="ident">display</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">e</span>)
-        }
-        <span class="ident">InvalidResponse</span>(<span class="ident">reason</span>: <span class="ident">String</span>) {
-            <span class="ident">display</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">reason</span>)
-        }
-        <span class="ident">InvalidRequest</span>(<span class="ident">reason</span>: <span class="ident">String</span>) {
-            <span class="ident">display</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">reason</span>)
-        }
-        <span class="ident">Timeout</span>(<span class="ident">d</span>: <span class="ident">Duration</span>) {
-            <span class="ident">display</span>(<span class="string">&quot;timeout after {:?}&quot;</span>, <span class="ident">d</span>)
-        }
-    }
+    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;{0}&quot;</span>)]</span>
+    <span class="ident">Io</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">IoError</span>),
+
+    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;{0}&quot;</span>)]</span>
+    <span class="ident">Server</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">RaftServerError</span>),
+
+    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;{0}&quot;</span>)]</span>
+    <span class="ident">InvalidResponse</span>(<span class="ident">String</span>),
+
+    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;{0}&quot;</span>)]</span>
+    <span class="ident">InvalidRequest</span>(<span class="ident">String</span>),
+
+    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;timeout after {0:?}&quot;</span>)]</span>
+    <span class="ident">Timeout</span>(<span class="ident">Duration</span>),
 }
 
 <span class="kw">fn</span> <span class="ident">get_status_kind_from_error</span>(<span class="ident">e</span>: <span class="kw-2">&amp;</span><span class="ident">Error</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">RequestStatusKind</span> {

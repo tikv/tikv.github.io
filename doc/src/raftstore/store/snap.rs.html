@@ -2537,18 +2537,10 @@
 <span id="2534">2534</span>
 <span id="2535">2535</span>
 <span id="2536">2536</span>
-<span id="2537">2537</span>
-<span id="2538">2538</span>
-<span id="2539">2539</span>
-<span id="2540">2540</span>
-<span id="2541">2541</span>
-<span id="2542">2542</span>
-<span id="2543">2543</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2017 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
 <span class="kw">use</span> <span class="ident">std::cmp</span>::{<span class="ident">Ordering</span> <span class="kw">as</span> <span class="ident">CmpOrdering</span>, <span class="ident">Reverse</span>};
-<span class="kw">use</span> <span class="ident">std::f64::INFINITY</span>;
 <span class="kw">use</span> <span class="ident">std::fmt</span>::{<span class="self">self</span>, <span class="ident">Display</span>, <span class="ident">Formatter</span>};
 <span class="kw">use</span> <span class="ident">std::fs</span>::{<span class="self">self</span>, <span class="ident">File</span>, <span class="ident">Metadata</span>, <span class="ident">OpenOptions</span>};
 <span class="kw">use</span> <span class="ident">std::io</span>::{<span class="self">self</span>, <span class="ident">ErrorKind</span>, <span class="ident">Read</span>, <span class="ident">Write</span>};
@@ -2557,13 +2549,8 @@
 <span class="kw">use</span> <span class="ident">std::sync::atomic</span>::{<span class="ident">AtomicU64</span>, <span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>};
 <span class="kw">use</span> <span class="ident">std::sync</span>::{<span class="ident">Arc</span>, <span class="ident">RwLock</span>};
 <span class="kw">use</span> <span class="ident">std::time::Instant</span>;
-<span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">error</span>, <span class="ident">result</span>, <span class="ident">str</span>, <span class="ident">thread</span>, <span class="ident">time</span>, <span class="ident">u64</span>};
+<span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">error::Error</span> <span class="kw">as</span> <span class="ident">StdError</span>, <span class="ident">result</span>, <span class="ident">str</span>, <span class="ident">thread</span>, <span class="ident">time</span>, <span class="ident">u64</span>};
 
-<span class="kw">use</span> <span class="ident">encryption</span>::{
-    <span class="ident">create_aes_ctr_crypter</span>, <span class="ident">encryption_method_from_db_encryption_method</span>, <span class="ident">DataKeyManager</span>, <span class="ident">Iv</span>,
-};
-<span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">CfName</span>, <span class="ident">CF_DEFAULT</span>, <span class="ident">CF_LOCK</span>, <span class="ident">CF_WRITE</span>};
-<span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">EncryptionKeyManager</span>, <span class="ident">KvEngine</span>};
 <span class="kw">use</span> <span class="ident">fail::fail_point</span>;
 <span class="kw">use</span> <span class="ident">futures::executor::block_on</span>;
 <span class="kw">use</span> <span class="ident">futures_util::io</span>::{<span class="ident">AllowStdIo</span>, <span class="ident">AsyncWriteExt</span>};
@@ -2571,17 +2558,22 @@
 <span class="kw">use</span> <span class="ident">kvproto::metapb::Region</span>;
 <span class="kw">use</span> <span class="ident">kvproto::raft_serverpb::RaftSnapshotData</span>;
 <span class="kw">use</span> <span class="ident">kvproto::raft_serverpb</span>::{<span class="ident">SnapshotCfFile</span>, <span class="ident">SnapshotMeta</span>};
+<span class="kw">use</span> <span class="ident">openssl::symm</span>::{<span class="ident">Cipher</span>, <span class="ident">Crypter</span>, <span class="ident">Mode</span>};
 <span class="kw">use</span> <span class="ident">protobuf::Message</span>;
-<span class="kw">use</span> <span class="ident">quick_error::quick_error</span>;
 <span class="kw">use</span> <span class="ident">raft::eraftpb::Snapshot</span> <span class="kw">as</span> <span class="ident">RaftSnapshot</span>;
+<span class="kw">use</span> <span class="ident">thiserror::Error</span>;
 
 <span class="kw">use</span> <span class="ident">collections</span>::{<span class="ident">HashMap</span>, <span class="ident">HashMapEntry</span> <span class="kw">as</span> <span class="ident">Entry</span>};
+<span class="kw">use</span> <span class="ident">encryption</span>::{
+    <span class="ident">create_aes_ctr_crypter</span>, <span class="ident">encryption_method_from_db_encryption_method</span>, <span class="ident">DataKeyManager</span>, <span class="ident">Iv</span>,
+};
+<span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">CfName</span>, <span class="ident">CF_DEFAULT</span>, <span class="ident">CF_LOCK</span>, <span class="ident">CF_WRITE</span>};
+<span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">EncryptionKeyManager</span>, <span class="ident">KvEngine</span>};
 <span class="kw">use</span> <span class="ident">error_code</span>::{<span class="self">self</span>, <span class="ident">ErrorCode</span>, <span class="ident">ErrorCodeExt</span>};
 <span class="kw">use</span> <span class="ident">file_system</span>::{
     <span class="ident">calc_crc32</span>, <span class="ident">calc_crc32_and_size</span>, <span class="ident">delete_file_if_exist</span>, <span class="ident">file_exists</span>, <span class="ident">get_file_size</span>, <span class="ident">sync_dir</span>,
 };
 <span class="kw">use</span> <span class="ident">keys</span>::{<span class="ident">enc_end_key</span>, <span class="ident">enc_start_key</span>};
-<span class="kw">use</span> <span class="ident">openssl::symm</span>::{<span class="ident">Cipher</span>, <span class="ident">Crypter</span>, <span class="ident">Mode</span>};
 <span class="kw">use</span> <span class="ident">tikv_util::time</span>::{<span class="ident">duration_to_sec</span>, <span class="ident">Limiter</span>};
 <span class="kw">use</span> <span class="ident">tikv_util::HandyRwLock</span>;
 <span class="kw">use</span> <span class="ident">tikv_util</span>::{<span class="ident">box_err</span>, <span class="ident">box_try</span>, <span class="ident">debug</span>, <span class="ident">error</span>, <span class="ident">info</span>, <span class="ident">map</span>, <span class="ident">warn</span>};
@@ -2620,21 +2612,16 @@
 <span class="kw">const</span> <span class="ident">DELETE_RETRY_MAX_TIMES</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="number">6</span>;
 <span class="kw">const</span> <span class="ident">DELETE_RETRY_TIME_MILLIS</span>: <span class="ident">u64</span> <span class="op">=</span> <span class="number">500</span>;
 
-<span class="macro">quick_error!</span> {
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Error</span> {
-        <span class="ident">Abort</span> {
-            <span class="ident">display</span>(<span class="string">&quot;abort&quot;</span>)
-        }
-        <span class="ident">TooManySnapshots</span> {
-            <span class="ident">display</span>(<span class="string">&quot;too many snapshots&quot;</span>)
-        }
-        <span class="ident">Other</span>(<span class="ident">err</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">error::Error</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span>) {
-            <span class="ident">from</span>()
-            <span class="ident">cause</span>(<span class="ident">err</span>.<span class="ident">as_ref</span>())
-            <span class="ident">display</span>(<span class="string">&quot;snap failed {:?}&quot;</span>, <span class="ident">err</span>)
-        }
-    }
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Error</span>)]</span>
+<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Error</span> {
+    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;abort&quot;</span>)]</span>
+    <span class="ident">Abort</span>,
+
+    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;too many snapshots&quot;</span>)]</span>
+    <span class="ident">TooManySnapshots</span>,
+
+    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;snap failed {0:?}&quot;</span>)]</span>
+    <span class="ident">Other</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">StdError</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span>),
 }
 
 <span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">io::Error</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Error</span> {
@@ -3015,7 +3002,7 @@
         <span class="ident">mgr</span>: <span class="kw-2">&amp;</span><span class="ident">SnapManagerCore</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">RaftStoreResult</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">s</span> <span class="op">=</span> <span class="self">Self</span><span class="ident">::new</span>(<span class="ident">dir</span>, <span class="ident">key</span>, <span class="bool-val">true</span>, <span class="ident">CheckPolicy::ErrNotAllowed</span>, <span class="ident">mgr</span>)<span class="question-mark">?</span>;
-        <span class="ident">s</span>.<span class="ident">mgr</span>.<span class="ident">limiter</span> <span class="op">=</span> <span class="ident">Limiter::new</span>(<span class="ident">INFINITY</span>);
+        <span class="ident">s</span>.<span class="ident">mgr</span>.<span class="ident">limiter</span> <span class="op">=</span> <span class="ident">Limiter::new</span>(<span class="ident">f64::INFINITY</span>);
 
         <span class="kw">if</span> <span class="op">!</span><span class="ident">s</span>.<span class="ident">exists</span>() {
             <span class="comment">// Skip the initialization below if it doesn&#39;t exists.</span>
@@ -3092,7 +3079,7 @@
         <span class="ident">mgr</span>: <span class="kw-2">&amp;</span><span class="ident">SnapManagerCore</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">RaftStoreResult</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">s</span> <span class="op">=</span> <span class="self">Self</span><span class="ident">::new</span>(<span class="ident">dir</span>, <span class="ident">key</span>, <span class="bool-val">false</span>, <span class="ident">CheckPolicy::ErrNotAllowed</span>, <span class="ident">mgr</span>)<span class="question-mark">?</span>;
-        <span class="ident">s</span>.<span class="ident">mgr</span>.<span class="ident">limiter</span> <span class="op">=</span> <span class="ident">Limiter::new</span>(<span class="ident">INFINITY</span>);
+        <span class="ident">s</span>.<span class="ident">mgr</span>.<span class="ident">limiter</span> <span class="op">=</span> <span class="ident">Limiter::new</span>(<span class="ident">f64::INFINITY</span>);
         <span class="prelude-val">Ok</span>(<span class="ident">s</span>)
     }
 
@@ -4095,7 +4082,7 @@
         <span class="kw">let</span> <span class="ident">limiter</span> <span class="op">=</span> <span class="ident">Limiter::new</span>(<span class="kw">if</span> <span class="self">self</span>.<span class="ident">max_write_bytes_per_sec</span> <span class="op">&gt;</span> <span class="number">0</span> {
             <span class="self">self</span>.<span class="ident">max_write_bytes_per_sec</span> <span class="kw">as</span> <span class="ident">f64</span>
         } <span class="kw">else</span> {
-            <span class="ident">INFINITY</span>
+            <span class="ident">f64::INFINITY</span>
         });
         <span class="kw">let</span> <span class="ident">max_total_size</span> <span class="op">=</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">max_total_size</span> <span class="op">&gt;</span> <span class="number">0</span> {
             <span class="self">self</span>.<span class="ident">max_total_size</span>
@@ -4118,7 +4105,6 @@
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">tests</span> {
     <span class="kw">use</span> <span class="ident">std::cmp</span>;
-    <span class="kw">use</span> <span class="ident">std::f64::INFINITY</span>;
     <span class="kw">use</span> <span class="ident">std::fs</span>::{<span class="self">self</span>, <span class="ident">File</span>, <span class="ident">OpenOptions</span>};
     <span class="kw">use</span> <span class="ident">std::io</span>::{<span class="self">self</span>, <span class="ident">Read</span>, <span class="ident">Seek</span>, <span class="ident">SeekFrom</span>, <span class="ident">Write</span>};
     <span class="kw">use</span> <span class="ident">std::path</span>::{<span class="ident">Path</span>, <span class="ident">PathBuf</span>};
@@ -4289,7 +4275,7 @@
         <span class="ident">SnapManagerCore</span> {
             <span class="ident">base</span>: <span class="ident">path</span>.<span class="ident">to_owned</span>(),
             <span class="ident">registry</span>: <span class="ident">Arc::new</span>(<span class="ident">RwLock::new</span>(<span class="macro">map!</span>[])),
-            <span class="ident">limiter</span>: <span class="ident">Limiter::new</span>(<span class="ident">INFINITY</span>),
+            <span class="ident">limiter</span>: <span class="ident">Limiter::new</span>(<span class="ident">f64::INFINITY</span>),
             <span class="ident">temp_sst_id</span>: <span class="ident">Arc::new</span>(<span class="ident">AtomicU64::new</span>(<span class="number">0</span>)),
             <span class="ident">encryption_key_manager</span>: <span class="prelude-val">None</span>,
         }

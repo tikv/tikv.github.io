@@ -648,6 +648,43 @@
 <span id="645">645</span>
 <span id="646">646</span>
 <span id="647">647</span>
+<span id="648">648</span>
+<span id="649">649</span>
+<span id="650">650</span>
+<span id="651">651</span>
+<span id="652">652</span>
+<span id="653">653</span>
+<span id="654">654</span>
+<span id="655">655</span>
+<span id="656">656</span>
+<span id="657">657</span>
+<span id="658">658</span>
+<span id="659">659</span>
+<span id="660">660</span>
+<span id="661">661</span>
+<span id="662">662</span>
+<span id="663">663</span>
+<span id="664">664</span>
+<span id="665">665</span>
+<span id="666">666</span>
+<span id="667">667</span>
+<span id="668">668</span>
+<span id="669">669</span>
+<span id="670">670</span>
+<span id="671">671</span>
+<span id="672">672</span>
+<span id="673">673</span>
+<span id="674">674</span>
+<span id="675">675</span>
+<span id="676">676</span>
+<span id="677">677</span>
+<span id="678">678</span>
+<span id="679">679</span>
+<span id="680">680</span>
+<span id="681">681</span>
+<span id="682">682</span>
+<span id="683">683</span>
+<span id="684">684</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -667,83 +704,136 @@
     <span class="ident">SHORT_VALUE_MAX_LEN</span>,
 };
 
-<span class="kw">use</span> <span class="ident">error_code</span>::{<span class="self">self</span>, <span class="ident">ErrorCode</span>, <span class="ident">ErrorCodeExt</span>};
 <span class="kw">use</span> <span class="ident">std::error</span>;
-<span class="kw">use</span> <span class="ident">std::fmt</span>;
 <span class="kw">use</span> <span class="ident">std::io</span>;
+
+<span class="kw">use</span> <span class="ident">error_code</span>::{<span class="self">self</span>, <span class="ident">ErrorCode</span>, <span class="ident">ErrorCodeExt</span>};
+<span class="kw">use</span> <span class="ident">thiserror::Error</span>;
+
 <span class="kw">use</span> <span class="ident">tikv_util::metrics::CRITICAL_ERROR</span>;
 <span class="kw">use</span> <span class="ident">tikv_util</span>::{<span class="ident">panic_when_unexpected_key_or_data</span>, <span class="ident">set_panic_mark</span>};
 
-<span class="macro">quick_error!</span> {
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">ErrorInner</span> {
-        <span class="ident">Engine</span>(<span class="ident">err</span>: <span class="kw">crate</span><span class="ident">::storage::kv::Error</span>) {
-            <span class="ident">from</span>()
-            <span class="ident">cause</span>(<span class="ident">err</span>)
-            <span class="ident">display</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">err</span>)
-        }
-        <span class="ident">Io</span>(<span class="ident">err</span>: <span class="ident">io::Error</span>) {
-            <span class="ident">from</span>()
-            <span class="ident">cause</span>(<span class="ident">err</span>)
-            <span class="ident">display</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">err</span>)
-        }
-        <span class="ident">Codec</span>(<span class="ident">err</span>: <span class="ident">tikv_util::codec::Error</span>) {
-            <span class="ident">from</span>()
-            <span class="ident">cause</span>(<span class="ident">err</span>)
-            <span class="ident">display</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">err</span>)
-        }
-        <span class="ident">KeyIsLocked</span>(<span class="ident">info</span>: <span class="ident">kvproto::kvrpcpb::LockInfo</span>) {
-            <span class="ident">display</span>(<span class="string">&quot;key is locked (backoff or cleanup) {:?}&quot;</span>, <span class="ident">info</span>)
-        }
-        <span class="ident">BadFormat</span>(<span class="ident">err</span>: <span class="ident">txn_types::Error</span> ) {
-            <span class="ident">cause</span>(<span class="ident">err</span>)
-            <span class="ident">display</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">err</span>)
-        }
-        <span class="ident">Committed</span> { <span class="ident">start_ts</span>: <span class="ident">TimeStamp</span>, <span class="ident">commit_ts</span>: <span class="ident">TimeStamp</span>, <span class="ident">key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> } {
-            <span class="ident">display</span>(<span class="string">&quot;txn already committed, start_ts: {}, commit_ts: {}, key: {}&quot;</span>, <span class="ident">start_ts</span>, <span class="ident">commit_ts</span>, <span class="ident">log_wrappers::Value::key</span>(<span class="ident">key</span>))
-        }
-        <span class="ident">PessimisticLockRolledBack</span> { <span class="ident">start_ts</span>: <span class="ident">TimeStamp</span>, <span class="ident">key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> } {
-            <span class="ident">display</span>(<span class="string">&quot;pessimistic lock already rollbacked, start_ts:{}, key:{}&quot;</span>, <span class="ident">start_ts</span>, <span class="ident">log_wrappers::Value::key</span>(<span class="ident">key</span>))
-        }
-        <span class="ident">TxnLockNotFound</span> { <span class="ident">start_ts</span>: <span class="ident">TimeStamp</span>, <span class="ident">commit_ts</span>: <span class="ident">TimeStamp</span>, <span class="ident">key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> } {
-            <span class="ident">display</span>(<span class="string">&quot;txn lock not found {}-{} key:{}&quot;</span>, <span class="ident">start_ts</span>, <span class="ident">commit_ts</span>, <span class="ident">log_wrappers::Value::key</span>(<span class="ident">key</span>))
-        }
-        <span class="ident">TxnNotFound</span> { <span class="ident">start_ts</span>: <span class="ident">TimeStamp</span>, <span class="ident">key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> } {
-            <span class="ident">display</span>(<span class="string">&quot;txn not found {} key: {}&quot;</span>, <span class="ident">start_ts</span>, <span class="ident">log_wrappers::Value::key</span>(<span class="ident">key</span>))
-        }
-        <span class="ident">LockTypeNotMatch</span> { <span class="ident">start_ts</span>: <span class="ident">TimeStamp</span>, <span class="ident">key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>, <span class="ident">pessimistic</span>: <span class="ident">bool</span> } {
-            <span class="ident">display</span>(<span class="string">&quot;lock type not match, start_ts:{}, key:{}, pessimistic:{}&quot;</span>, <span class="ident">start_ts</span>, <span class="ident">log_wrappers::Value::key</span>(<span class="ident">key</span>), <span class="ident">pessimistic</span>)
-        }
-        <span class="ident">WriteConflict</span> { <span class="ident">start_ts</span>: <span class="ident">TimeStamp</span>, <span class="ident">conflict_start_ts</span>: <span class="ident">TimeStamp</span>, <span class="ident">conflict_commit_ts</span>: <span class="ident">TimeStamp</span>, <span class="ident">key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>, <span class="ident">primary</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> } {
-            <span class="ident">display</span>(<span class="string">&quot;write conflict, start_ts:{}, conflict_start_ts:{}, conflict_commit_ts:{}, key:{}, primary:{}&quot;</span>,
-                    <span class="ident">start_ts</span>, <span class="ident">conflict_start_ts</span>, <span class="ident">conflict_commit_ts</span>, <span class="ident">log_wrappers::Value::key</span>(<span class="ident">key</span>), <span class="ident">log_wrappers::Value::key</span>(<span class="ident">primary</span>))
-        }
-        <span class="ident">Deadlock</span> { <span class="ident">start_ts</span>: <span class="ident">TimeStamp</span>, <span class="ident">lock_ts</span>: <span class="ident">TimeStamp</span>, <span class="ident">lock_key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>, <span class="ident">deadlock_key_hash</span>: <span class="ident">u64</span> } {
-            <span class="ident">display</span>(<span class="string">&quot;deadlock occurs between txn:{} and txn:{}, lock_key:{}, deadlock_key_hash:{}&quot;</span>,
-                    <span class="ident">start_ts</span>, <span class="ident">lock_ts</span>, <span class="ident">log_wrappers::Value::key</span>(<span class="ident">lock_key</span>), <span class="ident">deadlock_key_hash</span>)
-        }
-        <span class="ident">AlreadyExist</span> { <span class="ident">key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> } {
-            <span class="ident">display</span>(<span class="string">&quot;key {} already exists&quot;</span>, <span class="ident">log_wrappers::Value::key</span>(<span class="ident">key</span>))
-        }
-        <span class="ident">DefaultNotFound</span> { <span class="ident">key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> } {
-            <span class="ident">display</span>(<span class="string">&quot;default not found: key:{}, maybe read truncated/dropped table data?&quot;</span>, <span class="ident">log_wrappers::Value::key</span>(<span class="ident">key</span>))
-        }
-        <span class="ident">CommitTsExpired</span> { <span class="ident">start_ts</span>: <span class="ident">TimeStamp</span>, <span class="ident">commit_ts</span>: <span class="ident">TimeStamp</span>, <span class="ident">key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>, <span class="ident">min_commit_ts</span>: <span class="ident">TimeStamp</span> } {
-            <span class="ident">display</span>(<span class="string">&quot;try to commit key {} with commit_ts {} but min_commit_ts is {}&quot;</span>, <span class="ident">log_wrappers::Value::key</span>(<span class="ident">key</span>), <span class="ident">commit_ts</span>, <span class="ident">min_commit_ts</span>)
-        }
-        <span class="ident">KeyVersion</span> { <span class="ident">display</span>(<span class="string">&quot;bad format key(version)&quot;</span>) }
-        <span class="ident">PessimisticLockNotFound</span> { <span class="ident">start_ts</span>: <span class="ident">TimeStamp</span>, <span class="ident">key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> } {
-            <span class="ident">display</span>(<span class="string">&quot;pessimistic lock not found, start_ts:{}, key:{}&quot;</span>, <span class="ident">start_ts</span>, <span class="ident">log_wrappers::Value::key</span>(<span class="ident">key</span>))
-        }
-        <span class="ident">CommitTsTooLarge</span> { <span class="ident">start_ts</span>: <span class="ident">TimeStamp</span>, <span class="ident">min_commit_ts</span>: <span class="ident">TimeStamp</span>, <span class="ident">max_commit_ts</span>: <span class="ident">TimeStamp</span> } {
-            <span class="ident">display</span>(<span class="string">&quot;min_commit_ts {} is larger than max_commit_ts {}, start_ts: {}&quot;</span>, <span class="ident">min_commit_ts</span>, <span class="ident">max_commit_ts</span>, <span class="ident">start_ts</span>)
-        }
-        <span class="ident">Other</span>(<span class="ident">err</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">error::Error</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span>) {
-            <span class="ident">from</span>()
-            <span class="ident">cause</span>(<span class="ident">err</span>.<span class="ident">as_ref</span>())
-            <span class="ident">display</span>(<span class="string">&quot;{:?}&quot;</span>, <span class="ident">err</span>)
-        }
-    }
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Error</span>)]</span>
+<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">ErrorInner</span> {
+    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;{0}&quot;</span>)]</span>
+    <span class="ident">Engine</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="kw">crate</span><span class="ident">::storage::kv::Error</span>),
+
+    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;{0}&quot;</span>)]</span>
+    <span class="ident">Io</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">io::Error</span>),
+
+    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;{0}&quot;</span>)]</span>
+    <span class="ident">Codec</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">tikv_util::codec::Error</span>),
+
+    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;key is locked (backoff or cleanup) {0:?}&quot;</span>)]</span>
+    <span class="ident">KeyIsLocked</span>(<span class="ident">kvproto::kvrpcpb::LockInfo</span>),
+
+    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;{0}&quot;</span>)]</span>
+    <span class="ident">BadFormat</span>(<span class="attribute">#[<span class="ident">source</span>]</span> <span class="ident">txn_types::Error</span>),
+
+    <span class="attribute">#[<span class="ident">error</span>(
+        <span class="string">&quot;txn already committed, start_ts: {}, commit_ts: {}, key: {}&quot;</span>,
+        .<span class="ident">start_ts</span>, .<span class="ident">commit_ts</span>, <span class="ident">log_wrappers::Value::key</span>(.<span class="ident">key</span>)
+    )]</span>
+    <span class="ident">Committed</span> {
+        <span class="ident">start_ts</span>: <span class="ident">TimeStamp</span>,
+        <span class="ident">commit_ts</span>: <span class="ident">TimeStamp</span>,
+        <span class="ident">key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
+    },
+
+    <span class="attribute">#[<span class="ident">error</span>(
+        <span class="string">&quot;pessimistic lock already rollbacked, start_ts:{}, key:{}&quot;</span>,
+        .<span class="ident">start_ts</span>, <span class="ident">log_wrappers::Value::key</span>(.<span class="ident">key</span>)
+    )]</span>
+    <span class="ident">PessimisticLockRolledBack</span> { <span class="ident">start_ts</span>: <span class="ident">TimeStamp</span>, <span class="ident">key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> },
+
+    <span class="attribute">#[<span class="ident">error</span>(
+        <span class="string">&quot;txn lock not found {}-{} key:{}&quot;</span>,
+        .<span class="ident">start_ts</span>, .<span class="ident">commit_ts</span>, <span class="ident">log_wrappers::Value::key</span>(.<span class="ident">key</span>)
+    )]</span>
+    <span class="ident">TxnLockNotFound</span> {
+        <span class="ident">start_ts</span>: <span class="ident">TimeStamp</span>,
+        <span class="ident">commit_ts</span>: <span class="ident">TimeStamp</span>,
+        <span class="ident">key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
+    },
+
+    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;txn not found {} key: {}&quot;</span>, .<span class="ident">start_ts</span>, <span class="ident">log_wrappers::Value::key</span>(.<span class="ident">key</span>))]</span>
+    <span class="ident">TxnNotFound</span> { <span class="ident">start_ts</span>: <span class="ident">TimeStamp</span>, <span class="ident">key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> },
+
+    <span class="attribute">#[<span class="ident">error</span>(
+        <span class="string">&quot;lock type not match, start_ts:{}, key:{}, pessimistic:{}&quot;</span>,
+        .<span class="ident">start_ts</span>, <span class="ident">log_wrappers::Value::key</span>(.<span class="ident">key</span>), .<span class="ident">pessimistic</span>
+    )]</span>
+    <span class="ident">LockTypeNotMatch</span> {
+        <span class="ident">start_ts</span>: <span class="ident">TimeStamp</span>,
+        <span class="ident">key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
+        <span class="ident">pessimistic</span>: <span class="ident">bool</span>,
+    },
+
+    <span class="attribute">#[<span class="ident">error</span>(
+        <span class="string">&quot;write conflict, start_ts:{}, conflict_start_ts:{}, conflict_commit_ts:{}, key:{}, primary:{}&quot;</span>,
+        .<span class="ident">start_ts</span>, .<span class="ident">conflict_start_ts</span>, .<span class="ident">conflict_commit_ts</span>,
+        <span class="ident">log_wrappers::Value::key</span>(.<span class="ident">key</span>), <span class="ident">log_wrappers::Value::key</span>(.<span class="ident">primary</span>)
+    )]</span>
+    <span class="ident">WriteConflict</span> {
+        <span class="ident">start_ts</span>: <span class="ident">TimeStamp</span>,
+        <span class="ident">conflict_start_ts</span>: <span class="ident">TimeStamp</span>,
+        <span class="ident">conflict_commit_ts</span>: <span class="ident">TimeStamp</span>,
+        <span class="ident">key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
+        <span class="ident">primary</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
+    },
+
+    <span class="attribute">#[<span class="ident">error</span>(
+        <span class="string">&quot;deadlock occurs between txn:{} and txn:{}, lock_key:{}, deadlock_key_hash:{}&quot;</span>,
+        .<span class="ident">start_ts</span>, .<span class="ident">lock_ts</span>, <span class="ident">log_wrappers::Value::key</span>(.<span class="ident">lock_key</span>), .<span class="ident">deadlock_key_hash</span>
+    )]</span>
+    <span class="ident">Deadlock</span> {
+        <span class="ident">start_ts</span>: <span class="ident">TimeStamp</span>,
+        <span class="ident">lock_ts</span>: <span class="ident">TimeStamp</span>,
+        <span class="ident">lock_key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
+        <span class="ident">deadlock_key_hash</span>: <span class="ident">u64</span>,
+    },
+
+    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;key {} already exists&quot;</span>, <span class="ident">log_wrappers::Value::key</span>(.<span class="ident">key</span>))]</span>
+    <span class="ident">AlreadyExist</span> { <span class="ident">key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> },
+
+    <span class="attribute">#[<span class="ident">error</span>(
+        <span class="string">&quot;default not found: key:{}, maybe read truncated/dropped table data?&quot;</span>,
+        <span class="ident">log_wrappers::Value::key</span>(.<span class="ident">key</span>)
+    )]</span>
+    <span class="ident">DefaultNotFound</span> { <span class="ident">key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> },
+
+    <span class="attribute">#[<span class="ident">error</span>(
+        <span class="string">&quot;try to commit key {} with commit_ts {} but min_commit_ts is {}&quot;</span>,
+        <span class="ident">log_wrappers::Value::key</span>(.<span class="ident">key</span>), .<span class="ident">commit_ts</span>, .<span class="ident">min_commit_ts</span>
+    )]</span>
+    <span class="ident">CommitTsExpired</span> {
+        <span class="ident">start_ts</span>: <span class="ident">TimeStamp</span>,
+        <span class="ident">commit_ts</span>: <span class="ident">TimeStamp</span>,
+        <span class="ident">key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
+        <span class="ident">min_commit_ts</span>: <span class="ident">TimeStamp</span>,
+    },
+
+    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;bad format key(version)&quot;</span>)]</span>
+    <span class="ident">KeyVersion</span>,
+
+    <span class="attribute">#[<span class="ident">error</span>(
+        <span class="string">&quot;pessimistic lock not found, start_ts:{}, key:{}&quot;</span>,
+        .<span class="ident">start_ts</span>, <span class="ident">log_wrappers::Value::key</span>(.<span class="ident">key</span>)
+    )]</span>
+    <span class="ident">PessimisticLockNotFound</span> { <span class="ident">start_ts</span>: <span class="ident">TimeStamp</span>, <span class="ident">key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> },
+
+    <span class="attribute">#[<span class="ident">error</span>(
+        <span class="string">&quot;min_commit_ts {} is larger than max_commit_ts {}, start_ts: {}&quot;</span>,
+        .<span class="ident">min_commit_ts</span>, .<span class="ident">max_commit_ts</span>, .<span class="ident">start_ts</span>
+    )]</span>
+    <span class="ident">CommitTsTooLarge</span> {
+        <span class="ident">start_ts</span>: <span class="ident">TimeStamp</span>,
+        <span class="ident">min_commit_ts</span>: <span class="ident">TimeStamp</span>,
+        <span class="ident">max_commit_ts</span>: <span class="ident">TimeStamp</span>,
+    },
+
+    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;{0:?}&quot;</span>)]</span>
+    <span class="ident">Other</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">error::Error</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span>),
 }
 
 <span class="kw">impl</span> <span class="ident">ErrorInner</span> {
@@ -850,29 +940,13 @@
     }
 }
 
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Error</span>(<span class="kw">pub</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">ErrorInner</span><span class="op">&gt;</span>);
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Error</span>)]</span>
+<span class="attribute">#[<span class="ident">error</span>(<span class="ident">transparent</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Error</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="kw">pub</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">ErrorInner</span><span class="op">&gt;</span>);
 
 <span class="kw">impl</span> <span class="ident">Error</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">maybe_clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Error</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="number">0</span>.<span class="ident">maybe_clone</span>().<span class="ident">map</span>(<span class="ident">Error::from</span>)
-    }
-}
-
-<span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">Error</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt::Result</span> {
-        <span class="ident">fmt::Debug::fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>, <span class="ident">f</span>)
-    }
-}
-
-<span class="kw">impl</span> <span class="ident">fmt::Display</span> <span class="kw">for</span> <span class="ident">Error</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt::Result</span> {
-        <span class="ident">fmt::Display::fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>, <span class="ident">f</span>)
-    }
-}
-
-<span class="kw">impl</span> <span class="ident">std::error::Error</span> <span class="kw">for</span> <span class="ident">Error</span> {
-    <span class="kw">fn</span> <span class="ident">source</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span>(<span class="kw">dyn</span> <span class="ident">std::error::Error</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>)<span class="op">&gt;</span> {
-        <span class="ident">std::error::Error::source</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>)
     }
 }
 

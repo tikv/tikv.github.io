@@ -314,26 +314,27 @@
 <span id="311">311</span>
 <span id="312">312</span>
 <span id="313">313</span>
-<span id="314">314</span>
-<span id="315">315</span>
-<span id="316">316</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
-<span class="kw">use</span> <span class="self">self</span><span class="ident">::metrics</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::config::UnifiedReadPoolConfig</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::storage::kv</span>::{<span class="ident">destroy_tls_engine</span>, <span class="ident">set_tls_engine</span>, <span class="ident">Engine</span>, <span class="ident">FlowStatsReporter</span>};
-<span class="kw">use</span> <span class="ident">file_system</span>::{<span class="ident">set_io_type</span>, <span class="ident">IOType</span>};
+<span class="kw">use</span> <span class="ident">std::future::Future</span>;
+<span class="kw">use</span> <span class="ident">std::sync</span>::{<span class="ident">Arc</span>, <span class="ident">Mutex</span>};
+
 <span class="kw">use</span> <span class="ident">futures::channel::oneshot</span>;
 <span class="kw">use</span> <span class="ident">futures::future::TryFutureExt</span>;
 <span class="kw">use</span> <span class="ident">kvproto::kvrpcpb::CommandPri</span>;
 <span class="kw">use</span> <span class="ident">prometheus::IntGauge</span>;
-<span class="kw">use</span> <span class="ident">std::future::Future</span>;
-<span class="kw">use</span> <span class="ident">std::sync</span>::{<span class="ident">Arc</span>, <span class="ident">Mutex</span>};
-<span class="kw">use</span> <span class="ident">tikv_util::yatp_pool</span>::{<span class="self">self</span>, <span class="ident">FuturePool</span>, <span class="ident">PoolTicker</span>, <span class="ident">YatpPoolBuilder</span>};
+<span class="kw">use</span> <span class="ident">thiserror::Error</span>;
+<span class="kw">use</span> <span class="ident">yatp::pool::Remote</span>;
 <span class="kw">use</span> <span class="ident">yatp::queue::Extras</span>;
 <span class="kw">use</span> <span class="ident">yatp::task::future::TaskCell</span>;
-<span class="kw">use</span> <span class="ident">yatp::Remote</span>;
+
+<span class="kw">use</span> <span class="ident">file_system</span>::{<span class="ident">set_io_type</span>, <span class="ident">IOType</span>};
+<span class="kw">use</span> <span class="ident">tikv_util::yatp_pool</span>::{<span class="self">self</span>, <span class="ident">FuturePool</span>, <span class="ident">PoolTicker</span>, <span class="ident">YatpPoolBuilder</span>};
+
+<span class="kw">use</span> <span class="self">self</span><span class="ident">::metrics</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::config::UnifiedReadPoolConfig</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::storage::kv</span>::{<span class="ident">destroy_tls_engine</span>, <span class="ident">set_tls_engine</span>, <span class="ident">Engine</span>, <span class="ident">FlowStatsReporter</span>};
 
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">ReadPool</span> {
     <span class="ident">FuturePools</span> {
@@ -545,23 +546,16 @@
     }
 }
 
-<span class="macro">quick_error!</span> {
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">ReadPoolError</span> {
-        <span class="ident">FuturePoolFull</span>(<span class="ident">err</span>: <span class="ident">yatp_pool::Full</span>) {
-            <span class="ident">from</span>()
-            <span class="ident">cause</span>(<span class="ident">err</span>)
-            <span class="ident">display</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">err</span>)
-        }
-        <span class="ident">UnifiedReadPoolFull</span> {
-            <span class="ident">display</span>(<span class="string">&quot;Unified read pool is full&quot;</span>)
-        }
-        <span class="ident">Canceled</span>(<span class="ident">err</span>: <span class="ident">oneshot::Canceled</span>) {
-            <span class="ident">from</span>()
-            <span class="ident">cause</span>(<span class="ident">err</span>)
-            <span class="ident">display</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">err</span>)
-        }
-    }
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Error</span>)]</span>
+<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">ReadPoolError</span> {
+    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;{0}&quot;</span>)]</span>
+    <span class="ident">FuturePoolFull</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">yatp_pool::Full</span>),
+
+    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;Unified read pool is full&quot;</span>)]</span>
+    <span class="ident">UnifiedReadPoolFull</span>,
+
+    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;{0}&quot;</span>)]</span>
+    <span class="ident">Canceled</span>(<span class="attribute">#[<span class="ident">from</span>]</span> <span class="ident">oneshot::Canceled</span>),
 }
 
 <span class="kw">mod</span> <span class="ident">metrics</span> {
