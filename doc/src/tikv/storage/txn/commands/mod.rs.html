@@ -823,6 +823,32 @@
 <span id="820">820</span>
 <span id="821">821</span>
 <span id="822">822</span>
+<span id="823">823</span>
+<span id="824">824</span>
+<span id="825">825</span>
+<span id="826">826</span>
+<span id="827">827</span>
+<span id="828">828</span>
+<span id="829">829</span>
+<span id="830">830</span>
+<span id="831">831</span>
+<span id="832">832</span>
+<span id="833">833</span>
+<span id="834">834</span>
+<span id="835">835</span>
+<span id="836">836</span>
+<span id="837">837</span>
+<span id="838">838</span>
+<span id="839">839</span>
+<span id="840">840</span>
+<span id="841">841</span>
+<span id="842">842</span>
+<span id="843">843</span>
+<span id="844">844</span>
+<span id="845">845</span>
+<span id="846">846</span>
+<span id="847">847</span>
+<span id="848">848</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1190,10 +1216,36 @@
     <span class="kw">pub</span> <span class="ident">to_be_write</span>: <span class="ident">WriteData</span>,
     <span class="kw">pub</span> <span class="ident">rows</span>: <span class="ident">usize</span>,
     <span class="kw">pub</span> <span class="ident">pr</span>: <span class="ident">ProcessResult</span>,
-    <span class="comment">// (lock, is_first_lock, wait_timeout)</span>
-    <span class="kw">pub</span> <span class="ident">lock_info</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">lock_manager::Lock</span>, <span class="ident">bool</span>, <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">WaitTimeout</span><span class="op">&gt;</span>)<span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">lock_info</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">WriteResultLockInfo</span><span class="op">&gt;</span>,
     <span class="kw">pub</span> <span class="ident">lock_guards</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">KeyHandleGuard</span><span class="op">&gt;</span>,
     <span class="kw">pub</span> <span class="ident">response_policy</span>: <span class="ident">ResponsePolicy</span>,
+}
+
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">WriteResultLockInfo</span> {
+    <span class="kw">pub</span> <span class="ident">lock</span>: <span class="ident">lock_manager::Lock</span>,
+    <span class="kw">pub</span> <span class="ident">key</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">is_first_lock</span>: <span class="ident">bool</span>,
+    <span class="kw">pub</span> <span class="ident">wait_timeout</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">WaitTimeout</span><span class="op">&gt;</span>,
+}
+
+<span class="kw">impl</span> <span class="ident">WriteResultLockInfo</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_lock_info_pb</span>(
+        <span class="ident">lock_info</span>: <span class="kw-2">&amp;</span><span class="ident">LockInfo</span>,
+        <span class="ident">is_first_lock</span>: <span class="ident">bool</span>,
+        <span class="ident">wait_timeout</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">WaitTimeout</span><span class="op">&gt;</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+        <span class="kw">let</span> <span class="ident">lock</span> <span class="op">=</span> <span class="ident">lock_manager::Lock</span> {
+            <span class="ident">ts</span>: <span class="ident">lock_info</span>.<span class="ident">get_lock_version</span>().<span class="ident">into</span>(),
+            <span class="ident">hash</span>: <span class="ident">Key::from_raw</span>(<span class="ident">lock_info</span>.<span class="ident">get_key</span>()).<span class="ident">gen_hash</span>(),
+        };
+        <span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> <span class="ident">lock_info</span>.<span class="ident">get_key</span>().<span class="ident">to_owned</span>();
+        <span class="self">Self</span> {
+            <span class="ident">lock</span>,
+            <span class="ident">key</span>,
+            <span class="ident">is_first_lock</span>,
+            <span class="ident">wait_timeout</span>,
+        }
+    }
 }
 
 <span class="kw">impl</span> <span class="ident">ReleasedLocks</span> {
