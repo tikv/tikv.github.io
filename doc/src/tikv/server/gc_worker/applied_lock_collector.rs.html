@@ -883,6 +883,7 @@
 <span id="880">880</span>
 <span id="881">881</span>
 <span id="882">882</span>
+<span id="883">883</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -900,7 +901,8 @@
 <span class="kw">use</span> <span class="ident">kvproto::raft_cmdpb::CmdType</span>;
 <span class="kw">use</span> <span class="ident">tikv_util::worker</span>::{<span class="ident">Builder</span> <span class="kw">as</span> <span class="ident">WorkerBuilder</span>, <span class="ident">Runnable</span>, <span class="ident">ScheduleError</span>, <span class="ident">Scheduler</span>, <span class="ident">Worker</span>};
 
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::storage::mvcc</span>::{<span class="ident">Error</span> <span class="kw">as</span> <span class="ident">MvccError</span>, <span class="ident">ErrorInner</span> <span class="kw">as</span> <span class="ident">MvccErrorInner</span>, <span class="ident">Lock</span>, <span class="ident">TimeStamp</span>};
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::storage::mvcc</span>::{<span class="ident">ErrorInner</span> <span class="kw">as</span> <span class="ident">MvccErrorInner</span>, <span class="ident">Lock</span>, <span class="ident">TimeStamp</span>};
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::storage::txn::Error</span> <span class="kw">as</span> <span class="ident">TxnError</span>;
 <span class="kw">use</span> <span class="ident">raftstore::coprocessor</span>::{
     <span class="ident">ApplySnapshotObserver</span>, <span class="ident">BoxApplySnapshotObserver</span>, <span class="ident">BoxQueryObserver</span>, <span class="ident">Cmd</span>, <span class="ident">Coprocessor</span>,
     <span class="ident">CoprocessorHost</span>, <span class="ident">ObserverContext</span>, <span class="ident">QueryObserver</span>,
@@ -1124,7 +1126,7 @@
             .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">key</span>, <span class="ident">value</span>)<span class="op">|</span> {
                 <span class="ident">Lock::parse</span>(<span class="ident">value</span>)
                     .<span class="ident">map</span>(<span class="op">|</span><span class="ident">lock</span><span class="op">|</span> (<span class="ident">key</span>, <span class="ident">lock</span>))
-                    .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">ErrorInner::Mvcc</span>(<span class="ident">e</span>.<span class="ident">into</span>()).<span class="ident">into</span>())
+                    .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">ErrorInner::Txn</span>(<span class="ident">TxnError::from_mvcc</span>(<span class="ident">e</span>)).<span class="ident">into</span>())
             })
             .<span class="ident">filter</span>(<span class="op">|</span><span class="ident">result</span><span class="op">|</span> <span class="ident">result</span>.<span class="ident">is_err</span>() <span class="op">|</span><span class="op">|</span> <span class="ident">result</span>.<span class="ident">as_ref</span>().<span class="ident">unwrap</span>().<span class="number">1</span>.<span class="ident">ts</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">max_ts</span>)
             .<span class="ident">map</span>(<span class="op">|</span><span class="ident">result</span><span class="op">|</span> {
@@ -1221,7 +1223,7 @@
             .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">k</span>, <span class="ident">l</span>)<span class="op">|</span> {
                 <span class="ident">k</span>.<span class="ident">to_raw</span>()
                     .<span class="ident">map</span>(<span class="op">|</span><span class="ident">raw_key</span><span class="op">|</span> <span class="ident">l</span>.<span class="ident">clone</span>().<span class="ident">into_lock_info</span>(<span class="ident">raw_key</span>))
-                    .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">Error::from</span>(<span class="ident">MvccError::from</span>(<span class="ident">e</span>)))
+                    .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">Error::from</span>(<span class="ident">TxnError::from_mvcc</span>(<span class="ident">e</span>)))
             })
             .<span class="ident">collect</span>();
 
@@ -1323,7 +1325,7 @@
                 <span class="comment">// `Lock::check_ts_conflict` can&#39;t be used here, because LockType::Lock</span>
                 <span class="comment">// can&#39;t be ignored in this case.</span>
                 <span class="kw">if</span> <span class="ident">lock</span>.<span class="ident">ts</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">max_ts</span> {
-                    <span class="prelude-val">Err</span>(<span class="ident">MvccError::from</span>(<span class="ident">MvccErrorInner::KeyIsLocked</span>(
+                    <span class="prelude-val">Err</span>(<span class="ident">TxnError::from_mvcc</span>(<span class="ident">MvccErrorInner::KeyIsLocked</span>(
                         <span class="ident">lock</span>.<span class="ident">clone</span>().<span class="ident">into_lock_info</span>(<span class="ident">key</span>.<span class="ident">to_raw</span>()<span class="question-mark">?</span>),
                     )))
                 } <span class="kw">else</span> {
