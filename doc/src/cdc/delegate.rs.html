@@ -1106,68 +1106,12 @@
 <span id="1103">1103</span>
 <span id="1104">1104</span>
 <span id="1105">1105</span>
-<span id="1106">1106</span>
-<span id="1107">1107</span>
-<span id="1108">1108</span>
-<span id="1109">1109</span>
-<span id="1110">1110</span>
-<span id="1111">1111</span>
-<span id="1112">1112</span>
-<span id="1113">1113</span>
-<span id="1114">1114</span>
-<span id="1115">1115</span>
-<span id="1116">1116</span>
-<span id="1117">1117</span>
-<span id="1118">1118</span>
-<span id="1119">1119</span>
-<span id="1120">1120</span>
-<span id="1121">1121</span>
-<span id="1122">1122</span>
-<span id="1123">1123</span>
-<span id="1124">1124</span>
-<span id="1125">1125</span>
-<span id="1126">1126</span>
-<span id="1127">1127</span>
-<span id="1128">1128</span>
-<span id="1129">1129</span>
-<span id="1130">1130</span>
-<span id="1131">1131</span>
-<span id="1132">1132</span>
-<span id="1133">1133</span>
-<span id="1134">1134</span>
-<span id="1135">1135</span>
-<span id="1136">1136</span>
-<span id="1137">1137</span>
-<span id="1138">1138</span>
-<span id="1139">1139</span>
-<span id="1140">1140</span>
-<span id="1141">1141</span>
-<span id="1142">1142</span>
-<span id="1143">1143</span>
-<span id="1144">1144</span>
-<span id="1145">1145</span>
-<span id="1146">1146</span>
-<span id="1147">1147</span>
-<span id="1148">1148</span>
-<span id="1149">1149</span>
-<span id="1150">1150</span>
-<span id="1151">1151</span>
-<span id="1152">1152</span>
-<span id="1153">1153</span>
-<span id="1154">1154</span>
-<span id="1155">1155</span>
-<span id="1156">1156</span>
-<span id="1157">1157</span>
-<span id="1158">1158</span>
-<span id="1159">1159</span>
-<span id="1160">1160</span>
-<span id="1161">1161</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
 <span class="kw">use</span> <span class="ident">std::mem</span>;
 <span class="kw">use</span> <span class="ident">std::sync::atomic</span>::{<span class="ident">AtomicBool</span>, <span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>};
-<span class="kw">use</span> <span class="ident">std::sync</span>::{<span class="ident">Arc</span>, <span class="ident">Mutex</span>};
+<span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
 
 <span class="kw">use</span> <span class="ident">collections::HashMap</span>;
 <span class="kw">use</span> <span class="ident">crossbeam::atomic::AtomicCell</span>;
@@ -1196,18 +1140,17 @@
 <span class="kw">use</span> <span class="ident">raftstore::Error</span> <span class="kw">as</span> <span class="ident">RaftStoreError</span>;
 <span class="kw">use</span> <span class="ident">resolved_ts::Resolver</span>;
 <span class="kw">use</span> <span class="ident">tikv::storage::txn::TxnEntry</span>;
+<span class="kw">use</span> <span class="ident">tikv_util::mpsc::batch::Sender</span> <span class="kw">as</span> <span class="ident">BatchSender</span>;
 <span class="kw">use</span> <span class="ident">tikv_util::time::Instant</span>;
 <span class="kw">use</span> <span class="ident">tikv_util</span>::{<span class="ident">debug</span>, <span class="ident">info</span>, <span class="ident">warn</span>};
 <span class="kw">use</span> <span class="ident">txn_types</span>::{<span class="ident">Key</span>, <span class="ident">Lock</span>, <span class="ident">LockType</span>, <span class="ident">TimeStamp</span>, <span class="ident">WriteBatchFlags</span>, <span class="ident">WriteRef</span>, <span class="ident">WriteType</span>};
 
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::endpoint</span>::{<span class="ident">OldValueCache</span>, <span class="ident">OldValueCallback</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::metrics</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::rate_limiter::RateLimiter</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::service</span>::{<span class="ident">CdcEvent</span>, <span class="ident">ConnID</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">Error</span>, <span class="prelude-ty">Result</span>};
 
-<span class="comment">// 6MB</span>
-<span class="kw">const</span> <span class="ident">EVENT_MAX_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">6</span> <span class="op">*</span> <span class="number">1024</span> <span class="op">*</span> <span class="number">1024</span>;
+<span class="kw">const</span> <span class="ident">EVENT_MAX_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">6</span> <span class="op">*</span> <span class="number">1024</span> <span class="op">*</span> <span class="number">1024</span>; <span class="comment">// 6MB</span>
 <span class="kw">static</span> <span class="ident">DOWNSTREAM_ID_ALLOC</span>: <span class="ident">AtomicUsize</span> <span class="op">=</span> <span class="ident">AtomicUsize::new</span>(<span class="number">0</span>);
 
 <span class="doccomment">/// A unique identifier of a Downstream.</span>
@@ -1227,14 +1170,6 @@
     <span class="ident">Stopped</span>,
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">IncrementalScanState</span> {
-    <span class="ident">NotStarted</span>,
-    <span class="ident">Ongoing</span>,
-    <span class="ident">Done</span>,
-    <span class="ident">ErrorPending</span>(<span class="ident">Event</span>),
-}
-
 <span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">DownstreamState</span> {
     <span class="kw">fn</span> <span class="ident">default</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="self">Self</span><span class="ident">::Uninitialized</span>
@@ -1252,10 +1187,9 @@
     <span class="comment">// The IP address of downstream.</span>
     <span class="ident">peer</span>: <span class="ident">String</span>,
     <span class="ident">region_epoch</span>: <span class="ident">RegionEpoch</span>,
-    <span class="ident">sink</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RateLimiter</span><span class="op">&lt;</span><span class="ident">CdcEvent</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">sink</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">BatchSender</span><span class="op">&lt;</span><span class="ident">CdcEvent</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">state</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicCell</span><span class="op">&lt;</span><span class="ident">DownstreamState</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">enable_old_value</span>: <span class="ident">bool</span>,
-    <span class="ident">incremental_scan_state</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">IncrementalScanState</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">Downstream</span> {
@@ -1279,7 +1213,6 @@
             <span class="ident">sink</span>: <span class="prelude-val">None</span>,
             <span class="ident">state</span>: <span class="ident">Arc::new</span>(<span class="ident">AtomicCell::new</span>(<span class="ident">DownstreamState::default</span>())),
             <span class="ident">enable_old_value</span>,
-            <span class="ident">incremental_scan_state</span>: <span class="ident">Arc::new</span>(<span class="ident">Mutex::new</span>(<span class="ident">IncrementalScanState::NotStarted</span>)),
         }
     }
 
@@ -1287,38 +1220,28 @@
     <span class="doccomment">/// The size of `Error` and `ResolvedTS` are considered zero.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">sink_event</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw-2">mut</span> <span class="ident">event</span>: <span class="ident">Event</span>) {
         <span class="ident">event</span>.<span class="ident">set_request_id</span>(<span class="self">self</span>.<span class="ident">req_id</span>);
-
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">sink</span>.<span class="ident">is_none</span>() {
-            <span class="macro">warn!</span>(<span class="string">&quot;cdc drop event, no rate_limiter&quot;</span>;
-                <span class="string">&quot;conn_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="self">self</span>.<span class="ident">conn_id</span>, <span class="string">&quot;downstream_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="self">self</span>.<span class="ident">id</span>);
+            <span class="macro">info!</span>(<span class="string">&quot;cdc drop event, no sink&quot;</span>;
+                <span class="string">&quot;conn_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="self">self</span>.<span class="ident">conn_id</span>, <span class="string">&quot;downstream_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="self">self</span>.<span class="ident">id</span>, <span class="string">&quot;req_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">req_id</span>);
             <span class="kw">return</span>;
         }
-
-        <span class="kw">let</span> <span class="ident">rate_limiter</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">sink</span>.<span class="ident">as_ref</span>().<span class="ident">unwrap</span>();
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">rate_limiter</span>.<span class="ident">send_realtime_event</span>(<span class="ident">CdcEvent::Event</span>(<span class="ident">event</span>)) {
-            <span class="macro">info!</span>(<span class="string">&quot;cdc send event failed&quot;</span>;
-                <span class="string">&quot;conn_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="self">self</span>.<span class="ident">conn_id</span>, <span class="string">&quot;downstream_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="self">self</span>.<span class="ident">id</span>, <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
-        }
-    }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">sink_error</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw-2">mut</span> <span class="ident">event</span>: <span class="ident">Event</span>) {
-        <span class="ident">event</span>.<span class="ident">set_request_id</span>(<span class="self">self</span>.<span class="ident">req_id</span>);
-
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">rate_limiter</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">sink</span>.<span class="ident">as_ref</span>() {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">rate_limiter</span>.<span class="ident">close_with_error</span>(<span class="ident">CdcEvent::Event</span>(<span class="ident">event</span>)) {
-                <span class="macro">info!</span>(<span class="string">&quot;cdc sink error failed&quot;</span>; <span class="string">&quot;conn_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="self">self</span>.<span class="ident">conn_id</span>, <span class="string">&quot;downstream_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="self">self</span>.<span class="ident">id</span>, <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
+        <span class="kw">let</span> <span class="ident">sink</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">sink</span>.<span class="ident">as_ref</span>().<span class="ident">unwrap</span>();
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">sink</span>.<span class="ident">try_send</span>(<span class="ident">CdcEvent::Event</span>(<span class="ident">event</span>)) {
+            <span class="kw">match</span> <span class="ident">e</span> {
+                <span class="ident">crossbeam::channel::TrySendError::Disconnected</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="macro">debug!</span>(<span class="string">&quot;cdc send event failed, disconnected&quot;</span>;
+                        <span class="string">&quot;conn_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="self">self</span>.<span class="ident">conn_id</span>, <span class="string">&quot;downstream_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="self">self</span>.<span class="ident">id</span>, <span class="string">&quot;req_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">req_id</span>);
+                }
+                <span class="ident">crossbeam::channel::TrySendError::Full</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="macro">info!</span>(<span class="string">&quot;cdc send event failed, full&quot;</span>;
+                        <span class="string">&quot;conn_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="self">self</span>.<span class="ident">conn_id</span>, <span class="string">&quot;downstream_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="self">self</span>.<span class="ident">id</span>, <span class="string">&quot;req_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">req_id</span>);
+                }
             }
-        } <span class="kw">else</span> {
-            <span class="macro">warn!</span>(<span class="string">&quot;cdc sink error failed, no rate_limiter found&quot;</span>; <span class="string">&quot;conn_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="self">self</span>.<span class="ident">conn_id</span>, <span class="string">&quot;downstream_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="self">self</span>.<span class="ident">id</span>)
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_sink</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">sink</span>: <span class="ident">RateLimiter</span><span class="op">&lt;</span><span class="ident">CdcEvent</span><span class="op">&gt;</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_sink</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">sink</span>: <span class="ident">BatchSender</span><span class="op">&lt;</span><span class="ident">CdcEvent</span><span class="op">&gt;</span>) {
         <span class="self">self</span>.<span class="ident">sink</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">sink</span>);
-    }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_rate_limiter</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RateLimiter</span><span class="op">&lt;</span><span class="ident">CdcEvent</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">sink</span>.<span class="ident">clone</span>()
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_id</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">DownstreamID</span> {
@@ -1331,10 +1254,6 @@
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_conn_id</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ConnID</span> {
         <span class="self">self</span>.<span class="ident">conn_id</span>
-    }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_req_id</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u64</span> {
-        <span class="self">self</span>.<span class="ident">req_id</span>
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">sink_duplicate_error</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">region_id</span>: <span class="ident">u64</span>) {
@@ -1356,10 +1275,6 @@
         <span class="ident">change_data_event</span>.<span class="ident">event</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">Event_oneof_event::Error</span>(<span class="ident">cdc_err</span>));
         <span class="ident">change_data_event</span>.<span class="ident">region_id</span> <span class="op">=</span> <span class="ident">region_id</span>;
         <span class="self">self</span>.<span class="ident">sink_event</span>(<span class="ident">change_data_event</span>);
-    }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_incremental_scan_state</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">IncrementalScanState</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">incremental_scan_state</span>.<span class="ident">clone</span>()
     }
 }
 
@@ -1440,7 +1355,7 @@
                 <span class="bool-val">true</span>,  <span class="comment">/* check_ver */</span>
                 <span class="bool-val">true</span>,  <span class="comment">/* include_region */</span>
             ) {
-                <span class="macro">info!</span>(<span class="string">&quot;fail to subscribe downstream&quot;</span>;
+                <span class="macro">info!</span>(<span class="string">&quot;cdc fail to subscribe downstream&quot;</span>;
                     <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region</span>.<span class="ident">get_id</span>(),
                     <span class="string">&quot;downstream_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">downstream</span>.<span class="ident">get_id</span>(),
                     <span class="string">&quot;conn_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">downstream</span>.<span class="ident">get_conn_id</span>(),
@@ -1535,23 +1450,13 @@
         <span class="comment">// Stop observe further events.</span>
         <span class="self">self</span>.<span class="ident">enabled</span>.<span class="ident">store</span>(<span class="bool-val">false</span>, <span class="ident">Ordering::SeqCst</span>);
 
-        <span class="macro">info!</span>(<span class="string">&quot;region met error&quot;</span>;
+        <span class="macro">info!</span>(<span class="string">&quot;cdc met region error&quot;</span>;
             <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">region_id</span>, <span class="string">&quot;error&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">err</span>);
         <span class="kw">let</span> <span class="ident">change_data_err</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">error_event</span>(<span class="ident">err</span>);
-
-        <span class="kw">for</span> <span class="ident">d</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">downstreams</span>() {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">incremental_state</span> <span class="op">=</span> <span class="ident">d</span>.<span class="ident">incremental_scan_state</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
-            <span class="kw">match</span> <span class="kw-2">*</span><span class="ident">incremental_state</span> {
-                <span class="ident">IncrementalScanState::Ongoing</span> <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="macro">info!</span>(<span class="string">&quot;cdc incremental scan not done, holding off error&quot;</span>; <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">region_id</span>);
-                    <span class="kw-2">*</span><span class="ident">incremental_state</span> <span class="op">=</span> <span class="ident">IncrementalScanState::ErrorPending</span>(<span class="ident">change_data_err</span>.<span class="ident">clone</span>())
-                }
-                <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="ident">d</span>.<span class="ident">state</span>.<span class="ident">store</span>(<span class="ident">DownstreamState::Stopped</span>);
-                    <span class="ident">d</span>.<span class="ident">sink_error</span>(<span class="ident">change_data_err</span>.<span class="ident">clone</span>());
-                }
-            }
+        <span class="kw">for</span> <span class="ident">d</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">downstreams</span> {
+            <span class="ident">d</span>.<span class="ident">state</span>.<span class="ident">store</span>(<span class="ident">DownstreamState::Stopped</span>);
         }
+        <span class="self">self</span>.<span class="ident">broadcast</span>(<span class="ident">change_data_err</span>, <span class="bool-val">false</span>);
     }
 
     <span class="kw">fn</span> <span class="ident">broadcast</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">change_data_event</span>: <span class="ident">Event</span>, <span class="ident">normal_only</span>: <span class="ident">bool</span>) {
@@ -1574,11 +1479,7 @@
                     }
                 }
             }
-            <span class="kw">if</span> <span class="ident">normal_only</span> {
-                <span class="ident">downstream</span>.<span class="ident">sink_event</span>(<span class="ident">event</span>);
-            } <span class="kw">else</span> {
-                <span class="ident">downstream</span>.<span class="ident">sink_error</span>(<span class="ident">event</span>);
-            }
+            <span class="ident">downstream</span>.<span class="ident">sink_event</span>(<span class="ident">event</span>);
         }
     }
 
@@ -1599,21 +1500,21 @@
             }
         }
         <span class="self">self</span>.<span class="ident">resolver</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">resolver</span>);
-        <span class="macro">info!</span>(<span class="string">&quot;region is ready&quot;</span>; <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">region_id</span>);
+        <span class="macro">info!</span>(<span class="string">&quot;cdc region is ready&quot;</span>; <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">region_id</span>);
         <span class="ident">pending</span>.<span class="ident">take_downstreams</span>()
     }
 
     <span class="doccomment">/// Try advance and broadcast resolved ts.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">on_min_ts</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">min_ts</span>: <span class="ident">TimeStamp</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">TimeStamp</span><span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">resolver</span>.<span class="ident">is_none</span>() {
-            <span class="macro">debug!</span>(<span class="string">&quot;region resolver not ready&quot;</span>;
+            <span class="macro">debug!</span>(<span class="string">&quot;cdc region resolver not ready&quot;</span>;
                 <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">region_id</span>, <span class="string">&quot;min_ts&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">min_ts</span>);
             <span class="kw">return</span> <span class="prelude-val">None</span>;
         }
-        <span class="macro">debug!</span>(<span class="string">&quot;try to advance ts&quot;</span>; <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">region_id</span>, <span class="string">&quot;min_ts&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">min_ts</span>);
+        <span class="macro">debug!</span>(<span class="string">&quot;cdc try to advance ts&quot;</span>; <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">region_id</span>, <span class="string">&quot;min_ts&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">min_ts</span>);
         <span class="kw">let</span> <span class="ident">resolver</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">resolver</span>.<span class="ident">as_mut</span>().<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">resolved_ts</span> <span class="op">=</span> <span class="ident">resolver</span>.<span class="ident">resolve</span>(<span class="ident">min_ts</span>);
-        <span class="macro">debug!</span>(<span class="string">&quot;resolved ts updated&quot;</span>;
+        <span class="macro">debug!</span>(<span class="string">&quot;cdc resolved ts updated&quot;</span>;
             <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">region_id</span>, <span class="string">&quot;resolved_ts&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">resolved_ts</span>);
         <span class="ident">CDC_RESOLVED_TS_GAP_HISTOGRAM</span>
             .<span class="ident">observe</span>((<span class="ident">min_ts</span>.<span class="ident">physical</span>() <span class="op">-</span> <span class="ident">resolved_ts</span>.<span class="ident">physical</span>()) <span class="kw">as</span> <span class="ident">f64</span> <span class="op">/</span> <span class="number">1000f64</span>);
@@ -1660,11 +1561,20 @@
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">convert_to_grpc_events</span>(
-        <span class="ident">region_id</span>: <span class="ident">u64</span>,
-        <span class="ident">request_id</span>: <span class="ident">u64</span>,
-        <span class="ident">entries</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">TxnEntry</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Event</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">on_scan</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">downstream_id</span>: <span class="ident">DownstreamID</span>, <span class="ident">entries</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">TxnEntry</span><span class="op">&gt;</span><span class="op">&gt;</span>) {
+        <span class="kw">let</span> <span class="ident">downstreams</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">pending</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">pending</span>.<span class="ident">as_mut</span>() {
+            <span class="kw-2">&amp;</span><span class="ident">pending</span>.<span class="ident">downstreams</span>
+        } <span class="kw">else</span> {
+            <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">downstreams</span>
+        };
+        <span class="kw">let</span> <span class="ident">downstream</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">d</span>) <span class="op">=</span> <span class="ident">downstreams</span>.<span class="ident">iter</span>().<span class="ident">find</span>(<span class="op">|</span><span class="ident">d</span><span class="op">|</span> <span class="ident">d</span>.<span class="ident">id</span> <span class="op">=</span><span class="op">=</span> <span class="ident">downstream_id</span>) {
+            <span class="ident">d</span>
+        } <span class="kw">else</span> {
+            <span class="macro">warn!</span>(<span class="string">&quot;cdc downstream not found&quot;</span>;
+                <span class="string">&quot;downstream_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">downstream_id</span>, <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">region_id</span>);
+            <span class="kw">return</span>;
+        };
+
         <span class="kw">let</span> <span class="ident">entries_len</span> <span class="op">=</span> <span class="ident">entries</span>.<span class="ident">len</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rows</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="ident">Vec::with_capacity</span>(<span class="ident">entries_len</span>)];
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">current_rows_size</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">0</span>;
@@ -1733,39 +1643,20 @@
             }
         }
 
-        <span class="ident">rows</span>.<span class="ident">into_iter</span>()
-            .<span class="ident">filter</span>(<span class="op">|</span><span class="ident">rs</span><span class="op">|</span> <span class="op">!</span><span class="ident">rs</span>.<span class="ident">is_empty</span>())
-            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">rs</span><span class="op">|</span> {
+        <span class="kw">for</span> <span class="ident">rs</span> <span class="kw">in</span> <span class="ident">rows</span> {
+            <span class="kw">if</span> <span class="op">!</span><span class="ident">rs</span>.<span class="ident">is_empty</span>() {
                 <span class="kw">let</span> <span class="ident">event_entries</span> <span class="op">=</span> <span class="ident">EventEntries</span> {
                     <span class="ident">entries</span>: <span class="ident">rs</span>.<span class="ident">into</span>(),
                     ..<span class="ident">Default::default</span>()
                 };
-                <span class="ident">Event</span> {
-                    <span class="ident">region_id</span>,
-                    <span class="ident">request_id</span>,
+                <span class="kw">let</span> <span class="ident">event</span> <span class="op">=</span> <span class="ident">Event</span> {
+                    <span class="ident">region_id</span>: <span class="self">self</span>.<span class="ident">region_id</span>,
                     <span class="ident">event</span>: <span class="prelude-val">Some</span>(<span class="ident">Event_oneof_event::Entries</span>(<span class="ident">event_entries</span>)),
                     ..<span class="ident">Default::default</span>()
-                }
-            })
-            .<span class="ident">collect</span>()
-    }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">on_scan</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">downstream_id</span>: <span class="ident">DownstreamID</span>, <span class="ident">entries</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">TxnEntry</span><span class="op">&gt;</span><span class="op">&gt;</span>) {
-        <span class="kw">let</span> <span class="ident">downstreams</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">pending</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">pending</span>.<span class="ident">as_mut</span>() {
-            <span class="kw-2">&amp;</span><span class="ident">pending</span>.<span class="ident">downstreams</span>
-        } <span class="kw">else</span> {
-            <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">downstreams</span>
-        };
-        <span class="kw">let</span> <span class="ident">downstream</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">d</span>) <span class="op">=</span> <span class="ident">downstreams</span>.<span class="ident">iter</span>().<span class="ident">find</span>(<span class="op">|</span><span class="ident">d</span><span class="op">|</span> <span class="ident">d</span>.<span class="ident">id</span> <span class="op">=</span><span class="op">=</span> <span class="ident">downstream_id</span>) {
-            <span class="ident">d</span>
-        } <span class="kw">else</span> {
-            <span class="macro">warn!</span>(<span class="string">&quot;downstream not found&quot;</span>; <span class="string">&quot;downstream_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">downstream_id</span>, <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">region_id</span>);
-            <span class="kw">return</span>;
-        };
-
-        <span class="self">Self</span><span class="ident">::convert_to_grpc_events</span>(<span class="self">self</span>.<span class="ident">region_id</span>, <span class="ident">downstream</span>.<span class="ident">req_id</span>, <span class="ident">entries</span>)
-            .<span class="ident">into_iter</span>()
-            .<span class="ident">for_each</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">downstream</span>.<span class="ident">sink_event</span>(<span class="ident">e</span>))
+                };
+                <span class="ident">downstream</span>.<span class="ident">sink_event</span>(<span class="ident">event</span>);
+            }
+        }
     }
 
     <span class="kw">fn</span> <span class="ident">sink_data</span>(
@@ -2021,7 +1912,7 @@
         <span class="ident">WriteType::Delete</span> <span class="op">=</span><span class="op">&gt;</span> (<span class="ident">EventRowOpType::Delete</span>, <span class="ident">EventLogType::Commit</span>),
         <span class="ident">WriteType::Rollback</span> <span class="op">=</span><span class="op">&gt;</span> (<span class="ident">EventRowOpType::Unknown</span>, <span class="ident">EventLogType::Rollback</span>),
         <span class="ident">other</span> <span class="op">=</span><span class="op">&gt;</span> {
-            <span class="macro">debug!</span>(<span class="string">&quot;skip write record&quot;</span>; <span class="string">&quot;write&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">other</span>, <span class="string">&quot;key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">key</span>);
+            <span class="macro">debug!</span>(<span class="string">&quot;cdc skip write record&quot;</span>; <span class="string">&quot;write&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">other</span>, <span class="string">&quot;key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">key</span>);
             <span class="kw">return</span> <span class="bool-val">true</span>;
         }
     };
@@ -2047,7 +1938,7 @@
         <span class="ident">LockType::Put</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">EventRowOpType::Put</span>,
         <span class="ident">LockType::Delete</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">EventRowOpType::Delete</span>,
         <span class="ident">other</span> <span class="op">=</span><span class="op">&gt;</span> {
-            <span class="macro">debug!</span>(<span class="string">&quot;skip lock record&quot;</span>;
+            <span class="macro">debug!</span>(<span class="string">&quot;cdc skip lock record&quot;</span>;
                 <span class="string">&quot;type&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">other</span>,
                 <span class="string">&quot;start_ts&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">lock</span>.<span class="ident">ts</span>,
                 <span class="string">&quot;key&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">log_wrappers::Value::key</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>),
@@ -2076,24 +1967,16 @@
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
 <span class="kw">mod</span> <span class="ident">tests</span> {
     <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
-    <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::rate_limiter::testing_util::TestingHarness</span>;
-    <span class="kw">use</span> <span class="ident">futures::future::FutureExt</span>;
+    <span class="kw">use</span> <span class="ident">futures::executor::block_on</span>;
     <span class="kw">use</span> <span class="ident">futures::stream::StreamExt</span>;
     <span class="kw">use</span> <span class="ident">kvproto::errorpb::Error</span> <span class="kw">as</span> <span class="ident">ErrorHeader</span>;
     <span class="kw">use</span> <span class="ident">kvproto::metapb::Region</span>;
     <span class="kw">use</span> <span class="ident">std::cell::Cell</span>;
     <span class="kw">use</span> <span class="ident">tikv::storage::mvcc::test_util</span>::<span class="kw-2">*</span>;
+    <span class="kw">use</span> <span class="ident">tikv_util::mpsc::batch</span>::{<span class="self">self</span>, <span class="ident">BatchReceiver</span>, <span class="ident">VecCollector</span>};
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_error</span>() {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">builder</span> <span class="op">=</span> <span class="ident">tokio::runtime::Builder::new</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">runtime</span> <span class="op">=</span> <span class="ident">builder</span>
-            .<span class="ident">threaded_scheduler</span>()
-            .<span class="ident">core_threads</span>(<span class="number">4</span>)
-            .<span class="ident">enable_all</span>()
-            .<span class="ident">build</span>()
-            .<span class="ident">unwrap</span>();
-
         <span class="kw">let</span> <span class="ident">region_id</span> <span class="op">=</span> <span class="number">1</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">region</span> <span class="op">=</span> <span class="ident">Region::default</span>();
         <span class="ident">region</span>.<span class="ident">set_id</span>(<span class="ident">region_id</span>);
@@ -2102,14 +1985,12 @@
         <span class="ident">region</span>.<span class="ident">mut_region_epoch</span>().<span class="ident">set_conf_ver</span>(<span class="number">2</span>);
         <span class="kw">let</span> <span class="ident">region_epoch</span> <span class="op">=</span> <span class="ident">region</span>.<span class="ident">get_region_epoch</span>().<span class="ident">clone</span>();
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">harness</span> <span class="op">=</span> <span class="ident">TestingHarness::new</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rx</span> <span class="op">=</span> <span class="ident">harness</span>.<span class="ident">get_rx</span>();
-        <span class="kw">let</span> <span class="ident">rate_limiter</span> <span class="op">=</span> <span class="ident">harness</span>.<span class="ident">get_rate_limiter</span>();
-
+        <span class="kw">let</span> (<span class="ident">sink</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">batch::unbounded</span>(<span class="number">1</span>);
+        <span class="kw">let</span> <span class="ident">rx</span> <span class="op">=</span> <span class="ident">BatchReceiver::new</span>(<span class="ident">rx</span>, <span class="number">1</span>, <span class="ident">Vec::new</span>, <span class="ident">VecCollector</span>);
         <span class="kw">let</span> <span class="ident">request_id</span> <span class="op">=</span> <span class="number">123</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">downstream</span> <span class="op">=</span>
             <span class="ident">Downstream::new</span>(<span class="ident">String::new</span>(), <span class="ident">region_epoch</span>, <span class="ident">request_id</span>, <span class="ident">ConnID::new</span>(), <span class="bool-val">true</span>);
-        <span class="ident">downstream</span>.<span class="ident">set_sink</span>(<span class="ident">rate_limiter</span>.<span class="ident">with_region_id</span>(<span class="ident">region_id</span>));
+        <span class="ident">downstream</span>.<span class="ident">set_sink</span>(<span class="ident">sink</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">delegate</span> <span class="op">=</span> <span class="ident">Delegate::new</span>(<span class="ident">region_id</span>);
         <span class="ident">delegate</span>.<span class="ident">subscribe</span>(<span class="ident">downstream</span>);
         <span class="kw">let</span> <span class="ident">enabled</span> <span class="op">=</span> <span class="ident">delegate</span>.<span class="ident">enabled</span>();
@@ -2119,20 +2000,27 @@
             <span class="ident">delegate</span>.<span class="ident">subscribe</span>(<span class="ident">downstream</span>);
         }
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">receive_error</span> <span class="op">=</span> <span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
-            <span class="ident">runtime</span>.<span class="ident">block_on</span>(<span class="ident">rx</span>.<span class="ident">next</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">resps</span><span class="op">|</span> {
-                <span class="kw">let</span> (<span class="ident">resp</span>, <span class="kw">_</span>) <span class="op">=</span> <span class="ident">resps</span>.<span class="ident">as_ref</span>().<span class="ident">unwrap</span>();
-                <span class="kw">let</span> <span class="ident">resps</span> <span class="op">=</span> <span class="ident">resp</span>.<span class="ident">get_events</span>();
-                <span class="macro">assert_eq!</span>(<span class="ident">resps</span>.<span class="ident">len</span>(), <span class="number">1</span>);
-                <span class="kw">for</span> <span class="ident">r</span> <span class="kw">in</span> <span class="ident">resps</span> {
-                    <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">get_request_id</span>(), <span class="ident">request_id</span>);
+        <span class="kw">let</span> <span class="ident">rx_wrap</span> <span class="op">=</span> <span class="ident">Cell::new</span>(<span class="prelude-val">Some</span>(<span class="ident">rx</span>));
+        <span class="kw">let</span> <span class="ident">receive_error</span> <span class="op">=</span> <span class="op">|</span><span class="op">|</span> {
+            <span class="kw">let</span> (<span class="ident">resps</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">block_on</span>(<span class="ident">rx_wrap</span>.<span class="ident">replace</span>(<span class="prelude-val">None</span>).<span class="ident">unwrap</span>().<span class="ident">into_future</span>());
+            <span class="ident">rx_wrap</span>.<span class="ident">set</span>(<span class="prelude-val">Some</span>(<span class="ident">rx</span>));
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">resps</span> <span class="op">=</span> <span class="ident">resps</span>.<span class="ident">unwrap</span>();
+            <span class="macro">assert_eq!</span>(<span class="ident">resps</span>.<span class="ident">len</span>(), <span class="number">1</span>);
+            <span class="kw">for</span> <span class="ident">r</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">resps</span> {
+                <span class="kw">if</span> <span class="kw">let</span> <span class="ident">CdcEvent::Event</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">r</span> {
+                    <span class="macro">assert_eq!</span>(<span class="ident">e</span>.<span class="ident">get_request_id</span>(), <span class="ident">request_id</span>);
                 }
-                <span class="kw">let</span> <span class="ident">cdc_event</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">resps</span>[<span class="number">0</span>];
-                <span class="kw">match</span> <span class="ident">cdc_event</span>.<span class="ident">event</span>.<span class="ident">as_ref</span>().<span class="ident">unwrap</span>() {
-                    <span class="ident">Event_oneof_event::Error</span>(<span class="ident">err</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">err</span>.<span class="ident">clone</span>(),
+            }
+            <span class="kw">let</span> <span class="ident">cdc_event</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">resps</span>[<span class="number">0</span>];
+            <span class="kw">if</span> <span class="kw">let</span> <span class="ident">CdcEvent::Event</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">cdc_event</span> {
+                <span class="kw">let</span> <span class="ident">event</span> <span class="op">=</span> <span class="ident">e</span>.<span class="ident">event</span>.<span class="ident">take</span>().<span class="ident">unwrap</span>();
+                <span class="kw">match</span> <span class="ident">event</span> {
+                    <span class="ident">Event_oneof_event::Error</span>(<span class="ident">err</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">err</span>,
                     <span class="ident">other</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic!</span>(<span class="string">&quot;unknown event {:?}&quot;</span>, <span class="ident">other</span>),
                 }
-            }))
+            } <span class="kw">else</span> {
+                <span class="macro">panic!</span>(<span class="string">&quot;unknown event&quot;</span>)
+            }
         };
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">err_header</span> <span class="op">=</span> <span class="ident">ErrorHeader::default</span>();
@@ -2225,15 +2113,13 @@
         <span class="ident">region</span>.<span class="ident">mut_region_epoch</span>().<span class="ident">set_conf_ver</span>(<span class="number">2</span>);
         <span class="kw">let</span> <span class="ident">region_epoch</span> <span class="op">=</span> <span class="ident">region</span>.<span class="ident">get_region_epoch</span>().<span class="ident">clone</span>();
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">harness</span> <span class="op">=</span> <span class="ident">TestingHarness::new</span>();
-        <span class="kw">let</span> <span class="ident">rx</span> <span class="op">=</span> <span class="ident">harness</span>.<span class="ident">get_rx</span>();
-        <span class="kw">let</span> <span class="ident">rate_limiter</span> <span class="op">=</span> <span class="ident">harness</span>.<span class="ident">get_rate_limiter</span>();
-
+        <span class="kw">let</span> (<span class="ident">sink</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">batch::unbounded</span>(<span class="number">1</span>);
+        <span class="kw">let</span> <span class="ident">rx</span> <span class="op">=</span> <span class="ident">BatchReceiver::new</span>(<span class="ident">rx</span>, <span class="number">1</span>, <span class="ident">Vec::new</span>, <span class="ident">VecCollector</span>);
         <span class="kw">let</span> <span class="ident">request_id</span> <span class="op">=</span> <span class="number">123</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">downstream</span> <span class="op">=</span>
             <span class="ident">Downstream::new</span>(<span class="ident">String::new</span>(), <span class="ident">region_epoch</span>, <span class="ident">request_id</span>, <span class="ident">ConnID::new</span>(), <span class="bool-val">true</span>);
         <span class="kw">let</span> <span class="ident">downstream_id</span> <span class="op">=</span> <span class="ident">downstream</span>.<span class="ident">get_id</span>();
-        <span class="ident">downstream</span>.<span class="ident">set_sink</span>(<span class="ident">rate_limiter</span>);
+        <span class="ident">downstream</span>.<span class="ident">set_sink</span>(<span class="ident">sink</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">delegate</span> <span class="op">=</span> <span class="ident">Delegate::new</span>(<span class="ident">region_id</span>);
         <span class="ident">delegate</span>.<span class="ident">subscribe</span>(<span class="ident">downstream</span>);
         <span class="kw">let</span> <span class="ident">enabled</span> <span class="op">=</span> <span class="ident">delegate</span>.<span class="ident">enabled</span>();
@@ -2241,24 +2127,26 @@
 
         <span class="kw">let</span> <span class="ident">rx_wrap</span> <span class="op">=</span> <span class="ident">Cell::new</span>(<span class="prelude-val">Some</span>(<span class="ident">rx</span>));
         <span class="kw">let</span> <span class="ident">check_event</span> <span class="op">=</span> <span class="op">|</span><span class="ident">event_rows</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">EventRow</span><span class="op">&gt;</span><span class="op">|</span> {
-            <span class="kw">let</span> <span class="ident">harness</span> <span class="op">=</span> <span class="ident">TestingHarness::new</span>();
-            <span class="kw">let</span> (<span class="ident">resp</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">harness</span>.<span class="ident">block_on</span>(<span class="ident">rx_wrap</span>.<span class="ident">replace</span>(<span class="prelude-val">None</span>).<span class="ident">unwrap</span>().<span class="ident">into_future</span>());
+            <span class="kw">let</span> (<span class="ident">resps</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">block_on</span>(<span class="ident">rx_wrap</span>.<span class="ident">replace</span>(<span class="prelude-val">None</span>).<span class="ident">unwrap</span>().<span class="ident">into_future</span>());
             <span class="ident">rx_wrap</span>.<span class="ident">set</span>(<span class="prelude-val">Some</span>(<span class="ident">rx</span>));
-            <span class="kw">let</span> (<span class="ident">resp</span>, <span class="kw">_</span>) <span class="op">=</span> <span class="ident">resp</span>.<span class="ident">unwrap</span>();
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">resps</span> <span class="op">=</span> <span class="ident">resp</span>.<span class="ident">events</span>;
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">resps</span> <span class="op">=</span> <span class="ident">resps</span>.<span class="ident">unwrap</span>();
             <span class="macro">assert_eq!</span>(<span class="ident">resps</span>.<span class="ident">len</span>(), <span class="number">1</span>);
             <span class="kw">for</span> <span class="ident">r</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">resps</span> {
-                <span class="macro">assert_eq!</span>(<span class="ident">r</span>.<span class="ident">get_request_id</span>(), <span class="ident">request_id</span>);
-            }
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cdc_event</span> <span class="op">=</span> <span class="ident">resps</span>.<span class="ident">remove</span>(<span class="number">0</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">cdc_event</span>.<span class="ident">region_id</span>, <span class="ident">region_id</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">cdc_event</span>.<span class="ident">index</span>, <span class="number">0</span>);
-            <span class="kw">let</span> <span class="ident">event</span> <span class="op">=</span> <span class="ident">cdc_event</span>.<span class="ident">event</span>.<span class="ident">take</span>().<span class="ident">unwrap</span>();
-            <span class="kw">match</span> <span class="ident">event</span> {
-                <span class="ident">Event_oneof_event::Entries</span>(<span class="ident">entries</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="macro">assert_eq!</span>(<span class="ident">entries</span>.<span class="ident">entries</span>.<span class="ident">as_slice</span>(), <span class="ident">event_rows</span>.<span class="ident">as_slice</span>());
+                <span class="kw">if</span> <span class="kw">let</span> <span class="ident">CdcEvent::Event</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">r</span> {
+                    <span class="macro">assert_eq!</span>(<span class="ident">e</span>.<span class="ident">get_request_id</span>(), <span class="ident">request_id</span>);
                 }
-                <span class="ident">other</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic!</span>(<span class="string">&quot;unknown event {:?}&quot;</span>, <span class="ident">other</span>),
+            }
+            <span class="kw">let</span> <span class="ident">cdc_event</span> <span class="op">=</span> <span class="ident">resps</span>.<span class="ident">remove</span>(<span class="number">0</span>);
+            <span class="kw">if</span> <span class="kw">let</span> <span class="ident">CdcEvent::Event</span>(<span class="kw-2">mut</span> <span class="ident">e</span>) <span class="op">=</span> <span class="ident">cdc_event</span> {
+                <span class="macro">assert_eq!</span>(<span class="ident">e</span>.<span class="ident">region_id</span>, <span class="ident">region_id</span>);
+                <span class="macro">assert_eq!</span>(<span class="ident">e</span>.<span class="ident">index</span>, <span class="number">0</span>);
+                <span class="kw">let</span> <span class="ident">event</span> <span class="op">=</span> <span class="ident">e</span>.<span class="ident">event</span>.<span class="ident">take</span>().<span class="ident">unwrap</span>();
+                <span class="kw">match</span> <span class="ident">event</span> {
+                    <span class="ident">Event_oneof_event::Entries</span>(<span class="ident">entries</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                        <span class="macro">assert_eq!</span>(<span class="ident">entries</span>.<span class="ident">entries</span>.<span class="ident">as_slice</span>(), <span class="ident">event_rows</span>.<span class="ident">as_slice</span>());
+                    }
+                    <span class="ident">other</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic!</span>(<span class="string">&quot;unknown event {:?}&quot;</span>, <span class="ident">other</span>),
+                }
             }
         };
 
