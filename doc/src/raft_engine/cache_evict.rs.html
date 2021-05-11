@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `/rust/git/checkouts/raft-engine-35ec7b0b2c07ddd2/8452ee1/src/cache_evict.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>cache_evict.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><script src="../../crates.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `/rust/git/checkouts/raft-engine-35ec7b0b2c07ddd2/8d559de/src/cache_evict.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>cache_evict.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><script src="../../crates.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
 <link rel="alternate icon" type="image/png" href="../../favicon-16x16.png">
 <link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../raft_engine/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
                 <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
@@ -296,6 +296,39 @@
 <span id="293">293</span>
 <span id="294">294</span>
 <span id="295">295</span>
+<span id="296">296</span>
+<span id="297">297</span>
+<span id="298">298</span>
+<span id="299">299</span>
+<span id="300">300</span>
+<span id="301">301</span>
+<span id="302">302</span>
+<span id="303">303</span>
+<span id="304">304</span>
+<span id="305">305</span>
+<span id="306">306</span>
+<span id="307">307</span>
+<span id="308">308</span>
+<span id="309">309</span>
+<span id="310">310</span>
+<span id="311">311</span>
+<span id="312">312</span>
+<span id="313">313</span>
+<span id="314">314</span>
+<span id="315">315</span>
+<span id="316">316</span>
+<span id="317">317</span>
+<span id="318">318</span>
+<span id="319">319</span>
+<span id="320">320</span>
+<span id="321">321</span>
+<span id="322">322</span>
+<span id="323">323</span>
+<span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">std::cmp::PartialEq</span>;
 <span class="kw">use</span> <span class="ident">std::collections::VecDeque</span>;
@@ -304,13 +337,14 @@
 <span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
 
 <span class="kw">use</span> <span class="ident">crossbeam::channel</span>::{<span class="ident">bounded</span>, <span class="ident">Sender</span>};
+<span class="kw">use</span> <span class="ident">log</span>::{<span class="ident">debug</span>, <span class="ident">warn</span>};
 <span class="kw">use</span> <span class="ident">protobuf::Message</span>;
 
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::engine::MemTableAccessor</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::log_batch</span>::{<span class="ident">EntryExt</span>, <span class="ident">LogBatch</span>, <span class="ident">LogItemContent</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::pipe_log</span>::{<span class="ident">GenericPipeLog</span>, <span class="ident">LogQueue</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util</span>::{<span class="ident">HandyRwLock</span>, <span class="ident">Runnable</span>, <span class="ident">Scheduler</span>};
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::GlobalStats</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">GlobalStats</span>, <span class="prelude-ty">Result</span>};
 
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DEFAULT_CACHE_CHUNK_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">4</span> <span class="op">*</span> <span class="number">1024</span> <span class="op">*</span> <span class="number">1024</span>;
 
@@ -367,8 +401,8 @@
         <span class="ident">file_num</span>: <span class="ident">u64</span>,
         <span class="ident">offset</span>: <span class="ident">u64</span>,
         <span class="ident">size</span>: <span class="ident">usize</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicUsize</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">cache_limit</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">CacheTracker</span><span class="op">&gt;</span> {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">cache_limit</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> <span class="op">|</span><span class="op">|</span> <span class="ident">size</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
             <span class="kw">return</span> <span class="prelude-val">None</span>;
         }
 
@@ -390,7 +424,9 @@
                     <span class="comment">// Log file is switched, use `u64::MAX` as the end.</span>
                     <span class="ident">task</span>.<span class="ident">end_offset</span> <span class="op">=</span> <span class="ident">u64::MAX</span>;
                 }
-                <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">scheduler</span>.<span class="ident">schedule</span>(<span class="ident">CacheTask::NewChunk</span>(<span class="ident">task</span>));
+                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">scheduler</span>.<span class="ident">schedule</span>(<span class="ident">CacheTask::NewChunk</span>(<span class="ident">task</span>)) {
+                    <span class="macro">warn!</span>(<span class="string">&quot;Failed to schedule cache chunk to evictor: {}&quot;</span>, <span class="ident">e</span>);
+                }
             }
             <span class="self">self</span>.<span class="ident">reset</span>(<span class="ident">file_num</span>, <span class="ident">offset</span>);
         }
@@ -407,8 +443,10 @@
 
         <span class="self">self</span>.<span class="ident">chunk_size</span> <span class="op">+</span><span class="op">=</span> <span class="ident">size</span>;
         <span class="self">self</span>.<span class="ident">size_tracker</span>.<span class="ident">fetch_add</span>(<span class="ident">size</span>, <span class="ident">Ordering::Release</span>);
-        <span class="self">self</span>.<span class="ident">global_stats</span>.<span class="ident">add_mem_change</span>(<span class="ident">size</span>);
-        <span class="prelude-val">Some</span>(<span class="self">self</span>.<span class="ident">size_tracker</span>.<span class="ident">clone</span>())
+        <span class="prelude-val">Some</span>(<span class="ident">CacheTracker::new</span>(
+            <span class="self">self</span>.<span class="ident">global_stats</span>.<span class="ident">clone</span>(),
+            <span class="self">self</span>.<span class="ident">size_tracker</span>.<span class="ident">clone</span>(),
+        ))
     }
 
     <span class="kw">fn</span> <span class="ident">reset</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">file_num</span>: <span class="ident">u64</span>, <span class="ident">offset</span>: <span class="ident">u64</span>) {
@@ -486,19 +524,16 @@
                 <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="bool-val">false</span>,
             };
 
-            <span class="kw">let</span> <span class="ident">file_num</span> <span class="op">=</span> <span class="ident">chunk</span>.<span class="ident">file_num</span>;
-            <span class="kw">let</span> <span class="ident">read_len</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">chunk</span>.<span class="ident">end_offset</span> <span class="op">=</span><span class="op">=</span> <span class="ident">u64::MAX</span> {
-                <span class="self">self</span>.<span class="ident">pipe_log</span>.<span class="ident">file_len</span>(<span class="ident">LogQueue::Append</span>, <span class="ident">file_num</span>) <span class="op">-</span> <span class="ident">chunk</span>.<span class="ident">base_offset</span>
-            } <span class="kw">else</span> {
-                <span class="ident">chunk</span>.<span class="ident">end_offset</span> <span class="op">-</span> <span class="ident">chunk</span>.<span class="ident">base_offset</span>
+            <span class="kw">let</span> (<span class="ident">read_len</span>, <span class="ident">chunk_content</span>) <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">read_chunk</span>(<span class="kw-2">&amp;</span><span class="ident">chunk</span>) {
+                <span class="prelude-val">Ok</span>((<span class="ident">len</span>, <span class="ident">content</span>)) <span class="op">=</span><span class="op">&gt;</span> (<span class="ident">len</span>, <span class="ident">content</span>),
+                <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="macro">debug!</span>(<span class="string">&quot;Evictor read chunk {:?} fail: {}&quot;</span>, <span class="ident">chunk</span>, <span class="ident">e</span>);
+                    <span class="kw">continue</span>;
+                }
             };
-            <span class="kw">let</span> <span class="ident">chunk_content</span> <span class="op">=</span> <span class="self">self</span>
-                .<span class="ident">pipe_log</span>
-                .<span class="ident">fread</span>(<span class="ident">LogQueue::Append</span>, <span class="ident">file_num</span>, <span class="ident">chunk</span>.<span class="ident">base_offset</span>, <span class="ident">read_len</span>)
-                .<span class="ident">unwrap</span>();
 
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reader</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>] <span class="op">=</span> <span class="ident">chunk_content</span>.<span class="ident">as_ref</span>();
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">offset</span> <span class="op">=</span> <span class="ident">chunk</span>.<span class="ident">base_offset</span>;
+            <span class="kw">let</span> (<span class="ident">file_num</span>, <span class="kw-2">mut</span> <span class="ident">offset</span>) <span class="op">=</span> (<span class="ident">chunk</span>.<span class="ident">file_num</span>, <span class="ident">chunk</span>.<span class="ident">base_offset</span>);
             <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">b</span>) <span class="op">=</span> <span class="ident">LogBatch</span>::<span class="op">&lt;</span><span class="ident">E</span>, <span class="ident">W</span><span class="op">&gt;</span><span class="ident">::from_bytes</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">reader</span>, <span class="ident">file_num</span>, <span class="ident">offset</span>).<span class="ident">unwrap</span>()
             {
                 <span class="ident">offset</span> <span class="op">+</span><span class="op">=</span> <span class="ident">read_len</span> <span class="op">-</span> <span class="ident">reader</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">u64</span>;
@@ -516,6 +551,23 @@
             }
         }
         <span class="bool-val">true</span>
+    }
+
+    <span class="kw">fn</span> <span class="ident">read_chunk</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">chunk</span>: <span class="kw-2">&amp;</span><span class="ident">CacheChunk</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">u64</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>)<span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="ident">read_len</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">chunk</span>.<span class="ident">end_offset</span> <span class="op">=</span><span class="op">=</span> <span class="ident">u64::MAX</span> {
+            <span class="kw">let</span> <span class="ident">file_len</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pipe_log</span>.<span class="ident">file_len</span>(<span class="ident">LogQueue::Append</span>, <span class="ident">chunk</span>.<span class="ident">file_num</span>)<span class="question-mark">?</span>;
+            <span class="ident">file_len</span> <span class="op">-</span> <span class="ident">chunk</span>.<span class="ident">base_offset</span>
+        } <span class="kw">else</span> {
+            <span class="ident">chunk</span>.<span class="ident">end_offset</span> <span class="op">-</span> <span class="ident">chunk</span>.<span class="ident">base_offset</span>
+        };
+
+        <span class="kw">let</span> <span class="ident">content</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pipe_log</span>.<span class="ident">fread</span>(
+            <span class="ident">LogQueue::Append</span>,
+            <span class="ident">chunk</span>.<span class="ident">file_num</span>,
+            <span class="ident">chunk</span>.<span class="ident">base_offset</span>,
+            <span class="ident">read_len</span>,
+        )<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>((<span class="ident">read_len</span>, <span class="ident">content</span>))
     }
 }
 
@@ -550,7 +602,7 @@
     <span class="ident">EvictOldest</span>(<span class="ident">Sender</span><span class="op">&lt;</span>()<span class="op">&gt;</span>),
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>)]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Debug</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CacheChunk</span> {
     <span class="ident">file_num</span>: <span class="ident">u64</span>,
     <span class="ident">base_offset</span>: <span class="ident">u64</span>,
@@ -560,14 +612,28 @@
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CacheTracker</span> {
+    <span class="kw">pub</span> <span class="ident">global_stats</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GlobalStats</span><span class="op">&gt;</span>,
     <span class="kw">pub</span> <span class="ident">chunk_size</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicUsize</span><span class="op">&gt;</span>,
     <span class="kw">pub</span> <span class="ident">sub_on_drop</span>: <span class="ident">usize</span>,
 }
 
+<span class="kw">impl</span> <span class="ident">CacheTracker</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">global_stats</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GlobalStats</span><span class="op">&gt;</span>, <span class="ident">chunk_size</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicUsize</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+        <span class="ident">CacheTracker</span> {
+            <span class="ident">global_stats</span>,
+            <span class="ident">chunk_size</span>,
+            <span class="ident">sub_on_drop</span>: <span class="number">0</span>,
+        }
+    }
+}
+
 <span class="kw">impl</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">CacheTracker</span> {
     <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">chunk_size</span>
-            .<span class="ident">fetch_sub</span>(<span class="self">self</span>.<span class="ident">sub_on_drop</span>, <span class="ident">Ordering::SeqCst</span>);
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">sub_on_drop</span> <span class="op">&gt;</span> <span class="number">0</span> {
+            <span class="self">self</span>.<span class="ident">global_stats</span>.<span class="ident">sub_mem_change</span>(<span class="self">self</span>.<span class="ident">sub_on_drop</span>);
+            <span class="self">self</span>.<span class="ident">chunk_size</span>
+                .<span class="ident">fetch_sub</span>(<span class="self">self</span>.<span class="ident">sub_on_drop</span>, <span class="ident">Ordering::Release</span>);
+        }
     }
 }
 
@@ -588,7 +654,7 @@
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">self_check</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">expected_chunk_size</span>: <span class="ident">usize</span>) {
         <span class="macro">assert!</span>(<span class="self">self</span>.<span class="ident">end_offset</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">base_offset</span>);
-        <span class="kw">let</span> <span class="ident">chunk_size</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">size_tracker</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>);
+        <span class="kw">let</span> <span class="ident">chunk_size</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">size_tracker</span>.<span class="ident">load</span>(<span class="ident">Ordering::Acquire</span>);
         <span class="macro">assert_eq!</span>(<span class="ident">chunk_size</span>, <span class="ident">expected_chunk_size</span>);
     }
 }

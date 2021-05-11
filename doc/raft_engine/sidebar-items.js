@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["Error",""],["RecoveryMode",""]],"mod":[["codec",""]],"struct":[["CacheStats",""],["Config",""],["GlobalStats",""],["LogBatch",""]],"trait":[["EntryExt",""]],"type":[["RaftLogEngine",""],["Result",""]]});
+initSidebarItems({"enum":[["Error",""],["RecoveryMode",""]],"mod":[["codec",""]],"struct":[["CacheStats",""],["Config",""],["GlobalStats",""],["LogBatch",""],["ReadableSize",""]],"trait":[["EntryExt",""]],"type":[["RaftLogEngine",""],["Result",""]]});

@@ -3867,8 +3867,6 @@
 <span id="3864">3864</span>
 <span id="3865">3865</span>
 <span id="3866">3866</span>
-<span id="3867">3867</span>
-<span id="3868">3868</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2017 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -6240,13 +6238,17 @@
         } <span class="kw">else</span> {
             <span class="self">self</span>.<span class="ident">raft_engine</span>.<span class="ident">config</span>.<span class="ident">dir</span> <span class="op">=</span> <span class="ident">config::canonicalize_path</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">raft_engine</span>.<span class="ident">config</span>.<span class="ident">dir</span>)<span class="question-mark">?</span>;
         }
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">raft_engine</span>.<span class="ident">config</span>.<span class="ident">dir</span> <span class="op">=</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">raft_store</span>.<span class="ident">raftdb_path</span> {
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;raft_engine.config.dir can&#39;t be same as raft_store.raftdb_path&quot;</span>.<span class="ident">into</span>());
+        }
 
         <span class="kw">let</span> <span class="ident">kv_db_path</span> <span class="op">=</span>
             <span class="ident">config::canonicalize_sub_path</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">storage</span>.<span class="ident">data_dir</span>, <span class="ident">DEFAULT_ROCKSDB_SUB_DIR</span>)<span class="question-mark">?</span>;
 
         <span class="kw">if</span> <span class="ident">kv_db_path</span> <span class="op">=</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">raft_store</span>.<span class="ident">raftdb_path</span> {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;raft_store.raftdb_path can not same with storage.data_dir/db&quot;</span>.<span class="ident">into</span>());
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;raft_store.raftdb_path can&#39;t be same as storage.data_dir/db&quot;</span>.<span class="ident">into</span>());
         }
+
         <span class="kw">let</span> <span class="ident">kv_db_wal_path</span> <span class="op">=</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">rocksdb</span>.<span class="ident">wal_dir</span>.<span class="ident">is_empty</span>() {
             <span class="ident">config::canonicalize_path</span>(<span class="kw-2">&amp;</span><span class="ident">kv_db_path</span>)<span class="question-mark">?</span>
         } <span class="kw">else</span> {
@@ -6258,31 +6260,20 @@
             <span class="ident">config::canonicalize_path</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">raftdb</span>.<span class="ident">wal_dir</span>)<span class="question-mark">?</span>
         };
         <span class="kw">if</span> <span class="ident">kv_db_wal_path</span> <span class="op">=</span><span class="op">=</span> <span class="ident">raft_db_wal_path</span> {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;raftdb.wal_dir can not same with rocksdb.wal_dir&quot;</span>.<span class="ident">into</span>());
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;raftdb.wal_dir can&#39;t be same as rocksdb.wal_dir&quot;</span>.<span class="ident">into</span>());
         }
-        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">raft_engine</span>.<span class="ident">enable</span> {
-            <span class="kw">if</span> <span class="ident">RocksEngine::exists</span>(<span class="kw-2">&amp;</span><span class="ident">kv_db_path</span>)
-                <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="ident">RocksEngine::exists</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">raft_store</span>.<span class="ident">raftdb_path</span>)
-            {
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;default rocksdb exist, but raftdb not exist&quot;</span>.<span class="ident">into</span>());
-            }
-            <span class="kw">if</span> <span class="op">!</span><span class="ident">RocksEngine::exists</span>(<span class="kw-2">&amp;</span><span class="ident">kv_db_path</span>)
-                <span class="op">&amp;&amp;</span> <span class="ident">RocksEngine::exists</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">raft_store</span>.<span class="ident">raftdb_path</span>)
-            {
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;default rocksdb not exist, but raftdb exist&quot;</span>.<span class="ident">into</span>());
-            }
-        } <span class="kw">else</span> {
-            <span class="kw">if</span> <span class="ident">RocksEngine::exists</span>(<span class="kw-2">&amp;</span><span class="ident">kv_db_path</span>)
-                <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="ident">RaftLogEngine::exists</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">raft_engine</span>.<span class="ident">config</span>.<span class="ident">dir</span>)
-                <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="ident">RocksEngine::exists</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">raft_store</span>.<span class="ident">raftdb_path</span>)
-            {
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;default rocksdb exist, but raftdb and raft engine not exist&quot;</span>.<span class="ident">into</span>());
-            }
-            <span class="kw">if</span> <span class="op">!</span><span class="ident">RocksEngine::exists</span>(<span class="kw-2">&amp;</span><span class="ident">kv_db_path</span>)
-                <span class="op">&amp;&amp;</span> <span class="ident">RaftLogEngine::exists</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">raft_engine</span>.<span class="ident">config</span>.<span class="ident">dir</span>)
-            {
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;default rocksdb not exist, but raft engine exist&quot;</span>.<span class="ident">into</span>());
-            }
+
+        <span class="kw">if</span> <span class="ident">RocksEngine::exists</span>(<span class="kw-2">&amp;</span><span class="ident">kv_db_path</span>)
+            <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="ident">RocksEngine::exists</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">raft_store</span>.<span class="ident">raftdb_path</span>)
+            <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="ident">RaftLogEngine::exists</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">raft_engine</span>.<span class="ident">config</span>.<span class="ident">dir</span>)
+        {
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;default rocksdb exists, but raftdb and raft engine doesn&#39;t exist&quot;</span>.<span class="ident">into</span>());
+        }
+        <span class="kw">if</span> <span class="op">!</span><span class="ident">RocksEngine::exists</span>(<span class="kw-2">&amp;</span><span class="ident">kv_db_path</span>)
+            <span class="op">&amp;&amp;</span> (<span class="ident">RocksEngine::exists</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">raft_store</span>.<span class="ident">raftdb_path</span>)
+                <span class="op">|</span><span class="op">|</span> <span class="ident">RaftLogEngine::exists</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">raft_engine</span>.<span class="ident">config</span>.<span class="ident">dir</span>))
+        {
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;default rocksdb doesn&#39;t exist, but raftdb or raft engine exists&quot;</span>.<span class="ident">into</span>());
         }
 
         <span class="comment">// Check blob file dir is empty when titan is disabled</span>
@@ -6484,25 +6475,30 @@
             }
         }
 
-        <span class="kw">if</span> <span class="ident">last_cfg</span>.<span class="ident">raft_store</span>.<span class="ident">raftdb_path</span> <span class="op">!</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">raft_store</span>.<span class="ident">raftdb_path</span> {
+        <span class="kw">if</span> <span class="ident">last_cfg</span>.<span class="ident">raft_store</span>.<span class="ident">raftdb_path</span> <span class="op">!</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">raft_store</span>.<span class="ident">raftdb_path</span>
+            <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="ident">last_cfg</span>.<span class="ident">raft_engine</span>.<span class="ident">enable</span>
+        {
             <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">format!</span>(
-                <span class="string">&quot;raft dir have been changed, former raft dir is &#39;{}&#39;, \
-                 current raft dir is &#39;{}&#39;, please check if it is expected.&quot;</span>,
+                <span class="string">&quot;raft db dir have been changed, former is &#39;{}&#39;, \
+                 current is &#39;{}&#39;, please check if it is expected.&quot;</span>,
                 <span class="ident">last_cfg</span>.<span class="ident">raft_store</span>.<span class="ident">raftdb_path</span>, <span class="self">self</span>.<span class="ident">raft_store</span>.<span class="ident">raftdb_path</span>
             ));
         }
-        <span class="kw">if</span> <span class="ident">last_cfg</span>.<span class="ident">raft_engine</span>.<span class="ident">enable</span>
-            <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">raft_engine</span>.<span class="ident">enable</span>
-            <span class="op">&amp;&amp;</span> <span class="ident">last_cfg</span>.<span class="ident">raft_engine</span>.<span class="ident">config</span>.<span class="ident">dir</span> <span class="op">!</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">raft_engine</span>.<span class="ident">config</span>.<span class="ident">dir</span>
+        <span class="kw">if</span> <span class="ident">last_cfg</span>.<span class="ident">raftdb</span>.<span class="ident">wal_dir</span> <span class="op">!</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">raftdb</span>.<span class="ident">wal_dir</span> <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="ident">last_cfg</span>.<span class="ident">raft_engine</span>.<span class="ident">enable</span> {
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">format!</span>(
+                <span class="string">&quot;raft db wal dir have been changed, former is &#39;{}&#39;, \
+                 current is &#39;{}&#39;, please check if it is expected.&quot;</span>,
+                <span class="ident">last_cfg</span>.<span class="ident">raftdb</span>.<span class="ident">wal_dir</span>, <span class="self">self</span>.<span class="ident">raftdb</span>.<span class="ident">wal_dir</span>
+            ));
+        }
+        <span class="kw">if</span> <span class="ident">last_cfg</span>.<span class="ident">raft_engine</span>.<span class="ident">config</span>.<span class="ident">dir</span> <span class="op">!</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">raft_engine</span>.<span class="ident">config</span>.<span class="ident">dir</span>
+            <span class="op">&amp;&amp;</span> <span class="ident">last_cfg</span>.<span class="ident">raft_engine</span>.<span class="ident">enable</span>
         {
             <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="macro">format!</span>(
                 <span class="string">&quot;raft engine dir have been changed, former is &#39;{}&#39;, \
                  current is &#39;{}&#39;, please check if it is expected.&quot;</span>,
                 <span class="ident">last_cfg</span>.<span class="ident">raft_engine</span>.<span class="ident">config</span>.<span class="ident">dir</span>, <span class="self">self</span>.<span class="ident">raft_engine</span>.<span class="ident">config</span>.<span class="ident">dir</span>
             ));
-        }
-        <span class="kw">if</span> <span class="ident">last_cfg</span>.<span class="ident">raft_engine</span>.<span class="ident">enable</span> <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">raft_engine</span>.<span class="ident">enable</span> {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;raft engine can&#39;t be disabled after switched on.&quot;</span>.<span class="ident">to_owned</span>());
         }
         <span class="kw">if</span> <span class="ident">last_cfg</span>.<span class="ident">storage</span>.<span class="ident">enable_ttl</span> <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">storage</span>.<span class="ident">enable_ttl</span> {
             <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;can&#39;t disable ttl on a ttl instance&quot;</span>.<span class="ident">to_owned</span>());
