@@ -509,28 +509,9 @@
 <span id="506">506</span>
 <span id="507">507</span>
 <span id="508">508</span>
-<span id="509">509</span>
-<span id="510">510</span>
-<span id="511">511</span>
-<span id="512">512</span>
-<span id="513">513</span>
-<span id="514">514</span>
-<span id="515">515</span>
-<span id="516">516</span>
-<span id="517">517</span>
-<span id="518">518</span>
-<span id="519">519</span>
-<span id="520">520</span>
-<span id="521">521</span>
-<span id="522">522</span>
-<span id="523">523</span>
-<span id="524">524</span>
-<span id="525">525</span>
-<span id="526">526</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
-<span class="kw">use</span> <span class="ident">std::f64::INFINITY</span>;
 <span class="kw">use</span> <span class="ident">std::path::PathBuf</span>;
 <span class="kw">use</span> <span class="ident">std::sync</span>::{<span class="ident">Arc</span>, <span class="ident">Mutex</span>};
 
@@ -554,7 +535,7 @@
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::server::CONFIG_ROCKSDB_GAUGE</span>;
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">SstExt</span>, <span class="ident">SstWriterBuilder</span>};
 <span class="kw">use</span> <span class="ident">raftstore::router::RaftStoreRouter</span>;
-<span class="kw">use</span> <span class="ident">raftstore::store</span>::{<span class="ident">Callback</span>, <span class="ident">PeerMsg</span>};
+<span class="kw">use</span> <span class="ident">raftstore::store::Callback</span>;
 <span class="kw">use</span> <span class="ident">sst_importer::send_rpc_response</span>;
 <span class="kw">use</span> <span class="ident">tikv_util::future::create_stream_with_buffer</span>;
 <span class="kw">use</span> <span class="ident">tikv_util::future::paired_future_callback</span>;
@@ -603,21 +584,14 @@
             .<span class="ident">before_stop</span>(<span class="kw">move</span> <span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">tikv_alloc::remove_thread_memory_accessor</span>())
             .<span class="ident">create</span>()
             .<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="ident">router</span>.<span class="ident">clone</span>();
-        <span class="ident">importer</span>.<span class="ident">start_switch_mode_check</span>(
-            <span class="kw-2">&amp;</span><span class="ident">threads</span>,
-            <span class="ident">engine</span>.<span class="ident">clone</span>(),
-            <span class="ident">Box::new</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
-                <span class="ident">r</span>.<span class="ident">broadcast_normal</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">PeerMsg::SplitCheck</span>);
-            }),
-        );
+        <span class="ident">importer</span>.<span class="ident">start_switch_mode_check</span>(<span class="kw-2">&amp;</span><span class="ident">threads</span>, <span class="ident">engine</span>.<span class="ident">clone</span>());
         <span class="ident">ImportSSTService</span> {
             <span class="ident">cfg</span>,
             <span class="ident">engine</span>,
             <span class="ident">threads</span>,
             <span class="ident">router</span>,
             <span class="ident">importer</span>,
-            <span class="ident">limiter</span>: <span class="ident">Limiter::new</span>(<span class="ident">INFINITY</span>),
+            <span class="ident">limiter</span>: <span class="ident">Limiter::new</span>(<span class="ident">f64::INFINITY</span>),
             <span class="ident">task_slots</span>: <span class="ident">Arc::new</span>(<span class="ident">Mutex::new</span>(<span class="ident">HashSet::default</span>())),
         }
     }
@@ -654,17 +628,7 @@
             }
 
             <span class="kw">match</span> <span class="ident">req</span>.<span class="ident">get_mode</span>() {
-                <span class="ident">SwitchMode::Normal</span> <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="kw">match</span> <span class="self">self</span>.<span class="ident">importer</span>.<span class="ident">enter_normal_mode</span>(<span class="self">self</span>.<span class="ident">engine</span>.<span class="ident">clone</span>(), <span class="ident">mf</span>) {
-                        <span class="prelude-val">Ok</span>(<span class="ident">ret</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                            <span class="kw">if</span> <span class="ident">ret</span> {
-                                <span class="self">self</span>.<span class="ident">router</span>.<span class="ident">broadcast_normal</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">PeerMsg::SplitCheck</span>);
-                            }
-                            <span class="prelude-val">Ok</span>(<span class="ident">ret</span>)
-                        }
-                        <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>),
-                    }
-                }
+                <span class="ident">SwitchMode::Normal</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">importer</span>.<span class="ident">enter_normal_mode</span>(<span class="self">self</span>.<span class="ident">engine</span>.<span class="ident">clone</span>(), <span class="ident">mf</span>),
                 <span class="ident">SwitchMode::Import</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">importer</span>.<span class="ident">enter_import_mode</span>(<span class="self">self</span>.<span class="ident">engine</span>.<span class="ident">clone</span>(), <span class="ident">mf</span>),
             }
         };
@@ -960,7 +924,7 @@
         <span class="self">self</span>.<span class="ident">limiter</span>.<span class="ident">set_speed_limit</span>(<span class="kw">if</span> <span class="ident">speed_limit</span> <span class="op">&gt;</span> <span class="number">0</span> {
             <span class="ident">speed_limit</span> <span class="kw">as</span> <span class="ident">f64</span>
         } <span class="kw">else</span> {
-            <span class="ident">INFINITY</span>
+            <span class="ident">f64::INFINITY</span>
         });
 
         <span class="kw">let</span> <span class="ident">ctx_task</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {

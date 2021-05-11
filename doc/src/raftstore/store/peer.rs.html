@@ -4201,51 +4201,6 @@
 <span id="4198">4198</span>
 <span id="4199">4199</span>
 <span id="4200">4200</span>
-<span id="4201">4201</span>
-<span id="4202">4202</span>
-<span id="4203">4203</span>
-<span id="4204">4204</span>
-<span id="4205">4205</span>
-<span id="4206">4206</span>
-<span id="4207">4207</span>
-<span id="4208">4208</span>
-<span id="4209">4209</span>
-<span id="4210">4210</span>
-<span id="4211">4211</span>
-<span id="4212">4212</span>
-<span id="4213">4213</span>
-<span id="4214">4214</span>
-<span id="4215">4215</span>
-<span id="4216">4216</span>
-<span id="4217">4217</span>
-<span id="4218">4218</span>
-<span id="4219">4219</span>
-<span id="4220">4220</span>
-<span id="4221">4221</span>
-<span id="4222">4222</span>
-<span id="4223">4223</span>
-<span id="4224">4224</span>
-<span id="4225">4225</span>
-<span id="4226">4226</span>
-<span id="4227">4227</span>
-<span id="4228">4228</span>
-<span id="4229">4229</span>
-<span id="4230">4230</span>
-<span id="4231">4231</span>
-<span id="4232">4232</span>
-<span id="4233">4233</span>
-<span id="4234">4234</span>
-<span id="4235">4235</span>
-<span id="4236">4236</span>
-<span id="4237">4237</span>
-<span id="4238">4238</span>
-<span id="4239">4239</span>
-<span id="4240">4240</span>
-<span id="4241">4241</span>
-<span id="4242">4242</span>
-<span id="4243">4243</span>
-<span id="4244">4244</span>
-<span id="4245">4245</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -4298,7 +4253,6 @@
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::store::worker</span>::{<span class="ident">HeartbeatTask</span>, <span class="ident">ReadDelegate</span>, <span class="ident">ReadExecutor</span>, <span class="ident">ReadProgress</span>, <span class="ident">RegionTask</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::store</span>::{
     <span class="ident">Callback</span>, <span class="ident">Config</span>, <span class="ident">GlobalReplicationState</span>, <span class="ident">PdTask</span>, <span class="ident">ReadIndexContext</span>, <span class="ident">ReadResponse</span>,
-    <span class="ident">SplitCheckTask</span>,
 };
 <span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">Error</span>, <span class="prelude-ty">Result</span>};
 <span class="kw">use</span> <span class="ident">collections</span>::{<span class="ident">HashMap</span>, <span class="ident">HashSet</span>};
@@ -4680,9 +4634,13 @@
     <span class="doccomment">/// of deleted entries.</span>
     <span class="kw">pub</span> <span class="ident">compaction_declined_bytes</span>: <span class="ident">u64</span>,
     <span class="doccomment">/// Approximate size of the region.</span>
-    <span class="kw">pub</span> <span class="ident">approximate_size</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">approximate_size</span>: <span class="ident">u64</span>,
     <span class="doccomment">/// Approximate keys of the region.</span>
-    <span class="kw">pub</span> <span class="ident">approximate_keys</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">approximate_keys</span>: <span class="ident">u64</span>,
+    <span class="doccomment">/// Whether this region has calculated region size by split-check thread. If we just splitted</span>
+    <span class="doccomment">///  the region or ingested one file which may be overlapped with the existed data, the</span>
+    <span class="doccomment">/// `approximate_size` is not very accurate.</span>
+    <span class="kw">pub</span> <span class="ident">has_calculated_region_size</span>: <span class="ident">bool</span>,
 
     <span class="doccomment">/// The state for consistency check.</span>
     <span class="kw">pub</span> <span class="ident">consistency_state</span>: <span class="ident">ConsistencyState</span>,
@@ -4754,11 +4712,6 @@
     <span class="doccomment">/// The number of the last unpersisted ready.</span>
     <span class="ident">last_unpersisted_number</span>: <span class="ident">u64</span>,
 
-    <span class="doccomment">/// The number of pending pd heartbeat tasks. Pd heartbeat task may be blocked by</span>
-    <span class="doccomment">/// reading rocksdb. To avoid unnecessary io operations, we always let the later</span>
-    <span class="doccomment">/// task run when there are more than 1 pending tasks.</span>
-    <span class="kw">pub</span> <span class="ident">pending_pd_heartbeat_tasks</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicU64</span><span class="op">&gt;</span>,
-
     <span class="kw">pub</span> <span class="ident">read_progress</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">RegionReadProgress</span><span class="op">&gt;</span>,
 }
 
@@ -4814,8 +4767,9 @@
             <span class="ident">down_peer_ids</span>: <span class="macro">vec!</span>[],
             <span class="ident">size_diff_hint</span>: <span class="number">0</span>,
             <span class="ident">delete_keys_hint</span>: <span class="number">0</span>,
-            <span class="ident">approximate_size</span>: <span class="prelude-val">None</span>,
-            <span class="ident">approximate_keys</span>: <span class="prelude-val">None</span>,
+            <span class="ident">approximate_size</span>: <span class="number">0</span>,
+            <span class="ident">approximate_keys</span>: <span class="number">0</span>,
+            <span class="ident">has_calculated_region_size</span>: <span class="bool-val">false</span>,
             <span class="ident">compaction_declined_bytes</span>: <span class="number">0</span>,
             <span class="ident">leader_unreachable</span>: <span class="bool-val">false</span>,
             <span class="ident">pending_remove</span>: <span class="bool-val">false</span>,
@@ -4852,7 +4806,6 @@
             <span class="ident">max_ts_sync_status</span>: <span class="ident">Arc::new</span>(<span class="ident">AtomicU64::new</span>(<span class="number">0</span>)),
             <span class="ident">cmd_epoch_checker</span>: <span class="ident">Default::default</span>(),
             <span class="ident">last_unpersisted_number</span>: <span class="number">0</span>,
-            <span class="ident">pending_pd_heartbeat_tasks</span>: <span class="ident">Arc::new</span>(<span class="ident">AtomicU64::new</span>(<span class="number">0</span>)),
             <span class="ident">read_progress</span>: <span class="ident">Arc::new</span>(<span class="ident">RegionReadProgress::new</span>(
                 <span class="ident">applied_index</span>,
                 <span class="ident">REGION_READ_PROGRESS_CAP</span>,
@@ -7610,11 +7563,6 @@
         <span class="prelude-val">Some</span>(<span class="ident">status</span>)
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_region_size_or_keys_none</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="macro">fail_point!</span>(<span class="string">&quot;region_size_or_keys_none&quot;</span>, <span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="bool-val">true</span>);
-        <span class="self">self</span>.<span class="ident">approximate_size</span>.<span class="ident">is_none</span>() <span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">approximate_keys</span>.<span class="ident">is_none</span>()
-    }
-
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">heartbeat_pd</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="ident">PollContext</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">T</span><span class="op">&gt;</span>) {
         <span class="kw">let</span> <span class="ident">task</span> <span class="op">=</span> <span class="ident">PdTask::Heartbeat</span>(<span class="ident">HeartbeatTask</span> {
             <span class="ident">term</span>: <span class="self">self</span>.<span class="ident">term</span>(),
@@ -7624,58 +7572,20 @@
             <span class="ident">pending_peers</span>: <span class="self">self</span>.<span class="ident">collect_pending_peers</span>(<span class="ident">ctx</span>),
             <span class="ident">written_bytes</span>: <span class="self">self</span>.<span class="ident">peer_stat</span>.<span class="ident">written_bytes</span>,
             <span class="ident">written_keys</span>: <span class="self">self</span>.<span class="ident">peer_stat</span>.<span class="ident">written_keys</span>,
-            <span class="ident">approximate_size</span>: <span class="self">self</span>.<span class="ident">approximate_size</span>.<span class="ident">unwrap_or_default</span>(),
-            <span class="ident">approximate_keys</span>: <span class="self">self</span>.<span class="ident">approximate_keys</span>.<span class="ident">unwrap_or_default</span>(),
+            <span class="ident">approximate_size</span>: <span class="self">self</span>.<span class="ident">approximate_size</span>,
+            <span class="ident">approximate_keys</span>: <span class="self">self</span>.<span class="ident">approximate_keys</span>,
             <span class="ident">replication_status</span>: <span class="self">self</span>.<span class="ident">region_replication_status</span>(),
         });
-        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">is_region_size_or_keys_none</span>() {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">ctx</span>.<span class="ident">pd_scheduler</span>.<span class="ident">schedule</span>(<span class="ident">task</span>) {
-                <span class="macro">error!</span>(
-                    <span class="string">&quot;failed to notify pd&quot;</span>;
-                    <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">region_id</span>,
-                    <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">peer</span>.<span class="ident">get_id</span>(),
-                    <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>,
-                );
-            }
-            <span class="kw">return</span>;
-        }
-
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">pending_pd_heartbeat_tasks</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>) <span class="op">&gt;</span> <span class="number">2</span> {
-            <span class="kw">return</span>;
-        }
-        <span class="kw">let</span> <span class="ident">region_id</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">region_id</span>;
-        <span class="kw">let</span> <span class="ident">peer_id</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">peer</span>.<span class="ident">get_id</span>();
-        <span class="kw">let</span> <span class="ident">scheduler</span> <span class="op">=</span> <span class="ident">ctx</span>.<span class="ident">pd_scheduler</span>.<span class="ident">clone</span>();
-        <span class="kw">let</span> <span class="ident">split_check_task</span> <span class="op">=</span> <span class="ident">SplitCheckTask::GetRegionApproximateSizeAndKeys</span> {
-            <span class="ident">region</span>: <span class="self">self</span>.<span class="ident">region</span>().<span class="ident">clone</span>(),
-            <span class="ident">pending_tasks</span>: <span class="self">self</span>.<span class="ident">pending_pd_heartbeat_tasks</span>.<span class="ident">clone</span>(),
-            <span class="ident">cb</span>: <span class="ident">Box::new</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">size</span>: <span class="ident">u64</span>, <span class="ident">keys</span>: <span class="ident">u64</span><span class="op">|</span> {
-                <span class="kw">if</span> <span class="kw">let</span> <span class="ident">PdTask::Heartbeat</span>(<span class="kw-2">mut</span> <span class="ident">h</span>) <span class="op">=</span> <span class="ident">task</span> {
-                    <span class="ident">h</span>.<span class="ident">approximate_size</span> <span class="op">=</span> <span class="ident">size</span>;
-                    <span class="ident">h</span>.<span class="ident">approximate_keys</span> <span class="op">=</span> <span class="ident">keys</span>;
-                    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">scheduler</span>.<span class="ident">schedule</span>(<span class="ident">PdTask::Heartbeat</span>(<span class="ident">h</span>)) {
-                        <span class="macro">error!</span>(
-                            <span class="string">&quot;failed to notify pd&quot;</span>;
-                            <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>,
-                            <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">peer_id</span>,
-                            <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>,
-                        );
-                    }
-                }
-            }),
-        };
-        <span class="self">self</span>.<span class="ident">pending_pd_heartbeat_tasks</span>
-            .<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>);
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">ctx</span>.<span class="ident">split_check_scheduler</span>.<span class="ident">schedule</span>(<span class="ident">split_check_task</span>) {
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">ctx</span>.<span class="ident">pd_scheduler</span>.<span class="ident">schedule</span>(<span class="ident">task</span>) {
             <span class="macro">error!</span>(
                 <span class="string">&quot;failed to notify pd&quot;</span>;
-                <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">region_id</span>,
-                <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">peer_id</span>,
+                <span class="string">&quot;region_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">region_id</span>,
+                <span class="string">&quot;peer_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">peer</span>.<span class="ident">get_id</span>(),
                 <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>,
             );
-            <span class="self">self</span>.<span class="ident">pending_pd_heartbeat_tasks</span>
-                .<span class="ident">fetch_sub</span>(<span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>);
+            <span class="kw">return</span>;
         }
+        <span class="macro">fail_point!</span>(<span class="string">&quot;schedule_check_split&quot;</span>);
     }
 
     <span class="kw">fn</span> <span class="ident">prepare_raft_message</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">RaftMessage</span> {
