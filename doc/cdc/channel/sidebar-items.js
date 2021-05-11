@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["CDC_EVENT_MAX_BATCH_SIZE",""],["CDC_MSG_MAX_BATCH_SIZE",""]],"enum":[["SendError",""]],"fn":[["canal",""]],"struct":[["Drain",""],["Sink",""]]});
