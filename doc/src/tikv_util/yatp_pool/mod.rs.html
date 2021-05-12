@@ -262,6 +262,12 @@
 <span id="259">259</span>
 <span id="260">260</span>
 <span id="261">261</span>
+<span id="262">262</span>
+<span id="263">263</span>
+<span id="264">264</span>
+<span id="265">265</span>
+<span id="266">266</span>
+<span id="267">267</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -270,6 +276,7 @@
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">future_pool</span>::{<span class="ident">Full</span>, <span class="ident">FuturePool</span>};
 
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::time</span>::{<span class="ident">Duration</span>, <span class="ident">Instant</span>};
+<span class="kw">use</span> <span class="ident">fail::fail_point</span>;
 <span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
 <span class="kw">use</span> <span class="ident">yatp::pool</span>::{<span class="ident">CloneRunnerBuilder</span>, <span class="ident">Local</span>, <span class="ident">Runner</span>};
 <span class="kw">use</span> <span class="ident">yatp::queue</span>::{<span class="ident">multilevel</span>, <span class="ident">QueueType</span>};
@@ -277,6 +284,11 @@
 <span class="kw">use</span> <span class="ident">yatp::ThreadPool</span>;
 
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">TICK_INTERVAL</span>: <span class="ident">Duration</span> <span class="op">=</span> <span class="ident">Duration::from_secs</span>(<span class="number">1</span>);
+
+<span class="kw">fn</span> <span class="ident">tick_interval</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Duration</span> {
+    <span class="macro">fail_point!</span>(<span class="string">&quot;mock_tick_interval&quot;</span>, <span class="op">|</span><span class="kw">_</span><span class="op">|</span> { <span class="ident">Duration::from_millis</span>(<span class="number">10</span>) });
+    <span class="ident">TICK_INTERVAL</span>
+}
 
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">PoolTicker</span>: <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Clone</span> <span class="op">+</span> <span class="lifetime">&#39;static</span> {
     <span class="kw">fn</span> <span class="ident">on_tick</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>);
@@ -298,7 +310,7 @@
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">try_tick</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
         <span class="kw">let</span> <span class="ident">now</span> <span class="op">=</span> <span class="ident">Instant::now_coarse</span>();
-        <span class="kw">if</span> <span class="ident">now</span>.<span class="ident">duration_since</span>(<span class="self">self</span>.<span class="ident">last_tick_time</span>) <span class="op">&lt;</span> <span class="ident">TICK_INTERVAL</span> {
+        <span class="kw">if</span> <span class="ident">now</span>.<span class="ident">duration_since</span>(<span class="self">self</span>.<span class="ident">last_tick_time</span>) <span class="op">&lt;</span> <span class="ident">tick_interval</span>() {
             <span class="kw">return</span>;
         }
         <span class="self">self</span>.<span class="ident">last_tick_time</span> <span class="op">=</span> <span class="ident">now</span>;
