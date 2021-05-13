@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["CdcObserver","An Observer for CDC."],["OldValueReader",""]]});
+initSidebarItems({"struct":[["CdcObserver","An Observer for CDC."]]});

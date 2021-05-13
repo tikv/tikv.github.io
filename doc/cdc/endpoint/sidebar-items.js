@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["FEATURE_RESOLVED_TS_STORE",""],["METRICS_FLUSH_INTERVAL",""]],"enum":[["Deregister",""],["Task",""],["Validate",""]],"struct":[["CdcTxnExtraScheduler",""],["Endpoint",""],["Initializer",""],["OldValueCache",""]],"type":[["InitCallback",""],["OldValueCallback",""]]});
+initSidebarItems({"constant":[["FEATURE_RESOLVED_TS_STORE",""],["METRICS_FLUSH_INTERVAL",""]],"enum":[["Deregister",""],["Task",""],["Validate",""]],"struct":[["CdcTxnExtraScheduler",""],["Endpoint",""],["Initializer",""]],"type":[["InitCallback",""]]});
