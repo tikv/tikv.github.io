@@ -5218,22 +5218,6 @@
 <span id="5215">5215</span>
 <span id="5216">5216</span>
 <span id="5217">5217</span>
-<span id="5218">5218</span>
-<span id="5219">5219</span>
-<span id="5220">5220</span>
-<span id="5221">5221</span>
-<span id="5222">5222</span>
-<span id="5223">5223</span>
-<span id="5224">5224</span>
-<span id="5225">5225</span>
-<span id="5226">5226</span>
-<span id="5227">5227</span>
-<span id="5228">5228</span>
-<span id="5229">5229</span>
-<span id="5230">5230</span>
-<span id="5231">5231</span>
-<span id="5232">5232</span>
-<span id="5233">5233</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2017 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -5288,7 +5272,7 @@
 <span class="kw">use</span> <span class="ident">time::Timespec</span>;
 <span class="kw">use</span> <span class="ident">uuid::Builder</span> <span class="kw">as</span> <span class="ident">UuidBuilder</span>;
 
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::coprocessor</span>::{<span class="ident">Cmd</span>, <span class="ident">CoprocessorHost</span>};
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::coprocessor</span>::{<span class="ident">Cmd</span>, <span class="ident">CoprocessorHost</span>, <span class="ident">ObserveHandle</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::store::fsm::RaftPollerBuilder</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::store::metrics</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::store::msg</span>::{<span class="ident">Callback</span>, <span class="ident">PeerMsg</span>, <span class="ident">ReadResponse</span>, <span class="ident">SignificantMsg</span>};
@@ -5674,10 +5658,9 @@
         <span class="self">self</span>.<span class="ident">cbs</span>.<span class="ident">push</span>(<span class="ident">ApplyCallback::new</span>(<span class="ident">delegate</span>.<span class="ident">region</span>.<span class="ident">clone</span>()));
         <span class="self">self</span>.<span class="ident">last_applied_index</span> <span class="op">=</span> <span class="ident">delegate</span>.<span class="ident">apply_state</span>.<span class="ident">get_applied_index</span>();
 
-        <span class="comment">// TODO: skip this step when we do not need to observe cmds.</span>
         <span class="self">self</span>.<span class="ident">host</span>.<span class="ident">prepare_for_apply</span>(
-            <span class="ident">delegate</span>.<span class="ident">observe_cmd</span>.<span class="ident">cdc_id</span>,
-            <span class="ident">delegate</span>.<span class="ident">observe_cmd</span>.<span class="ident">rts_id</span>,
+            <span class="kw-2">&amp;</span><span class="ident">delegate</span>.<span class="ident">observe_info</span>.<span class="ident">cdc_id</span>,
+            <span class="kw-2">&amp;</span><span class="ident">delegate</span>.<span class="ident">observe_info</span>.<span class="ident">rts_id</span>,
             <span class="ident">delegate</span>.<span class="ident">region_id</span>(),
         );
     }
@@ -6043,7 +6026,7 @@
     <span class="ident">last_sync_apply_index</span>: <span class="ident">u64</span>,
 
     <span class="doccomment">/// Info about cmd observer.</span>
-    <span class="ident">observe_cmd</span>: <span class="ident">ObserveCmd</span>,
+    <span class="ident">observe_info</span>: <span class="ident">CmdObserveInfo</span>,
 
     <span class="doccomment">/// The local metrics, and it will be flushed periodically.</span>
     <span class="ident">metrics</span>: <span class="ident">ApplyMetrics</span>,
@@ -6077,7 +6060,7 @@
             <span class="ident">metrics</span>: <span class="ident">Default::default</span>(),
             <span class="ident">last_merge_version</span>: <span class="number">0</span>,
             <span class="ident">pending_request_snapshot_count</span>: <span class="ident">reg</span>.<span class="ident">pending_request_snapshot_count</span>,
-            <span class="ident">observe_cmd</span>: <span class="ident">ObserveCmd::default</span>(),
+            <span class="ident">observe_info</span>: <span class="ident">CmdObserveInfo::default</span>(),
             <span class="ident">priority</span>: <span class="ident">Priority::Normal</span>,
         }
     }
@@ -6350,10 +6333,10 @@
         <span class="kw">let</span> <span class="ident">cmd_cb</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">find_pending</span>(<span class="ident">index</span>, <span class="ident">term</span>, <span class="ident">is_conf_change_cmd</span>(<span class="kw-2">&amp;</span><span class="ident">cmd</span>));
         <span class="kw">let</span> <span class="ident">cmd</span> <span class="op">=</span> <span class="ident">Cmd::new</span>(<span class="ident">index</span>, <span class="ident">cmd</span>, <span class="ident">resp</span>);
         <span class="ident">apply_ctx</span>.<span class="ident">host</span>.<span class="ident">on_apply_cmd</span>(
-            <span class="self">self</span>.<span class="ident">observe_cmd</span>.<span class="ident">cdc_id</span>,
-            <span class="self">self</span>.<span class="ident">observe_cmd</span>.<span class="ident">rts_id</span>,
+            <span class="self">self</span>.<span class="ident">observe_info</span>.<span class="ident">cdc_id</span>.<span class="ident">id</span>,
+            <span class="self">self</span>.<span class="ident">observe_info</span>.<span class="ident">rts_id</span>.<span class="ident">id</span>,
             <span class="self">self</span>.<span class="ident">region_id</span>(),
-            <span class="ident">cmd</span>.<span class="ident">clone</span>(),
+            <span class="kw-2">&amp;</span><span class="ident">cmd</span>,
         );
 
         <span class="ident">apply_ctx</span>.<span class="ident">cbs</span>.<span class="ident">last_mut</span>().<span class="ident">unwrap</span>().<span class="ident">push</span>(<span class="ident">cmd_cb</span>, <span class="ident">cmd</span>);
@@ -8126,51 +8109,30 @@
     }
 }
 
-<span class="kw">static</span> <span class="ident">OBSERVE_ID_ALLOC</span>: <span class="ident">AtomicUsize</span> <span class="op">=</span> <span class="ident">AtomicUsize::new</span>(<span class="number">0</span>);
-
-<span class="doccomment">/// A unique identifier for checking stale observed commands.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>, <span class="ident">Eq</span>, <span class="ident">PartialEq</span>, <span class="ident">Ord</span>, <span class="ident">PartialOrd</span>, <span class="ident">Hash</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ObserveID</span>(<span class="ident">usize</span>);
-
-<span class="kw">impl</span> <span class="ident">ObserveID</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ObserveID</span> {
-        <span class="ident">ObserveID</span>(<span class="ident">OBSERVE_ID_ALLOC</span>.<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>))
-    }
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Default</span>)]</span>
+<span class="kw">struct</span> <span class="ident">CmdObserveInfo</span> {
+    <span class="ident">cdc_id</span>: <span class="ident">ObserveHandle</span>,
+    <span class="ident">rts_id</span>: <span class="ident">ObserveHandle</span>,
 }
 
-<span class="kw">struct</span> <span class="ident">ObserveCmd</span> {
-    <span class="comment">// TODO: Add flags to disable observing.</span>
-    <span class="ident">cdc_id</span>: <span class="ident">ObserveID</span>,
-    <span class="ident">rts_id</span>: <span class="ident">ObserveID</span>,
-}
-
-<span class="kw">impl</span> <span class="ident">Debug</span> <span class="kw">for</span> <span class="ident">ObserveCmd</span> {
+<span class="kw">impl</span> <span class="ident">Debug</span> <span class="kw">for</span> <span class="ident">CmdObserveInfo</span> {
     <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt::Result</span> {
-        <span class="ident">f</span>.<span class="ident">debug_struct</span>(<span class="string">&quot;ObserveCmd&quot;</span>)
-            .<span class="ident">field</span>(<span class="string">&quot;cdc_id&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">cdc_id</span>)
-            .<span class="ident">field</span>(<span class="string">&quot;rts_id&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">rts_id</span>)
+        <span class="ident">f</span>.<span class="ident">debug_struct</span>(<span class="string">&quot;CmdObserveInfo&quot;</span>)
+            .<span class="ident">field</span>(<span class="string">&quot;cdc_id&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">cdc_id</span>.<span class="ident">id</span>)
+            .<span class="ident">field</span>(<span class="string">&quot;rts_id&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">rts_id</span>.<span class="ident">id</span>)
             .<span class="ident">finish</span>()
-    }
-}
-
-<span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">ObserveCmd</span> {
-    <span class="kw">fn</span> <span class="ident">default</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="self">Self</span> {
-            <span class="ident">cdc_id</span>: <span class="ident">ObserveID</span>(<span class="number">0</span>),
-            <span class="ident">rts_id</span>: <span class="ident">ObserveID</span>(<span class="number">0</span>),
-        }
     }
 }
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ChangeObserver</span> {
-    <span class="ident">cdc_id</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ObserveID</span><span class="op">&gt;</span>,
-    <span class="ident">rts_id</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ObserveID</span><span class="op">&gt;</span>,
+    <span class="ident">cdc_id</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ObserveHandle</span><span class="op">&gt;</span>,
+    <span class="ident">rts_id</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ObserveHandle</span><span class="op">&gt;</span>,
     <span class="ident">region_id</span>: <span class="ident">u64</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">ChangeObserver</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_cdc</span>(<span class="ident">region_id</span>: <span class="ident">u64</span>, <span class="ident">id</span>: <span class="ident">ObserveID</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_cdc</span>(<span class="ident">region_id</span>: <span class="ident">u64</span>, <span class="ident">id</span>: <span class="ident">ObserveHandle</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="self">Self</span> {
             <span class="ident">cdc_id</span>: <span class="prelude-val">Some</span>(<span class="ident">id</span>),
             <span class="ident">rts_id</span>: <span class="prelude-val">None</span>,
@@ -8178,7 +8140,7 @@
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_rts</span>(<span class="ident">region_id</span>: <span class="ident">u64</span>, <span class="ident">id</span>: <span class="ident">ObserveID</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_rts</span>(<span class="ident">region_id</span>: <span class="ident">u64</span>, <span class="ident">id</span>: <span class="ident">ObserveHandle</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="self">Self</span> {
             <span class="ident">cdc_id</span>: <span class="prelude-val">None</span>,
             <span class="ident">rts_id</span>: <span class="prelude-val">Some</span>(<span class="ident">id</span>),
@@ -8596,15 +8558,15 @@
             <span class="ident">region_id</span>,
         } <span class="op">=</span> <span class="ident">cmd</span>;
 
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">id</span>) <span class="op">=</span> <span class="ident">cdc_id</span> {
-            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">delegate</span>.<span class="ident">observe_cmd</span>.<span class="ident">cdc_id</span> <span class="op">&gt;</span> <span class="ident">id</span> {
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">ObserveHandle</span> { <span class="ident">id</span>, .. }) <span class="op">=</span> <span class="ident">cdc_id</span> {
+            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">delegate</span>.<span class="ident">observe_info</span>.<span class="ident">cdc_id</span>.<span class="ident">id</span> <span class="op">&gt;</span> <span class="ident">id</span> {
                 <span class="ident">notify_stale_req</span>(<span class="self">self</span>.<span class="ident">delegate</span>.<span class="ident">term</span>, <span class="ident">cb</span>);
                 <span class="kw">return</span>;
             }
         }
 
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">id</span>) <span class="op">=</span> <span class="ident">rts_id</span> {
-            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">delegate</span>.<span class="ident">observe_cmd</span>.<span class="ident">rts_id</span> <span class="op">&gt;</span> <span class="ident">id</span> {
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">ObserveHandle</span> { <span class="ident">id</span>, .. }) <span class="op">=</span> <span class="ident">rts_id</span> {
+            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">delegate</span>.<span class="ident">observe_info</span>.<span class="ident">rts_id</span>.<span class="ident">id</span> <span class="op">&gt;</span> <span class="ident">id</span> {
                 <span class="ident">notify_stale_req</span>(<span class="self">self</span>.<span class="ident">delegate</span>.<span class="ident">term</span>, <span class="ident">cb</span>);
                 <span class="kw">return</span>;
             }
@@ -8644,10 +8606,10 @@
         };
 
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">id</span>) <span class="op">=</span> <span class="ident">cdc_id</span> {
-            <span class="self">self</span>.<span class="ident">delegate</span>.<span class="ident">observe_cmd</span>.<span class="ident">cdc_id</span> <span class="op">=</span> <span class="ident">id</span>;
+            <span class="self">self</span>.<span class="ident">delegate</span>.<span class="ident">observe_info</span>.<span class="ident">cdc_id</span> <span class="op">=</span> <span class="ident">id</span>;
         }
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">id</span>) <span class="op">=</span> <span class="ident">rts_id</span> {
-            <span class="self">self</span>.<span class="ident">delegate</span>.<span class="ident">observe_cmd</span>.<span class="ident">rts_id</span> <span class="op">=</span> <span class="ident">id</span>;
+            <span class="self">self</span>.<span class="ident">delegate</span>.<span class="ident">observe_info</span>.<span class="ident">rts_id</span> <span class="op">=</span> <span class="ident">id</span>;
         }
 
         <span class="ident">cb</span>.<span class="ident">invoke_read</span>(<span class="ident">resp</span>);
@@ -9596,18 +9558,18 @@
     <span class="kw">where</span>
         <span class="ident">E</span>: <span class="ident">KvEngine</span>,
     {
-        <span class="kw">fn</span> <span class="ident">on_prepare_for_apply</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">cdc_id</span>: <span class="ident">ObserveID</span>, <span class="ident">rts_id</span>: <span class="ident">ObserveID</span>, <span class="ident">region_id</span>: <span class="ident">u64</span>) {
+        <span class="kw">fn</span> <span class="ident">on_prepare_for_apply</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">cdc</span>: <span class="kw-2">&amp;</span><span class="ident">ObserveHandle</span>, <span class="ident">rts</span>: <span class="kw-2">&amp;</span><span class="ident">ObserveHandle</span>, <span class="ident">region_id</span>: <span class="ident">u64</span>) {
             <span class="self">self</span>.<span class="ident">cmd_batches</span>
                 .<span class="ident">borrow_mut</span>()
-                .<span class="ident">push</span>(<span class="ident">CmdBatch::new</span>(<span class="ident">cdc_id</span>, <span class="ident">rts_id</span>, <span class="ident">region_id</span>));
+                .<span class="ident">push</span>(<span class="ident">CmdBatch::new</span>(<span class="ident">cdc</span>.<span class="ident">id</span>, <span class="ident">rts</span>.<span class="ident">id</span>, <span class="ident">region_id</span>));
         }
 
-        <span class="kw">fn</span> <span class="ident">on_apply_cmd</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">cdc_id</span>: <span class="ident">ObserveID</span>, <span class="ident">rts_id</span>: <span class="ident">ObserveID</span>, <span class="ident">region_id</span>: <span class="ident">u64</span>, <span class="ident">cmd</span>: <span class="ident">Cmd</span>) {
+        <span class="kw">fn</span> <span class="ident">on_apply_cmd</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">cdc_id</span>: <span class="ident">ObserveID</span>, <span class="ident">rts_id</span>: <span class="ident">ObserveID</span>, <span class="ident">region_id</span>: <span class="ident">u64</span>, <span class="ident">cmd</span>: <span class="kw-2">&amp;</span><span class="ident">Cmd</span>) {
             <span class="self">self</span>.<span class="ident">cmd_batches</span>
                 .<span class="ident">borrow_mut</span>()
                 .<span class="ident">last_mut</span>()
                 .<span class="ident">expect</span>(<span class="string">&quot;should exist some cmd batch&quot;</span>)
-                .<span class="ident">push</span>(<span class="ident">cdc_id</span>, <span class="ident">rts_id</span>, <span class="ident">region_id</span>, <span class="ident">cmd</span>);
+                .<span class="ident">push</span>(<span class="ident">cdc_id</span>, <span class="ident">rts_id</span>, <span class="ident">region_id</span>, <span class="ident">cmd</span>.<span class="ident">clone</span>());
         }
 
         <span class="kw">fn</span> <span class="ident">on_flush_apply</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw">_</span>: <span class="ident">E</span>) {
@@ -10020,15 +9982,14 @@
             .<span class="ident">build</span>();
         <span class="ident">router</span>.<span class="ident">schedule_task</span>(<span class="number">1</span>, <span class="ident">Msg::apply</span>(<span class="ident">apply</span>(<span class="ident">peer_id</span>, <span class="number">1</span>, <span class="number">2</span>, <span class="macro">vec!</span>[<span class="ident">put_entry</span>], <span class="macro">vec!</span>[])));
         <span class="comment">// Register cmd observer to region 1.</span>
-        <span class="kw">let</span> <span class="ident">enabled</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">AtomicBool::new</span>(<span class="bool-val">true</span>));
-        <span class="kw">let</span> <span class="ident">observe_id</span> <span class="op">=</span> <span class="ident">ObserveID::new</span>();
+        <span class="kw">let</span> <span class="ident">observe_handle</span> <span class="op">=</span> <span class="ident">ObserveHandle::with_id</span>(<span class="number">1</span>);
         <span class="ident">router</span>.<span class="ident">schedule_task</span>(
             <span class="number">1</span>,
             <span class="ident">Msg::Change</span> {
                 <span class="ident">region_epoch</span>: <span class="ident">region_epoch</span>.<span class="ident">clone</span>(),
                 <span class="ident">cmd</span>: <span class="ident">ChangeObserver</span> {
-                    <span class="ident">cdc_id</span>: <span class="prelude-val">Some</span>(<span class="ident">observe_id</span>),
-                    <span class="ident">rts_id</span>: <span class="prelude-val">Some</span>(<span class="ident">observe_id</span>),
+                    <span class="ident">cdc_id</span>: <span class="prelude-val">Some</span>(<span class="ident">observe_handle</span>.<span class="ident">clone</span>()),
+                    <span class="ident">rts_id</span>: <span class="prelude-val">Some</span>(<span class="ident">observe_handle</span>.<span class="ident">clone</span>()),
                     <span class="ident">region_id</span>: <span class="number">1</span>,
                 },
                 <span class="ident">cb</span>: <span class="ident">Callback::Read</span>(<span class="ident">Box::new</span>(<span class="op">|</span><span class="ident">resp</span>: <span class="ident">ReadResponse</span><span class="op">&lt;</span><span class="ident">KvTestSnapshot</span><span class="op">&gt;</span><span class="op">|</span> {
@@ -10042,6 +10003,10 @@
         <span class="comment">// Unblock the apply worker</span>
         <span class="ident">block_tx</span>.<span class="ident">send</span>(()).<span class="ident">unwrap</span>();
         <span class="ident">fetch_apply_res</span>(<span class="kw-2">&amp;</span><span class="ident">rx</span>);
+        <span class="kw">let</span> <span class="ident">cmd_batch</span> <span class="op">=</span> <span class="ident">cmdbatch_rx</span>.<span class="ident">recv_timeout</span>(<span class="ident">Duration::from_secs</span>(<span class="number">3</span>)).<span class="ident">unwrap</span>();
+        <span class="macro">assert_eq!</span>(<span class="ident">cmd_batch</span>.<span class="ident">cdc_id</span>, <span class="ident">ObserveHandle::with_id</span>(<span class="number">0</span>).<span class="ident">id</span>);
+        <span class="macro">assert_eq!</span>(<span class="ident">cmd_batch</span>.<span class="ident">rts_id</span>, <span class="ident">ObserveHandle::with_id</span>(<span class="number">0</span>).<span class="ident">id</span>);
+
         <span class="kw">let</span> (<span class="ident">capture_tx</span>, <span class="ident">capture_rx</span>) <span class="op">=</span> <span class="ident">mpsc::channel</span>();
         <span class="kw">let</span> <span class="ident">put_entry</span> <span class="op">=</span> <span class="ident">EntryBuilder::new</span>(<span class="number">3</span>, <span class="number">2</span>)
             .<span class="ident">put_cf</span>(<span class="ident">CF_LOCK</span>, <span class="string">b&quot;k1&quot;</span>, <span class="string">b&quot;v1&quot;</span>)
@@ -10062,6 +10027,8 @@
         <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">resp</span>.<span class="ident">get_header</span>().<span class="ident">has_error</span>(), <span class="string">&quot;{:?}&quot;</span>, <span class="ident">resp</span>);
         <span class="macro">assert_eq!</span>(<span class="ident">resp</span>.<span class="ident">get_responses</span>().<span class="ident">len</span>(), <span class="number">1</span>);
         <span class="kw">let</span> <span class="ident">cmd_batch</span> <span class="op">=</span> <span class="ident">cmdbatch_rx</span>.<span class="ident">recv_timeout</span>(<span class="ident">Duration::from_secs</span>(<span class="number">3</span>)).<span class="ident">unwrap</span>();
+        <span class="macro">assert_eq!</span>(<span class="ident">cmd_batch</span>.<span class="ident">cdc_id</span>, <span class="ident">observe_handle</span>.<span class="ident">id</span>);
+        <span class="macro">assert_eq!</span>(<span class="ident">cmd_batch</span>.<span class="ident">rts_id</span>, <span class="ident">observe_handle</span>.<span class="ident">id</span>);
         <span class="macro">assert_eq!</span>(<span class="ident">resp</span>, <span class="ident">cmd_batch</span>.<span class="ident">into_iter</span>(<span class="number">1</span>).<span class="ident">next</span>().<span class="ident">unwrap</span>().<span class="ident">response</span>);
 
         <span class="kw">let</span> <span class="ident">put_entry1</span> <span class="op">=</span> <span class="ident">EntryBuilder::new</span>(<span class="number">4</span>, <span class="number">2</span>)
@@ -10077,10 +10044,12 @@
             <span class="ident">Msg::apply</span>(<span class="ident">apply</span>(<span class="ident">peer_id</span>, <span class="number">1</span>, <span class="number">2</span>, <span class="macro">vec!</span>[<span class="ident">put_entry1</span>, <span class="ident">put_entry2</span>], <span class="macro">vec!</span>[])),
         );
         <span class="kw">let</span> <span class="ident">cmd_batch</span> <span class="op">=</span> <span class="ident">cmdbatch_rx</span>.<span class="ident">recv_timeout</span>(<span class="ident">Duration::from_secs</span>(<span class="number">3</span>)).<span class="ident">unwrap</span>();
-        <span class="macro">assert_eq!</span>(<span class="number">1</span>, <span class="ident">cmd_batch</span>.<span class="ident">len</span>());
+        <span class="macro">assert_eq!</span>(<span class="number">2</span>, <span class="ident">cmd_batch</span>.<span class="ident">len</span>());
 
         <span class="comment">// Stop observer regoin 1.</span>
-        <span class="ident">enabled</span>.<span class="ident">store</span>(<span class="bool-val">false</span>, <span class="ident">Ordering::SeqCst</span>);
+        <span class="ident">observe_handle</span>.<span class="ident">stop_observing</span>();
+
+        <span class="kw">let</span> <span class="ident">observe_handle</span> <span class="op">=</span> <span class="ident">ObserveHandle::new</span>();
         <span class="kw">let</span> <span class="ident">put_entry</span> <span class="op">=</span> <span class="ident">EntryBuilder::new</span>(<span class="number">6</span>, <span class="number">2</span>)
             .<span class="ident">put</span>(<span class="string">b&quot;k2&quot;</span>, <span class="string">b&quot;v2&quot;</span>)
             .<span class="ident">epoch</span>(<span class="number">1</span>, <span class="number">3</span>)
@@ -10093,8 +10062,8 @@
             <span class="ident">Msg::Change</span> {
                 <span class="ident">region_epoch</span>,
                 <span class="ident">cmd</span>: <span class="ident">ChangeObserver</span> {
-                    <span class="ident">cdc_id</span>: <span class="prelude-val">Some</span>(<span class="ident">observe_id</span>),
-                    <span class="ident">rts_id</span>: <span class="prelude-val">Some</span>(<span class="ident">observe_id</span>),
+                    <span class="ident">cdc_id</span>: <span class="prelude-val">Some</span>(<span class="ident">observe_handle</span>.<span class="ident">clone</span>()),
+                    <span class="ident">rts_id</span>: <span class="prelude-val">Some</span>(<span class="ident">observe_handle</span>),
                     <span class="ident">region_id</span>: <span class="number">2</span>,
                 },
                 <span class="ident">cb</span>: <span class="ident">Callback::Read</span>(<span class="ident">Box::new</span>(<span class="op">|</span><span class="ident">resp</span>: <span class="ident">ReadResponse</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">|</span> {
@@ -10264,15 +10233,14 @@
         <span class="ident">system</span>.<span class="ident">spawn</span>(<span class="string">&quot;test-split&quot;</span>.<span class="ident">to_owned</span>(), <span class="ident">builder</span>);
 
         <span class="ident">router</span>.<span class="ident">schedule_task</span>(<span class="number">1</span>, <span class="ident">Msg::Registration</span>(<span class="ident">reg</span>.<span class="ident">clone</span>()));
-        <span class="kw">let</span> <span class="ident">enabled</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">AtomicBool::new</span>(<span class="bool-val">true</span>));
-        <span class="kw">let</span> <span class="ident">observe_id</span> <span class="op">=</span> <span class="ident">ObserveID::new</span>();
+        <span class="kw">let</span> <span class="ident">observe_handle</span> <span class="op">=</span> <span class="ident">ObserveHandle::new</span>();
         <span class="ident">router</span>.<span class="ident">schedule_task</span>(
             <span class="number">1</span>,
             <span class="ident">Msg::Change</span> {
                 <span class="ident">region_epoch</span>: <span class="ident">region_epoch</span>.<span class="ident">clone</span>(),
                 <span class="ident">cmd</span>: <span class="ident">ChangeObserver</span> {
-                    <span class="ident">cdc_id</span>: <span class="prelude-val">Some</span>(<span class="ident">observe_id</span>),
-                    <span class="ident">rts_id</span>: <span class="prelude-val">Some</span>(<span class="ident">observe_id</span>),
+                    <span class="ident">cdc_id</span>: <span class="prelude-val">Some</span>(<span class="ident">observe_handle</span>.<span class="ident">clone</span>()),
+                    <span class="ident">rts_id</span>: <span class="prelude-val">Some</span>(<span class="ident">observe_handle</span>.<span class="ident">clone</span>()),
                     <span class="ident">region_id</span>: <span class="number">1</span>,
                 },
                 <span class="ident">cb</span>: <span class="ident">Callback::Read</span>(<span class="ident">Box::new</span>(<span class="op">|</span><span class="ident">resp</span>: <span class="ident">ReadResponse</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">|</span> {
@@ -10424,14 +10392,14 @@
         <span class="ident">checker</span>.<span class="ident">check</span>(<span class="string">b&quot;k32&quot;</span>, <span class="string">b&quot;k4&quot;</span>, <span class="number">28</span>, <span class="kw-2">&amp;</span>[<span class="number">29</span>, <span class="number">30</span>, <span class="number">31</span>], <span class="bool-val">true</span>);
 
         <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">mpsc::channel</span>();
-        <span class="ident">enabled</span>.<span class="ident">store</span>(<span class="bool-val">false</span>, <span class="ident">Ordering::SeqCst</span>);
+        <span class="ident">observe_handle</span>.<span class="ident">stop_observing</span>();
         <span class="ident">router</span>.<span class="ident">schedule_task</span>(
             <span class="number">1</span>,
             <span class="ident">Msg::Change</span> {
                 <span class="ident">region_epoch</span>,
                 <span class="ident">cmd</span>: <span class="ident">ChangeObserver</span> {
-                    <span class="ident">cdc_id</span>: <span class="prelude-val">Some</span>(<span class="ident">observe_id</span>),
-                    <span class="ident">rts_id</span>: <span class="prelude-val">Some</span>(<span class="ident">observe_id</span>),
+                    <span class="ident">cdc_id</span>: <span class="prelude-val">Some</span>(<span class="ident">observe_handle</span>.<span class="ident">clone</span>()),
+                    <span class="ident">rts_id</span>: <span class="prelude-val">Some</span>(<span class="ident">observe_handle</span>),
                     <span class="ident">region_id</span>: <span class="number">1</span>,
                 },
                 <span class="ident">cb</span>: <span class="ident">Callback::Read</span>(<span class="ident">Box::new</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">resp</span>: <span class="ident">ReadResponse</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">|</span> {
