@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["NoopStorage","A storage saves files into void. It is mainly for test use."]]});
+initSidebarItems({"constant":[["STORAGE_NAME",""]],"fn":[["url_for",""]],"struct":[["NoopStorage","A storage saves files into void. It is mainly for test use."]]});

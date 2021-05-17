@@ -1,12 +1,3 @@
 (function() {var implementors = {};
-implementors["backup"] = [{"text":"impl Fail for Error","synthetic":false,"types":[]}];
-implementors["cdc"] = [{"text":"impl Fail for Error","synthetic":false,"types":[]}];
-implementors["cloud"] = [{"text":"impl Fail for Error","synthetic":false,"types":[]},{"text":"impl Fail for KmsError","synthetic":false,"types":[]}];
-implementors["codec"] = [{"text":"impl Fail for ErrorInner","synthetic":false,"types":[]},{"text":"impl Fail for Error","synthetic":false,"types":[]}];
-implementors["encryption"] = [{"text":"impl Fail for Error","synthetic":false,"types":[]}];
 implementors["failure"] = [];
-implementors["keys"] = [{"text":"impl Fail for Error","synthetic":false,"types":[]}];
-implementors["tidb_query_common"] = [{"text":"impl Fail for EvaluateError","synthetic":false,"types":[]},{"text":"impl Fail for StorageError","synthetic":false,"types":[]},{"text":"impl Fail for ErrorInner","synthetic":false,"types":[]}];
-implementors["tidb_query_datatype"] = [{"text":"impl Fail for DataTypeError","synthetic":false,"types":[]}];
-implementors["tikv"] = [{"text":"impl Fail for Error","synthetic":false,"types":[]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

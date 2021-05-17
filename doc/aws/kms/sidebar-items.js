@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["AWS_KMS_DATA_KEY_SPEC",""],["AWS_KMS_VENDOR_NAME",""],["AWS_VENDOR_NAME",""]],"fn":[["classify_decrypt_error",""],["classify_error",""],["classify_generate_data_key_error",""]],"struct":[["AwsKms",""],["KmsClientDebug",""]]});
+initSidebarItems({"constant":[["AWS_KMS_DATA_KEY_SPEC",""],["ENCRYPTION_VENDOR_NAME_AWS_KMS",""]],"fn":[["classify_decrypt_error",""],["classify_error",""],["classify_generate_data_key_error",""]],"struct":[["AwsKms",""],["FixRusotoErrorDisplay",""],["KmsClientDebug",""]]});

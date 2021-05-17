@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["AWS_VENDOR_NAME",""]],"mod":[["kms",""],["util",""]],"struct":[["AwsKms",""]]});
+initSidebarItems({"constant":[["ENCRYPTION_VENDOR_NAME_AWS_KMS",""],["STORAGE_VENDOR_NAME_AWS",""]],"mod":[["kms",""],["s3",""],["util",""]],"struct":[["AwsKms",""],["Config",""],["S3Storage",""]]});

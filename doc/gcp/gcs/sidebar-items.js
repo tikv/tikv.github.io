@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["GOOGLEAPI_HOST",""],["STORAGE_NAME",""]],"enum":[["RequestError",""]],"fn":[["change_host",""],["deserialize_service_account_info",""],["parse_predefined_acl",""],["parse_storage_class",""],["status_code_error",""]],"struct":[["CloudDynamic",""],["Config",""],["GCSStorage",""],["InputBucket",""],["InputConfig",""]],"trait":[["ResultExt",""]]});

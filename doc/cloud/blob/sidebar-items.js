@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["none_to_empty",""]],"struct":[["BucketConf",""],["CloudDynamic",""],["StringNonEmpty",""]],"trait":[["BlobConfig",""],["BlobStorage","An abstraction for blob storage. Currently the same as ExternalStorage"]]});

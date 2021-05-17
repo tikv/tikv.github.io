@@ -170,256 +170,55 @@
 <span id="167">167</span>
 <span id="168">168</span>
 <span id="169">169</span>
-<span id="170">170</span>
-<span id="171">171</span>
-<span id="172">172</span>
-<span id="173">173</span>
-<span id="174">174</span>
-<span id="175">175</span>
-<span id="176">176</span>
-<span id="177">177</span>
-<span id="178">178</span>
-<span id="179">179</span>
-<span id="180">180</span>
-<span id="181">181</span>
-<span id="182">182</span>
-<span id="183">183</span>
-<span id="184">184</span>
-<span id="185">185</span>
-<span id="186">186</span>
-<span id="187">187</span>
-<span id="188">188</span>
-<span id="189">189</span>
-<span id="190">190</span>
-<span id="191">191</span>
-<span id="192">192</span>
-<span id="193">193</span>
-<span id="194">194</span>
-<span id="195">195</span>
-<span id="196">196</span>
-<span id="197">197</span>
-<span id="198">198</span>
-<span id="199">199</span>
-<span id="200">200</span>
-<span id="201">201</span>
-<span id="202">202</span>
-<span id="203">203</span>
-<span id="204">204</span>
-<span id="205">205</span>
-<span id="206">206</span>
-<span id="207">207</span>
-<span id="208">208</span>
-<span id="209">209</span>
-<span id="210">210</span>
-<span id="211">211</span>
-<span id="212">212</span>
-<span id="213">213</span>
-<span id="214">214</span>
-<span id="215">215</span>
-<span id="216">216</span>
-<span id="217">217</span>
-<span id="218">218</span>
-<span id="219">219</span>
-<span id="220">220</span>
-<span id="221">221</span>
-<span id="222">222</span>
-<span id="223">223</span>
-<span id="224">224</span>
-<span id="225">225</span>
-<span id="226">226</span>
-<span id="227">227</span>
-<span id="228">228</span>
-<span id="229">229</span>
-<span id="230">230</span>
-<span id="231">231</span>
-<span id="232">232</span>
-<span id="233">233</span>
-<span id="234">234</span>
-<span id="235">235</span>
-<span id="236">236</span>
-<span id="237">237</span>
-<span id="238">238</span>
-<span id="239">239</span>
-<span id="240">240</span>
-<span id="241">241</span>
-<span id="242">242</span>
-<span id="243">243</span>
-<span id="244">244</span>
-<span id="245">245</span>
-<span id="246">246</span>
-<span id="247">247</span>
-<span id="248">248</span>
-<span id="249">249</span>
-<span id="250">250</span>
-<span id="251">251</span>
-<span id="252">252</span>
-<span id="253">253</span>
-<span id="254">254</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
 <span class="doccomment">//! External storage support.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! This crate define an abstraction of external storage. Currently, it</span>
-<span class="doccomment">//! supports local storage.</span>
+<span class="doccomment">//! Cloud provider backends can be found under components/cloud</span>
 
 <span class="attribute">#[<span class="ident">macro_use</span>]</span>
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">slog_global</span>;
 <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused_extern_crates</span>)]</span>
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">tikv_alloc</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span>
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">fail</span>;
 
-<span class="kw">use</span> <span class="ident">std::io</span>;
+<span class="kw">use</span> <span class="ident">std::io</span>::{<span class="self">self</span>, <span class="ident">Write</span>};
 <span class="kw">use</span> <span class="ident">std::marker::Unpin</span>;
-<span class="kw">use</span> <span class="ident">std::path::Path</span>;
 <span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
-<span class="kw">use</span> <span class="ident">std::time::Instant</span>;
+<span class="kw">use</span> <span class="ident">std::time</span>::{<span class="ident">Duration</span>, <span class="ident">Instant</span>};
 
+<span class="kw">use</span> <span class="ident">file_system::File</span>;
 <span class="kw">use</span> <span class="ident">futures_io::AsyncRead</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;protobuf-codec&quot;</span>)]</span>
-<span class="kw">use</span> <span class="ident">kvproto::backup::StorageBackend_oneof_backend</span> <span class="kw">as</span> <span class="ident">Backend</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;prost-codec&quot;</span>)]</span>
-<span class="kw">use</span> <span class="ident">kvproto::backup</span>::{<span class="ident">storage_backend::Backend</span>, <span class="ident">Local</span>};
-<span class="kw">use</span> <span class="ident">kvproto::backup</span>::{<span class="ident">Gcs</span>, <span class="ident">Noop</span>, <span class="ident">StorageBackend</span>, <span class="ident">S3</span>};
+<span class="kw">use</span> <span class="ident">futures_util::AsyncReadExt</span>;
+<span class="kw">use</span> <span class="ident">tikv_util::stream</span>::{<span class="ident">block_on_external_io</span>, <span class="ident">READ_BUF_SIZE</span>};
+<span class="kw">use</span> <span class="ident">tikv_util::time::Limiter</span>;
+<span class="kw">use</span> <span class="ident">tokio::time::timeout</span>;
 
 <span class="kw">mod</span> <span class="ident">local</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">local::LocalStorage</span>;
 <span class="kw">mod</span> <span class="ident">noop</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">noop::NoopStorage</span>;
-<span class="kw">mod</span> <span class="ident">s3</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">s3::S3Storage</span>;
-<span class="kw">mod</span> <span class="ident">gcs</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">gcs::GCSStorage</span>;
 <span class="kw">mod</span> <span class="ident">metrics</span>;
-<span class="kw">use</span> <span class="ident">metrics</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident">metrics::EXT_STORAGE_CREATE_HISTOGRAM</span>;
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;cloud-storage-dylib&quot;</span>)]</span>
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">dylib_client</span>;
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;cloud-storage-grpc&quot;</span>)]</span>
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">grpc_client</span>;
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">any</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;cloud-storage-dylib&quot;</span>, <span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;cloud-storage-grpc&quot;</span>))]</span>
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">request</span>;
 
-<span class="doccomment">/// Create a new storage from the given storage backend description.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create_storage</span>(<span class="ident">backend</span>: <span class="kw-2">&amp;</span><span class="ident">StorageBackend</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io::Result</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">ExternalStorage</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">Instant::now</span>();
-    <span class="kw">let</span> (<span class="ident">label</span>, <span class="ident">storage</span>) <span class="op">=</span> <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="ident">backend</span>.<span class="ident">backend</span> {
-        <span class="prelude-val">Some</span>(<span class="ident">Backend::Local</span>(<span class="ident">local</span>)) <span class="op">=</span><span class="op">&gt;</span> {
-            <span class="kw">let</span> <span class="ident">p</span> <span class="op">=</span> <span class="ident">Path::new</span>(<span class="kw-2">&amp;</span><span class="ident">local</span>.<span class="ident">path</span>);
-            (<span class="string">&quot;local&quot;</span>, <span class="ident">LocalStorage::new</span>(<span class="ident">p</span>).<span class="ident">map</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">Arc::new</span>(<span class="ident">s</span>) <span class="kw">as</span> <span class="kw">_</span>))
-        }
-        <span class="prelude-val">Some</span>(<span class="ident">Backend::Noop</span>(<span class="kw">_</span>)) <span class="op">=</span><span class="op">&gt;</span> (<span class="string">&quot;noop&quot;</span>, <span class="prelude-val">Ok</span>(<span class="ident">Arc::new</span>(<span class="ident">NoopStorage::default</span>()) <span class="kw">as</span> <span class="kw">_</span>)),
-        <span class="prelude-val">Some</span>(<span class="ident">Backend::S3</span>(<span class="ident">config</span>)) <span class="op">=</span><span class="op">&gt;</span> (<span class="string">&quot;s3&quot;</span>, <span class="ident">S3Storage::new</span>(<span class="ident">config</span>).<span class="ident">map</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">Arc::new</span>(<span class="ident">s</span>) <span class="kw">as</span> <span class="kw">_</span>)),
-        <span class="prelude-val">Some</span>(<span class="ident">Backend::Gcs</span>(<span class="ident">config</span>)) <span class="op">=</span><span class="op">&gt;</span> (<span class="string">&quot;gcs&quot;</span>, <span class="ident">GCSStorage::new</span>(<span class="ident">config</span>).<span class="ident">map</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">Arc::new</span>(<span class="ident">s</span>) <span class="kw">as</span> <span class="kw">_</span>)),
-        <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> {
-            <span class="kw">let</span> <span class="ident">u</span> <span class="op">=</span> <span class="ident">url_of_backend</span>(<span class="ident">backend</span>);
-            <span class="macro">error!</span>(<span class="string">&quot;unknown storage&quot;</span>; <span class="string">&quot;scheme&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">u</span>.<span class="ident">scheme</span>());
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">io::Error::new</span>(
-                <span class="ident">io::ErrorKind::Other</span>,
-                <span class="macro">format!</span>(<span class="string">&quot;unknown storage {}&quot;</span>, <span class="ident">u</span>),
-            ));
-        }
-    };
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">record_storage_create</span>(<span class="ident">start</span>: <span class="ident">Instant</span>, <span class="ident">storage</span>: <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">ExternalStorage</span>) {
     <span class="ident">EXT_STORAGE_CREATE_HISTOGRAM</span>
-        .<span class="ident">with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="ident">label</span>])
+        .<span class="ident">with_label_values</span>(<span class="kw-2">&amp;</span>[<span class="ident">storage</span>.<span class="ident">name</span>()])
         .<span class="ident">observe</span>(<span class="ident">start</span>.<span class="ident">elapsed</span>().<span class="ident">as_secs_f64</span>());
-    <span class="ident">storage</span>
-}
-
-<span class="doccomment">/// Formats the storage backend as a URL.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">url_of_backend</span>(<span class="ident">backend</span>: <span class="kw-2">&amp;</span><span class="ident">StorageBackend</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">url::Url</span> {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">u</span> <span class="op">=</span> <span class="ident">url::Url::parse</span>(<span class="string">&quot;unknown:///&quot;</span>).<span class="ident">unwrap</span>();
-    <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="ident">backend</span>.<span class="ident">backend</span> {
-        <span class="prelude-val">Some</span>(<span class="ident">Backend::Local</span>(<span class="ident">local</span>)) <span class="op">=</span><span class="op">&gt;</span> {
-            <span class="ident">u</span>.<span class="ident">set_scheme</span>(<span class="string">&quot;local&quot;</span>).<span class="ident">unwrap</span>();
-            <span class="ident">u</span>.<span class="ident">set_path</span>(<span class="kw-2">&amp;</span><span class="ident">local</span>.<span class="ident">path</span>);
-        }
-        <span class="prelude-val">Some</span>(<span class="ident">Backend::Noop</span>(<span class="kw">_</span>)) <span class="op">=</span><span class="op">&gt;</span> {
-            <span class="ident">u</span>.<span class="ident">set_scheme</span>(<span class="string">&quot;noop&quot;</span>).<span class="ident">unwrap</span>();
-        }
-        <span class="prelude-val">Some</span>(<span class="ident">Backend::S3</span>(<span class="ident">s3</span>)) <span class="op">=</span><span class="op">&gt;</span> {
-            <span class="ident">u</span>.<span class="ident">set_scheme</span>(<span class="string">&quot;s3&quot;</span>).<span class="ident">unwrap</span>();
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">u</span>.<span class="ident">set_host</span>(<span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">s3</span>.<span class="ident">bucket</span>)) {
-                <span class="macro">warn!</span>(<span class="string">&quot;ignoring invalid S3 bucket name&quot;</span>; <span class="string">&quot;bucket&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">s3</span>.<span class="ident">bucket</span>, <span class="string">&quot;error&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>);
-            }
-            <span class="ident">u</span>.<span class="ident">set_path</span>(<span class="ident">s3</span>.<span class="ident">get_prefix</span>());
-        }
-        <span class="prelude-val">Some</span>(<span class="ident">Backend::Gcs</span>(<span class="ident">gcs</span>)) <span class="op">=</span><span class="op">&gt;</span> {
-            <span class="ident">u</span>.<span class="ident">set_scheme</span>(<span class="string">&quot;gcs&quot;</span>).<span class="ident">unwrap</span>();
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">u</span>.<span class="ident">set_host</span>(<span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">gcs</span>.<span class="ident">bucket</span>)) {
-                <span class="macro">warn!</span>(<span class="string">&quot;ignoring invalid GCS bucket name&quot;</span>; <span class="string">&quot;bucket&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">gcs</span>.<span class="ident">bucket</span>, <span class="string">&quot;error&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>);
-            }
-            <span class="ident">u</span>.<span class="ident">set_path</span>(<span class="ident">gcs</span>.<span class="ident">get_prefix</span>());
-        }
-        <span class="prelude-val">Some</span>(<span class="ident">Backend::CloudDynamic</span>(<span class="kw">_</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">unimplemented!</span>(),
-        <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> {}
-    }
-    <span class="ident">u</span>
-}
-
-<span class="doccomment">/// Creates a local `StorageBackend` to the given path.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">make_local_backend</span>(<span class="ident">path</span>: <span class="kw-2">&amp;</span><span class="ident">Path</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">StorageBackend</span> {
-    <span class="kw">let</span> <span class="ident">path</span> <span class="op">=</span> <span class="ident">path</span>.<span class="ident">display</span>().<span class="ident">to_string</span>();
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;prost-codec&quot;</span>)]</span>
-    {
-        <span class="ident">StorageBackend</span> {
-            <span class="ident">backend</span>: <span class="prelude-val">Some</span>(<span class="ident">Backend::Local</span>(<span class="ident">Local</span> { <span class="ident">path</span> })),
-        }
-    }
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;protobuf-codec&quot;</span>)]</span>
-    {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">backend</span> <span class="op">=</span> <span class="ident">StorageBackend::default</span>();
-        <span class="ident">backend</span>.<span class="ident">mut_local</span>().<span class="ident">set_path</span>(<span class="ident">path</span>);
-        <span class="ident">backend</span>
-    }
-}
-
-<span class="doccomment">/// Creates a noop `StorageBackend`.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">make_noop_backend</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">StorageBackend</span> {
-    <span class="kw">let</span> <span class="ident">noop</span> <span class="op">=</span> <span class="ident">Noop::default</span>();
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;prost-codec&quot;</span>)]</span>
-    {
-        <span class="ident">StorageBackend</span> {
-            <span class="ident">backend</span>: <span class="prelude-val">Some</span>(<span class="ident">Backend::Noop</span>(<span class="ident">noop</span>)),
-        }
-    }
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;protobuf-codec&quot;</span>)]</span>
-    {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">backend</span> <span class="op">=</span> <span class="ident">StorageBackend::default</span>();
-        <span class="ident">backend</span>.<span class="ident">set_noop</span>(<span class="ident">noop</span>);
-        <span class="ident">backend</span>
-    }
-}
-
-<span class="comment">// Creates a S3 `StorageBackend`</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">make_s3_backend</span>(<span class="ident">config</span>: <span class="ident">S3</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">StorageBackend</span> {
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;prost-codec&quot;</span>)]</span>
-    {
-        <span class="ident">StorageBackend</span> {
-            <span class="ident">backend</span>: <span class="prelude-val">Some</span>(<span class="ident">Backend::S3</span>(<span class="ident">config</span>)),
-        }
-    }
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;protobuf-codec&quot;</span>)]</span>
-    {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">backend</span> <span class="op">=</span> <span class="ident">StorageBackend::default</span>();
-        <span class="ident">backend</span>.<span class="ident">set_s3</span>(<span class="ident">config</span>);
-        <span class="ident">backend</span>
-    }
-}
-
-<span class="comment">// Creates a GCS `StorageBackend`</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">make_gcs_backend</span>(<span class="ident">config</span>: <span class="ident">Gcs</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">StorageBackend</span> {
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;prost-codec&quot;</span>)]</span>
-    {
-        <span class="ident">StorageBackend</span> {
-            <span class="ident">backend</span>: <span class="prelude-val">Some</span>(<span class="ident">Backend::Gcs</span>(<span class="ident">config</span>)),
-        }
-    }
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;protobuf-codec&quot;</span>)]</span>
-    {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">backend</span> <span class="op">=</span> <span class="ident">StorageBackend::default</span>();
-        <span class="ident">backend</span>.<span class="ident">set_gcs</span>(<span class="ident">config</span>);
-        <span class="ident">backend</span>
-    }
 }
 
 <span class="doccomment">/// An abstraction of an external storage.</span>
 <span class="comment">// TODO: these should all be returning a future (i.e. async fn).</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">ExternalStorage</span>: <span class="lifetime">&#39;static</span> {
+<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">ExternalStorage</span>: <span class="lifetime">&#39;static</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span> {
+    <span class="kw">fn</span> <span class="ident">name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>;
+
+    <span class="kw">fn</span> <span class="ident">url</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io::Result</span><span class="op">&lt;</span><span class="ident">url::Url</span><span class="op">&gt;</span>;
+
     <span class="doccomment">/// Write all contents of the read to the given path.</span>
     <span class="kw">fn</span> <span class="ident">write</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
@@ -427,11 +226,44 @@
         <span class="ident">reader</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">AsyncRead</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Unpin</span><span class="op">&gt;</span>,
         <span class="ident">content_length</span>: <span class="ident">u64</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span>;
+
     <span class="doccomment">/// Read all contents of the given path.</span>
     <span class="kw">fn</span> <span class="ident">read</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">AsyncRead</span> <span class="op">+</span> <span class="ident">Unpin</span> <span class="op">+</span> <span class="lifetime">&#39;_</span><span class="op">&gt;</span>;
+
+    <span class="doccomment">/// Read from external storage and restore to the given path</span>
+    <span class="kw">fn</span> <span class="ident">restore</span>(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="ident">storage_name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
+        <span class="ident">restore_name</span>: <span class="ident">std::path::PathBuf</span>,
+        <span class="ident">expected_length</span>: <span class="ident">u64</span>,
+        <span class="ident">speed_limiter</span>: <span class="kw-2">&amp;</span><span class="ident">Limiter</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">input</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">read</span>(<span class="ident">storage_name</span>);
+        <span class="kw">let</span> <span class="ident">output</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw">dyn</span> <span class="ident">Write</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">File::create</span>(<span class="ident">restore_name</span>)<span class="question-mark">?</span>;
+        <span class="comment">// the minimum speed of reading data, in bytes/second.</span>
+        <span class="comment">// if reading speed is slower than this rate, we will stop with</span>
+        <span class="comment">// a &quot;TimedOut&quot; error.</span>
+        <span class="comment">// (at 8 KB/s for a 2 MB buffer, this means we timeout after 4m16s.)</span>
+        <span class="kw">let</span> <span class="ident">min_read_speed</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">8192</span>;
+        <span class="ident">block_on_external_io</span>(<span class="ident">read_external_storage_into_file</span>(
+            <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">input</span>,
+            <span class="ident">output</span>,
+            <span class="ident">speed_limiter</span>,
+            <span class="ident">expected_length</span>,
+            <span class="ident">min_read_speed</span>,
+        ))
+    }
 }
 
 <span class="kw">impl</span> <span class="ident">ExternalStorage</span> <span class="kw">for</span> <span class="ident">Arc</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">ExternalStorage</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> {
+        (<span class="kw-2">*</span><span class="kw-2">*</span><span class="self">self</span>).<span class="ident">name</span>()
+    }
+
+    <span class="kw">fn</span> <span class="ident">url</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io::Result</span><span class="op">&lt;</span><span class="ident">url::Url</span><span class="op">&gt;</span> {
+        (<span class="kw-2">*</span><span class="kw-2">*</span><span class="self">self</span>).<span class="ident">url</span>()
+    }
+
     <span class="kw">fn</span> <span class="ident">write</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
@@ -440,75 +272,73 @@
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         (<span class="kw-2">*</span><span class="kw-2">*</span><span class="self">self</span>).<span class="ident">write</span>(<span class="ident">name</span>, <span class="ident">reader</span>, <span class="ident">content_length</span>)
     }
+
     <span class="kw">fn</span> <span class="ident">read</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">AsyncRead</span> <span class="op">+</span> <span class="ident">Unpin</span> <span class="op">+</span> <span class="lifetime">&#39;_</span><span class="op">&gt;</span> {
         (<span class="kw-2">*</span><span class="kw-2">*</span><span class="self">self</span>).<span class="ident">read</span>(<span class="ident">name</span>)
     }
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">tests</span> {
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
-    <span class="kw">use</span> <span class="ident">tempfile::Builder</span>;
+<span class="kw">impl</span> <span class="ident">ExternalStorage</span> <span class="kw">for</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">ExternalStorage</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> {
+        <span class="self">self</span>.<span class="ident">as_ref</span>().<span class="ident">name</span>()
+    }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_create_storage</span>() {
-        <span class="kw">let</span> <span class="ident">temp_dir</span> <span class="op">=</span> <span class="ident">Builder::new</span>().<span class="ident">tempdir</span>().<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">path</span> <span class="op">=</span> <span class="ident">temp_dir</span>.<span class="ident">path</span>();
-        <span class="kw">let</span> <span class="ident">backend</span> <span class="op">=</span> <span class="ident">make_local_backend</span>(<span class="kw-2">&amp;</span><span class="ident">path</span>.<span class="ident">join</span>(<span class="string">&quot;not_exist&quot;</span>));
-        <span class="kw">match</span> <span class="ident">create_storage</span>(<span class="kw-2">&amp;</span><span class="ident">backend</span>) {
-            <span class="prelude-val">Ok</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic!</span>(<span class="string">&quot;must be NotFound error&quot;</span>),
-            <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="macro">assert_eq!</span>(<span class="ident">e</span>.<span class="ident">kind</span>(), <span class="ident">io::ErrorKind::NotFound</span>);
-            }
+    <span class="kw">fn</span> <span class="ident">url</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io::Result</span><span class="op">&lt;</span><span class="ident">url::Url</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">as_ref</span>().<span class="ident">url</span>()
+    }
+
+    <span class="kw">fn</span> <span class="ident">write</span>(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
+        <span class="ident">reader</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">AsyncRead</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Unpin</span><span class="op">&gt;</span>,
+        <span class="ident">content_length</span>: <span class="ident">u64</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">as_ref</span>().<span class="ident">write</span>(<span class="ident">name</span>, <span class="ident">reader</span>, <span class="ident">content_length</span>)
+    }
+
+    <span class="kw">fn</span> <span class="ident">read</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">AsyncRead</span> <span class="op">+</span> <span class="ident">Unpin</span> <span class="op">+</span> <span class="lifetime">&#39;_</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">as_ref</span>().<span class="ident">read</span>(<span class="ident">name</span>)
+    }
+}
+
+<span class="kw">pub</span> <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">read_external_storage_into_file</span>(
+    <span class="ident">input</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> (<span class="kw">dyn</span> <span class="ident">AsyncRead</span> <span class="op">+</span> <span class="ident">Unpin</span>),
+    <span class="ident">output</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw">dyn</span> <span class="ident">Write</span>,
+    <span class="ident">speed_limiter</span>: <span class="kw-2">&amp;</span><span class="ident">Limiter</span>,
+    <span class="ident">expected_length</span>: <span class="ident">u64</span>,
+    <span class="ident">min_read_speed</span>: <span class="ident">usize</span>,
+) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="ident">dur</span> <span class="op">=</span> <span class="ident">Duration::from_secs</span>((<span class="ident">READ_BUF_SIZE</span> <span class="op">/</span> <span class="ident">min_read_speed</span>) <span class="kw">as</span> <span class="ident">u64</span>);
+
+    <span class="comment">// do the I/O copy from external_storage to the local file.</span>
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buffer</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="number">0u8</span>; <span class="ident">READ_BUF_SIZE</span>];
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">file_length</span> <span class="op">=</span> <span class="number">0</span>;
+
+    <span class="kw">loop</span> {
+        <span class="comment">// separate the speed limiting from actual reading so it won&#39;t</span>
+        <span class="comment">// affect the timeout calculation.</span>
+        <span class="kw">let</span> <span class="ident">bytes_read</span> <span class="op">=</span> <span class="ident">timeout</span>(<span class="ident">dur</span>, <span class="ident">input</span>.<span class="ident">read</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">buffer</span>))
+            .<span class="kw">await</span>
+            .<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">io::ErrorKind::TimedOut</span>)<span class="question-mark">?</span><span class="question-mark">?</span>;
+        <span class="kw">if</span> <span class="ident">bytes_read</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
+            <span class="kw">break</span>;
         }
-
-        <span class="kw">let</span> <span class="ident">backend</span> <span class="op">=</span> <span class="ident">make_local_backend</span>(<span class="ident">path</span>);
-        <span class="ident">create_storage</span>(<span class="kw-2">&amp;</span><span class="ident">backend</span>).<span class="ident">unwrap</span>();
-
-        <span class="kw">let</span> <span class="ident">backend</span> <span class="op">=</span> <span class="ident">make_noop_backend</span>();
-        <span class="ident">create_storage</span>(<span class="kw-2">&amp;</span><span class="ident">backend</span>).<span class="ident">unwrap</span>();
-
-        <span class="kw">let</span> <span class="ident">backend</span> <span class="op">=</span> <span class="ident">StorageBackend::default</span>();
-        <span class="macro">assert!</span>(<span class="ident">create_storage</span>(<span class="kw-2">&amp;</span><span class="ident">backend</span>).<span class="ident">is_err</span>());
+        <span class="ident">speed_limiter</span>.<span class="ident">consume</span>(<span class="ident">bytes_read</span>).<span class="kw">await</span>;
+        <span class="ident">output</span>.<span class="ident">write_all</span>(<span class="kw-2">&amp;</span><span class="ident">buffer</span>[..<span class="ident">bytes_read</span>])<span class="question-mark">?</span>;
+        <span class="ident">file_length</span> <span class="op">+</span><span class="op">=</span> <span class="ident">bytes_read</span> <span class="kw">as</span> <span class="ident">u64</span>;
     }
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">test_url_of_backend</span>() {
-        <span class="kw">use</span> <span class="ident">kvproto::backup::S3</span>;
-
-        <span class="kw">let</span> <span class="ident">backend</span> <span class="op">=</span> <span class="ident">make_local_backend</span>(<span class="ident">Path::new</span>(<span class="string">&quot;/tmp/a&quot;</span>));
-        <span class="macro">assert_eq!</span>(<span class="ident">url_of_backend</span>(<span class="kw-2">&amp;</span><span class="ident">backend</span>).<span class="ident">to_string</span>(), <span class="string">&quot;local:///tmp/a&quot;</span>);
-
-        <span class="kw">let</span> <span class="ident">backend</span> <span class="op">=</span> <span class="ident">make_noop_backend</span>();
-        <span class="macro">assert_eq!</span>(<span class="ident">url_of_backend</span>(<span class="kw-2">&amp;</span><span class="ident">backend</span>).<span class="ident">to_string</span>(), <span class="string">&quot;noop:///&quot;</span>);
-
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">backend</span> <span class="op">=</span> <span class="ident">StorageBackend</span> {
-            <span class="ident">backend</span>: <span class="prelude-val">Some</span>(<span class="ident">Backend::S3</span>(<span class="ident">S3</span> {
-                <span class="ident">bucket</span>: <span class="string">&quot;bucket&quot;</span>.<span class="ident">to_owned</span>(),
-                <span class="ident">prefix</span>: <span class="string">&quot;/backup 01/prefix/&quot;</span>.<span class="ident">to_owned</span>(),
-                <span class="ident">endpoint</span>: <span class="string">&quot;http://endpoint.com&quot;</span>.<span class="ident">to_owned</span>(),
-                <span class="comment">// ^ only &#39;bucket&#39; and &#39;prefix&#39; should be visible in url_of_backend()</span>
-                ..<span class="ident">S3::default</span>()
-            })),
-            ..<span class="ident">Default::default</span>()
-        };
-        <span class="macro">assert_eq!</span>(
-            <span class="ident">url_of_backend</span>(<span class="kw-2">&amp;</span><span class="ident">backend</span>).<span class="ident">to_string</span>(),
-            <span class="string">&quot;s3://bucket/backup%2001/prefix/&quot;</span>
-        );
-
-        <span class="ident">backend</span>.<span class="ident">backend</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">Backend::Gcs</span>(<span class="ident">Gcs</span> {
-            <span class="ident">bucket</span>: <span class="string">&quot;bucket&quot;</span>.<span class="ident">to_owned</span>(),
-            <span class="ident">prefix</span>: <span class="string">&quot;/backup 02/prefix/&quot;</span>.<span class="ident">to_owned</span>(),
-            <span class="ident">endpoint</span>: <span class="string">&quot;http://endpoint.com&quot;</span>.<span class="ident">to_owned</span>(),
-            <span class="comment">// ^ only &#39;bucket&#39; and &#39;prefix&#39; should be visible in url_of_backend()</span>
-            ..<span class="ident">Gcs::default</span>()
-        }));
-        <span class="macro">assert_eq!</span>(
-            <span class="ident">url_of_backend</span>(<span class="kw-2">&amp;</span><span class="ident">backend</span>).<span class="ident">to_string</span>(),
-            <span class="string">&quot;gcs://bucket/backup%2002/prefix/&quot;</span>
-        );
+    <span class="kw">if</span> <span class="ident">expected_length</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> <span class="op">&amp;&amp;</span> <span class="ident">expected_length</span> <span class="op">!</span><span class="op">=</span> <span class="ident">file_length</span> {
+        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">io::Error::new</span>(
+            <span class="ident">io::ErrorKind::InvalidData</span>,
+            <span class="macro">format!</span>(
+                <span class="string">&quot;downloaded size {}, expected {}&quot;</span>,
+                <span class="ident">file_length</span>, <span class="ident">expected_length</span>
+            ),
+        ));
     }
+
+    <span class="prelude-val">Ok</span>(())
 }
 </pre></div>
 </section><section id="search" class="content hidden"></section><section class="footer"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="external_storage" data-search-js="../../search-index.js"></div>

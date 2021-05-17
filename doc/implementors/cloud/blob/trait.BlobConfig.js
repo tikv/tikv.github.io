@@ -1,0 +1,5 @@
+(function() {var implementors = {};
+implementors["aws"] = [{"text":"impl <a class=\"trait\" href=\"cloud/blob/trait.BlobConfig.html\" title=\"trait cloud::blob::BlobConfig\">BlobConfig</a> for <a class=\"struct\" href=\"aws/s3/struct.Config.html\" title=\"struct aws::s3::Config\">Config</a>","synthetic":false,"types":["aws::s3::Config"]}];
+implementors["cloud"] = [];
+implementors["gcp"] = [{"text":"impl <a class=\"trait\" href=\"cloud/blob/trait.BlobConfig.html\" title=\"trait cloud::blob::BlobConfig\">BlobConfig</a> for <a class=\"struct\" href=\"gcp/gcs/struct.Config.html\" title=\"struct gcp::gcs::Config\">Config</a>","synthetic":false,"types":["gcp::gcs::Config"]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

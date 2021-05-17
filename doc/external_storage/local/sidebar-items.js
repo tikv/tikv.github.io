@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["LOCAL_STORAGE_TMP_FILE_SUFFIX",""]],"struct":[["LocalStorage","A storage saves files in local file system."]]});
+initSidebarItems({"constant":[["LOCAL_STORAGE_TMP_FILE_SUFFIX",""],["STORAGE_NAME",""]],"fn":[["url_for",""]],"struct":[["LocalStorage","A storage saves files in local file system."]]});

@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["create_backup",""]],"struct":[["BackupClient",""]],"trait":[["Backup",""]]});
+initSidebarItems({"fn":[["create_backup",""],["create_external_storage",""]],"struct":[["BackupClient",""],["ExternalStorageClient",""]],"trait":[["Backup",""],["ExternalStorage",""]]});

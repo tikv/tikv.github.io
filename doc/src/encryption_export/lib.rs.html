@@ -132,25 +132,45 @@
 <span id="129">129</span>
 <span id="130">130</span>
 <span id="131">131</span>
+<span id="132">132</span>
+<span id="133">133</span>
+<span id="134">134</span>
+<span id="135">135</span>
+<span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
+<span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
+<span id="144">144</span>
+<span id="145">145</span>
+<span id="146">146</span>
+<span id="147">147</span>
+<span id="148">148</span>
+<span id="149">149</span>
+<span id="150">150</span>
+<span id="151">151</span>
+<span id="152">152</span>
+<span id="153">153</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2021 TiKV Project Authors. Licensed under Apache-2.0.</span>
-
 <span class="kw">use</span> <span class="ident">async_trait::async_trait</span>;
 <span class="kw">use</span> <span class="ident">derive_more::Deref</span>;
 <span class="kw">use</span> <span class="ident">error_code</span>::{<span class="self">self</span>, <span class="ident">ErrorCode</span>, <span class="ident">ErrorCodeExt</span>};
 <span class="kw">use</span> <span class="ident">std::fmt::Debug</span>;
 <span class="kw">use</span> <span class="ident">std::path::Path</span>;
-<span class="kw">use</span> <span class="ident">tikv_util::error</span>;
-<span class="kw">use</span> <span class="ident">tikv_util::impl_format_delegate_newtype</span>;
 <span class="kw">use</span> <span class="ident">tikv_util::stream::RetryError</span>;
+<span class="kw">use</span> <span class="ident">tikv_util</span>::{<span class="ident">error</span>, <span class="ident">info</span>};
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;aws&quot;</span>)]</span>
-<span class="kw">use</span> <span class="ident">aws</span>::{<span class="ident">AwsKms</span>, <span class="ident">AWS_VENDOR_NAME</span>};
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;aws&quot;</span>)]</span>
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;cloud-aws&quot;</span>)]</span>
+<span class="kw">use</span> <span class="ident">aws</span>::{<span class="ident">AwsKms</span>, <span class="ident">STORAGE_VENDOR_NAME_AWS</span>};
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;cloud-aws&quot;</span>)]</span>
 <span class="kw">use</span> <span class="ident">cloud::kms::Config</span> <span class="kw">as</span> <span class="ident">CloudConfig</span>;
 <span class="kw">use</span> <span class="ident">cloud::kms</span>::{<span class="ident">EncryptedKey</span> <span class="kw">as</span> <span class="ident">CloudEncryptedKey</span>, <span class="ident">KmsProvider</span> <span class="kw">as</span> <span class="ident">CloudKmsProvider</span>};
 <span class="kw">use</span> <span class="ident">cloud::Error</span> <span class="kw">as</span> <span class="ident">CloudError</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;aws&quot;</span>)]</span>
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;cloud-aws&quot;</span>)]</span>
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">encryption::KmsBackend</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">encryption</span>::{
     <span class="ident">encryption_method_from_db_encryption_method</span>, <span class="ident">Backend</span>, <span class="ident">DataKeyManager</span>, <span class="ident">DataKeyManagerArgs</span>,
@@ -185,13 +205,25 @@
     <span class="ident">result</span>
 }
 
+<span class="kw">fn</span> <span class="ident">cloud_convert_error</span>(<span class="ident">msg</span>: <span class="ident">String</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">FnOnce</span>(<span class="ident">CloudError</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">CloudConvertError</span><span class="op">&gt;</span> {
+    <span class="ident">Box::new</span>(<span class="op">|</span><span class="ident">err</span>: <span class="ident">CloudError</span><span class="op">|</span> <span class="ident">CloudConvertError</span>(<span class="ident">err</span>, <span class="ident">msg</span>))
+}
+
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create_cloud_backend</span>(<span class="ident">config</span>: <span class="kw-2">&amp;</span><span class="ident">KmsConfig</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Backend</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    <span class="macro">info!</span>(<span class="string">&quot;Encryption init cloud backend&quot;</span>;
+        <span class="string">&quot;region&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">config</span>.<span class="ident">region</span>,
+        <span class="string">&quot;endpoint&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">config</span>.<span class="ident">endpoint</span>,
+        <span class="string">&quot;key_id&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">config</span>.<span class="ident">key_id</span>,
+        <span class="string">&quot;vendor&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">config</span>.<span class="ident">vendor</span>,
+    );
     <span class="kw">match</span> <span class="ident">config</span>.<span class="ident">vendor</span>.<span class="ident">as_str</span>() {
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;aws&quot;</span>)]</span>
-        <span class="ident">AWS_VENDOR_NAME</span> <span class="op">|</span> <span class="string">&quot;&quot;</span> <span class="op">=</span><span class="op">&gt;</span> {
-            <span class="kw">let</span> <span class="ident">conf</span> <span class="op">=</span>
-                <span class="ident">CloudConfig::from_proto</span>(<span class="ident">config</span>.<span class="ident">clone</span>().<span class="ident">into_proto</span>()).<span class="ident">map_err</span>(<span class="ident">CloudConvertError</span>)<span class="question-mark">?</span>;
-            <span class="kw">let</span> <span class="ident">kms_provider</span> <span class="op">=</span> <span class="ident">CloudKms</span>(<span class="ident">Box::new</span>(<span class="ident">AwsKms::new</span>(<span class="ident">conf</span>).<span class="ident">map_err</span>(<span class="ident">CloudConvertError</span>)<span class="question-mark">?</span>));
+        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;cloud-aws&quot;</span>)]</span>
+        <span class="ident">STORAGE_VENDOR_NAME_AWS</span> <span class="op">|</span> <span class="string">&quot;&quot;</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="kw">let</span> <span class="ident">conf</span> <span class="op">=</span> <span class="ident">CloudConfig::from_proto</span>(<span class="ident">config</span>.<span class="ident">clone</span>().<span class="ident">into_proto</span>())
+                .<span class="ident">map_err</span>(<span class="ident">cloud_convert_error</span>(<span class="string">&quot;aws from proto&quot;</span>.<span class="ident">to_owned</span>()))<span class="question-mark">?</span>;
+            <span class="kw">let</span> <span class="ident">kms_provider</span> <span class="op">=</span> <span class="ident">CloudKms</span>(<span class="ident">Box::new</span>(
+                <span class="ident">AwsKms::new</span>(<span class="ident">conf</span>).<span class="ident">map_err</span>(<span class="ident">cloud_convert_error</span>(<span class="string">&quot;new AWS KMS&quot;</span>.<span class="ident">to_owned</span>()))<span class="question-mark">?</span>,
+            ));
             <span class="prelude-val">Ok</span>(<span class="ident">Box::new</span>(<span class="ident">KmsBackend::new</span>(<span class="ident">Box::new</span>(<span class="ident">kms_provider</span>))<span class="question-mark">?</span>) <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Backend</span><span class="op">&gt;</span>)
         }
         <span class="ident">provider</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Err</span>(<span class="ident">Error::Other</span>(<span class="macro">box_err!</span>(<span class="string">&quot;provider not found {}&quot;</span>, <span class="ident">provider</span>))),
@@ -218,7 +250,10 @@
         <span class="kw">let</span> <span class="ident">cdk</span> <span class="op">=</span> (<span class="kw-2">*</span><span class="kw-2">*</span><span class="self">self</span>)
             .<span class="ident">generate_data_key</span>()
             .<span class="kw">await</span>
-            .<span class="ident">map_err</span>(<span class="ident">CloudConvertError</span>)<span class="question-mark">?</span>;
+            .<span class="ident">map_err</span>(<span class="ident">cloud_convert_error</span>(<span class="macro">format!</span>(
+                <span class="string">&quot;{} generate data key API&quot;</span>,
+                <span class="self">self</span>.<span class="ident">name</span>()
+            )))<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(<span class="ident">DataKeyPair</span> {
             <span class="ident">plaintext</span>: <span class="ident">PlainKey::new</span>(<span class="ident">cdk</span>.<span class="ident">plaintext</span>.<span class="ident">to_vec</span>())<span class="question-mark">?</span>,
             <span class="ident">encrypted</span>: <span class="ident">EncryptedKey::new</span>(<span class="ident">cdk</span>.<span class="ident">encrypted</span>.<span class="ident">to_vec</span>())<span class="question-mark">?</span>,
@@ -226,26 +261,35 @@
     }
 
     <span class="kw">async</span> <span class="kw">fn</span> <span class="ident">decrypt_data_key</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">data_key</span>: <span class="kw-2">&amp;</span><span class="ident">EncryptedKey</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> <span class="ident">CloudEncryptedKey::new</span>((<span class="kw-2">*</span><span class="ident">data_key</span>).<span class="ident">to_vec</span>()).<span class="ident">map_err</span>(<span class="ident">CloudConvertError</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> <span class="ident">CloudEncryptedKey::new</span>((<span class="kw-2">*</span><span class="ident">data_key</span>).<span class="ident">to_vec</span>()).<span class="ident">map_err</span>(<span class="ident">cloud_convert_error</span>(
+            <span class="macro">format!</span>(<span class="string">&quot;{} data key init for decrypt&quot;</span>, <span class="self">self</span>.<span class="ident">name</span>()),
+        ))<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>((<span class="kw-2">*</span><span class="kw-2">*</span><span class="self">self</span>)
             .<span class="ident">decrypt_data_key</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>)
             .<span class="kw">await</span>
-            .<span class="ident">map_err</span>(<span class="ident">CloudConvertError</span>)<span class="question-mark">?</span>)
+            .<span class="ident">map_err</span>(<span class="ident">cloud_convert_error</span>(<span class="macro">format!</span>(
+                <span class="string">&quot;{} decrypt data key API&quot;</span>,
+                <span class="self">self</span>.<span class="ident">name</span>()
+            )))<span class="question-mark">?</span>)
     }
 
-    <span class="kw">fn</span> <span class="ident">name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span>[<span class="ident">u8</span>] {
+    <span class="kw">fn</span> <span class="ident">name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">str</span> {
         (<span class="kw-2">*</span><span class="kw-2">*</span><span class="self">self</span>).<span class="ident">name</span>()
     }
 }
 
 <span class="comment">// CloudConverError adapts cloud errors to encryption errors</span>
 <span class="comment">// As the abstract RetryCodedError</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Deref</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CloudConvertError</span>(<span class="ident">CloudError</span>);
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CloudConvertError</span>(<span class="ident">CloudError</span>, <span class="ident">String</span>);
 
 <span class="kw">impl</span> <span class="ident">RetryCodedError</span> <span class="kw">for</span> <span class="ident">CloudConvertError</span> {}
 
-<span class="macro">impl_format_delegate_newtype!</span>(<span class="ident">CloudConvertError</span>);
+<span class="kw">impl</span> <span class="ident">std::fmt::Display</span> <span class="kw">for</span> <span class="ident">CloudConvertError</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">std::fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">std::fmt::Result</span> {
+        <span class="ident">f</span>.<span class="ident">write_fmt</span>(<span class="macro">format_args!</span>(<span class="string">&quot;{} {}&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">1</span>))
+    }
+}
 
 <span class="kw">impl</span> <span class="ident">std::convert::From</span><span class="op">&lt;</span><span class="ident">CloudConvertError</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Error</span> {
     <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">err</span>: <span class="ident">CloudConvertError</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Error</span> {

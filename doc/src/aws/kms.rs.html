@@ -271,6 +271,23 @@
 <span id="268">268</span>
 <span id="269">269</span>
 <span id="270">270</span>
+<span id="271">271</span>
+<span id="272">272</span>
+<span id="273">273</span>
+<span id="274">274</span>
+<span id="275">275</span>
+<span id="276">276</span>
+<span id="277">277</span>
+<span id="278">278</span>
+<span id="279">279</span>
+<span id="280">280</span>
+<span id="281">281</span>
+<span id="282">282</span>
+<span id="283">283</span>
+<span id="284">284</span>
+<span id="285">285</span>
+<span id="286">286</span>
+<span id="287">287</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2021 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -289,8 +306,7 @@
 <span class="kw">use</span> <span class="ident">cloud::kms</span>::{<span class="ident">Config</span>, <span class="ident">DataKeyPair</span>, <span class="ident">EncryptedKey</span>, <span class="ident">KeyId</span>, <span class="ident">KmsProvider</span>, <span class="ident">PlainKey</span>};
 
 <span class="kw">const</span> <span class="ident">AWS_KMS_DATA_KEY_SPEC</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;AES_256&quot;</span>;
-<span class="kw">const</span> <span class="ident">AWS_KMS_VENDOR_NAME</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>] <span class="op">=</span> <span class="string">b&quot;AWS&quot;</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">AWS_VENDOR_NAME</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;aws&quot;</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ENCRYPTION_VENDOR_NAME_AWS_KMS</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;AWS&quot;</span>;
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">AwsKms</span> {
     <span class="ident">client</span>: <span class="ident">KmsClient</span>,
@@ -351,8 +367,8 @@
 
 <span class="attribute">#[<span class="ident">async_trait</span>]</span>
 <span class="kw">impl</span> <span class="ident">KmsProvider</span> <span class="kw">for</span> <span class="ident">AwsKms</span> {
-    <span class="kw">fn</span> <span class="ident">name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span>[<span class="ident">u8</span>] {
-        <span class="ident">AWS_KMS_VENDOR_NAME</span>
+    <span class="kw">fn</span> <span class="ident">name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">str</span> {
+        <span class="ident">ENCRYPTION_VENDOR_NAME_AWS_KMS</span>
     }
 
     <span class="comment">// On decrypt failure, the rule is to return WrongMasterKey error in case it is possible that</span>
@@ -398,6 +414,24 @@
     }
 }
 
+<span class="comment">// Rusoto errors Display implementation just gives the cause message and discards the type.</span>
+<span class="comment">// This is really bad when the cause message is empty!</span>
+<span class="comment">// Use Debug instead: this will show both</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">FixRusotoErrorDisplay</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">std::fmt::Debug</span> <span class="op">+</span> <span class="ident">std::error::Error</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span>(
+    <span class="ident">RusotoError</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>,
+);
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">std::error::Error</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span> <span class="ident">std::fmt::Debug</span> <span class="kw">for</span> <span class="ident">FixRusotoErrorDisplay</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">std::fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">std::fmt::Result</span> {
+        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;{:?}&quot;</span>, <span class="self">self</span>.<span class="number">0</span>)
+    }
+}
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">std::error::Error</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span> <span class="ident">std::fmt::Display</span> <span class="kw">for</span> <span class="ident">FixRusotoErrorDisplay</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">std::fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">std::fmt::Result</span> {
+        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;{:?}&quot;</span>, <span class="self">self</span>.<span class="number">0</span>)
+    }
+}
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">std::error::Error</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span> <span class="ident">std::error::Error</span> <span class="kw">for</span> <span class="ident">FixRusotoErrorDisplay</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {}
+
 <span class="kw">fn</span> <span class="ident">classify_generate_data_key_error</span>(<span class="ident">err</span>: <span class="ident">RusotoError</span><span class="op">&lt;</span><span class="ident">GenerateDataKeyError</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Error</span> {
     <span class="kw">if</span> <span class="kw">let</span> <span class="ident">RusotoError::Service</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">err</span> {
         <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="ident">e</span> {
@@ -407,7 +441,7 @@
             }
             <span class="ident">GenerateDataKeyError::DependencyTimeout</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Error::ApiTimeout</span>(<span class="ident">err</span>.<span class="ident">into</span>()),
             <span class="ident">GenerateDataKeyError::KMSInternal</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Error::ApiInternal</span>(<span class="ident">err</span>.<span class="ident">into</span>()),
-            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Error::KmsError</span>(<span class="ident">KmsError::Other</span>(<span class="ident">err</span>.<span class="ident">into</span>())),
+            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Error::KmsError</span>(<span class="ident">KmsError::Other</span>(<span class="ident">FixRusotoErrorDisplay</span>(<span class="ident">err</span>).<span class="ident">into</span>())),
         }
     } <span class="kw">else</span> {
         <span class="ident">classify_error</span>(<span class="ident">err</span>)
@@ -422,7 +456,7 @@
             }
             <span class="ident">DecryptError::DependencyTimeout</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Error::ApiTimeout</span>(<span class="ident">err</span>.<span class="ident">into</span>()),
             <span class="ident">DecryptError::KMSInternal</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Error::ApiInternal</span>(<span class="ident">err</span>.<span class="ident">into</span>()),
-            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Error::KmsError</span>(<span class="ident">KmsError::Other</span>(<span class="ident">err</span>.<span class="ident">into</span>())),
+            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Error::KmsError</span>(<span class="ident">KmsError::Other</span>(<span class="ident">FixRusotoErrorDisplay</span>(<span class="ident">err</span>).<span class="ident">into</span>())),
         }
     } <span class="kw">else</span> {
         <span class="ident">classify_error</span>(<span class="ident">err</span>)
@@ -434,7 +468,7 @@
         <span class="ident">RusotoError::HttpDispatch</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Error::ApiTimeout</span>(<span class="ident">err</span>.<span class="ident">into</span>()),
         <span class="ident">RusotoError::Credentials</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Error::ApiAuthentication</span>(<span class="ident">err</span>.<span class="ident">into</span>()),
         <span class="ident">e</span> <span class="kw">if</span> <span class="ident">e</span>.<span class="ident">is_retryable</span>() <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Error::ApiInternal</span>(<span class="ident">err</span>.<span class="ident">into</span>()),
-        <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Error::Other</span>(<span class="ident">err</span>.<span class="ident">into</span>()),
+        <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Error::KmsError</span>(<span class="ident">KmsError::Other</span>(<span class="ident">FixRusotoErrorDisplay</span>(<span class="ident">err</span>).<span class="ident">into</span>())),
     }
 }
 
