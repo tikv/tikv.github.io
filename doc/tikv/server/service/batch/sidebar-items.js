@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["future_batch_get_command",""],["future_batch_raw_get_command",""]],"struct":[["ReqBatcher",""]]});
+initSidebarItems({"constant":[["MAX_BATCH_GET_REQUEST_COUNT",""],["MAX_QUEUE_SIZE_PER_WORKER",""],["MIN_BATCH_GET_REQUEST_COUNT",""]],"fn":[["future_batch_get_command",""],["future_batch_raw_get_command",""]],"struct":[["BatcherBuilder",""],["GetCommandResponseConsumer",""],["ReqBatcher",""]]});

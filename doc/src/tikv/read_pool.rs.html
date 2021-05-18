@@ -314,6 +314,37 @@
 <span id="311">311</span>
 <span id="312">312</span>
 <span id="313">313</span>
+<span id="314">314</span>
+<span id="315">315</span>
+<span id="316">316</span>
+<span id="317">317</span>
+<span id="318">318</span>
+<span id="319">319</span>
+<span id="320">320</span>
+<span id="321">321</span>
+<span id="322">322</span>
+<span id="323">323</span>
+<span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
+<span id="329">329</span>
+<span id="330">330</span>
+<span id="331">331</span>
+<span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
+<span id="336">336</span>
+<span id="337">337</span>
+<span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+<span id="341">341</span>
+<span id="342">342</span>
+<span id="343">343</span>
+<span id="344">344</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -346,6 +377,7 @@
         <span class="ident">pool</span>: <span class="ident">yatp::ThreadPool</span><span class="op">&lt;</span><span class="ident">TaskCell</span><span class="op">&gt;</span>,
         <span class="ident">running_tasks</span>: <span class="ident">IntGauge</span>,
         <span class="ident">max_tasks</span>: <span class="ident">usize</span>,
+        <span class="ident">pool_size</span>: <span class="ident">usize</span>,
     },
 }
 
@@ -365,10 +397,12 @@
                 <span class="ident">pool</span>,
                 <span class="ident">running_tasks</span>,
                 <span class="ident">max_tasks</span>,
+                <span class="ident">pool_size</span>,
             } <span class="op">=</span><span class="op">&gt;</span> <span class="ident">ReadPoolHandle::Yatp</span> {
                 <span class="ident">remote</span>: <span class="ident">pool</span>.<span class="ident">remote</span>().<span class="ident">clone</span>(),
                 <span class="ident">running_tasks</span>: <span class="ident">running_tasks</span>.<span class="ident">clone</span>(),
                 <span class="ident">max_tasks</span>: <span class="kw-2">*</span><span class="ident">max_tasks</span>,
+                <span class="ident">pool_size</span>: <span class="kw-2">*</span><span class="ident">pool_size</span>,
             },
         }
     }
@@ -385,6 +419,7 @@
         <span class="ident">remote</span>: <span class="ident">Remote</span><span class="op">&lt;</span><span class="ident">TaskCell</span><span class="op">&gt;</span>,
         <span class="ident">running_tasks</span>: <span class="ident">IntGauge</span>,
         <span class="ident">max_tasks</span>: <span class="ident">usize</span>,
+        <span class="ident">pool_size</span>: <span class="ident">usize</span>,
     },
 }
 
@@ -411,6 +446,7 @@
                 <span class="ident">remote</span>,
                 <span class="ident">running_tasks</span>,
                 <span class="ident">max_tasks</span>,
+                ..
             } <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> <span class="ident">running_tasks</span> <span class="op">=</span> <span class="ident">running_tasks</span>.<span class="ident">clone</span>();
                 <span class="comment">// Note that the running task number limit is not strict.</span>
@@ -421,6 +457,7 @@
                     <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">ReadPoolError::UnifiedReadPoolFull</span>);
                 }
 
+                <span class="ident">running_tasks</span>.<span class="ident">inc</span>();
                 <span class="kw">let</span> <span class="ident">fixed_level</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">priority</span> {
                     <span class="ident">CommandPri::High</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Some</span>(<span class="number">0</span>),
                     <span class="ident">CommandPri::Normal</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">None</span>,
@@ -429,7 +466,6 @@
                 <span class="kw">let</span> <span class="ident">extras</span> <span class="op">=</span> <span class="ident">Extras::new_multilevel</span>(<span class="ident">task_id</span>, <span class="ident">fixed_level</span>);
                 <span class="kw">let</span> <span class="ident">task_cell</span> <span class="op">=</span> <span class="ident">TaskCell::new</span>(
                     <span class="kw">async</span> <span class="kw">move</span> {
-                        <span class="ident">running_tasks</span>.<span class="ident">inc</span>();
                         <span class="ident">f</span>.<span class="kw">await</span>;
                         <span class="ident">running_tasks</span>.<span class="ident">dec</span>();
                     },
@@ -463,6 +499,31 @@
         <span class="kw">async</span> <span class="kw">move</span> {
             <span class="ident">res</span><span class="question-mark">?</span>;
             <span class="ident">rx</span>.<span class="ident">map_err</span>(<span class="ident">ReadPoolError::from</span>).<span class="kw">await</span>
+        }
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_normal_pool_size</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+        <span class="kw">match</span> <span class="self">self</span> {
+            <span class="ident">ReadPoolHandle::FuturePools</span> {
+                <span class="ident">read_pool_normal</span>, ..
+            } <span class="op">=</span><span class="op">&gt;</span> <span class="ident">read_pool_normal</span>.<span class="ident">get_pool_size</span>(),
+            <span class="ident">ReadPoolHandle::Yatp</span> { <span class="ident">pool_size</span>, .. } <span class="op">=</span><span class="op">&gt;</span> <span class="kw-2">*</span><span class="ident">pool_size</span>,
+        }
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_queue_size_per_worker</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+        <span class="kw">match</span> <span class="self">self</span> {
+            <span class="ident">ReadPoolHandle::FuturePools</span> {
+                <span class="ident">read_pool_normal</span>, ..
+            } <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="ident">read_pool_normal</span>.<span class="ident">get_running_task_count</span>() <span class="kw">as</span> <span class="ident">usize</span>
+                    <span class="op">/</span> <span class="ident">read_pool_normal</span>.<span class="ident">get_pool_size</span>()
+            }
+            <span class="ident">ReadPoolHandle::Yatp</span> {
+                <span class="ident">running_tasks</span>,
+                <span class="ident">pool_size</span>,
+                ..
+            } <span class="op">=</span><span class="op">&gt;</span> <span class="ident">running_tasks</span>.<span class="ident">get</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">/</span> <span class="kw-2">*</span><span class="ident">pool_size</span>,
         }
     }
 }
@@ -529,6 +590,7 @@
         <span class="ident">max_tasks</span>: <span class="ident">config</span>
             .<span class="ident">max_tasks_per_worker</span>
             .<span class="ident">saturating_mul</span>(<span class="ident">config</span>.<span class="ident">max_thread_count</span>),
+        <span class="ident">pool_size</span>: <span class="ident">config</span>.<span class="ident">max_thread_count</span>,
     }
 }
 

@@ -539,16 +539,6 @@
 <span id="536">536</span>
 <span id="537">537</span>
 <span id="538">538</span>
-<span id="539">539</span>
-<span id="540">540</span>
-<span id="541">541</span>
-<span id="542">542</span>
-<span id="543">543</span>
-<span id="544">544</span>
-<span id="545">545</span>
-<span id="546">546</span>
-<span id="547">547</span>
-<span id="548">548</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -618,7 +608,6 @@
     <span class="ident">stats_pool</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Runtime</span><span class="op">&gt;</span>,
     <span class="ident">grpc_thread_load</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">ThreadLoad</span><span class="op">&gt;</span>,
     <span class="ident">yatp_read_pool</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ReadPool</span><span class="op">&gt;</span>,
-    <span class="ident">readpool_normal_thread_load</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">ThreadLoad</span><span class="op">&gt;</span>,
     <span class="ident">debug_thread_pool</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Runtime</span><span class="op">&gt;</span>,
     <span class="ident">health_service</span>: <span class="ident">HealthService</span>,
     <span class="ident">timer</span>: <span class="ident">Handle</span>,
@@ -655,8 +644,6 @@
             <span class="prelude-val">None</span>
         };
         <span class="kw">let</span> <span class="ident">grpc_thread_load</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">ThreadLoad::with_threshold</span>(<span class="ident">cfg</span>.<span class="ident">heavy_load_threshold</span>));
-        <span class="kw">let</span> <span class="ident">readpool_normal_thread_load</span> <span class="op">=</span>
-            <span class="ident">Arc::new</span>(<span class="ident">ThreadLoad::with_threshold</span>(<span class="ident">cfg</span>.<span class="ident">heavy_load_threshold</span>));
 
         <span class="kw">let</span> <span class="ident">snap_worker</span> <span class="op">=</span> <span class="ident">Worker::new</span>(<span class="string">&quot;snap-handler&quot;</span>);
         <span class="kw">let</span> <span class="ident">lazy_worker</span> <span class="op">=</span> <span class="ident">snap_worker</span>.<span class="ident">lazy_build</span>(<span class="string">&quot;snap-handler&quot;</span>);
@@ -671,7 +658,6 @@
             <span class="ident">raft_router</span>.<span class="ident">clone</span>(),
             <span class="ident">lazy_worker</span>.<span class="ident">scheduler</span>(),
             <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">grpc_thread_load</span>),
-            <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">readpool_normal_thread_load</span>),
             <span class="ident">cfg</span>.<span class="ident">enable_request_batch</span>,
             <span class="ident">proxy</span>,
         );
@@ -724,7 +710,6 @@
             <span class="ident">stats_pool</span>,
             <span class="ident">grpc_thread_load</span>,
             <span class="ident">yatp_read_pool</span>,
-            <span class="ident">readpool_normal_thread_load</span>,
             <span class="ident">debug_thread_pool</span>,
             <span class="ident">health_service</span>,
             <span class="ident">timer</span>: <span class="ident">GLOBAL_TIMER_HANDLE</span>.<span class="ident">clone</span>(),
@@ -794,10 +779,6 @@
             <span class="kw">let</span> <span class="ident">tl</span> <span class="op">=</span> <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">grpc_thread_load</span>);
             <span class="ident">ThreadLoadStatistics::new</span>(<span class="ident">LOAD_STATISTICS_SLOTS</span>, <span class="ident">GRPC_THREAD_PREFIX</span>, <span class="ident">tl</span>)
         };
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">readpool_normal_load_stats</span> <span class="op">=</span> {
-            <span class="kw">let</span> <span class="ident">tl</span> <span class="op">=</span> <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">readpool_normal_thread_load</span>);
-            <span class="ident">ThreadLoadStatistics::new</span>(<span class="ident">LOAD_STATISTICS_SLOTS</span>, <span class="ident">READPOOL_NORMAL_THREAD_PREFIX</span>, <span class="ident">tl</span>)
-        };
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">delay</span> <span class="op">=</span> <span class="self">self</span>
             .<span class="ident">timer</span>
             .<span class="ident">interval</span>(<span class="ident">Instant::now</span>(), <span class="ident">LOAD_STATISTICS_INTERVAL</span>)
@@ -806,7 +787,6 @@
             <span class="ident">p</span>.<span class="ident">spawn</span>(<span class="kw">async</span> <span class="kw">move</span> {
                 <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(<span class="ident">i</span>)) <span class="op">=</span> <span class="ident">delay</span>.<span class="ident">next</span>().<span class="kw">await</span> {
                     <span class="ident">grpc_load_stats</span>.<span class="ident">record</span>(<span class="ident">i</span>);
-                    <span class="ident">readpool_normal_load_stats</span>.<span class="ident">record</span>(<span class="ident">i</span>);
                 }
             });
         };
