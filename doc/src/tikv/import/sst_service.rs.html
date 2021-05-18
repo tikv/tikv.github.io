@@ -518,15 +518,89 @@
 <span id="515">515</span>
 <span id="516">516</span>
 <span id="517">517</span>
+<span id="518">518</span>
+<span id="519">519</span>
+<span id="520">520</span>
+<span id="521">521</span>
+<span id="522">522</span>
+<span id="523">523</span>
+<span id="524">524</span>
+<span id="525">525</span>
+<span id="526">526</span>
+<span id="527">527</span>
+<span id="528">528</span>
+<span id="529">529</span>
+<span id="530">530</span>
+<span id="531">531</span>
+<span id="532">532</span>
+<span id="533">533</span>
+<span id="534">534</span>
+<span id="535">535</span>
+<span id="536">536</span>
+<span id="537">537</span>
+<span id="538">538</span>
+<span id="539">539</span>
+<span id="540">540</span>
+<span id="541">541</span>
+<span id="542">542</span>
+<span id="543">543</span>
+<span id="544">544</span>
+<span id="545">545</span>
+<span id="546">546</span>
+<span id="547">547</span>
+<span id="548">548</span>
+<span id="549">549</span>
+<span id="550">550</span>
+<span id="551">551</span>
+<span id="552">552</span>
+<span id="553">553</span>
+<span id="554">554</span>
+<span id="555">555</span>
+<span id="556">556</span>
+<span id="557">557</span>
+<span id="558">558</span>
+<span id="559">559</span>
+<span id="560">560</span>
+<span id="561">561</span>
+<span id="562">562</span>
+<span id="563">563</span>
+<span id="564">564</span>
+<span id="565">565</span>
+<span id="566">566</span>
+<span id="567">567</span>
+<span id="568">568</span>
+<span id="569">569</span>
+<span id="570">570</span>
+<span id="571">571</span>
+<span id="572">572</span>
+<span id="573">573</span>
+<span id="574">574</span>
+<span id="575">575</span>
+<span id="576">576</span>
+<span id="577">577</span>
+<span id="578">578</span>
+<span id="579">579</span>
+<span id="580">580</span>
+<span id="581">581</span>
+<span id="582">582</span>
+<span id="583">583</span>
+<span id="584">584</span>
+<span id="585">585</span>
+<span id="586">586</span>
+<span id="587">587</span>
+<span id="588">588</span>
+<span id="589">589</span>
+<span id="590">590</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
+<span class="kw">use</span> <span class="ident">std::future::Future</span>;
 <span class="kw">use</span> <span class="ident">std::path::PathBuf</span>;
 <span class="kw">use</span> <span class="ident">std::sync</span>::{<span class="ident">Arc</span>, <span class="ident">Mutex</span>};
 
 <span class="kw">use</span> <span class="ident">collections::HashSet</span>;
 
-<span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">name_to_cf</span>, <span class="ident">KvEngine</span>, <span class="ident">CF_DEFAULT</span>};
+<span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">name_to_cf</span>, <span class="ident">KvEngine</span>, <span class="ident">CF_WRITE</span>};
 <span class="kw">use</span> <span class="ident">file_system</span>::{<span class="ident">set_io_type</span>, <span class="ident">IOType</span>};
 <span class="kw">use</span> <span class="ident">futures::executor</span>::{<span class="ident">ThreadPool</span>, <span class="ident">ThreadPoolBuilder</span>};
 <span class="kw">use</span> <span class="ident">futures</span>::{<span class="ident">TryFutureExt</span>, <span class="ident">TryStreamExt</span>};
@@ -539,6 +613,7 @@
 <span class="kw">use</span> <span class="ident">kvproto::import_sstpb::WriteRequest_oneof_chunk</span> <span class="kw">as</span> <span class="ident">Chunk</span>;
 <span class="kw">use</span> <span class="ident">kvproto::import_sstpb</span>::<span class="kw-2">*</span>;
 
+<span class="kw">use</span> <span class="ident">kvproto::kvrpcpb::Context</span>;
 <span class="kw">use</span> <span class="ident">kvproto::raft_cmdpb</span>::<span class="kw-2">*</span>;
 
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::server::CONFIG_ROCKSDB_GAUGE</span>;
@@ -614,6 +689,106 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">slots</span> <span class="op">=</span> <span class="ident">task_slots</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">p</span> <span class="op">=</span> <span class="ident">sst_meta_to_path</span>(<span class="ident">meta</span>)<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(<span class="ident">slots</span>.<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="ident">p</span>))
+    }
+
+    <span class="kw">fn</span> <span class="ident">check_write_stall</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">errorpb::Error</span><span class="op">&gt;</span> {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">importer</span>.<span class="ident">get_mode</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">SwitchMode::Normal</span>
+            <span class="op">&amp;&amp;</span> <span class="self">self</span>
+                .<span class="ident">engine</span>
+                .<span class="ident">ingest_maybe_slowdown_writes</span>(<span class="ident">CF_WRITE</span>)
+                .<span class="ident">expect</span>(<span class="string">&quot;cf&quot;</span>)
+        {
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">errorpb</span> <span class="op">=</span> <span class="ident">errorpb::Error::default</span>();
+            <span class="kw">let</span> <span class="ident">err</span> <span class="op">=</span> <span class="string">&quot;too many sst files are ingesting&quot;</span>;
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">server_is_busy_err</span> <span class="op">=</span> <span class="ident">errorpb::ServerIsBusy::default</span>();
+            <span class="ident">server_is_busy_err</span>.<span class="ident">set_reason</span>(<span class="ident">err</span>.<span class="ident">to_string</span>());
+            <span class="ident">errorpb</span>.<span class="ident">set_message</span>(<span class="ident">err</span>.<span class="ident">to_string</span>());
+            <span class="ident">errorpb</span>.<span class="ident">set_server_is_busy</span>(<span class="ident">server_is_busy_err</span>);
+            <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">errorpb</span>);
+        }
+        <span class="prelude-val">None</span>
+    }
+
+    <span class="kw">fn</span> <span class="ident">ingest_files</span>(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="kw-2">mut</span> <span class="ident">context</span>: <span class="ident">Context</span>,
+        <span class="ident">label</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>,
+        <span class="ident">ssts</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SstMeta</span><span class="op">&gt;</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="kw">impl</span> <span class="ident">Future</span><span class="op">&lt;</span><span class="ident">Output</span> <span class="op">=</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">IngestResponse</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">header</span> <span class="op">=</span> <span class="ident">RaftRequestHeader::default</span>();
+        <span class="kw">let</span> <span class="ident">region_id</span> <span class="op">=</span> <span class="ident">context</span>.<span class="ident">get_region_id</span>();
+        <span class="ident">header</span>.<span class="ident">set_peer</span>(<span class="ident">context</span>.<span class="ident">take_peer</span>());
+        <span class="ident">header</span>.<span class="ident">set_region_id</span>(<span class="ident">region_id</span>);
+        <span class="ident">header</span>.<span class="ident">set_region_epoch</span>(<span class="ident">context</span>.<span class="ident">take_region_epoch</span>());
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">Request::default</span>();
+        <span class="ident">req</span>.<span class="ident">set_cmd_type</span>(<span class="ident">CmdType::Snap</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cmd</span> <span class="op">=</span> <span class="ident">RaftCmdRequest::default</span>();
+        <span class="ident">cmd</span>.<span class="ident">set_header</span>(<span class="ident">header</span>.<span class="ident">clone</span>());
+        <span class="ident">cmd</span>.<span class="ident">set_requests</span>(<span class="macro">vec!</span>[<span class="ident">req</span>].<span class="ident">into</span>());
+        <span class="kw">let</span> (<span class="ident">cb</span>, <span class="ident">future</span>) <span class="op">=</span> <span class="ident">paired_future_callback</span>();
+
+        <span class="kw">let</span> <span class="ident">router</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">router</span>.<span class="ident">clone</span>();
+        <span class="kw">let</span> <span class="ident">importer</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">importer</span>.<span class="ident">clone</span>();
+        <span class="kw">async</span> <span class="kw">move</span> {
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">IngestResponse::default</span>();
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">router</span>.<span class="ident">send_command</span>(<span class="ident">cmd</span>, <span class="ident">Callback::Read</span>(<span class="ident">cb</span>)) {
+                <span class="ident">resp</span>.<span class="ident">set_error</span>(<span class="ident">e</span>.<span class="ident">into</span>());
+                <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">resp</span>);
+            }
+
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">future</span>.<span class="kw">await</span>.<span class="ident">map_err</span>(<span class="ident">Error::from</span>)<span class="question-mark">?</span>;
+            <span class="macro">fail_point!</span>(<span class="string">&quot;import::sst_service::ingest&quot;</span>);
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">resp_header</span> <span class="op">=</span> <span class="ident">res</span>.<span class="ident">response</span>.<span class="ident">take_header</span>();
+            <span class="kw">if</span> <span class="ident">resp_header</span>.<span class="ident">has_error</span>() {
+                <span class="ident">pb_error_inc</span>(<span class="ident">label</span>, <span class="ident">resp_header</span>.<span class="ident">get_error</span>());
+                <span class="ident">resp</span>.<span class="ident">set_error</span>(<span class="ident">resp_header</span>.<span class="ident">take_error</span>());
+                <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">resp</span>);
+            }
+
+            <span class="comment">// Make ingest command.</span>
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cmd</span> <span class="op">=</span> <span class="ident">RaftCmdRequest::default</span>();
+            <span class="ident">cmd</span>.<span class="ident">set_header</span>(<span class="ident">header</span>);
+            <span class="kw">for</span> <span class="ident">sst</span> <span class="kw">in</span> <span class="ident">ssts</span>.<span class="ident">iter</span>() {
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ingest</span> <span class="op">=</span> <span class="ident">Request::default</span>();
+                <span class="ident">ingest</span>.<span class="ident">set_cmd_type</span>(<span class="ident">CmdType::IngestSst</span>);
+                <span class="ident">ingest</span>.<span class="ident">mut_ingest_sst</span>().<span class="ident">set_sst</span>(<span class="ident">sst</span>.<span class="ident">clone</span>());
+                <span class="ident">cmd</span>.<span class="ident">mut_requests</span>().<span class="ident">push</span>(<span class="ident">ingest</span>);
+            }
+            <span class="ident">cmd</span>.<span class="ident">mut_header</span>().<span class="ident">set_term</span>(<span class="ident">resp_header</span>.<span class="ident">get_current_term</span>());
+
+            <span class="comment">// Here we shall check whether the file has been ingested before. This operation</span>
+            <span class="comment">// must execute after geting a snapshot from raftstore to make sure that the</span>
+            <span class="comment">// current leader has applied to current term.</span>
+            <span class="kw">for</span> <span class="ident">sst</span> <span class="kw">in</span> <span class="ident">ssts</span>.<span class="ident">iter</span>() {
+                <span class="kw">if</span> <span class="op">!</span><span class="ident">importer</span>.<span class="ident">exist</span>(<span class="kw-2">&amp;</span><span class="ident">sst</span>) {
+                    <span class="macro">warn!</span>(
+                        <span class="string">&quot;sst [{:?}] not exist. we may retry an operation that has already succeeded&quot;</span>,
+                        <span class="ident">sst</span>
+                    );
+                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">errorpb</span> <span class="op">=</span> <span class="ident">errorpb::Error::default</span>();
+                    <span class="kw">let</span> <span class="ident">err</span> <span class="op">=</span> <span class="string">&quot;The file which would be ingested doest not exist.&quot;</span>;
+                    <span class="kw">let</span> <span class="ident">stale_err</span> <span class="op">=</span> <span class="ident">errorpb::StaleCommand::default</span>();
+                    <span class="ident">errorpb</span>.<span class="ident">set_message</span>(<span class="ident">err</span>.<span class="ident">to_string</span>());
+                    <span class="ident">errorpb</span>.<span class="ident">set_stale_command</span>(<span class="ident">stale_err</span>);
+                    <span class="ident">resp</span>.<span class="ident">set_error</span>(<span class="ident">errorpb</span>);
+                    <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">resp</span>);
+                }
+            }
+
+            <span class="kw">let</span> (<span class="ident">cb</span>, <span class="ident">future</span>) <span class="op">=</span> <span class="ident">paired_future_callback</span>();
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">router</span>.<span class="ident">send_command</span>(<span class="ident">cmd</span>, <span class="ident">Callback::write</span>(<span class="ident">cb</span>)) {
+                <span class="ident">resp</span>.<span class="ident">set_error</span>(<span class="ident">e</span>.<span class="ident">into</span>());
+                <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">resp</span>);
+            }
+
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">future</span>.<span class="kw">await</span>.<span class="ident">map_err</span>(<span class="ident">Error::from</span>)<span class="question-mark">?</span>;
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">header</span> <span class="op">=</span> <span class="ident">res</span>.<span class="ident">response</span>.<span class="ident">take_header</span>();
+            <span class="kw">if</span> <span class="ident">header</span>.<span class="ident">has_error</span>() {
+                <span class="ident">pb_error_inc</span>(<span class="ident">label</span>, <span class="ident">header</span>.<span class="ident">get_error</span>());
+                <span class="ident">resp</span>.<span class="ident">set_error</span>(<span class="ident">header</span>.<span class="ident">take_error</span>());
+            }
+            <span class="prelude-val">Ok</span>(<span class="ident">resp</span>)
+        }
     }
 }
 
@@ -768,18 +943,7 @@
         <span class="kw">let</span> <span class="ident">timer</span> <span class="op">=</span> <span class="ident">Instant::now_coarse</span>();
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">IngestResponse::default</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">errorpb</span> <span class="op">=</span> <span class="ident">errorpb::Error::default</span>();
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">importer</span>.<span class="ident">get_mode</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">SwitchMode::Normal</span>
-            <span class="op">&amp;&amp;</span> <span class="self">self</span>
-                .<span class="ident">engine</span>
-                .<span class="ident">ingest_maybe_slowdown_writes</span>(<span class="ident">CF_DEFAULT</span>)
-                .<span class="ident">expect</span>(<span class="string">&quot;cf&quot;</span>)
-        {
-            <span class="kw">let</span> <span class="ident">err</span> <span class="op">=</span> <span class="string">&quot;too many sst files are ingesting&quot;</span>;
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">server_is_busy_err</span> <span class="op">=</span> <span class="ident">errorpb::ServerIsBusy::default</span>();
-            <span class="ident">server_is_busy_err</span>.<span class="ident">set_reason</span>(<span class="ident">err</span>.<span class="ident">to_string</span>());
-            <span class="ident">errorpb</span>.<span class="ident">set_message</span>(<span class="ident">err</span>.<span class="ident">to_string</span>());
-            <span class="ident">errorpb</span>.<span class="ident">set_server_is_busy</span>(<span class="ident">server_is_busy_err</span>);
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">errorpb</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">check_write_stall</span>() {
             <span class="ident">resp</span>.<span class="ident">set_error</span>(<span class="ident">errorpb</span>);
             <span class="ident">ctx</span>.<span class="ident">spawn</span>(
                 <span class="ident">sink</span>.<span class="ident">success</span>(<span class="ident">resp</span>)
@@ -788,6 +952,7 @@
             <span class="kw">return</span>;
         }
 
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">errorpb</span> <span class="op">=</span> <span class="ident">errorpb::Error::default</span>();
         <span class="kw">if</span> <span class="op">!</span><span class="self">Self</span><span class="ident">::acquire_lock</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">task_slots</span>, <span class="ident">req</span>.<span class="ident">get_sst</span>()).<span class="ident">unwrap_or</span>(<span class="bool-val">false</span>) {
             <span class="ident">errorpb</span>.<span class="ident">set_message</span>(<span class="ident">Error::FileConflict</span>.<span class="ident">to_string</span>());
             <span class="ident">resp</span>.<span class="ident">set_error</span>(<span class="ident">errorpb</span>);
@@ -798,74 +963,64 @@
             <span class="kw">return</span>;
         }
 
-        <span class="kw">let</span> <span class="ident">meta</span> <span class="op">=</span> <span class="ident">req</span>.<span class="ident">take_sst</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">header</span> <span class="op">=</span> <span class="ident">RaftRequestHeader::default</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">context</span> <span class="op">=</span> <span class="ident">req</span>.<span class="ident">take_context</span>();
-        <span class="kw">let</span> <span class="ident">region_id</span> <span class="op">=</span> <span class="ident">context</span>.<span class="ident">get_region_id</span>();
-        <span class="ident">header</span>.<span class="ident">set_peer</span>(<span class="ident">context</span>.<span class="ident">take_peer</span>());
-        <span class="ident">header</span>.<span class="ident">set_region_id</span>(<span class="ident">region_id</span>);
-        <span class="ident">header</span>.<span class="ident">set_region_epoch</span>(<span class="ident">context</span>.<span class="ident">take_region_epoch</span>());
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">Request::default</span>();
-        <span class="ident">req</span>.<span class="ident">set_cmd_type</span>(<span class="ident">CmdType::Snap</span>);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cmd</span> <span class="op">=</span> <span class="ident">RaftCmdRequest::default</span>();
-        <span class="ident">cmd</span>.<span class="ident">set_header</span>(<span class="ident">header</span>.<span class="ident">clone</span>());
-        <span class="ident">cmd</span>.<span class="ident">set_requests</span>(<span class="macro">vec!</span>[<span class="ident">req</span>].<span class="ident">into</span>());
-        <span class="kw">let</span> (<span class="ident">cb</span>, <span class="ident">future</span>) <span class="op">=</span> <span class="ident">paired_future_callback</span>();
-
-        <span class="kw">let</span> <span class="ident">router</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">router</span>.<span class="ident">clone</span>();
         <span class="kw">let</span> <span class="ident">task_slots</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">task_slots</span>.<span class="ident">clone</span>();
-        <span class="kw">let</span> <span class="ident">importer</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">importer</span>.<span class="ident">clone</span>();
-
+        <span class="kw">let</span> <span class="ident">meta</span> <span class="op">=</span> <span class="ident">req</span>.<span class="ident">take_sst</span>();
+        <span class="kw">let</span> <span class="ident">f</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">ingest_files</span>(<span class="ident">req</span>.<span class="ident">take_context</span>(), <span class="ident">label</span>, <span class="macro">vec!</span>[<span class="ident">meta</span>.<span class="ident">clone</span>()]);
         <span class="kw">let</span> <span class="ident">handle_task</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
-            <span class="kw">let</span> <span class="ident">m</span> <span class="op">=</span> <span class="ident">meta</span>.<span class="ident">clone</span>();
-            <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">IngestResponse::default</span>();
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">router</span>.<span class="ident">send_command</span>(<span class="ident">cmd</span>, <span class="ident">Callback::Read</span>(<span class="ident">cb</span>)) {
-                    <span class="ident">resp</span>.<span class="ident">set_error</span>(<span class="ident">e</span>.<span class="ident">into</span>());
-                    <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">resp</span>);
-                }
-
-                <span class="comment">// Make ingest command.</span>
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ingest</span> <span class="op">=</span> <span class="ident">Request::default</span>();
-                <span class="ident">ingest</span>.<span class="ident">set_cmd_type</span>(<span class="ident">CmdType::IngestSst</span>);
-                <span class="ident">ingest</span>.<span class="ident">mut_ingest_sst</span>().<span class="ident">set_sst</span>(<span class="ident">m</span>.<span class="ident">clone</span>());
-
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cmd</span> <span class="op">=</span> <span class="ident">RaftCmdRequest::default</span>();
-                <span class="ident">cmd</span>.<span class="ident">set_header</span>(<span class="ident">header</span>);
-                <span class="ident">cmd</span>.<span class="ident">mut_requests</span>().<span class="ident">push</span>(<span class="ident">ingest</span>);
-
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">future</span>.<span class="kw">await</span>.<span class="ident">map_err</span>(<span class="ident">Error::from</span>)<span class="question-mark">?</span>;
-                <span class="macro">fail_point!</span>(<span class="string">&quot;import::sst_service::ingest&quot;</span>);
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">header</span> <span class="op">=</span> <span class="ident">res</span>.<span class="ident">response</span>.<span class="ident">take_header</span>();
-                <span class="kw">if</span> <span class="ident">header</span>.<span class="ident">has_error</span>() {
-                    <span class="ident">pb_error_inc</span>(<span class="ident">label</span>, <span class="ident">header</span>.<span class="ident">get_error</span>());
-                    <span class="ident">resp</span>.<span class="ident">set_error</span>(<span class="ident">header</span>.<span class="ident">take_error</span>());
-                    <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">resp</span>);
-                }
-                <span class="ident">cmd</span>.<span class="ident">mut_header</span>().<span class="ident">set_term</span>(<span class="ident">header</span>.<span class="ident">get_current_term</span>());
-                <span class="comment">// Here we shall check whether the file has been ingested before. This operation</span>
-                <span class="comment">// must execute after geting a snapshot from raftstore to make sure that the</span>
-                <span class="comment">// current leader has applied to current term.</span>
-                <span class="kw">if</span> <span class="op">!</span><span class="ident">importer</span>.<span class="ident">exist</span>(<span class="kw-2">&amp;</span><span class="ident">m</span>) {
-                    <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">resp</span>);
-                }
-
-                <span class="kw">let</span> (<span class="ident">cb</span>, <span class="ident">future</span>) <span class="op">=</span> <span class="ident">paired_future_callback</span>();
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">router</span>.<span class="ident">send_command</span>(<span class="ident">cmd</span>, <span class="ident">Callback::write</span>(<span class="ident">cb</span>)) {
-                    <span class="ident">resp</span>.<span class="ident">set_error</span>(<span class="ident">e</span>.<span class="ident">into</span>());
-                    <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">resp</span>);
-                }
-
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">future</span>.<span class="kw">await</span>.<span class="ident">map_err</span>(<span class="ident">Error::from</span>)<span class="question-mark">?</span>;
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">header</span> <span class="op">=</span> <span class="ident">res</span>.<span class="ident">response</span>.<span class="ident">take_header</span>();
-                <span class="kw">if</span> <span class="ident">header</span>.<span class="ident">has_error</span>() {
-                    <span class="ident">pb_error_inc</span>(<span class="ident">label</span>, <span class="ident">header</span>.<span class="ident">get_error</span>());
-                    <span class="ident">resp</span>.<span class="ident">set_error</span>(<span class="ident">header</span>.<span class="ident">take_error</span>());
-                }
-                <span class="prelude-val">Ok</span>(<span class="ident">resp</span>)
-            };
-            <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">res</span>.<span class="kw">await</span>;
+            <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">f</span>.<span class="kw">await</span>;
             <span class="self">Self</span><span class="ident">::release_lock</span>(<span class="kw-2">&amp;</span><span class="ident">task_slots</span>, <span class="kw-2">&amp;</span><span class="ident">meta</span>).<span class="ident">unwrap</span>();
+            <span class="macro">send_rpc_response!</span>(<span class="ident">res</span>, <span class="ident">sink</span>, <span class="ident">label</span>, <span class="ident">timer</span>);
+        };
+        <span class="self">self</span>.<span class="ident">threads</span>.<span class="ident">spawn_ok</span>(<span class="ident">handle_task</span>);
+    }
+
+    <span class="doccomment">/// Ingest multiple files by sending a raft command to raftstore.</span>
+    <span class="doccomment">///</span>
+    <span class="kw">fn</span> <span class="ident">multi_ingest</span>(
+        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
+        <span class="ident">ctx</span>: <span class="ident">RpcContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>,
+        <span class="kw-2">mut</span> <span class="ident">req</span>: <span class="ident">MultiIngestRequest</span>,
+        <span class="ident">sink</span>: <span class="ident">UnarySink</span><span class="op">&lt;</span><span class="ident">IngestResponse</span><span class="op">&gt;</span>,
+    ) {
+        <span class="kw">let</span> <span class="ident">label</span> <span class="op">=</span> <span class="string">&quot;multi-ingest&quot;</span>;
+        <span class="kw">let</span> <span class="ident">timer</span> <span class="op">=</span> <span class="ident">Instant::now_coarse</span>();
+
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">resp</span> <span class="op">=</span> <span class="ident">IngestResponse::default</span>();
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">errorpb</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">check_write_stall</span>() {
+            <span class="ident">resp</span>.<span class="ident">set_error</span>(<span class="ident">errorpb</span>);
+            <span class="ident">ctx</span>.<span class="ident">spawn</span>(
+                <span class="ident">sink</span>.<span class="ident">success</span>(<span class="ident">resp</span>)
+                    .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">warn!</span>(<span class="string">&quot;send rpc failed&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>)),
+            );
+            <span class="kw">return</span>;
+        }
+
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">errorpb</span> <span class="op">=</span> <span class="ident">errorpb::Error::default</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">metas</span> <span class="op">=</span> <span class="macro">vec!</span>[];
+        <span class="kw">for</span> <span class="ident">sst</span> <span class="kw">in</span> <span class="ident">req</span>.<span class="ident">get_ssts</span>() {
+            <span class="kw">if</span> <span class="self">Self</span><span class="ident">::acquire_lock</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">task_slots</span>, <span class="ident">sst</span>).<span class="ident">unwrap_or</span>(<span class="bool-val">false</span>) {
+                <span class="ident">metas</span>.<span class="ident">push</span>(<span class="ident">sst</span>.<span class="ident">clone</span>());
+            }
+        }
+        <span class="kw">if</span> <span class="ident">metas</span>.<span class="ident">len</span>() <span class="op">&lt;</span> <span class="ident">req</span>.<span class="ident">get_ssts</span>().<span class="ident">len</span>() {
+            <span class="kw">for</span> <span class="ident">m</span> <span class="kw">in</span> <span class="ident">metas</span> {
+                <span class="self">Self</span><span class="ident">::release_lock</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">task_slots</span>, <span class="kw-2">&amp;</span><span class="ident">m</span>).<span class="ident">unwrap</span>();
+            }
+            <span class="ident">errorpb</span>.<span class="ident">set_message</span>(<span class="ident">Error::FileConflict</span>.<span class="ident">to_string</span>());
+            <span class="ident">resp</span>.<span class="ident">set_error</span>(<span class="ident">errorpb</span>);
+            <span class="ident">ctx</span>.<span class="ident">spawn</span>(
+                <span class="ident">sink</span>.<span class="ident">success</span>(<span class="ident">resp</span>)
+                    .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">warn!</span>(<span class="string">&quot;send rpc failed&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="op">%</span><span class="ident">e</span>)),
+            );
+            <span class="kw">return</span>;
+        }
+        <span class="kw">let</span> <span class="ident">task_slots</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">task_slots</span>.<span class="ident">clone</span>();
+        <span class="kw">let</span> <span class="ident">f</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">ingest_files</span>(<span class="ident">req</span>.<span class="ident">take_context</span>(), <span class="ident">label</span>, <span class="ident">req</span>.<span class="ident">take_ssts</span>().<span class="ident">into</span>());
+        <span class="kw">let</span> <span class="ident">handle_task</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
+            <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">f</span>.<span class="kw">await</span>;
+            <span class="kw">for</span> <span class="ident">m</span> <span class="kw">in</span> <span class="ident">metas</span> {
+                <span class="self">Self</span><span class="ident">::release_lock</span>(<span class="kw-2">&amp;</span><span class="ident">task_slots</span>, <span class="kw-2">&amp;</span><span class="ident">m</span>).<span class="ident">unwrap</span>();
+            }
             <span class="macro">send_rpc_response!</span>(<span class="ident">res</span>, <span class="ident">sink</span>, <span class="ident">label</span>, <span class="ident">timer</span>);
         };
         <span class="self">self</span>.<span class="ident">threads</span>.<span class="ident">spawn_ok</span>(<span class="ident">handle_task</span>);
@@ -1000,15 +1155,6 @@
 
         <span class="self">self</span>.<span class="ident">threads</span>.<span class="ident">spawn_ok</span>(<span class="ident">buf_driver</span>);
         <span class="self">self</span>.<span class="ident">threads</span>.<span class="ident">spawn_ok</span>(<span class="ident">handle_task</span>);
-    }
-
-    <span class="kw">fn</span> <span class="ident">multi_ingest</span>(
-        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
-        <span class="kw">_</span>: <span class="ident">RpcContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>,
-        <span class="kw">_</span>: <span class="ident">MultiIngestRequest</span>,
-        <span class="kw">_</span>: <span class="ident">UnarySink</span><span class="op">&lt;</span><span class="ident">kvproto::import_sstpb::IngestResponse</span><span class="op">&gt;</span>,
-    ) {
-        <span class="macro">unimplemented!</span>()
     }
 }
 
