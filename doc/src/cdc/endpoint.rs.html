@@ -2047,6 +2047,19 @@
 <span id="2044">2044</span>
 <span id="2045">2045</span>
 <span id="2046">2046</span>
+<span id="2047">2047</span>
+<span id="2048">2048</span>
+<span id="2049">2049</span>
+<span id="2050">2050</span>
+<span id="2051">2051</span>
+<span id="2052">2052</span>
+<span id="2053">2053</span>
+<span id="2054">2054</span>
+<span id="2055">2055</span>
+<span id="2056">2056</span>
+<span id="2057">2057</span>
+<span id="2058">2058</span>
+<span id="2059">2059</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -2394,15 +2407,7 @@
                 <span class="kw">if</span> <span class="ident">is_last</span> {
                     <span class="kw">let</span> <span class="ident">delegate</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">capture_regions</span>.<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="ident">region_id</span>).<span class="ident">unwrap</span>();
                     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">reader</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">store_meta</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">readers</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">region_id</span>) {
-                        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">reader</span>
-                            .<span class="ident">txn_extra_op</span>
-                            .<span class="ident">compare_exchange</span>(<span class="ident">TxnExtraOp::ReadOldValue</span>, <span class="ident">TxnExtraOp::Noop</span>)
-                        {
-                            <span class="macro">panic!</span>(
-                                <span class="string">&quot;unexpect txn extra op {:?}, region_id: {:?}, downstream_id: {:?}, conn_id: {:?}&quot;</span>,
-                                <span class="ident">e</span>, <span class="ident">region_id</span>, <span class="ident">downstream_id</span>, <span class="ident">conn_id</span>
-                            );
-                        }
+                        <span class="ident">reader</span>.<span class="ident">txn_extra_op</span>.<span class="ident">store</span>(<span class="ident">TxnExtraOp::Noop</span>);
                     }
                     <span class="comment">// Do not continue to observe the events of the region.</span>
                     <span class="kw">let</span> <span class="ident">id</span> <span class="op">=</span> <span class="ident">delegate</span>.<span class="ident">handle</span>.<span class="ident">id</span>;
@@ -3429,8 +3434,11 @@
     <span class="kw">use</span> <span class="ident">kvproto::errorpb::Error</span> <span class="kw">as</span> <span class="ident">ErrorHeader</span>;
     <span class="kw">use</span> <span class="ident">raftstore::errors::Error</span> <span class="kw">as</span> <span class="ident">RaftStoreError</span>;
     <span class="kw">use</span> <span class="ident">raftstore::store::msg::CasualMessage</span>;
+    <span class="kw">use</span> <span class="ident">raftstore::store::util::RegionReadProgress</span>;
+    <span class="kw">use</span> <span class="ident">raftstore::store</span>::{<span class="ident">ReadDelegate</span>, <span class="ident">TrackVer</span>};
     <span class="kw">use</span> <span class="ident">std::collections::BTreeMap</span>;
     <span class="kw">use</span> <span class="ident">std::fmt::Display</span>;
+    <span class="kw">use</span> <span class="ident">std::sync::atomic::AtomicU64</span>;
     <span class="kw">use</span> <span class="ident">std::sync::mpsc</span>::{<span class="ident">channel</span>, <span class="ident">Receiver</span>, <span class="ident">RecvTimeoutError</span>, <span class="ident">Sender</span>};
     <span class="kw">use</span> <span class="ident">tempfile::TempDir</span>;
     <span class="kw">use</span> <span class="ident">test_raftstore::MockRaftStoreRouter</span>;
@@ -3440,6 +3448,7 @@
     <span class="kw">use</span> <span class="ident">tikv::storage::TestEngineBuilder</span>;
     <span class="kw">use</span> <span class="ident">tikv_util::config::ReadableDuration</span>;
     <span class="kw">use</span> <span class="ident">tikv_util::worker</span>::{<span class="ident">dummy_scheduler</span>, <span class="ident">LazyWorker</span>, <span class="ident">ReceiverWrapper</span>};
+    <span class="kw">use</span> <span class="ident">time::Timespec</span>;
 
     <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
     <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::channel</span>;
@@ -3512,6 +3521,23 @@
         <span class="ident">MockRaftStoreRouter</span>,
         <span class="ident">ReceiverWrapper</span><span class="op">&lt;</span><span class="ident">Task</span><span class="op">&gt;</span>,
     ) {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">region</span> <span class="op">=</span> <span class="ident">Region::default</span>();
+        <span class="ident">region</span>.<span class="ident">set_id</span>(<span class="number">1</span>);
+        <span class="kw">let</span> <span class="ident">store_meta</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">Mutex::new</span>(<span class="ident">StoreMeta::new</span>(<span class="number">0</span>)));
+        <span class="kw">let</span> <span class="ident">read_delegate</span> <span class="op">=</span> <span class="ident">ReadDelegate</span> {
+            <span class="ident">tag</span>: <span class="ident">String::new</span>(),
+            <span class="ident">region</span>: <span class="ident">Arc::new</span>(<span class="ident">region</span>),
+            <span class="ident">peer_id</span>: <span class="number">2</span>,
+            <span class="ident">term</span>: <span class="number">1</span>,
+            <span class="ident">applied_index_term</span>: <span class="number">1</span>,
+            <span class="ident">leader_lease</span>: <span class="prelude-val">None</span>,
+            <span class="ident">last_valid_ts</span>: <span class="ident">Timespec::new</span>(<span class="number">0</span>, <span class="number">0</span>),
+            <span class="ident">txn_extra_op</span>: <span class="ident">Arc::new</span>(<span class="ident">AtomicCell::new</span>(<span class="ident">TxnExtraOp::default</span>())),
+            <span class="ident">max_ts_sync_status</span>: <span class="ident">Arc::new</span>(<span class="ident">AtomicU64::new</span>(<span class="number">0</span>)),
+            <span class="ident">track_ver</span>: <span class="ident">TrackVer::new</span>(),
+            <span class="ident">read_progress</span>: <span class="ident">Arc::new</span>(<span class="ident">RegionReadProgress::new</span>(<span class="number">0</span>, <span class="number">0</span>)),
+        };
+        <span class="ident">store_meta</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">readers</span>.<span class="ident">insert</span>(<span class="number">1</span>, <span class="ident">read_delegate</span>);
         <span class="kw">let</span> (<span class="ident">task_sched</span>, <span class="ident">task_rx</span>) <span class="op">=</span> <span class="ident">dummy_scheduler</span>();
         <span class="kw">let</span> <span class="ident">raft_router</span> <span class="op">=</span> <span class="ident">MockRaftStoreRouter::new</span>();
         <span class="kw">let</span> <span class="ident">observer</span> <span class="op">=</span> <span class="ident">CdcObserver::new</span>(<span class="ident">task_sched</span>.<span class="ident">clone</span>());
@@ -3524,7 +3550,7 @@
             <span class="ident">task_sched</span>,
             <span class="ident">raft_router</span>.<span class="ident">clone</span>(),
             <span class="ident">observer</span>,
-            <span class="ident">Arc::new</span>(<span class="ident">Mutex::new</span>(<span class="ident">StoreMeta::new</span>(<span class="number">0</span>))),
+            <span class="ident">store_meta</span>,
             <span class="ident">ConcurrencyManager::new</span>(<span class="number">1</span>.<span class="ident">into</span>()),
             <span class="ident">env</span>,
             <span class="ident">security_mgr</span>,
