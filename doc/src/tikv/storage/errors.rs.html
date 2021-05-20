@@ -391,6 +391,22 @@
 <span id="388">388</span>
 <span id="389">389</span>
 <span id="390">390</span>
+<span id="391">391</span>
+<span id="392">392</span>
+<span id="393">393</span>
+<span id="394">394</span>
+<span id="395">395</span>
+<span id="396">396</span>
+<span id="397">397</span>
+<span id="398">398</span>
+<span id="399">399</span>
+<span id="400">400</span>
+<span id="401">401</span>
+<span id="402">402</span>
+<span id="403">403</span>
+<span id="404">404</span>
+<span id="405">405</span>
+<span id="406">406</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -403,6 +419,7 @@
 <span class="kw">use</span> <span class="ident">thiserror::Error</span>;
 
 <span class="kw">use</span> <span class="ident">error_code</span>::{<span class="self">self</span>, <span class="ident">ErrorCode</span>, <span class="ident">ErrorCodeExt</span>};
+<span class="kw">use</span> <span class="ident">tikv_util::deadline::DeadlineError</span>;
 <span class="kw">use</span> <span class="ident">txn_types</span>::{<span class="ident">KvPair</span>, <span class="ident">TimeStamp</span>};
 
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::storage</span>::{
@@ -444,6 +461,15 @@
 
     <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;ttl is not enabled, but get put request with ttl&quot;</span>)]</span>
     <span class="ident">TTLNotEnabled</span>,
+
+    <span class="attribute">#[<span class="ident">error</span>(<span class="string">&quot;deadline exceeded&quot;</span>)]</span>
+    <span class="ident">DeadlineExceeded</span>,
+}
+
+<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">DeadlineError</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ErrorInner</span> {
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="kw">_</span>: <span class="ident">DeadlineError</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+        <span class="ident">ErrorInner::DeadlineExceeded</span>
+    }
 }
 
 <span class="doccomment">/// Errors for storage module. Wrapper type of `ErrorInner`.</span>
@@ -479,6 +505,7 @@
             <span class="ident">ErrorInner::KeyTooLarge</span> { .. } <span class="op">=</span><span class="op">&gt;</span> <span class="ident">error_code::storage::KEY_TOO_LARGE</span>,
             <span class="ident">ErrorInner::InvalidCf</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">error_code::storage::INVALID_CF</span>,
             <span class="ident">ErrorInner::TTLNotEnabled</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">error_code::storage::TTL_NOT_ENABLED</span>,
+            <span class="ident">ErrorInner::DeadlineExceeded</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">error_code::storage::DEADLINE_EXCEEDED</span>,
         }
     }
 }
@@ -589,6 +616,11 @@
             <span class="comment">// temporarily, the client should retry the request in other TiKVs.</span>
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">err</span> <span class="op">=</span> <span class="ident">errorpb::Error::default</span>();
             <span class="ident">err</span>.<span class="ident">set_message</span>(<span class="string">&quot;TiKV is Closing&quot;</span>.<span class="ident">to_string</span>());
+            <span class="prelude-val">Some</span>(<span class="ident">err</span>)
+        }
+        <span class="prelude-val">Err</span>(<span class="ident">Error</span>(<span class="kw">box</span> <span class="ident">ErrorInner::DeadlineExceeded</span>)) <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">err</span> <span class="op">=</span> <span class="ident">errorpb::Error::default</span>();
+            <span class="ident">err</span>.<span class="ident">set_message</span>(<span class="string">&quot;Deadline is exceeded&quot;</span>.<span class="ident">to_string</span>());
             <span class="prelude-val">Some</span>(<span class="ident">err</span>)
         }
         <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">None</span>,

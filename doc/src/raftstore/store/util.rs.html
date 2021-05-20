@@ -1673,6 +1673,19 @@
 <span id="1670">1670</span>
 <span id="1671">1671</span>
 <span id="1672">1672</span>
+<span id="1673">1673</span>
+<span id="1674">1674</span>
+<span id="1675">1675</span>
+<span id="1676">1676</span>
+<span id="1677">1677</span>
+<span id="1678">1678</span>
+<span id="1679">1679</span>
+<span id="1680">1680</span>
+<span id="1681">1681</span>
+<span id="1682">1682</span>
+<span id="1683">1683</span>
+<span id="1684">1684</span>
+<span id="1685">1685</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -2532,17 +2545,15 @@
     <span class="comment">// `core` used to keep track and update `safe_ts`, it should</span>
     <span class="comment">// not be accessed outside to avoid dead lock</span>
     <span class="ident">core</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">RegionReadProgressCore</span><span class="op">&gt;</span>,
-    <span class="comment">// The fast path to read `safe_ts` and `applied_index` without</span>
-    <span class="comment">// acquiring the mutex on `core`</span>
+    <span class="comment">// The fast path to read `safe_ts` without acquiring the mutex</span>
+    <span class="comment">// on `core`</span>
     <span class="ident">safe_ts</span>: <span class="ident">AtomicU64</span>,
-    <span class="ident">applied_index</span>: <span class="ident">AtomicU64</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">RegionReadProgress</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">applied_index</span>: <span class="ident">u64</span>, <span class="ident">cap</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">RegionReadProgress</span> {
         <span class="ident">RegionReadProgress</span> {
             <span class="ident">core</span>: <span class="ident">Mutex::new</span>(<span class="ident">RegionReadProgressCore::new</span>(<span class="ident">applied_index</span>, <span class="ident">cap</span>)),
-            <span class="ident">applied_index</span>: <span class="ident">AtomicU64::from</span>(<span class="ident">applied_index</span>),
             <span class="ident">safe_ts</span>: <span class="ident">AtomicU64::from</span>(<span class="number">0</span>),
         }
     }
@@ -2552,7 +2563,6 @@
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">ts</span>) <span class="op">=</span> <span class="ident">core</span>.<span class="ident">update_applied</span>(<span class="ident">applied</span>) {
             <span class="self">self</span>.<span class="ident">safe_ts</span>.<span class="ident">store</span>(<span class="ident">ts</span>, <span class="ident">AtomicOrdering::Release</span>);
         }
-        <span class="self">self</span>.<span class="ident">applied_index</span>.<span class="ident">store</span>(<span class="ident">applied</span>, <span class="ident">AtomicOrdering::Release</span>);
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">update_safe_ts</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">apply_index</span>: <span class="ident">u64</span>, <span class="ident">ts</span>: <span class="ident">u64</span>) {
@@ -2571,8 +2581,13 @@
         <span class="self">self</span>.<span class="ident">safe_ts</span>.<span class="ident">store</span>(<span class="number">0</span>, <span class="ident">AtomicOrdering::Release</span>);
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">applied_index</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u64</span> {
-        <span class="self">self</span>.<span class="ident">applied_index</span>.<span class="ident">load</span>(<span class="ident">AtomicOrdering::Acquire</span>)
+    <span class="comment">// Get the latest `read_state`</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">read_state</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ReadState</span> {
+        <span class="kw">let</span> <span class="ident">core</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">core</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+        <span class="ident">core</span>.<span class="ident">pending_items</span>
+            .<span class="ident">back</span>()
+            .<span class="ident">unwrap_or</span>(<span class="kw-2">&amp;</span><span class="ident">core</span>.<span class="ident">read_state</span>)
+            .<span class="ident">clone</span>()
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">safe_ts</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u64</span> {
@@ -2585,16 +2600,26 @@
     <span class="ident">applied_index</span>: <span class="ident">u64</span>,
     <span class="comment">// TODO: after region merged, the region&#39;s key range is extended and this</span>
     <span class="comment">// region wide `safe_ts` should reset to `min(source_safe_ts, target_safe_ts)`</span>
-    <span class="ident">safe_ts</span>: <span class="ident">u64</span>,
-    <span class="comment">// `pending_items` is a *sorted* list of `(apply index, safe ts)` item</span>
-    <span class="ident">pending_items</span>: <span class="ident">VecDeque</span><span class="op">&lt;</span>(<span class="ident">u64</span>, <span class="ident">u64</span>)<span class="op">&gt;</span>,
+    <span class="comment">//</span>
+    <span class="comment">// A wraper of `(apply_index, safe_ts)` item, where the `read_state.ts` is the peer&#39;s current `safe_ts`</span>
+    <span class="comment">// and the `read_state.idx` is the smallest `apply_index` required for that `safe_ts`</span>
+    <span class="ident">read_state</span>: <span class="ident">ReadState</span>,
+    <span class="comment">// `pending_items` is a *sorted* list of `(apply_index, safe_ts)` item</span>
+    <span class="ident">pending_items</span>: <span class="ident">VecDeque</span><span class="op">&lt;</span><span class="ident">ReadState</span><span class="op">&gt;</span>,
+}
+
+<span class="comment">// A helpful wraper of `(apply_index, safe_ts)` item</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">Default</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ReadState</span> {
+    <span class="kw">pub</span> <span class="ident">idx</span>: <span class="ident">u64</span>,
+    <span class="kw">pub</span> <span class="ident">ts</span>: <span class="ident">u64</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">RegionReadProgressCore</span> {
     <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">applied_index</span>: <span class="ident">u64</span>, <span class="ident">cap</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">RegionReadProgressCore</span> {
         <span class="ident">RegionReadProgressCore</span> {
             <span class="ident">applied_index</span>,
-            <span class="ident">safe_ts</span>: <span class="number">0</span>,
+            <span class="ident">read_state</span>: <span class="ident">ReadState::default</span>(),
             <span class="ident">pending_items</span>: <span class="ident">VecDeque::with_capacity</span>(<span class="ident">cap</span>),
         }
     }
@@ -2605,62 +2630,63 @@
         <span class="macro">assert!</span>(<span class="ident">applied</span> <span class="op">&gt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">applied_index</span>);
         <span class="self">self</span>.<span class="ident">applied_index</span> <span class="op">=</span> <span class="ident">applied</span>;
         <span class="comment">// Consume pending items with `apply_index` less or equal to `self.applied_index`</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ts_to_update</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">safe_ts</span>;
-        <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="ident">idx</span>, <span class="ident">ts</span>)) <span class="op">=</span> <span class="self">self</span>.<span class="ident">pending_items</span>.<span class="ident">pop_front</span>() {
-            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">applied_index</span> <span class="op">&lt;</span> <span class="ident">idx</span> {
-                <span class="self">self</span>.<span class="ident">pending_items</span>.<span class="ident">push_front</span>((<span class="ident">idx</span>, <span class="ident">ts</span>));
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">to_update</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">read_state</span>.<span class="ident">clone</span>();
+        <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">item</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">pending_items</span>.<span class="ident">pop_front</span>() {
+            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">applied_index</span> <span class="op">&lt;</span> <span class="ident">item</span>.<span class="ident">idx</span> {
+                <span class="self">self</span>.<span class="ident">pending_items</span>.<span class="ident">push_front</span>(<span class="ident">item</span>);
                 <span class="kw">break</span>;
             }
-            <span class="kw">if</span> <span class="ident">ts_to_update</span> <span class="op">&lt;</span> <span class="ident">ts</span> {
-                <span class="ident">ts_to_update</span> <span class="op">=</span> <span class="ident">ts</span>;
+            <span class="kw">if</span> <span class="ident">to_update</span>.<span class="ident">ts</span> <span class="op">&lt;</span> <span class="ident">item</span>.<span class="ident">ts</span> {
+                <span class="ident">to_update</span> <span class="op">=</span> <span class="ident">item</span>;
             }
         }
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">safe_ts</span> <span class="op">&lt;</span> <span class="ident">ts_to_update</span> {
-            <span class="self">self</span>.<span class="ident">safe_ts</span> <span class="op">=</span> <span class="ident">ts_to_update</span>;
-            <span class="prelude-val">Some</span>(<span class="ident">ts_to_update</span>)
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">read_state</span>.<span class="ident">ts</span> <span class="op">&lt;</span> <span class="ident">to_update</span>.<span class="ident">ts</span> {
+            <span class="self">self</span>.<span class="ident">read_state</span> <span class="op">=</span> <span class="ident">to_update</span>;
+            <span class="prelude-val">Some</span>(<span class="self">self</span>.<span class="ident">read_state</span>.<span class="ident">ts</span>)
         } <span class="kw">else</span> {
             <span class="prelude-val">None</span>
         }
     }
 
     <span class="comment">// Return the `safe_ts` if it is updated</span>
-    <span class="kw">fn</span> <span class="ident">update_safe_ts</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">apply_index</span>: <span class="ident">u64</span>, <span class="ident">ts</span>: <span class="ident">u64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">update_safe_ts</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">idx</span>: <span class="ident">u64</span>, <span class="ident">ts</span>: <span class="ident">u64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span> {
         <span class="comment">// The peer has enough data, try update `safe_ts` directly</span>
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">applied_index</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">apply_index</span> {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">applied_index</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">idx</span> {
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">updated_ts</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">safe_ts</span> <span class="op">&lt;</span> <span class="ident">ts</span> {
-                <span class="self">self</span>.<span class="ident">safe_ts</span> <span class="op">=</span> <span class="ident">ts</span>;
+            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">read_state</span>.<span class="ident">ts</span> <span class="op">&lt;</span> <span class="ident">ts</span> {
+                <span class="self">self</span>.<span class="ident">read_state</span> <span class="op">=</span> <span class="ident">ReadState</span> { <span class="ident">idx</span>, <span class="ident">ts</span> };
                 <span class="ident">updated_ts</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">ts</span>);
             }
             <span class="kw">return</span> <span class="ident">updated_ts</span>;
         }
         <span class="comment">// The peer doesn&#39;t has enough data, keep the item for future use</span>
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">item</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">pending_items</span>.<span class="ident">back_mut</span>() {
-            <span class="comment">// Discord the item if it has a smaller `safe_ts`</span>
-            <span class="kw">if</span> <span class="ident">item</span>.<span class="number">1</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">ts</span> {
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">prev_item</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">pending_items</span>.<span class="ident">back_mut</span>() {
+            <span class="comment">// Discard the item if it has a smaller `safe_ts`</span>
+            <span class="kw">if</span> <span class="ident">prev_item</span>.<span class="ident">ts</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">ts</span> {
                 <span class="kw">return</span> <span class="prelude-val">None</span>;
             }
-            <span class="comment">// Discord the item if it has a smaller `apply_index`</span>
-            <span class="kw">if</span> <span class="ident">item</span>.<span class="number">0</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">apply_index</span> {
-                <span class="comment">// Instead of adding a new item, try update the last one,</span>
-                <span class="comment">// update the last item&#39;s `safe_ts` if the incoming item</span>
-                <span class="comment">// require a less or equal `apply_index` with a larger `safe_ts`</span>
-                <span class="ident">item</span>.<span class="number">1</span> <span class="op">=</span> <span class="ident">ts</span>;
+            <span class="comment">// Discard the item if it has a smaller `apply_index`</span>
+            <span class="kw">if</span> <span class="ident">prev_item</span>.<span class="ident">idx</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">idx</span> {
+                <span class="comment">// Instead of dropping the incoming item, try use it to update</span>
+                <span class="comment">// the last one, update the last item&#39;s `safe_ts` if the incoming</span>
+                <span class="comment">// item require a less or equal `apply_index` with a larger `safe_ts`</span>
+                <span class="ident">prev_item</span>.<span class="ident">ts</span> <span class="op">=</span> <span class="ident">ts</span>;
                 <span class="kw">return</span> <span class="prelude-val">None</span>;
             }
         }
-        <span class="self">self</span>.<span class="ident">push_back</span>((<span class="ident">apply_index</span>, <span class="ident">ts</span>));
+        <span class="self">self</span>.<span class="ident">push_back</span>(<span class="ident">ReadState</span> { <span class="ident">idx</span>, <span class="ident">ts</span> });
         <span class="prelude-val">None</span>
     }
 
     <span class="kw">fn</span> <span class="ident">clear</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
         <span class="self">self</span>.<span class="ident">pending_items</span>.<span class="ident">clear</span>();
-        <span class="self">self</span>.<span class="ident">safe_ts</span> <span class="op">=</span> <span class="number">0</span>;
+        <span class="self">self</span>.<span class="ident">read_state</span>.<span class="ident">ts</span> <span class="op">=</span> <span class="number">0</span>;
+        <span class="self">self</span>.<span class="ident">read_state</span>.<span class="ident">idx</span> <span class="op">=</span> <span class="number">0</span>;
     }
 
-    <span class="kw">fn</span> <span class="ident">push_back</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">item</span>: (<span class="ident">u64</span>, <span class="ident">u64</span>)) {
+    <span class="kw">fn</span> <span class="ident">push_back</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">item</span>: <span class="ident">ReadState</span>) {
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">pending_items</span>.<span class="ident">len</span>() <span class="op">&gt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">pending_items</span>.<span class="ident">capacity</span>() {
-            <span class="comment">// Stepping by one to evently remove the items, so the follower can keep</span>
+            <span class="comment">// Stepping by one to evently remove pending items, so the follower can keep</span>
             <span class="comment">// the old items and use them to update the `safe_ts` even when the follower</span>
             <span class="comment">// not catch up new enough data</span>
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">keep</span> <span class="op">=</span> <span class="bool-val">false</span>;
