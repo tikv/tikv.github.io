@@ -2456,6 +2456,27 @@
 <span id="2453">2453</span>
 <span id="2454">2454</span>
 <span id="2455">2455</span>
+<span id="2456">2456</span>
+<span id="2457">2457</span>
+<span id="2458">2458</span>
+<span id="2459">2459</span>
+<span id="2460">2460</span>
+<span id="2461">2461</span>
+<span id="2462">2462</span>
+<span id="2463">2463</span>
+<span id="2464">2464</span>
+<span id="2465">2465</span>
+<span id="2466">2466</span>
+<span id="2467">2467</span>
+<span id="2468">2468</span>
+<span id="2469">2469</span>
+<span id="2470">2470</span>
+<span id="2471">2471</span>
+<span id="2472">2472</span>
+<span id="2473">2473</span>
+<span id="2474">2474</span>
+<span id="2475">2475</span>
+<span id="2476">2476</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -2487,7 +2508,7 @@
 };
 <span class="kw">use</span> <span class="ident">engine_rocks::encryption::get_env</span>;
 <span class="kw">use</span> <span class="ident">engine_rocks::RocksEngine</span>;
-<span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">EncryptionKeyManager</span>, <span class="ident">Engines</span>, <span class="ident">RaftEngine</span>};
+<span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">EncryptionKeyManager</span>, <span class="ident">Engines</span>, <span class="ident">Error</span> <span class="kw">as</span> <span class="ident">EngineError</span>, <span class="ident">RaftEngine</span>};
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">ALL_CFS</span>, <span class="ident">CF_DEFAULT</span>, <span class="ident">CF_LOCK</span>, <span class="ident">CF_WRITE</span>};
 <span class="kw">use</span> <span class="ident">file_system::calc_crc32</span>;
 <span class="kw">use</span> <span class="ident">kvproto::debugpb</span>::{<span class="ident">Db</span> <span class="kw">as</span> <span class="ident">DBType</span>, <span class="kw-2">*</span>};
@@ -2513,10 +2534,26 @@
 <span class="kw">const</span> <span class="ident">METRICS_ROCKSDB_RAFT</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;rocksdb_raft&quot;</span>;
 <span class="kw">const</span> <span class="ident">METRICS_JEMALLOC</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;jemalloc&quot;</span>;
 
+<span class="kw">const</span> <span class="ident">LOCK_FILE_ERROR</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;IO error: While lock file&quot;</span>;
+
 <span class="kw">type</span> <span class="ident">MvccInfoStream</span> <span class="op">=</span> <span class="ident">Pin</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Stream</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>, <span class="ident">MvccInfo</span>), <span class="ident">String</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>;
 
 <span class="kw">fn</span> <span class="ident">perror_and_exit</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">Error</span><span class="op">&gt;</span>(<span class="ident">prefix</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">e</span>: <span class="ident">E</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="op">!</span> {
     <span class="macro">ve1!</span>(<span class="string">&quot;{}: {}&quot;</span>, <span class="ident">prefix</span>, <span class="ident">e</span>);
+    <span class="ident">process::exit</span>(<span class="op">-</span><span class="number">1</span>);
+}
+
+<span class="kw">fn</span> <span class="ident">handle_engine_error</span>(<span class="ident">err</span>: <span class="ident">EngineError</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="op">!</span> {
+    <span class="macro">ve1!</span>(<span class="string">&quot;error while open kvdb: {}&quot;</span>, <span class="ident">err</span>);
+    <span class="kw">if</span> <span class="kw">let</span> <span class="ident">EngineError::Engine</span>(<span class="ident">msg</span>) <span class="op">=</span> <span class="ident">err</span> {
+        <span class="kw">if</span> <span class="ident">msg</span>.<span class="ident">starts_with</span>(<span class="ident">LOCK_FILE_ERROR</span>) {
+            <span class="macro">ve1!</span>(
+                <span class="string">&quot;LOCK file conflict indicates TiKV process is running. \
+                Do NOT delete the LOCK file and force the command to run. \
+                Doing so could cause data corruption.&quot;</span>
+            );
+        }
+    }
     <span class="ident">process::exit</span>(<span class="op">-</span><span class="number">1</span>);
 }
 
@@ -2547,7 +2584,10 @@
             <span class="kw">let</span> <span class="ident">kv_path</span> <span class="op">=</span> <span class="ident">PathBuf::from</span>(<span class="ident">kv_path</span>).<span class="ident">canonicalize</span>().<span class="ident">unwrap</span>();
             <span class="kw">let</span> <span class="ident">kv_path</span> <span class="op">=</span> <span class="ident">kv_path</span>.<span class="ident">to_str</span>().<span class="ident">unwrap</span>();
             <span class="kw">let</span> <span class="ident">kv_db</span> <span class="op">=</span>
-                <span class="ident">engine_rocks::raw_util::new_engine_opt</span>(<span class="ident">kv_path</span>, <span class="ident">kv_db_opts</span>, <span class="ident">kv_cfs_opts</span>).<span class="ident">unwrap</span>();
+                <span class="kw">match</span> <span class="ident">engine_rocks::raw_util::new_engine_opt</span>(<span class="ident">kv_path</span>, <span class="ident">kv_db_opts</span>, <span class="ident">kv_cfs_opts</span>) {
+                    <span class="prelude-val">Ok</span>(<span class="ident">db</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">db</span>,
+                    <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">handle_engine_error</span>(<span class="ident">e</span>),
+                };
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">kv_db</span> <span class="op">=</span> <span class="ident">RocksEngine::from_db</span>(<span class="ident">Arc::new</span>(<span class="ident">kv_db</span>));
             <span class="ident">kv_db</span>.<span class="ident">set_shared_block_cache</span>(<span class="ident">shared_block_cache</span>);
 
@@ -2566,12 +2606,14 @@
                 <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">raft_db_opts</span> <span class="op">=</span> <span class="ident">cfg</span>.<span class="ident">raftdb</span>.<span class="ident">build_opt</span>();
                 <span class="ident">raft_db_opts</span>.<span class="ident">set_env</span>(<span class="ident">env</span>);
                 <span class="kw">let</span> <span class="ident">raft_db_cf_opts</span> <span class="op">=</span> <span class="ident">cfg</span>.<span class="ident">raftdb</span>.<span class="ident">build_cf_opts</span>(<span class="kw-2">&amp;</span><span class="ident">cache</span>);
-                <span class="kw">let</span> <span class="ident">raft_db</span> <span class="op">=</span> <span class="ident">engine_rocks::raw_util::new_engine_opt</span>(
+                <span class="kw">let</span> <span class="ident">raft_db</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">engine_rocks::raw_util::new_engine_opt</span>(
                     <span class="kw-2">&amp;</span><span class="ident">raft_path</span>,
                     <span class="ident">raft_db_opts</span>,
                     <span class="ident">raft_db_cf_opts</span>,
-                )
-                .<span class="ident">unwrap</span>();
+                ) {
+                    <span class="prelude-val">Ok</span>(<span class="ident">db</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">db</span>,
+                    <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">handle_engine_error</span>(<span class="ident">e</span>),
+                };
                 <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">raft_db</span> <span class="op">=</span> <span class="ident">RocksEngine::from_db</span>(<span class="ident">Arc::new</span>(<span class="ident">raft_db</span>));
                 <span class="ident">raft_db</span>.<span class="ident">set_shared_block_cache</span>(<span class="ident">shared_block_cache</span>);
                 <span class="kw">let</span> <span class="ident">debugger</span> <span class="op">=</span> <span class="ident">Debugger::new</span>(<span class="ident">Engines::new</span>(<span class="ident">kv_db</span>, <span class="ident">raft_db</span>), <span class="ident">cfg_controller</span>);
