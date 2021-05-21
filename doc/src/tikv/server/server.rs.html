@@ -539,6 +539,16 @@
 <span id="536">536</span>
 <span id="537">537</span>
 <span id="538">538</span>
+<span id="539">539</span>
+<span id="540">540</span>
+<span id="541">541</span>
+<span id="542">542</span>
+<span id="543">543</span>
+<span id="544">544</span>
+<span id="545">545</span>
+<span id="546">546</span>
+<span id="547">547</span>
+<span id="548">548</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -566,8 +576,9 @@
 <span class="kw">use</span> <span class="ident">raftstore::router::RaftStoreRouter</span>;
 <span class="kw">use</span> <span class="ident">raftstore::store::SnapManager</span>;
 <span class="kw">use</span> <span class="ident">security::SecurityManager</span>;
+<span class="kw">use</span> <span class="ident">tikv_util::config::VersionTrack</span>;
 <span class="kw">use</span> <span class="ident">tikv_util::timer::GLOBAL_TIMER_HANDLE</span>;
-<span class="kw">use</span> <span class="ident">tikv_util::worker</span>::{<span class="ident">LazyWorker</span>, <span class="ident">Worker</span>};
+<span class="kw">use</span> <span class="ident">tikv_util::worker</span>::{<span class="ident">LazyWorker</span>, <span class="ident">Scheduler</span>, <span class="ident">Worker</span>};
 <span class="kw">use</span> <span class="ident">tikv_util::Either</span>;
 
 <span class="kw">use</span> <span class="kw">super</span><span class="ident">::load_statistics</span>::<span class="kw-2">*</span>;
@@ -617,7 +628,7 @@
     <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::too_many_arguments</span>)]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">Engine</span>, <span class="ident">L</span>: <span class="ident">LockManager</span><span class="op">&gt;</span>(
         <span class="ident">store_id</span>: <span class="ident">u64</span>,
-        <span class="ident">cfg</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Config</span><span class="op">&gt;</span>,
+        <span class="ident">cfg</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">VersionTrack</span><span class="op">&lt;</span><span class="ident">Config</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">security_mgr</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">SecurityManager</span><span class="op">&gt;</span>,
         <span class="ident">storage</span>: <span class="ident">Storage</span><span class="op">&lt;</span><span class="ident">E</span>, <span class="ident">L</span><span class="op">&gt;</span>,
         <span class="ident">cop</span>: <span class="ident">Endpoint</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>,
@@ -631,24 +642,25 @@
         <span class="ident">debug_thread_pool</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Runtime</span><span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
         <span class="comment">// A helper thread (or pool) for transport layer.</span>
-        <span class="kw">let</span> <span class="ident">stats_pool</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">cfg</span>.<span class="ident">stats_concurrency</span> <span class="op">&gt;</span> <span class="number">0</span> {
+        <span class="kw">let</span> <span class="ident">stats_pool</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">cfg</span>.<span class="ident">value</span>().<span class="ident">stats_concurrency</span> <span class="op">&gt;</span> <span class="number">0</span> {
             <span class="prelude-val">Some</span>(
                 <span class="ident">RuntimeBuilder::new</span>()
                     .<span class="ident">threaded_scheduler</span>()
                     .<span class="ident">thread_name</span>(<span class="ident">STATS_THREAD_PREFIX</span>)
-                    .<span class="ident">core_threads</span>(<span class="ident">cfg</span>.<span class="ident">stats_concurrency</span>)
+                    .<span class="ident">core_threads</span>(<span class="ident">cfg</span>.<span class="ident">value</span>().<span class="ident">stats_concurrency</span>)
                     .<span class="ident">build</span>()
                     .<span class="ident">unwrap</span>(),
             )
         } <span class="kw">else</span> {
             <span class="prelude-val">None</span>
         };
-        <span class="kw">let</span> <span class="ident">grpc_thread_load</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">ThreadLoad::with_threshold</span>(<span class="ident">cfg</span>.<span class="ident">heavy_load_threshold</span>));
+        <span class="kw">let</span> <span class="ident">grpc_thread_load</span> <span class="op">=</span>
+            <span class="ident">Arc::new</span>(<span class="ident">ThreadLoad::with_threshold</span>(<span class="ident">cfg</span>.<span class="ident">value</span>().<span class="ident">heavy_load_threshold</span>));
 
         <span class="kw">let</span> <span class="ident">snap_worker</span> <span class="op">=</span> <span class="ident">Worker::new</span>(<span class="string">&quot;snap-handler&quot;</span>);
         <span class="kw">let</span> <span class="ident">lazy_worker</span> <span class="op">=</span> <span class="ident">snap_worker</span>.<span class="ident">lazy_build</span>(<span class="string">&quot;snap-handler&quot;</span>);
 
-        <span class="kw">let</span> <span class="ident">proxy</span> <span class="op">=</span> <span class="ident">Proxy::new</span>(<span class="ident">security_mgr</span>.<span class="ident">clone</span>(), <span class="kw-2">&amp;</span><span class="ident">env</span>, <span class="ident">cfg</span>.<span class="ident">clone</span>());
+        <span class="kw">let</span> <span class="ident">proxy</span> <span class="op">=</span> <span class="ident">Proxy::new</span>(<span class="ident">security_mgr</span>.<span class="ident">clone</span>(), <span class="kw-2">&amp;</span><span class="ident">env</span>, <span class="ident">Arc::new</span>(<span class="ident">cfg</span>.<span class="ident">value</span>().<span class="ident">clone</span>()));
         <span class="kw">let</span> <span class="ident">kv_service</span> <span class="op">=</span> <span class="ident">KvService::new</span>(
             <span class="ident">store_id</span>,
             <span class="ident">storage</span>,
@@ -658,23 +670,23 @@
             <span class="ident">raft_router</span>.<span class="ident">clone</span>(),
             <span class="ident">lazy_worker</span>.<span class="ident">scheduler</span>(),
             <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">grpc_thread_load</span>),
-            <span class="ident">cfg</span>.<span class="ident">enable_request_batch</span>,
+            <span class="ident">cfg</span>.<span class="ident">value</span>().<span class="ident">enable_request_batch</span>,
             <span class="ident">proxy</span>,
         );
 
-        <span class="kw">let</span> <span class="ident">addr</span> <span class="op">=</span> <span class="ident">SocketAddr::from_str</span>(<span class="kw-2">&amp;</span><span class="ident">cfg</span>.<span class="ident">addr</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">addr</span> <span class="op">=</span> <span class="ident">SocketAddr::from_str</span>(<span class="kw-2">&amp;</span><span class="ident">cfg</span>.<span class="ident">value</span>().<span class="ident">addr</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">ip</span> <span class="op">=</span> <span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">addr</span>.<span class="ident">ip</span>());
         <span class="kw">let</span> <span class="ident">mem_quota</span> <span class="op">=</span> <span class="ident">ResourceQuota::new</span>(<span class="prelude-val">Some</span>(<span class="string">&quot;ServerMemQuota&quot;</span>))
-            .<span class="ident">resize_memory</span>(<span class="ident">cfg</span>.<span class="ident">grpc_memory_pool_quota</span>.<span class="number">0</span> <span class="kw">as</span> <span class="ident">usize</span>);
+            .<span class="ident">resize_memory</span>(<span class="ident">cfg</span>.<span class="ident">value</span>().<span class="ident">grpc_memory_pool_quota</span>.<span class="number">0</span> <span class="kw">as</span> <span class="ident">usize</span>);
         <span class="kw">let</span> <span class="ident">channel_args</span> <span class="op">=</span> <span class="ident">ChannelBuilder::new</span>(<span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">env</span>))
-            .<span class="ident">stream_initial_window_size</span>(<span class="ident">cfg</span>.<span class="ident">grpc_stream_initial_window_size</span>.<span class="number">0</span> <span class="kw">as</span> <span class="ident">i32</span>)
-            .<span class="ident">max_concurrent_stream</span>(<span class="ident">cfg</span>.<span class="ident">grpc_concurrent_stream</span>)
+            .<span class="ident">stream_initial_window_size</span>(<span class="ident">cfg</span>.<span class="ident">value</span>().<span class="ident">grpc_stream_initial_window_size</span>.<span class="number">0</span> <span class="kw">as</span> <span class="ident">i32</span>)
+            .<span class="ident">max_concurrent_stream</span>(<span class="ident">cfg</span>.<span class="ident">value</span>().<span class="ident">grpc_concurrent_stream</span>)
             .<span class="ident">max_receive_message_len</span>(<span class="op">-</span><span class="number">1</span>)
             .<span class="ident">set_resource_quota</span>(<span class="ident">mem_quota</span>)
             .<span class="ident">max_send_message_len</span>(<span class="op">-</span><span class="number">1</span>)
             .<span class="ident">http2_max_ping_strikes</span>(<span class="ident">i32::MAX</span>) <span class="comment">// For pings without data from clients.</span>
-            .<span class="ident">keepalive_time</span>(<span class="ident">cfg</span>.<span class="ident">grpc_keepalive_time</span>.<span class="ident">into</span>())
-            .<span class="ident">keepalive_timeout</span>(<span class="ident">cfg</span>.<span class="ident">grpc_keepalive_timeout</span>.<span class="ident">into</span>())
+            .<span class="ident">keepalive_time</span>(<span class="ident">cfg</span>.<span class="ident">value</span>().<span class="ident">grpc_keepalive_time</span>.<span class="ident">into</span>())
+            .<span class="ident">keepalive_timeout</span>(<span class="ident">cfg</span>.<span class="ident">value</span>().<span class="ident">grpc_keepalive_timeout</span>.<span class="ident">into</span>())
             .<span class="ident">build_args</span>();
         <span class="kw">let</span> <span class="ident">health_service</span> <span class="op">=</span> <span class="ident">HealthService::default</span>();
         <span class="kw">let</span> <span class="ident">builder</span> <span class="op">=</span> {
@@ -688,7 +700,7 @@
 
         <span class="kw">let</span> <span class="ident">conn_builder</span> <span class="op">=</span> <span class="ident">ConnectionBuilder::new</span>(
             <span class="ident">env</span>.<span class="ident">clone</span>(),
-            <span class="ident">cfg</span>.<span class="ident">clone</span>(),
+            <span class="ident">Arc::new</span>(<span class="ident">cfg</span>.<span class="ident">value</span>().<span class="ident">clone</span>()),
             <span class="ident">security_mgr</span>.<span class="ident">clone</span>(),
             <span class="ident">resolver</span>,
             <span class="ident">raft_router</span>.<span class="ident">clone</span>(),
@@ -720,6 +732,10 @@
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_debug_thread_pool</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">RuntimeHandle</span> {
         <span class="self">self</span>.<span class="ident">debug_thread_pool</span>.<span class="ident">handle</span>()
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_snap_worker_scheduler</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Scheduler</span><span class="op">&lt;</span><span class="ident">SnapTask</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">snap_worker</span>.<span class="ident">scheduler</span>()
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">transport</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ServerTransport</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">S</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span> {
@@ -760,7 +776,11 @@
 
     <span class="doccomment">/// Starts the TiKV server.</span>
     <span class="doccomment">/// Notice: Make sure call `build_and_bind` first.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">cfg</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Config</span><span class="op">&gt;</span>, <span class="ident">security_mgr</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">SecurityManager</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start</span>(
+        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
+        <span class="ident">cfg</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">VersionTrack</span><span class="op">&lt;</span><span class="ident">Config</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+        <span class="ident">security_mgr</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">SecurityManager</span><span class="op">&gt;</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">snap_runner</span> <span class="op">=</span> <span class="ident">SnapHandler::new</span>(
             <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">env</span>),
             <span class="self">self</span>.<span class="ident">snap_mgr</span>.<span class="ident">clone</span>(),
@@ -999,7 +1019,7 @@
         <span class="ident">gc_worker</span>.<span class="ident">start</span>().<span class="ident">unwrap</span>();
 
         <span class="kw">let</span> <span class="ident">quick_fail</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">AtomicBool::new</span>(<span class="bool-val">false</span>));
-        <span class="kw">let</span> <span class="ident">cfg</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">cfg</span>);
+        <span class="kw">let</span> <span class="ident">cfg</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">VersionTrack::new</span>(<span class="ident">cfg</span>));
         <span class="kw">let</span> <span class="ident">security_mgr</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">SecurityManager::new</span>(<span class="kw-2">&amp;</span><span class="ident">SecurityConfig::default</span>()).<span class="ident">unwrap</span>());
 
         <span class="kw">let</span> <span class="ident">cop_read_pool</span> <span class="op">=</span> <span class="ident">ReadPool::from</span>(<span class="ident">readpool_impl::build_read_pool_for_test</span>(
@@ -1007,7 +1027,7 @@
             <span class="ident">storage</span>.<span class="ident">get_engine</span>(),
         ));
         <span class="kw">let</span> <span class="ident">cop</span> <span class="op">=</span> <span class="ident">coprocessor::Endpoint::new</span>(
-            <span class="kw-2">&amp;</span><span class="ident">cfg</span>,
+            <span class="kw-2">&amp;</span><span class="ident">cfg</span>.<span class="ident">value</span>().<span class="ident">clone</span>(),
             <span class="ident">cop_read_pool</span>.<span class="ident">handle</span>(),
             <span class="ident">storage</span>.<span class="ident">get_concurrency_manager</span>(),
             <span class="ident">PerfLevel::EnableCount</span>,
