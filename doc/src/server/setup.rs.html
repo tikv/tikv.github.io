@@ -300,30 +300,6 @@
 <span id="297">297</span>
 <span id="298">298</span>
 <span id="299">299</span>
-<span id="300">300</span>
-<span id="301">301</span>
-<span id="302">302</span>
-<span id="303">303</span>
-<span id="304">304</span>
-<span id="305">305</span>
-<span id="306">306</span>
-<span id="307">307</span>
-<span id="308">308</span>
-<span id="309">309</span>
-<span id="310">310</span>
-<span id="311">311</span>
-<span id="312">312</span>
-<span id="313">313</span>
-<span id="314">314</span>
-<span id="315">315</span>
-<span id="316">316</span>
-<span id="317">317</span>
-<span id="318">318</span>
-<span id="319">319</span>
-<span id="320">320</span>
-<span id="321">321</span>
-<span id="322">322</span>
-<span id="323">323</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2018 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -392,33 +368,111 @@
 
 <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">initial_logger</span>(<span class="ident">config</span>: <span class="kw-2">&amp;</span><span class="ident">TiKvConfig</span>) {
-    <span class="kw">fn</span> <span class="ident">build_logger</span><span class="op">&lt;</span><span class="ident">D</span><span class="op">&gt;</span>(<span class="ident">drainer</span>: <span class="ident">D</span>, <span class="ident">config</span>: <span class="kw-2">&amp;</span><span class="ident">TiKvConfig</span>)
-    <span class="kw">where</span>
-        <span class="ident">D</span>: <span class="ident">slog::Drain</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
-        <span class="op">&lt;</span><span class="ident">D</span> <span class="kw">as</span> <span class="ident">slog::Drain</span><span class="op">&gt;</span><span class="ident">::Err</span>: <span class="ident">std::fmt::Display</span>,
-    {
-        <span class="comment">// use async drainer and init std log.</span>
-        <span class="ident">logger::init_log</span>(
-            <span class="ident">drainer</span>,
-            <span class="ident">config</span>.<span class="ident">log_level</span>,
-            <span class="bool-val">true</span>,
-            <span class="bool-val">true</span>,
-            <span class="macro">vec!</span>[],
-            <span class="ident">config</span>.<span class="ident">slow_log_threshold</span>.<span class="ident">as_millis</span>(),
+    <span class="kw">let</span> <span class="ident">rocksdb_info_log_path</span> <span class="op">=</span> <span class="kw">if</span> <span class="op">!</span><span class="ident">config</span>.<span class="ident">rocksdb</span>.<span class="ident">info_log_dir</span>.<span class="ident">is_empty</span>() {
+        <span class="ident">make_engine_log_path</span>(<span class="kw-2">&amp;</span><span class="ident">config</span>.<span class="ident">rocksdb</span>.<span class="ident">info_log_dir</span>, <span class="string">&quot;&quot;</span>, <span class="ident">DEFAULT_ROCKSDB_LOG_FILE</span>)
+    } <span class="kw">else</span> {
+        <span class="comment">// Don&#39;t use `DEFAULT_ROCKSDB_SUB_DIR`, because of the logic of `RocksEngine::exists`.</span>
+        <span class="ident">make_engine_log_path</span>(<span class="kw-2">&amp;</span><span class="ident">config</span>.<span class="ident">storage</span>.<span class="ident">data_dir</span>, <span class="string">&quot;&quot;</span>, <span class="ident">DEFAULT_ROCKSDB_LOG_FILE</span>)
+    };
+    <span class="kw">let</span> <span class="ident">raftdb_info_log_path</span> <span class="op">=</span> <span class="kw">if</span> <span class="op">!</span><span class="ident">config</span>.<span class="ident">raftdb</span>.<span class="ident">info_log_dir</span>.<span class="ident">is_empty</span>() {
+        <span class="ident">make_engine_log_path</span>(<span class="kw-2">&amp;</span><span class="ident">config</span>.<span class="ident">raftdb</span>.<span class="ident">info_log_dir</span>, <span class="string">&quot;&quot;</span>, <span class="ident">DEFAULT_RAFTDB_LOG_FILE</span>)
+    } <span class="kw">else</span> {
+        <span class="ident">make_engine_log_path</span>(<span class="kw-2">&amp;</span><span class="ident">config</span>.<span class="ident">storage</span>.<span class="ident">data_dir</span>, <span class="string">&quot;&quot;</span>, <span class="ident">DEFAULT_RAFTDB_LOG_FILE</span>)
+    };
+    <span class="kw">let</span> <span class="ident">rocksdb</span> <span class="op">=</span> <span class="ident">logger::file_writer</span>(
+        <span class="kw-2">&amp;</span><span class="ident">rocksdb_info_log_path</span>,
+        <span class="ident">config</span>.<span class="ident">log_rotation_timespan</span>,
+        <span class="ident">config</span>.<span class="ident">log_rotation_size</span>,
+        <span class="ident">rename_by_timestamp</span>,
+    )
+    .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
+        <span class="macro">fatal!</span>(
+            <span class="string">&quot;failed to initialize rocksdb log with file {}: {}&quot;</span>,
+            <span class="ident">rocksdb_info_log_path</span>,
+            <span class="ident">e</span>
+        );
+    });
+
+    <span class="kw">let</span> <span class="ident">raftdb</span> <span class="op">=</span> <span class="ident">logger::file_writer</span>(
+        <span class="kw-2">&amp;</span><span class="ident">raftdb_info_log_path</span>,
+        <span class="ident">config</span>.<span class="ident">log_rotation_timespan</span>,
+        <span class="ident">config</span>.<span class="ident">log_rotation_size</span>,
+        <span class="ident">rename_by_timestamp</span>,
+    )
+    .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
+        <span class="macro">fatal!</span>(
+            <span class="string">&quot;failed to initialize raftdb log with file {}: {}&quot;</span>,
+            <span class="ident">raftdb_info_log_path</span>,
+            <span class="ident">e</span>
+        );
+    });
+
+    <span class="kw">let</span> <span class="ident">slow_log_writer</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">config</span>.<span class="ident">slow_log_file</span>.<span class="ident">is_empty</span>() {
+        <span class="prelude-val">None</span>
+    } <span class="kw">else</span> {
+        <span class="kw">let</span> <span class="ident">slow_log_writer</span> <span class="op">=</span> <span class="ident">logger::file_writer</span>(
+            <span class="kw-2">&amp;</span><span class="ident">config</span>.<span class="ident">slow_log_file</span>,
+            <span class="ident">config</span>.<span class="ident">log_rotation_timespan</span>,
+            <span class="ident">config</span>.<span class="ident">log_rotation_size</span>,
+            <span class="ident">rename_by_timestamp</span>,
         )
         .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
+            <span class="macro">fatal!</span>(
+                <span class="string">&quot;failed to initialize slow-log with file {}: {}&quot;</span>,
+                <span class="ident">config</span>.<span class="ident">slow_log_file</span>,
+                <span class="ident">e</span>
+            );
+        });
+        <span class="prelude-val">Some</span>(<span class="ident">slow_log_writer</span>)
+    };
+
+    <span class="kw">fn</span> <span class="ident">build_logger_with_slow_log</span><span class="op">&lt;</span><span class="ident">N</span>, <span class="ident">R</span>, <span class="ident">S</span>, <span class="ident">T</span><span class="op">&gt;</span>(
+        <span class="ident">normal</span>: <span class="ident">N</span>,
+        <span class="ident">rocksdb</span>: <span class="ident">R</span>,
+        <span class="ident">raftdb</span>: <span class="ident">T</span>,
+        <span class="ident">slow</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>,
+        <span class="ident">config</span>: <span class="kw-2">&amp;</span><span class="ident">TiKvConfig</span>,
+    ) <span class="kw">where</span>
+        <span class="ident">N</span>: <span class="ident">slog::Drain</span><span class="op">&lt;</span><span class="prelude-val">Ok</span> <span class="op">=</span> (), <span class="prelude-val">Err</span> <span class="op">=</span> <span class="ident">io::Error</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+        <span class="ident">R</span>: <span class="ident">slog::Drain</span><span class="op">&lt;</span><span class="prelude-val">Ok</span> <span class="op">=</span> (), <span class="prelude-val">Err</span> <span class="op">=</span> <span class="ident">io::Error</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+        <span class="ident">S</span>: <span class="ident">slog::Drain</span><span class="op">&lt;</span><span class="prelude-val">Ok</span> <span class="op">=</span> (), <span class="prelude-val">Err</span> <span class="op">=</span> <span class="ident">io::Error</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+        <span class="ident">T</span>: <span class="ident">slog::Drain</span><span class="op">&lt;</span><span class="prelude-val">Ok</span> <span class="op">=</span> (), <span class="prelude-val">Err</span> <span class="op">=</span> <span class="ident">io::Error</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+    {
+        <span class="comment">// Use async drainer and init std log.</span>
+        <span class="kw">let</span> <span class="ident">drainer</span> <span class="op">=</span> <span class="ident">logger::LogDispatcher::new</span>(<span class="ident">normal</span>, <span class="ident">rocksdb</span>, <span class="ident">raftdb</span>, <span class="ident">slow</span>);
+        <span class="kw">let</span> <span class="ident">level</span> <span class="op">=</span> <span class="ident">config</span>.<span class="ident">log_level</span>;
+        <span class="kw">let</span> <span class="ident">slow_threshold</span> <span class="op">=</span> <span class="ident">config</span>.<span class="ident">slow_log_threshold</span>.<span class="ident">as_millis</span>();
+        <span class="ident">logger::init_log</span>(<span class="ident">drainer</span>, <span class="ident">level</span>, <span class="bool-val">true</span>, <span class="bool-val">true</span>, <span class="macro">vec!</span>[], <span class="ident">slow_threshold</span>).<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
             <span class="macro">fatal!</span>(<span class="string">&quot;failed to initialize log: {}&quot;</span>, <span class="ident">e</span>);
         });
     }
 
-    <span class="kw">if</span> <span class="ident">config</span>.<span class="ident">log_file</span>.<span class="ident">is_empty</span>() {
-        <span class="kw">let</span> <span class="ident">writer</span> <span class="op">=</span> <span class="ident">logger::term_writer</span>();
-        <span class="kw">match</span> <span class="ident">config</span>.<span class="ident">log_format</span> {
-            <span class="ident">config::LogFormat::Text</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">build_logger</span>(<span class="ident">logger::text_format</span>(<span class="ident">writer</span>), <span class="ident">config</span>),
-            <span class="ident">config::LogFormat::Json</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">build_logger</span>(<span class="ident">logger::json_format</span>(<span class="ident">writer</span>), <span class="ident">config</span>),
+    <span class="macro">macro_rules!</span> <span class="ident">do_build</span> {
+        (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">log</span>:<span class="ident">expr</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">rocksdb</span>:<span class="ident">expr</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">raftdb</span>:<span class="ident">expr</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">slow</span>:<span class="ident">expr</span>) <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="kw">match</span> <span class="ident">config</span>.<span class="ident">log_format</span> {
+                <span class="ident">config::LogFormat::Text</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">build_logger_with_slow_log</span>(
+                    <span class="ident">logger::text_format</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">log</span>),
+                    <span class="ident">logger::rocks_text_format</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">rocksdb</span>),
+                    <span class="ident">logger::rocks_text_format</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">raftdb</span>),
+                    <span class="macro-nonterminal">$</span><span class="macro-nonterminal">slow</span>.<span class="ident">map</span>(<span class="ident">logger::text_format</span>),
+                    <span class="ident">config</span>,
+                ),
+                <span class="ident">config::LogFormat::Json</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">build_logger_with_slow_log</span>(
+                    <span class="ident">logger::json_format</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">log</span>),
+                    <span class="ident">logger::json_format</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">rocksdb</span>),
+                    <span class="ident">logger::json_format</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">raftdb</span>),
+                    <span class="macro-nonterminal">$</span><span class="macro-nonterminal">slow</span>.<span class="ident">map</span>(<span class="ident">logger::json_format</span>),
+                    <span class="ident">config</span>,
+                ),
+            }
         };
+    }
+
+    <span class="kw">if</span> <span class="ident">config</span>.<span class="ident">log_file</span>.<span class="ident">is_empty</span>() {
+        <span class="kw">let</span> <span class="ident">log</span> <span class="op">=</span> <span class="ident">logger::term_writer</span>();
+        <span class="macro">do_build!</span>(<span class="ident">log</span>, <span class="ident">rocksdb</span>, <span class="ident">raftdb</span>, <span class="ident">slow_log_writer</span>);
     } <span class="kw">else</span> {
-        <span class="kw">let</span> <span class="ident">writer</span> <span class="op">=</span> <span class="ident">logger::file_writer</span>(
+        <span class="kw">let</span> <span class="ident">log</span> <span class="op">=</span> <span class="ident">logger::file_writer</span>(
             <span class="kw-2">&amp;</span><span class="ident">config</span>.<span class="ident">log_file</span>,
             <span class="ident">config</span>.<span class="ident">log_rotation_timespan</span>,
             <span class="ident">config</span>.<span class="ident">log_rotation_size</span>,
@@ -431,110 +485,8 @@
                 <span class="ident">e</span>
             );
         });
-
-        <span class="kw">let</span> <span class="ident">slow_log_writer</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">config</span>.<span class="ident">slow_log_file</span>.<span class="ident">is_empty</span>() {
-            <span class="prelude-val">None</span>
-        } <span class="kw">else</span> {
-            <span class="kw">let</span> <span class="ident">slow_log_writer</span> <span class="op">=</span> <span class="ident">logger::file_writer</span>(
-                <span class="kw-2">&amp;</span><span class="ident">config</span>.<span class="ident">slow_log_file</span>,
-                <span class="ident">config</span>.<span class="ident">log_rotation_timespan</span>,
-                <span class="ident">config</span>.<span class="ident">log_rotation_size</span>,
-                <span class="ident">rename_by_timestamp</span>,
-            )
-            .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
-                <span class="macro">fatal!</span>(
-                    <span class="string">&quot;failed to initialize slow-log with file {}: {}&quot;</span>,
-                    <span class="ident">config</span>.<span class="ident">slow_log_file</span>,
-                    <span class="ident">e</span>
-                );
-            });
-            <span class="prelude-val">Some</span>(<span class="ident">slow_log_writer</span>)
-        };
-
-        <span class="kw">let</span> <span class="ident">rocksdb_info_log_path</span> <span class="op">=</span> <span class="kw">if</span> <span class="op">!</span><span class="ident">config</span>.<span class="ident">rocksdb</span>.<span class="ident">info_log_dir</span>.<span class="ident">is_empty</span>() {
-            <span class="ident">make_engine_log_path</span>(<span class="kw-2">&amp;</span><span class="ident">config</span>.<span class="ident">rocksdb</span>.<span class="ident">info_log_dir</span>, <span class="string">&quot;&quot;</span>, <span class="ident">DEFAULT_ROCKSDB_LOG_FILE</span>)
-        } <span class="kw">else</span> {
-            <span class="comment">// Don&#39;t use `DEFAULT_ROCKSDB_SUB_DIR`, because of the logic of `RocksEngine::exists`.</span>
-            <span class="ident">make_engine_log_path</span>(<span class="kw-2">&amp;</span><span class="ident">config</span>.<span class="ident">storage</span>.<span class="ident">data_dir</span>, <span class="string">&quot;&quot;</span>, <span class="ident">DEFAULT_ROCKSDB_LOG_FILE</span>)
-        };
-        <span class="kw">let</span> <span class="ident">raftdb_info_log_path</span> <span class="op">=</span> <span class="kw">if</span> <span class="op">!</span><span class="ident">config</span>.<span class="ident">raftdb</span>.<span class="ident">info_log_dir</span>.<span class="ident">is_empty</span>() {
-            <span class="ident">make_engine_log_path</span>(<span class="kw-2">&amp;</span><span class="ident">config</span>.<span class="ident">raftdb</span>.<span class="ident">info_log_dir</span>, <span class="string">&quot;&quot;</span>, <span class="ident">DEFAULT_RAFTDB_LOG_FILE</span>)
-        } <span class="kw">else</span> {
-            <span class="ident">make_engine_log_path</span>(<span class="kw-2">&amp;</span><span class="ident">config</span>.<span class="ident">storage</span>.<span class="ident">data_dir</span>, <span class="string">&quot;&quot;</span>, <span class="ident">DEFAULT_RAFTDB_LOG_FILE</span>)
-        };
-        <span class="kw">let</span> <span class="ident">rocksdb_log_writer</span> <span class="op">=</span> <span class="ident">logger::file_writer</span>(
-            <span class="kw-2">&amp;</span><span class="ident">rocksdb_info_log_path</span>,
-            <span class="ident">config</span>.<span class="ident">log_rotation_timespan</span>,
-            <span class="ident">config</span>.<span class="ident">log_rotation_size</span>,
-            <span class="ident">rename_by_timestamp</span>,
-        )
-        .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
-            <span class="macro">fatal!</span>(
-                <span class="string">&quot;failed to initialize rocksdb log with file {}: {}&quot;</span>,
-                <span class="ident">rocksdb_info_log_path</span>,
-                <span class="ident">e</span>
-            );
-        });
-
-        <span class="kw">let</span> <span class="ident">raftdb_log_writer</span> <span class="op">=</span> <span class="ident">logger::file_writer</span>(
-            <span class="kw-2">&amp;</span><span class="ident">raftdb_info_log_path</span>,
-            <span class="ident">config</span>.<span class="ident">log_rotation_timespan</span>,
-            <span class="ident">config</span>.<span class="ident">log_rotation_size</span>,
-            <span class="ident">rename_by_timestamp</span>,
-        )
-        .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
-            <span class="macro">fatal!</span>(
-                <span class="string">&quot;failed to initialize raftdb log with file {}: {}&quot;</span>,
-                <span class="ident">raftdb_info_log_path</span>,
-                <span class="ident">e</span>
-            );
-        });
-
-        <span class="kw">match</span> <span class="ident">config</span>.<span class="ident">log_format</span> {
-            <span class="ident">config::LogFormat::Text</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">build_logger_with_slow_log</span>(
-                <span class="ident">logger::text_format</span>(<span class="ident">writer</span>),
-                <span class="ident">logger::rocks_text_format</span>(<span class="ident">rocksdb_log_writer</span>),
-                <span class="ident">logger::text_format</span>(<span class="ident">raftdb_log_writer</span>),
-                <span class="ident">slow_log_writer</span>.<span class="ident">map</span>(<span class="ident">logger::text_format</span>),
-                <span class="ident">config</span>,
-            ),
-            <span class="ident">config::LogFormat::Json</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">build_logger_with_slow_log</span>(
-                <span class="ident">logger::json_format</span>(<span class="ident">writer</span>),
-                <span class="ident">logger::json_format</span>(<span class="ident">rocksdb_log_writer</span>),
-                <span class="ident">logger::json_format</span>(<span class="ident">raftdb_log_writer</span>),
-                <span class="ident">slow_log_writer</span>.<span class="ident">map</span>(<span class="ident">logger::json_format</span>),
-                <span class="ident">config</span>,
-            ),
-        };
-
-        <span class="kw">fn</span> <span class="ident">build_logger_with_slow_log</span><span class="op">&lt;</span><span class="ident">N</span>, <span class="ident">R</span>, <span class="ident">S</span>, <span class="ident">T</span><span class="op">&gt;</span>(
-            <span class="ident">normal</span>: <span class="ident">N</span>,
-            <span class="ident">rocksdb</span>: <span class="ident">R</span>,
-            <span class="ident">raftdb</span>: <span class="ident">T</span>,
-            <span class="ident">slow</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>,
-            <span class="ident">config</span>: <span class="kw-2">&amp;</span><span class="ident">TiKvConfig</span>,
-        ) <span class="kw">where</span>
-            <span class="ident">N</span>: <span class="ident">slog::Drain</span><span class="op">&lt;</span><span class="prelude-val">Ok</span> <span class="op">=</span> (), <span class="prelude-val">Err</span> <span class="op">=</span> <span class="ident">io::Error</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
-            <span class="ident">R</span>: <span class="ident">slog::Drain</span><span class="op">&lt;</span><span class="prelude-val">Ok</span> <span class="op">=</span> (), <span class="prelude-val">Err</span> <span class="op">=</span> <span class="ident">io::Error</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
-            <span class="ident">S</span>: <span class="ident">slog::Drain</span><span class="op">&lt;</span><span class="prelude-val">Ok</span> <span class="op">=</span> (), <span class="prelude-val">Err</span> <span class="op">=</span> <span class="ident">io::Error</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
-            <span class="ident">T</span>: <span class="ident">slog::Drain</span><span class="op">&lt;</span><span class="prelude-val">Ok</span> <span class="op">=</span> (), <span class="prelude-val">Err</span> <span class="op">=</span> <span class="ident">io::Error</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
-        {
-            <span class="kw">let</span> <span class="ident">drainer</span> <span class="op">=</span> <span class="ident">logger::LogDispatcher::new</span>(<span class="ident">normal</span>, <span class="ident">rocksdb</span>, <span class="ident">raftdb</span>, <span class="ident">slow</span>);
-
-            <span class="comment">// use async drainer and init std log.</span>
-            <span class="ident">logger::init_log</span>(
-                <span class="ident">drainer</span>,
-                <span class="ident">config</span>.<span class="ident">log_level</span>,
-                <span class="bool-val">true</span>,
-                <span class="bool-val">true</span>,
-                <span class="macro">vec!</span>[],
-                <span class="ident">config</span>.<span class="ident">slow_log_threshold</span>.<span class="ident">as_millis</span>(),
-            )
-            .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
-                <span class="macro">fatal!</span>(<span class="string">&quot;failed to initialize log: {}&quot;</span>, <span class="ident">e</span>);
-            });
-        }
-    };
+        <span class="macro">do_build!</span>(<span class="ident">log</span>, <span class="ident">rocksdb</span>, <span class="ident">raftdb</span>, <span class="ident">slow_log_writer</span>);
+    }
 
     <span class="comment">// Set redact_info_log.</span>
     <span class="kw">let</span> <span class="ident">redact_info_log</span> <span class="op">=</span> <span class="ident">config</span>.<span class="ident">security</span>.<span class="ident">redact_info_log</span>.<span class="ident">unwrap_or</span>(<span class="bool-val">false</span>);
