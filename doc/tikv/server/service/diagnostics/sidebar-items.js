@@ -1,1 +1,1 @@
-initSidebarItems({"mod":[["ioload",""],["log",""],["sys",""]],"struct":[["Service","Service handles the RPC messages for the `Diagnostics` service."]]});
+initSidebarItems({"mod":[["ioload",""],["log",""],["sys",""]],"struct":[["SYS_INFO",""],["Service","Service handles the RPC messages for the `Diagnostics` service."]]});
