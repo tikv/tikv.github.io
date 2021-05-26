@@ -709,6 +709,40 @@
 <span id="706">706</span>
 <span id="707">707</span>
 <span id="708">708</span>
+<span id="709">709</span>
+<span id="710">710</span>
+<span id="711">711</span>
+<span id="712">712</span>
+<span id="713">713</span>
+<span id="714">714</span>
+<span id="715">715</span>
+<span id="716">716</span>
+<span id="717">717</span>
+<span id="718">718</span>
+<span id="719">719</span>
+<span id="720">720</span>
+<span id="721">721</span>
+<span id="722">722</span>
+<span id="723">723</span>
+<span id="724">724</span>
+<span id="725">725</span>
+<span id="726">726</span>
+<span id="727">727</span>
+<span id="728">728</span>
+<span id="729">729</span>
+<span id="730">730</span>
+<span id="731">731</span>
+<span id="732">732</span>
+<span id="733">733</span>
+<span id="734">734</span>
+<span id="735">735</span>
+<span id="736">736</span>
+<span id="737">737</span>
+<span id="738">738</span>
+<span id="739">739</span>
+<span id="740">740</span>
+<span id="741">741</span>
+<span id="742">742</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.</span>
 <span class="kw">use</span> <span class="ident">std::io</span>;
@@ -718,7 +752,7 @@
     {<span class="ident">ByteStream</span>, <span class="ident">RusotoError</span>},
 };
 <span class="kw">use</span> <span class="ident">rusoto_credential</span>::{<span class="ident">ProvideAwsCredentials</span>, <span class="ident">StaticProvider</span>};
-<span class="kw">use</span> <span class="ident">rusoto_s3</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident">rusoto_s3</span>::{<span class="ident">util::AddressingStyle</span>, <span class="kw-2">*</span>};
 <span class="kw">use</span> <span class="ident">tokio::time</span>::{<span class="ident">delay_for</span>, <span class="ident">timeout</span>};
 
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util</span>;
@@ -887,7 +921,10 @@
         <span class="kw">let</span> <span class="ident">bucket_region</span> <span class="op">=</span> <span class="ident">none_to_empty</span>(<span class="ident">config</span>.<span class="ident">bucket</span>.<span class="ident">region</span>.<span class="ident">clone</span>());
         <span class="kw">let</span> <span class="ident">bucket_endpoint</span> <span class="op">=</span> <span class="ident">config</span>.<span class="ident">bucket</span>.<span class="ident">endpoint</span>.<span class="ident">clone</span>();
         <span class="kw">let</span> <span class="ident">region</span> <span class="op">=</span> <span class="ident">util::get_region</span>(<span class="kw-2">&amp;</span><span class="ident">bucket_region</span>, <span class="kw-2">&amp;</span><span class="ident">none_to_empty</span>(<span class="ident">bucket_endpoint</span>))<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">S3Client::new_with</span>(<span class="ident">dispatcher</span>, <span class="ident">credentials_provider</span>, <span class="ident">region</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">client</span> <span class="op">=</span> <span class="ident">S3Client::new_with</span>(<span class="ident">dispatcher</span>, <span class="ident">credentials_provider</span>, <span class="ident">region</span>);
+        <span class="kw">if</span> <span class="ident">config</span>.<span class="ident">force_path_style</span> {
+            <span class="ident">client</span>.<span class="ident">config_mut</span>().<span class="ident">addressing_style</span> <span class="op">=</span> <span class="ident">AddressingStyle::Path</span>;
+        }
         <span class="prelude-val">Ok</span>(<span class="ident">S3Storage</span> { <span class="ident">config</span>, <span class="ident">client</span> })
     }
 
@@ -1239,10 +1276,12 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">bucket</span> <span class="op">=</span> <span class="ident">BucketConf::default</span>(<span class="ident">bucket_name</span>);
         <span class="ident">bucket</span>.<span class="ident">region</span> <span class="op">=</span> <span class="ident">StringNonEmpty::opt</span>(<span class="string">&quot;ap-southeast-2&quot;</span>.<span class="ident">to_string</span>());
         <span class="ident">bucket</span>.<span class="ident">prefix</span> <span class="op">=</span> <span class="ident">StringNonEmpty::opt</span>(<span class="string">&quot;myprefix&quot;</span>.<span class="ident">to_string</span>());
-        <span class="kw">let</span> <span class="ident">config</span> <span class="op">=</span> <span class="ident">Config::default</span>(<span class="ident">bucket</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">config</span> <span class="op">=</span> <span class="ident">Config::default</span>(<span class="ident">bucket</span>);
+        <span class="ident">config</span>.<span class="ident">force_path_style</span> <span class="op">=</span> <span class="bool-val">true</span>;
         <span class="kw">let</span> <span class="ident">dispatcher</span> <span class="op">=</span> <span class="ident">MockRequestDispatcher::with_status</span>(<span class="number">200</span>).<span class="ident">with_request_checker</span>(
             <span class="kw">move</span> <span class="op">|</span><span class="ident">req</span>: <span class="kw-2">&amp;</span><span class="ident">SignedRequest</span><span class="op">|</span> {
                 <span class="macro">assert_eq!</span>(<span class="ident">req</span>.<span class="ident">region</span>.<span class="ident">name</span>(), <span class="string">&quot;ap-southeast-2&quot;</span>);
+                <span class="macro">assert_eq!</span>(<span class="ident">req</span>.<span class="ident">hostname</span>(), <span class="string">&quot;s3.ap-southeast-2.amazonaws.com&quot;</span>);
                 <span class="macro">assert_eq!</span>(<span class="ident">req</span>.<span class="ident">path</span>(), <span class="string">&quot;/mybucket/myprefix/mykey&quot;</span>);
                 <span class="comment">// PutObject is translated to HTTP PUT.</span>
                 <span class="macro">assert_eq!</span>(<span class="ident">req</span>.<span class="ident">payload</span>.<span class="ident">is_some</span>(), <span class="ident">req</span>.<span class="ident">method</span>() <span class="op">=</span><span class="op">=</span> <span class="string">&quot;PUT&quot;</span>);
@@ -1302,6 +1341,35 @@
         <span class="ident">fail::remove</span>(<span class="ident">s3_timeout_injected_fp</span>);
         <span class="comment">// no timeout</span>
         <span class="macro">assert!</span>(<span class="ident">resp</span>.<span class="ident">is_ok</span>());
+    }
+
+    <span class="attribute">#[<span class="ident">test</span>]</span>
+    <span class="kw">fn</span> <span class="ident">test_s3_storage_with_virtual_host</span>() {
+        <span class="kw">let</span> <span class="ident">magic_contents</span> <span class="op">=</span> <span class="string">&quot;abcd&quot;</span>;
+        <span class="kw">let</span> <span class="ident">bucket_name</span> <span class="op">=</span> <span class="ident">StringNonEmpty::required</span>(<span class="string">&quot;bucket2&quot;</span>.<span class="ident">to_string</span>()).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">bucket</span> <span class="op">=</span> <span class="ident">BucketConf::default</span>(<span class="ident">bucket_name</span>);
+        <span class="ident">bucket</span>.<span class="ident">region</span> <span class="op">=</span> <span class="ident">StringNonEmpty::opt</span>(<span class="string">&quot;ap-southeast-1&quot;</span>.<span class="ident">to_string</span>());
+        <span class="ident">bucket</span>.<span class="ident">prefix</span> <span class="op">=</span> <span class="ident">StringNonEmpty::opt</span>(<span class="string">&quot;prefix2&quot;</span>.<span class="ident">to_string</span>());
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">config</span> <span class="op">=</span> <span class="ident">Config::default</span>(<span class="ident">bucket</span>);
+        <span class="ident">config</span>.<span class="ident">force_path_style</span> <span class="op">=</span> <span class="bool-val">false</span>;
+        <span class="kw">let</span> <span class="ident">dispatcher</span> <span class="op">=</span> <span class="ident">MockRequestDispatcher::with_status</span>(<span class="number">200</span>).<span class="ident">with_request_checker</span>(
+            <span class="kw">move</span> <span class="op">|</span><span class="ident">req</span>: <span class="kw-2">&amp;</span><span class="ident">SignedRequest</span><span class="op">|</span> {
+                <span class="macro">assert_eq!</span>(<span class="ident">req</span>.<span class="ident">region</span>.<span class="ident">name</span>(), <span class="string">&quot;ap-southeast-1&quot;</span>);
+                <span class="macro">assert_eq!</span>(<span class="ident">req</span>.<span class="ident">hostname</span>(), <span class="string">&quot;bucket2.s3.ap-southeast-1.amazonaws.com&quot;</span>);
+                <span class="macro">assert_eq!</span>(<span class="ident">req</span>.<span class="ident">path</span>(), <span class="string">&quot;/prefix2/key2&quot;</span>);
+                <span class="comment">// PutObject is translated to HTTP PUT.</span>
+                <span class="macro">assert_eq!</span>(<span class="ident">req</span>.<span class="ident">payload</span>.<span class="ident">is_some</span>(), <span class="ident">req</span>.<span class="ident">method</span>() <span class="op">=</span><span class="op">=</span> <span class="string">&quot;PUT&quot;</span>);
+            },
+        );
+        <span class="kw">let</span> <span class="ident">credentials_provider</span> <span class="op">=</span>
+            <span class="ident">StaticProvider::new_minimal</span>(<span class="string">&quot;abc&quot;</span>.<span class="ident">to_string</span>(), <span class="string">&quot;xyz&quot;</span>.<span class="ident">to_string</span>());
+        <span class="kw">let</span> <span class="ident">s</span> <span class="op">=</span> <span class="ident">S3Storage::new_creds_dispatcher</span>(<span class="ident">config</span>, <span class="ident">dispatcher</span>, <span class="ident">credentials_provider</span>).<span class="ident">unwrap</span>();
+        <span class="ident">s</span>.<span class="ident">put</span>(
+            <span class="string">&quot;key2&quot;</span>,
+            <span class="ident">Box::new</span>(<span class="ident">magic_contents</span>.<span class="ident">as_bytes</span>()),
+            <span class="ident">magic_contents</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">u64</span>,
+        )
+        .<span class="ident">unwrap</span>();
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>

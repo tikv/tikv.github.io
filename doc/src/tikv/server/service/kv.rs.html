@@ -1966,6 +1966,20 @@
 <span id="1963">1963</span>
 <span id="1964">1964</span>
 <span id="1965">1965</span>
+<span id="1966">1966</span>
+<span id="1967">1967</span>
+<span id="1968">1968</span>
+<span id="1969">1969</span>
+<span id="1970">1970</span>
+<span id="1971">1971</span>
+<span id="1972">1972</span>
+<span id="1973">1973</span>
+<span id="1974">1974</span>
+<span id="1975">1975</span>
+<span id="1976">1976</span>
+<span id="1977">1977</span>
+<span id="1978">1978</span>
+<span id="1979">1979</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2017 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -3023,11 +3037,24 @@
 
     <span class="kw">fn</span> <span class="ident">get_lock_wait_info</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
-        <span class="kw">_</span>: <span class="ident">RpcContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>,
-        <span class="kw">_</span>: <span class="ident">GetLockWaitInfoRequest</span>,
-        <span class="kw">_</span>: <span class="ident">UnarySink</span><span class="op">&lt;</span><span class="ident">GetLockWaitInfoResponse</span><span class="op">&gt;</span>,
+        <span class="ident">ctx</span>: <span class="ident">RpcContext</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>,
+        <span class="ident">_request</span>: <span class="ident">GetLockWaitInfoRequest</span>,
+        <span class="ident">sink</span>: <span class="ident">UnarySink</span><span class="op">&lt;</span><span class="ident">GetLockWaitInfoResponse</span><span class="op">&gt;</span>,
     ) {
-        <span class="macro">unimplemented!</span>()
+        <span class="kw">let</span> (<span class="ident">cb</span>, <span class="ident">f</span>) <span class="op">=</span> <span class="ident">paired_future_callback</span>();
+        <span class="self">self</span>.<span class="ident">storage</span>.<span class="ident">dump_wait_for_entries</span>(<span class="ident">cb</span>);
+        <span class="kw">let</span> <span class="ident">task</span> <span class="op">=</span> <span class="kw">async</span> <span class="kw">move</span> {
+            <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">f</span>.<span class="kw">await</span><span class="question-mark">?</span>;
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">response</span> <span class="op">=</span> <span class="ident">GetLockWaitInfoResponse::default</span>();
+            <span class="ident">response</span>.<span class="ident">set_entries</span>(<span class="ident">RepeatedField::from_vec</span>(<span class="ident">res</span>));
+            <span class="ident">sink</span>.<span class="ident">success</span>(<span class="ident">response</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+            <span class="ident">ServerResult::Ok</span>(())
+        }
+        .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
+            <span class="macro">warn!</span>(<span class="string">&quot;call dump_wait_for_entries failed&quot;</span>; <span class="string">&quot;err&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">e</span>);
+        })
+        .<span class="ident">map</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> ());
+        <span class="ident">ctx</span>.<span class="ident">spawn</span>(<span class="ident">task</span>);
     }
 }
 
@@ -3848,6 +3875,7 @@
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">kvproto::tikvpb::batch_commands_request</span>;
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;prost-codec&quot;</span>)]</span>
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">kvproto::tikvpb::batch_commands_response</span>;
+<span class="kw">use</span> <span class="ident">protobuf::RepeatedField</span>;
 
 <span class="kw">struct</span> <span class="ident">BatchRespCollector</span>;
 <span class="kw">impl</span> <span class="ident">BatchCollector</span><span class="op">&lt;</span><span class="ident">BatchCommandsResponse</span>, (<span class="ident">u64</span>, <span class="ident">batch_commands_response::Response</span>)<span class="op">&gt;</span>
