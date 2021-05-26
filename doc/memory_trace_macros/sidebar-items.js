@@ -1,0 +1,1 @@
+initSidebarItems({"derive":[["MemoryTraceHelper","MemoryTraceHelper adds two methods `reset` and `sum` to derived struct. All fields of derived struct should be `usize`. `reset` updates the struct and returns a delta represented by a `TraceEvent` `sum` returns the summary of all field values."]]});

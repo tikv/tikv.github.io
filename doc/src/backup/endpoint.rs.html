@@ -1573,6 +1573,14 @@
 <span id="1570">1570</span>
 <span id="1571">1571</span>
 <span id="1572">1572</span>
+<span id="1573">1573</span>
+<span id="1574">1574</span>
+<span id="1575">1575</span>
+<span id="1576">1576</span>
+<span id="1577">1577</span>
+<span id="1578">1578</span>
+<span id="1579">1579</span>
+<span id="1580">1580</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -2522,7 +2530,7 @@
 
     <span class="kw">use</span> <span class="ident">engine_traits::MiscExt</span>;
     <span class="kw">use</span> <span class="ident">external_storage_export</span>::{<span class="ident">make_local_backend</span>, <span class="ident">make_noop_backend</span>};
-    <span class="kw">use</span> <span class="ident">file_system</span>::{<span class="ident">IOOp</span>, <span class="ident">WithIORateLimit</span>};
+    <span class="kw">use</span> <span class="ident">file_system</span>::{<span class="ident">IOOp</span>, <span class="ident">IORateLimiter</span>};
     <span class="kw">use</span> <span class="ident">futures::executor::block_on</span>;
     <span class="kw">use</span> <span class="ident">futures::stream::StreamExt</span>;
     <span class="kw">use</span> <span class="ident">kvproto::metapb</span>;
@@ -2588,6 +2596,12 @@
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_endpoint</span>() <span class="op">-</span><span class="op">&gt;</span> (<span class="ident">TempDir</span>, <span class="ident">Endpoint</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">MockRegionInfoProvider</span><span class="op">&gt;</span>) {
+        <span class="ident">new_endpoint_with_limiter</span>(<span class="prelude-val">None</span>)
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_endpoint_with_limiter</span>(
+        <span class="ident">limiter</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">IORateLimiter</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> (<span class="ident">TempDir</span>, <span class="ident">Endpoint</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">MockRegionInfoProvider</span><span class="op">&gt;</span>) {
         <span class="kw">let</span> <span class="ident">temp</span> <span class="op">=</span> <span class="ident">TempDir::new</span>().<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">rocks</span> <span class="op">=</span> <span class="ident">TestEngineBuilder::new</span>()
             .<span class="ident">path</span>(<span class="ident">temp</span>.<span class="ident">path</span>())
@@ -2596,6 +2610,7 @@
                 <span class="ident">engine_traits::CF_LOCK</span>,
                 <span class="ident">engine_traits::CF_WRITE</span>,
             ])
+            .<span class="ident">io_rate_limiter</span>(<span class="ident">limiter</span>)
             .<span class="ident">build</span>()
             .<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">concurrency_manager</span> <span class="op">=</span> <span class="ident">ConcurrencyManager::new</span>(<span class="number">1</span>.<span class="ident">into</span>());
@@ -2809,8 +2824,9 @@
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_handle_backup_task</span>() {
-        <span class="kw">let</span> (<span class="ident">_guard</span>, <span class="ident">stats</span>) <span class="op">=</span> <span class="ident">WithIORateLimit::new</span>(<span class="number">0</span>);
-        <span class="kw">let</span> (<span class="ident">tmp</span>, <span class="ident">endpoint</span>) <span class="op">=</span> <span class="ident">new_endpoint</span>();
+        <span class="kw">let</span> <span class="ident">limiter</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">IORateLimiter::new</span>(<span class="number">0</span>, <span class="bool-val">true</span> <span class="comment">/*enable_statistics*/</span>));
+        <span class="kw">let</span> <span class="ident">stats</span> <span class="op">=</span> <span class="ident">limiter</span>.<span class="ident">statistics</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> (<span class="ident">tmp</span>, <span class="ident">endpoint</span>) <span class="op">=</span> <span class="ident">new_endpoint_with_limiter</span>(<span class="prelude-val">Some</span>(<span class="ident">limiter</span>));
         <span class="kw">let</span> <span class="ident">engine</span> <span class="op">=</span> <span class="ident">endpoint</span>.<span class="ident">engine</span>.<span class="ident">clone</span>();
 
         <span class="ident">endpoint</span>
@@ -3101,7 +3117,7 @@
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_thread_pool_shutdown_when_idle</span>() {
-        <span class="kw">let</span> (<span class="kw">_</span>, <span class="kw-2">mut</span> <span class="ident">endpoint</span>) <span class="op">=</span> <span class="ident">new_endpoint</span>();
+        <span class="kw">let</span> (<span class="ident">_tmp</span>, <span class="kw-2">mut</span> <span class="ident">endpoint</span>) <span class="op">=</span> <span class="ident">new_endpoint</span>();
 
         <span class="comment">// set the idle threshold to 100ms</span>
         <span class="ident">endpoint</span>.<span class="ident">pool_idle_threshold</span> <span class="op">=</span> <span class="number">100</span>;

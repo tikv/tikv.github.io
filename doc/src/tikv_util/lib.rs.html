@@ -701,6 +701,79 @@
 <span id="698">698</span>
 <span id="699">699</span>
 <span id="700">700</span>
+<span id="701">701</span>
+<span id="702">702</span>
+<span id="703">703</span>
+<span id="704">704</span>
+<span id="705">705</span>
+<span id="706">706</span>
+<span id="707">707</span>
+<span id="708">708</span>
+<span id="709">709</span>
+<span id="710">710</span>
+<span id="711">711</span>
+<span id="712">712</span>
+<span id="713">713</span>
+<span id="714">714</span>
+<span id="715">715</span>
+<span id="716">716</span>
+<span id="717">717</span>
+<span id="718">718</span>
+<span id="719">719</span>
+<span id="720">720</span>
+<span id="721">721</span>
+<span id="722">722</span>
+<span id="723">723</span>
+<span id="724">724</span>
+<span id="725">725</span>
+<span id="726">726</span>
+<span id="727">727</span>
+<span id="728">728</span>
+<span id="729">729</span>
+<span id="730">730</span>
+<span id="731">731</span>
+<span id="732">732</span>
+<span id="733">733</span>
+<span id="734">734</span>
+<span id="735">735</span>
+<span id="736">736</span>
+<span id="737">737</span>
+<span id="738">738</span>
+<span id="739">739</span>
+<span id="740">740</span>
+<span id="741">741</span>
+<span id="742">742</span>
+<span id="743">743</span>
+<span id="744">744</span>
+<span id="745">745</span>
+<span id="746">746</span>
+<span id="747">747</span>
+<span id="748">748</span>
+<span id="749">749</span>
+<span id="750">750</span>
+<span id="751">751</span>
+<span id="752">752</span>
+<span id="753">753</span>
+<span id="754">754</span>
+<span id="755">755</span>
+<span id="756">756</span>
+<span id="757">757</span>
+<span id="758">758</span>
+<span id="759">759</span>
+<span id="760">760</span>
+<span id="761">761</span>
+<span id="762">762</span>
+<span id="763">763</span>
+<span id="764">764</span>
+<span id="765">765</span>
+<span id="766">766</span>
+<span id="767">767</span>
+<span id="768">768</span>
+<span id="769">769</span>
+<span id="770">770</span>
+<span id="771">771</span>
+<span id="772">772</span>
+<span id="773">773</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1158,12 +1231,12 @@
             <span class="string">&quot;location&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">loc</span>.<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="string">&quot;&lt;unknown&gt;&quot;</span>.<span class="ident">to_owned</span>()),
             <span class="string">&quot;backtrace&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">format_args!</span>(<span class="string">&quot;{:?}&quot;</span>, <span class="ident">bt</span>),
         );
-        <span class="comment">// This may be needed to allow the above log statements to flush</span>
-        <span class="ident">thread::sleep</span>(<span class="ident">Duration::from_millis</span>(<span class="number">2</span>));
 
         <span class="comment">// There might be remaining logs in the async logger.</span>
         <span class="comment">// To collect remaining logs and also collect future logs, replace the old one with a</span>
         <span class="comment">// terminal logger.</span>
+        <span class="comment">// When the old global async logger is replaced, the old async guard will be taken and dropped.</span>
+        <span class="comment">// In the drop() the async guard, it waits for the finish of the remaining logs in the async logger.</span>
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">level</span>) <span class="op">=</span> <span class="ident">::log::max_level</span>().<span class="ident">to_level</span>() {
             <span class="kw">let</span> <span class="ident">drainer</span> <span class="op">=</span> <span class="ident">logger::text_format</span>(<span class="ident">logger::term_writer</span>());
             <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="ident">logger::init_log</span>(
@@ -1236,11 +1309,84 @@
 <span class="kw">mod</span> <span class="ident">tests</span> {
     <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 
+    <span class="kw">use</span> <span class="ident">std::io::Read</span>;
     <span class="kw">use</span> <span class="ident">std::rc::Rc</span>;
     <span class="kw">use</span> <span class="ident">std::sync::atomic</span>::{<span class="ident">AtomicBool</span>, <span class="ident">Ordering</span>};
     <span class="kw">use</span> <span class="ident">std</span>::<span class="kw-2">*</span>;
 
     <span class="kw">use</span> <span class="ident">tempfile::Builder</span>;
+
+    <span class="attribute">#[<span class="ident">test</span>]</span>
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">unix</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">test_panic_hook</span>() {
+        <span class="kw">use</span> <span class="ident">gag::BufferRedirect</span>;
+        <span class="kw">use</span> <span class="ident">nix::sys::wait</span>::{<span class="ident">wait</span>, <span class="ident">WaitStatus</span>};
+        <span class="kw">use</span> <span class="ident">nix::unistd</span>::{<span class="ident">fork</span>, <span class="ident">ForkResult</span>};
+        <span class="kw">use</span> <span class="ident">slog</span>::{<span class="self">self</span>, <span class="ident">Drain</span>, <span class="ident">OwnedKVList</span>, <span class="ident">Record</span>};
+
+        <span class="kw">struct</span> <span class="ident">DelayDrain</span><span class="op">&lt;</span><span class="ident">D</span><span class="op">&gt;</span>(<span class="ident">D</span>);
+
+        <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">D</span><span class="op">&gt;</span> <span class="ident">Drain</span> <span class="kw">for</span> <span class="ident">DelayDrain</span><span class="op">&lt;</span><span class="ident">D</span><span class="op">&gt;</span>
+        <span class="kw">where</span>
+            <span class="ident">D</span>: <span class="ident">Drain</span>,
+            <span class="op">&lt;</span><span class="ident">D</span> <span class="kw">as</span> <span class="ident">Drain</span><span class="op">&gt;</span><span class="ident">::Err</span>: <span class="ident">std::fmt::Display</span>,
+        {
+            <span class="kw">type</span> <span class="prelude-val">Ok</span> <span class="op">=</span> <span class="op">&lt;</span><span class="ident">D</span> <span class="kw">as</span> <span class="ident">Drain</span><span class="op">&gt;</span><span class="ident">::Ok</span>;
+            <span class="kw">type</span> <span class="prelude-val">Err</span> <span class="op">=</span> <span class="op">&lt;</span><span class="ident">D</span> <span class="kw">as</span> <span class="ident">Drain</span><span class="op">&gt;</span><span class="ident">::Err</span>;
+
+            <span class="kw">fn</span> <span class="ident">log</span>(
+                <span class="kw-2">&amp;</span><span class="self">self</span>,
+                <span class="ident">record</span>: <span class="kw-2">&amp;</span><span class="ident">Record</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>,
+                <span class="ident">values</span>: <span class="kw-2">&amp;</span><span class="ident">OwnedKVList</span>,
+            ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span><span class="ident">::Ok</span>, <span class="self">Self</span><span class="ident">::Err</span><span class="op">&gt;</span> {
+                <span class="ident">std::thread::sleep</span>(<span class="ident">Duration::from_millis</span>(<span class="number">100</span>));
+                <span class="self">self</span>.<span class="number">0</span>.<span class="ident">log</span>(<span class="ident">record</span>, <span class="ident">values</span>)
+            }
+        }
+
+        <span class="kw">fn</span> <span class="ident">run_and_wait_child_process</span>(<span class="ident">child</span>: <span class="kw">impl</span> <span class="ident">Fn</span>()) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">i32</span>, <span class="ident">String</span><span class="op">&gt;</span> {
+            <span class="kw">match</span> <span class="ident">fork</span>() {
+                <span class="prelude-val">Ok</span>(<span class="ident">ForkResult::Parent</span> { .. }) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">match</span> <span class="ident">wait</span>().<span class="ident">unwrap</span>() {
+                    <span class="ident">WaitStatus::Exited</span>(<span class="kw">_</span>, <span class="ident">status</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="ident">status</span>),
+                    <span class="ident">v</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Err</span>(<span class="macro">format!</span>(<span class="string">&quot;{:?}&quot;</span>, <span class="ident">v</span>)),
+                },
+                <span class="prelude-val">Ok</span>(<span class="ident">ForkResult::Child</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="ident">child</span>();
+                    <span class="ident">std::process::exit</span>(<span class="number">0</span>);
+                }
+                <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Err</span>(<span class="macro">format!</span>(<span class="string">&quot;Fork failed: {}&quot;</span>, <span class="ident">e</span>)),
+            }
+        }
+
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stderr</span> <span class="op">=</span> <span class="ident">BufferRedirect::stderr</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">status</span> <span class="op">=</span> <span class="ident">run_and_wait_child_process</span>(<span class="op">|</span><span class="op">|</span> {
+            <span class="ident">set_panic_hook</span>(<span class="bool-val">false</span>, <span class="string">&quot;./&quot;</span>);
+            <span class="kw">let</span> <span class="ident">drainer</span> <span class="op">=</span> <span class="ident">logger::text_format</span>(<span class="ident">logger::term_writer</span>());
+            <span class="kw">crate</span><span class="ident">::logger::init_log</span>(
+                <span class="ident">DelayDrain</span>(<span class="ident">drainer</span>),
+                <span class="ident">logger::get_level_by_string</span>(<span class="string">&quot;debug&quot;</span>).<span class="ident">unwrap</span>(),
+                <span class="bool-val">true</span>, <span class="comment">// use async drainer</span>
+                <span class="bool-val">true</span>, <span class="comment">// init std log</span>
+                <span class="macro">vec!</span>[],
+                <span class="number">0</span>,
+            )
+            .<span class="ident">unwrap</span>();
+
+            <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="ident">std::thread::spawn</span>(<span class="op">|</span><span class="op">|</span> {
+                <span class="comment">// let the global logger is held by the other thread, so the</span>
+                <span class="comment">// drop() of the async drain is not called in time.</span>
+                <span class="kw">let</span> <span class="ident">_guard</span> <span class="op">=</span> <span class="ident">slog_global::borrow_global</span>();
+                <span class="ident">std::thread::sleep</span>(<span class="ident">Duration::from_secs</span>(<span class="number">1</span>));
+            });
+            <span class="macro">panic!</span>(<span class="string">&quot;test&quot;</span>);
+        })
+        .<span class="ident">unwrap</span>();
+
+        <span class="macro">assert_eq!</span>(<span class="ident">status</span>, <span class="number">1</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">panic</span> <span class="op">=</span> <span class="ident">String::new</span>();
+        <span class="ident">stderr</span>.<span class="ident">read_to_string</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">panic</span>).<span class="ident">unwrap</span>();
+        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">panic</span>.<span class="ident">is_empty</span>());
+    }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_panic_mark_file_path</span>() {

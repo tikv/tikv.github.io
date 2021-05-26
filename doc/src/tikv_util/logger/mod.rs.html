@@ -957,6 +957,20 @@
 <span id="954">954</span>
 <span id="955">955</span>
 <span id="956">956</span>
+<span id="957">957</span>
+<span id="958">958</span>
+<span id="959">959</span>
+<span id="960">960</span>
+<span id="961">961</span>
+<span id="962">962</span>
+<span id="963">963</span>
+<span id="964">964</span>
+<span id="965">965</span>
+<span id="966">966</span>
+<span id="967">967</span>
+<span id="968">968</span>
+<span id="969">969</span>
+<span id="970">970</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -973,7 +987,7 @@
 
 <span class="kw">use</span> <span class="ident">log</span>::{<span class="self">self</span>, <span class="ident">SetLoggerError</span>};
 <span class="kw">use</span> <span class="ident">slog</span>::{<span class="self">self</span>, <span class="ident">slog_o</span>, <span class="ident">Drain</span>, <span class="ident">FnValue</span>, <span class="ident">Key</span>, <span class="ident">OwnedKVList</span>, <span class="ident">PushFnValue</span>, <span class="ident">Record</span>, <span class="ident">KV</span>};
-<span class="kw">use</span> <span class="ident">slog_async</span>::{<span class="ident">Async</span>, <span class="ident">OverflowStrategy</span>};
+<span class="kw">use</span> <span class="ident">slog_async</span>::{<span class="ident">Async</span>, <span class="ident">AsyncGuard</span>, <span class="ident">OverflowStrategy</span>};
 <span class="kw">use</span> <span class="ident">slog_term</span>::{<span class="ident">Decorator</span>, <span class="ident">PlainDecorator</span>, <span class="ident">RecordDecorator</span>};
 
 <span class="kw">use</span> <span class="self">self</span><span class="ident">::file_log</span>::{<span class="ident">RotateBySize</span>, <span class="ident">RotateByTime</span>, <span class="ident">RotatingFileLogger</span>, <span class="ident">RotatingFileLoggerBuilder</span>};
@@ -1035,20 +1049,20 @@
         }
     };
 
-    <span class="kw">let</span> <span class="ident">logger</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">use_async</span> {
-        <span class="kw">let</span> <span class="ident">drain</span> <span class="op">=</span> <span class="ident">Async::new</span>(<span class="ident">LogAndFuse</span>(<span class="ident">drain</span>))
+    <span class="kw">let</span> (<span class="ident">logger</span>, <span class="ident">guard</span>) <span class="op">=</span> <span class="kw">if</span> <span class="ident">use_async</span> {
+        <span class="kw">let</span> (<span class="ident">async_log</span>, <span class="ident">guard</span>) <span class="op">=</span> <span class="ident">Async::new</span>(<span class="ident">LogAndFuse</span>(<span class="ident">drain</span>))
             .<span class="ident">chan_size</span>(<span class="ident">SLOG_CHANNEL_SIZE</span>)
             .<span class="ident">overflow_strategy</span>(<span class="ident">SLOG_CHANNEL_OVERFLOW_STRATEGY</span>)
             .<span class="ident">thread_name</span>(<span class="macro">thd_name!</span>(<span class="string">&quot;slogger&quot;</span>))
-            .<span class="ident">build</span>()
-            .<span class="ident">filter_level</span>(<span class="ident">level</span>)
-            .<span class="ident">fuse</span>();
+            .<span class="ident">build_with_guard</span>();
+        <span class="kw">let</span> <span class="ident">drain</span> <span class="op">=</span> <span class="ident">async_log</span>.<span class="ident">filter_level</span>(<span class="ident">level</span>).<span class="ident">fuse</span>();
         <span class="kw">let</span> <span class="ident">drain</span> <span class="op">=</span> <span class="ident">SlowLogFilter</span> {
             <span class="ident">threshold</span>: <span class="ident">slow_threshold</span>,
             <span class="ident">inner</span>: <span class="ident">drain</span>,
         };
         <span class="kw">let</span> <span class="ident">filtered</span> <span class="op">=</span> <span class="ident">drain</span>.<span class="ident">filter</span>(<span class="ident">filter</span>).<span class="ident">fuse</span>();
-        <span class="ident">slog::Logger::root</span>(<span class="ident">filtered</span>, <span class="macro">slog_o!</span>())
+
+        (<span class="ident">slog::Logger::root</span>(<span class="ident">filtered</span>, <span class="macro">slog_o!</span>()), <span class="prelude-val">Some</span>(<span class="ident">guard</span>))
     } <span class="kw">else</span> {
         <span class="kw">let</span> <span class="ident">drain</span> <span class="op">=</span> <span class="ident">LogAndFuse</span>(<span class="ident">Mutex::new</span>(<span class="ident">drain</span>).<span class="ident">filter_level</span>(<span class="ident">level</span>));
         <span class="kw">let</span> <span class="ident">drain</span> <span class="op">=</span> <span class="ident">SlowLogFilter</span> {
@@ -1056,22 +1070,36 @@
             <span class="ident">inner</span>: <span class="ident">drain</span>,
         };
         <span class="kw">let</span> <span class="ident">filtered</span> <span class="op">=</span> <span class="ident">drain</span>.<span class="ident">filter</span>(<span class="ident">filter</span>).<span class="ident">fuse</span>();
-        <span class="ident">slog::Logger::root</span>(<span class="ident">filtered</span>, <span class="macro">slog_o!</span>())
+        (<span class="ident">slog::Logger::root</span>(<span class="ident">filtered</span>, <span class="macro">slog_o!</span>()), <span class="prelude-val">None</span>)
     };
 
-    <span class="ident">set_global_logger</span>(<span class="ident">level</span>, <span class="ident">init_stdlog</span>, <span class="ident">logger</span>)
+    <span class="ident">set_global_logger</span>(<span class="ident">level</span>, <span class="ident">init_stdlog</span>, <span class="ident">logger</span>, <span class="ident">guard</span>)
+}
+
+<span class="comment">// All Drains are reference-counted by every Logger that uses them. Async drain</span>
+<span class="comment">// runs a worker thread and sends a termination (and flushing) message only when</span>
+<span class="comment">// being dropped. Because of that it&#39;s actually quite easy to have a left-over</span>
+<span class="comment">// reference to a Async drain, when terminating: especially on panics or similar</span>
+<span class="comment">// unwinding event. Typically it&#39;s caused be a leftover reference like Logger in</span>
+<span class="comment">// thread-local variable, global variable, or a thread that is not being joined</span>
+<span class="comment">// on. So use AsyncGuard to send a flush and termination message to a Async</span>
+<span class="comment">// worker thread, and wait for it to finish on the guard&#39;s own drop.</span>
+<span class="macro">lazy_static::lazy_static!</span> {
+    <span class="kw">pub</span> <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">ASYNC_LOGGER_GUARD</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">AsyncGuard</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Mutex::new</span>(<span class="prelude-val">None</span>);
 }
 
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_global_logger</span>(
     <span class="ident">level</span>: <span class="ident">Level</span>,
     <span class="ident">init_stdlog</span>: <span class="ident">bool</span>,
     <span class="ident">logger</span>: <span class="ident">slog::Logger</span>,
+    <span class="ident">guard</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">AsyncGuard</span><span class="op">&gt;</span>,
 ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">SetLoggerError</span><span class="op">&gt;</span> {
     <span class="ident">slog_global::set_global</span>(<span class="ident">logger</span>);
     <span class="kw">if</span> <span class="ident">init_stdlog</span> {
         <span class="ident">slog_global::redirect_std_log</span>(<span class="prelude-val">Some</span>(<span class="ident">level</span>))<span class="question-mark">?</span>;
         <span class="ident">grpcio::redirect_log</span>();
     }
+    <span class="kw-2">*</span><span class="ident">ASYNC_LOGGER_GUARD</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>() <span class="op">=</span> <span class="ident">guard</span>;
 
     <span class="prelude-val">Ok</span>(())
 }

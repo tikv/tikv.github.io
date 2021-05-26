@@ -327,6 +327,21 @@
 <span id="324">324</span>
 <span id="325">325</span>
 <span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
+<span id="329">329</span>
+<span id="330">330</span>
+<span id="331">331</span>
+<span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
+<span id="336">336</span>
+<span id="337">337</span>
+<span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+<span id="341">341</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2021 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -335,7 +350,9 @@
 <span class="kw">use</span> <span class="ident">engine_rocks::raw::ColumnFamilyOptions</span>;
 <span class="kw">use</span> <span class="ident">engine_rocks::raw_util::CFOptions</span>;
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">CfName</span>, <span class="ident">ALL_CFS</span>, <span class="ident">CF_DEFAULT</span>, <span class="ident">CF_LOCK</span>, <span class="ident">CF_RAFT</span>, <span class="ident">CF_WRITE</span>};
+<span class="kw">use</span> <span class="ident">file_system::IORateLimiter</span>;
 <span class="kw">use</span> <span class="ident">std::path</span>::{<span class="ident">Path</span>, <span class="ident">PathBuf</span>};
+<span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
 
 <span class="comment">// Duplicated from rocksdb_engine</span>
 <span class="kw">const</span> <span class="ident">TEMP_DIR</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;&quot;</span>;
@@ -347,6 +364,7 @@
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">TestEngineBuilder</span> {
     <span class="ident">path</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">PathBuf</span><span class="op">&gt;</span>,
     <span class="ident">cfs</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">CfName</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">io_rate_limiter</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">IORateLimiter</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">enable_ttl</span>: <span class="ident">bool</span>,
 }
 
@@ -355,6 +373,7 @@
         <span class="self">Self</span> {
             <span class="ident">path</span>: <span class="prelude-val">None</span>,
             <span class="ident">cfs</span>: <span class="prelude-val">None</span>,
+            <span class="ident">io_rate_limiter</span>: <span class="prelude-val">None</span>,
             <span class="ident">enable_ttl</span>: <span class="bool-val">false</span>,
         }
     }
@@ -377,6 +396,11 @@
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">ttl</span>(<span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">b</span>: <span class="ident">bool</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="self">self</span>.<span class="ident">enable_ttl</span> <span class="op">=</span> <span class="ident">b</span>;
+        <span class="self">self</span>
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">io_rate_limiter</span>(<span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">limiter</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">IORateLimiter</span><span class="op">&gt;</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+        <span class="self">self</span>.<span class="ident">io_rate_limiter</span> <span class="op">=</span> <span class="ident">limiter</span>;
         <span class="self">self</span>
     }
 
@@ -407,7 +431,13 @@
                 <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">CFOptions::new</span>(<span class="kw-2">*</span><span class="ident">cf</span>, <span class="ident">ColumnFamilyOptions::new</span>()),
             })
             .<span class="ident">collect</span>();
-        <span class="ident">RocksEngine::new</span>(<span class="kw-2">&amp;</span><span class="ident">path</span>, <span class="kw-2">&amp;</span><span class="ident">cfs</span>, <span class="prelude-val">Some</span>(<span class="ident">cfs_opts</span>), <span class="ident">cache</span>.<span class="ident">is_some</span>())
+        <span class="ident">RocksEngine::new</span>(
+            <span class="kw-2">&amp;</span><span class="ident">path</span>,
+            <span class="kw-2">&amp;</span><span class="ident">cfs</span>,
+            <span class="prelude-val">Some</span>(<span class="ident">cfs_opts</span>),
+            <span class="ident">cache</span>.<span class="ident">is_some</span>(),
+            <span class="self">self</span>.<span class="ident">io_rate_limiter</span>,
+        )
     }
 }
 

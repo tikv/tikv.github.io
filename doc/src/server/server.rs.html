@@ -1259,6 +1259,7 @@
 <span id="1256">1256</span>
 <span id="1257">1257</span>
 <span id="1258">1258</span>
+<span id="1259">1259</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2021 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1295,9 +1296,7 @@
     <span class="ident">set_io_rate_limiter</span>, <span class="ident">BytesFetcher</span>, <span class="ident">IORateLimiter</span>, <span class="ident">MetricsManager</span> <span class="kw">as</span> <span class="ident">IOMetricsManager</span>,
 };
 <span class="kw">use</span> <span class="ident">fs2::FileExt</span>;
-<span class="kw">use</span> <span class="ident">futures::compat::Stream01CompatExt</span>;
 <span class="kw">use</span> <span class="ident">futures::executor::block_on</span>;
-<span class="kw">use</span> <span class="ident">futures::stream::StreamExt</span>;
 <span class="kw">use</span> <span class="ident">grpcio</span>::{<span class="ident">EnvBuilder</span>, <span class="ident">Environment</span>};
 <span class="kw">use</span> <span class="ident">kvproto</span>::{
     <span class="ident">backup::create_backup</span>, <span class="ident">cdcpb::create_change_data</span>, <span class="ident">deadlock::create_deadlock</span>,
@@ -1345,7 +1344,6 @@
     <span class="ident">config</span>::{<span class="ident">ensure_dir_exist</span>, <span class="ident">VersionTrack</span>},
     <span class="ident">sys::sys_quota::SysQuota</span>,
     <span class="ident">time::Monitor</span>,
-    <span class="ident">timer::GLOBAL_TIMER_HANDLE</span>,
     <span class="ident">worker</span>::{<span class="ident">Builder</span> <span class="kw">as</span> <span class="ident">WorkerBuilder</span>, <span class="ident">FutureWorker</span>, <span class="ident">LazyWorker</span>, <span class="ident">Worker</span>},
 };
 <span class="kw">use</span> <span class="ident">tokio::runtime::Builder</span>;
@@ -1377,12 +1375,12 @@
     <span class="macro">macro_rules!</span> <span class="ident">run_impl</span> {
         (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">ER</span>: <span class="ident">ty</span>) <span class="op">=</span><span class="op">&gt;</span> {{
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tikv</span> <span class="op">=</span> <span class="ident">TiKVServer</span>::<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">ER</span><span class="op">&gt;</span><span class="ident">::init</span>(<span class="ident">config</span>);
-            <span class="kw">let</span> <span class="ident">fetcher</span> <span class="op">=</span> <span class="ident">tikv</span>.<span class="ident">init_io_utility</span>();
             <span class="ident">tikv</span>.<span class="ident">check_conflict_addr</span>();
             <span class="ident">tikv</span>.<span class="ident">init_fs</span>();
             <span class="ident">tikv</span>.<span class="ident">init_yatp</span>();
             <span class="ident">tikv</span>.<span class="ident">init_encryption</span>();
-            <span class="kw">let</span> <span class="ident">engines</span> <span class="op">=</span> <span class="ident">tikv</span>.<span class="ident">init_raw_engines</span>();
+            <span class="kw">let</span> (<span class="ident">limiter</span>, <span class="ident">fetcher</span>) <span class="op">=</span> <span class="ident">tikv</span>.<span class="ident">init_io_utility</span>();
+            <span class="kw">let</span> <span class="ident">engines</span> <span class="op">=</span> <span class="ident">tikv</span>.<span class="ident">init_raw_engines</span>(<span class="prelude-val">Some</span>(<span class="ident">limiter</span>.<span class="ident">clone</span>()));
             <span class="ident">tikv</span>.<span class="ident">init_engines</span>(<span class="ident">engines</span>);
             <span class="kw">let</span> <span class="ident">server_config</span> <span class="op">=</span> <span class="ident">tikv</span>.<span class="ident">init_servers</span>();
             <span class="ident">tikv</span>.<span class="ident">register_services</span>();
@@ -2168,36 +2166,39 @@
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">init_io_utility</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">BytesFetcher</span> {
+    <span class="kw">fn</span> <span class="ident">init_io_utility</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> (<span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">IORateLimiter</span><span class="op">&gt;</span>, <span class="ident">BytesFetcher</span>) {
         <span class="kw">let</span> <span class="ident">io_snooper_on</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">enable_io_snoop</span>
             <span class="op">&amp;&amp;</span> <span class="ident">file_system::init_io_snooper</span>()
                 .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">error_unknown!</span>(<span class="op">%</span><span class="ident">e</span>; <span class="string">&quot;failed to init io snooper&quot;</span>))
                 .<span class="ident">is_ok</span>();
-        <span class="kw">let</span> (<span class="ident">fetcher</span>, <span class="ident">limiter</span>) <span class="op">=</span> <span class="kw">if</span> <span class="ident">io_snooper_on</span> {
-            (<span class="ident">BytesFetcher::FromIOSnooper</span>(), <span class="ident">IORateLimiter::new</span>(<span class="number">0</span>, <span class="bool-val">false</span>))
+        <span class="kw">let</span> <span class="ident">limiter</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">IORateLimiter::new</span>(
+            <span class="number">0</span>,
+            <span class="op">!</span><span class="ident">io_snooper_on</span>, <span class="comment">/*enable_statistics*/</span>
+        ));
+        <span class="kw">let</span> <span class="ident">fetcher</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">io_snooper_on</span> {
+            <span class="ident">BytesFetcher::FromIOSnooper</span>()
         } <span class="kw">else</span> {
-            <span class="kw">let</span> <span class="ident">limiter</span> <span class="op">=</span> <span class="ident">IORateLimiter::new</span>(<span class="number">0</span>, <span class="bool-val">true</span>);
-            (<span class="ident">BytesFetcher::FromRateLimiter</span>(<span class="ident">limiter</span>.<span class="ident">statistics</span>()), <span class="ident">limiter</span>)
+            <span class="ident">BytesFetcher::FromRateLimiter</span>(<span class="ident">limiter</span>.<span class="ident">statistics</span>().<span class="ident">unwrap</span>())
         };
-        <span class="ident">set_io_rate_limiter</span>(<span class="prelude-val">Some</span>(<span class="ident">Arc::new</span>(<span class="ident">limiter</span>)));
-        <span class="ident">fetcher</span>
+        <span class="comment">// Set up IO limiter even when rate limit is disabled, so that rate limits can be</span>
+        <span class="comment">// dynamically applied later on.</span>
+        <span class="ident">set_io_rate_limiter</span>(<span class="prelude-val">Some</span>(<span class="ident">limiter</span>.<span class="ident">clone</span>()));
+        (<span class="ident">limiter</span>, <span class="ident">fetcher</span>)
     }
 
     <span class="kw">fn</span> <span class="ident">init_metrics_flusher</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">fetcher</span>: <span class="ident">BytesFetcher</span>) {
-        <span class="kw">let</span> <span class="ident">handle</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">background_worker</span>.<span class="ident">clone_raw_handle</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">interval</span> <span class="op">=</span> <span class="ident">GLOBAL_TIMER_HANDLE</span>
-            .<span class="ident">interval</span>(<span class="ident">Instant::now</span>(), <span class="ident">DEFAULT_METRICS_FLUSH_INTERVAL</span>)
-            .<span class="ident">compat</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">engine_metrics</span> <span class="op">=</span>
             <span class="ident">EngineMetricsManager::new</span>(<span class="self">self</span>.<span class="ident">engines</span>.<span class="ident">as_ref</span>().<span class="ident">unwrap</span>().<span class="ident">engines</span>.<span class="ident">clone</span>());
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">io_metrics</span> <span class="op">=</span> <span class="ident">IOMetricsManager::new</span>(<span class="ident">fetcher</span>);
-        <span class="ident">handle</span>.<span class="ident">spawn</span>(<span class="kw">async</span> <span class="kw">move</span> {
-            <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(<span class="kw">_</span>)) <span class="op">=</span> <span class="ident">interval</span>.<span class="ident">next</span>().<span class="kw">await</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">last_call</span> <span class="op">=</span> <span class="ident">Instant::now</span>();
+        <span class="self">self</span>.<span class="ident">background_worker</span>
+            .<span class="ident">spawn_interval_task</span>(<span class="ident">DEFAULT_METRICS_FLUSH_INTERVAL</span>, <span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
                 <span class="kw">let</span> <span class="ident">now</span> <span class="op">=</span> <span class="ident">Instant::now</span>();
-                <span class="ident">engine_metrics</span>.<span class="ident">flush</span>(<span class="ident">now</span>);
-                <span class="ident">io_metrics</span>.<span class="ident">flush</span>(<span class="ident">now</span>);
-            }
-        });
+                <span class="kw">let</span> <span class="ident">duration</span> <span class="op">=</span> <span class="ident">now</span> <span class="op">-</span> <span class="ident">last_call</span>;
+                <span class="ident">last_call</span> <span class="op">=</span> <span class="ident">now</span>;
+                <span class="ident">engine_metrics</span>.<span class="ident">flush</span>(<span class="ident">duration</span>);
+                <span class="ident">io_metrics</span>.<span class="ident">flush</span>(<span class="ident">duration</span>);
+            });
     }
 
     <span class="kw">fn</span> <span class="ident">run_server</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">server_config</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">VersionTrack</span><span class="op">&lt;</span><span class="ident">ServerConfig</span><span class="op">&gt;</span><span class="op">&gt;</span>) {
@@ -2258,10 +2259,13 @@
 }
 
 <span class="kw">impl</span> <span class="ident">TiKVServer</span><span class="op">&lt;</span><span class="ident">RocksEngine</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">init_raw_engines</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Engines</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">init_raw_engines</span>(
+        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
+        <span class="ident">limiter</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">IORateLimiter</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Engines</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RocksEngine</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">env</span> <span class="op">=</span>
             <span class="ident">get_encrypted_env</span>(<span class="self">self</span>.<span class="ident">encryption_key_manager</span>.<span class="ident">clone</span>(), <span class="prelude-val">None</span> <span class="comment">/*base_env*/</span>).<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">env</span> <span class="op">=</span> <span class="ident">get_inspected_env</span>(<span class="prelude-val">Some</span>(<span class="ident">env</span>)).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">env</span> <span class="op">=</span> <span class="ident">get_inspected_env</span>(<span class="prelude-val">Some</span>(<span class="ident">env</span>), <span class="ident">limiter</span>).<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">block_cache</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">storage</span>.<span class="ident">block_cache</span>.<span class="ident">build_shared_cache</span>();
 
         <span class="comment">// Create raft engine.</span>
@@ -2326,10 +2330,13 @@
 }
 
 <span class="kw">impl</span> <span class="ident">TiKVServer</span><span class="op">&lt;</span><span class="ident">RaftLogEngine</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">init_raw_engines</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Engines</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RaftLogEngine</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">init_raw_engines</span>(
+        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
+        <span class="ident">limiter</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">IORateLimiter</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Engines</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">RaftLogEngine</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">env</span> <span class="op">=</span>
             <span class="ident">get_encrypted_env</span>(<span class="self">self</span>.<span class="ident">encryption_key_manager</span>.<span class="ident">clone</span>(), <span class="prelude-val">None</span> <span class="comment">/*base_env*/</span>).<span class="ident">unwrap</span>();
-        <span class="kw">let</span> <span class="ident">env</span> <span class="op">=</span> <span class="ident">get_inspected_env</span>(<span class="prelude-val">Some</span>(<span class="ident">env</span>)).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">env</span> <span class="op">=</span> <span class="ident">get_inspected_env</span>(<span class="prelude-val">Some</span>(<span class="ident">env</span>), <span class="ident">limiter</span>).<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">block_cache</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">storage</span>.<span class="ident">block_cache</span>.<span class="ident">build_shared_cache</span>();
 
         <span class="comment">// Create raft engine.</span>
@@ -2497,24 +2504,19 @@
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">EngineMetricsManager</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">RaftEngine</span><span class="op">&gt;</span> {
     <span class="ident">engines</span>: <span class="ident">Engines</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">R</span><span class="op">&gt;</span>,
-    <span class="ident">last_reset</span>: <span class="ident">Instant</span>,
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">RaftEngine</span><span class="op">&gt;</span> <span class="ident">EngineMetricsManager</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">engines</span>: <span class="ident">Engines</span><span class="op">&lt;</span><span class="ident">RocksEngine</span>, <span class="ident">R</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="ident">EngineMetricsManager</span> {
-            <span class="ident">engines</span>,
-            <span class="ident">last_reset</span>: <span class="ident">Instant::now</span>(),
-        }
+        <span class="ident">EngineMetricsManager</span> { <span class="ident">engines</span> }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">flush</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">now</span>: <span class="ident">Instant</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">flush</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">duration</span>: <span class="ident">Duration</span>) {
         <span class="self">self</span>.<span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">flush_metrics</span>(<span class="string">&quot;kv&quot;</span>);
         <span class="self">self</span>.<span class="ident">engines</span>.<span class="ident">raft</span>.<span class="ident">flush_metrics</span>(<span class="string">&quot;raft&quot;</span>);
-        <span class="kw">if</span> <span class="ident">now</span>.<span class="ident">duration_since</span>(<span class="self">self</span>.<span class="ident">last_reset</span>) <span class="op">&gt;</span><span class="op">=</span> <span class="ident">DEFAULT_ENGINE_METRICS_RESET_INTERVAL</span> {
+        <span class="kw">if</span> <span class="ident">duration</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">DEFAULT_ENGINE_METRICS_RESET_INTERVAL</span> {
             <span class="self">self</span>.<span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">reset_statistics</span>();
             <span class="self">self</span>.<span class="ident">engines</span>.<span class="ident">raft</span>.<span class="ident">reset_statistics</span>();
-            <span class="self">self</span>.<span class="ident">last_reset</span> <span class="op">=</span> <span class="ident">now</span>;
         }
     }
 }

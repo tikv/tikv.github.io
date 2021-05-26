@@ -3068,13 +3068,55 @@
 <span id="3065">3065</span>
 <span id="3066">3066</span>
 <span id="3067">3067</span>
+<span id="3068">3068</span>
+<span id="3069">3069</span>
+<span id="3070">3070</span>
+<span id="3071">3071</span>
+<span id="3072">3072</span>
+<span id="3073">3073</span>
+<span id="3074">3074</span>
+<span id="3075">3075</span>
+<span id="3076">3076</span>
+<span id="3077">3077</span>
+<span id="3078">3078</span>
+<span id="3079">3079</span>
+<span id="3080">3080</span>
+<span id="3081">3081</span>
+<span id="3082">3082</span>
+<span id="3083">3083</span>
+<span id="3084">3084</span>
+<span id="3085">3085</span>
+<span id="3086">3086</span>
+<span id="3087">3087</span>
+<span id="3088">3088</span>
+<span id="3089">3089</span>
+<span id="3090">3090</span>
+<span id="3091">3091</span>
+<span id="3092">3092</span>
+<span id="3093">3093</span>
+<span id="3094">3094</span>
+<span id="3095">3095</span>
+<span id="3096">3096</span>
+<span id="3097">3097</span>
+<span id="3098">3098</span>
+<span id="3099">3099</span>
+<span id="3100">3100</span>
+<span id="3101">3101</span>
+<span id="3102">3102</span>
+<span id="3103">3103</span>
+<span id="3104">3104</span>
+<span id="3105">3105</span>
+<span id="3106">3106</span>
+<span id="3107">3107</span>
+<span id="3108">3108</span>
+<span id="3109">3109</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
 <span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
 
 <span class="kw">use</span> <span class="ident">kvproto::coprocessor::KeyRange</span>;
-<span class="kw">use</span> <span class="ident">tidb_query_datatype</span>::{<span class="ident">Collation</span>, <span class="ident">EvalType</span>, <span class="ident">FieldTypeAccessor</span>};
+<span class="kw">use</span> <span class="ident">tidb_query_datatype</span>::{<span class="ident">EvalType</span>, <span class="ident">FieldTypeAccessor</span>};
 <span class="kw">use</span> <span class="ident">tipb::ColumnInfo</span>;
 <span class="kw">use</span> <span class="ident">tipb::FieldType</span>;
 <span class="kw">use</span> <span class="ident">tipb::IndexScan</span>;
@@ -3534,7 +3576,7 @@
             }
             <span class="kw">let</span> <span class="ident">is_bin_collation</span> <span class="op">=</span> <span class="ident">field_type</span>
                 .<span class="ident">collation</span>()
-                .<span class="ident">map</span>(<span class="op">|</span><span class="ident">col</span><span class="op">|</span> <span class="ident">col</span> <span class="op">=</span><span class="op">=</span> <span class="ident">Collation::Utf8Mb4Bin</span>)
+                .<span class="ident">map</span>(<span class="op">|</span><span class="ident">col</span><span class="op">|</span> <span class="ident">col</span>.<span class="ident">is_bin_collation</span>())
                 .<span class="ident">unwrap_or</span>(<span class="bool-val">false</span>);
 
             <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">column</span>.<span class="ident">is_empty</span>());
@@ -3879,7 +3921,7 @@
 
     <span class="kw">use</span> <span class="ident">codec::prelude::NumberEncoder</span>;
     <span class="kw">use</span> <span class="ident">kvproto::coprocessor::KeyRange</span>;
-    <span class="kw">use</span> <span class="ident">tidb_query_datatype</span>::{<span class="ident">FieldTypeAccessor</span>, <span class="ident">FieldTypeTp</span>};
+    <span class="kw">use</span> <span class="ident">tidb_query_datatype</span>::{<span class="ident">Collation</span>, <span class="ident">FieldTypeAccessor</span>, <span class="ident">FieldTypeTp</span>};
     <span class="kw">use</span> <span class="ident">tipb::ColumnInfo</span>;
 
     <span class="kw">use</span> <span class="ident">tidb_query_common::storage::test_fixture::FixtureStorage</span>;
@@ -6102,6 +6144,48 @@
         <span class="macro">assert_eq!</span>(
             <span class="ident">columns</span>[<span class="number">9</span>].<span class="ident">raw</span>().<span class="ident">last</span>().<span class="ident">unwrap</span>().<span class="ident">read_datum</span>().<span class="ident">unwrap</span>(),
             <span class="ident">Datum::Bytes</span>(<span class="string">&quot;A &quot;</span>.<span class="ident">as_bytes</span>().<span class="ident">to_vec</span>())
+        );
+    }
+
+    <span class="attribute">#[<span class="ident">test</span>]</span>
+    <span class="kw">fn</span> <span class="ident">test_common_handle_index_latin1_bin</span>() {
+        <span class="kw">use</span> <span class="ident">tidb_query_datatype::builder::FieldTypeBuilder</span>;
+
+        <span class="comment">// create table t(c1 varchar(200) CHARACTER SET latin1 COLLATE latin1_bin, c2 int, primary key(c1) clustered, key kk(c2));</span>
+        <span class="comment">// idx_exec for index kk(c2), its columns will be &lt;c2, c1&gt;</span>
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">idx_exe</span> <span class="op">=</span> <span class="ident">IndexScanExecutorImpl</span> {
+            <span class="ident">context</span>: <span class="ident">Default::default</span>(),
+            <span class="ident">schema</span>: <span class="macro">vec!</span>[
+                <span class="ident">FieldTypeTp::Long</span>.<span class="ident">into</span>(),
+                <span class="ident">FieldTypeBuilder::new</span>()
+                    .<span class="ident">tp</span>(<span class="ident">FieldTypeTp::String</span>)
+                    .<span class="ident">collation</span>(<span class="ident">Collation::Latin1Bin</span>)
+                    .<span class="ident">into</span>(),
+            ],
+            <span class="ident">columns_id_without_handle</span>: <span class="macro">vec!</span>[<span class="number">2</span>],
+            <span class="ident">columns_id_for_common_handle</span>: <span class="macro">vec!</span>[<span class="number">1</span>],
+            <span class="ident">decode_handle_strategy</span>: <span class="ident">DecodeHandleStrategy::DecodeCommonHandle</span>,
+            <span class="ident">pid_column_cnt</span>: <span class="number">0</span>,
+            <span class="ident">index_version</span>: <span class="op">-</span><span class="number">1</span>,
+        };
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">columns</span> <span class="op">=</span> <span class="ident">idx_exe</span>.<span class="ident">build_column_vec</span>(<span class="number">1</span>);
+        <span class="ident">idx_exe</span>
+            .<span class="ident">process_kv_pair</span>(
+                <span class="kw-2">&amp;</span>[
+                    <span class="number">0x74</span>, <span class="number">0x80</span>, <span class="number">0x0</span>, <span class="number">0x0</span>, <span class="number">0x0</span>, <span class="number">0x0</span>, <span class="number">0x0</span>, <span class="number">0x0</span>, <span class="number">0x37</span>, <span class="number">0x5f</span>, <span class="number">0x69</span>, <span class="number">0x80</span>, <span class="number">0x0</span>, <span class="number">0x0</span>,
+                    <span class="number">0x0</span>, <span class="number">0x0</span>, <span class="number">0x0</span>, <span class="number">0x0</span>, <span class="number">0x2</span>, <span class="number">0x3</span>, <span class="number">0x80</span>, <span class="number">0x0</span>, <span class="number">0x0</span>, <span class="number">0x0</span>, <span class="number">0x0</span>, <span class="number">0x0</span>, <span class="number">0x0</span>, <span class="number">0x1</span>, <span class="number">0x1</span>,
+                    <span class="number">0x6a</span>, <span class="number">0x6f</span>, <span class="number">0x76</span>, <span class="number">0x69</span>, <span class="number">0x61</span>, <span class="number">0x6c</span>, <span class="number">0x65</span>, <span class="number">0x64</span>, <span class="number">0xff</span>, <span class="number">0x69</span>, <span class="number">0x73</span>, <span class="number">0x6f</span>, <span class="number">0x6e</span>,
+                    <span class="number">0x0</span>, <span class="number">0x0</span>, <span class="number">0x0</span>, <span class="number">0x0</span>, <span class="number">0xfb</span>,
+                ],
+                <span class="kw-2">&amp;</span>[
+                    <span class="number">0x0</span>, <span class="number">0x7d</span>, <span class="number">0x1</span>, <span class="number">0x80</span>, <span class="number">0x0</span>, <span class="number">0x1</span>, <span class="number">0x0</span>, <span class="number">0x0</span>, <span class="number">0x0</span>, <span class="number">0x1</span>, <span class="number">0x1</span>, <span class="number">0x0</span>, <span class="number">0x0</span>,
+                ],
+                <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">columns</span>,
+            )
+            .<span class="ident">unwrap</span>();
+        <span class="macro">assert_eq!</span>(
+            <span class="ident">columns</span>[<span class="number">1</span>].<span class="ident">raw</span>().<span class="ident">last</span>().<span class="ident">unwrap</span>().<span class="ident">read_datum</span>().<span class="ident">unwrap</span>(),
+            <span class="ident">Datum::Bytes</span>(<span class="string">&quot;jovialedison&quot;</span>.<span class="ident">as_bytes</span>().<span class="ident">to_vec</span>())
         );
     }
 
