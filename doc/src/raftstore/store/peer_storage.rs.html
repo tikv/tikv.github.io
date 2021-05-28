@@ -2695,6 +2695,8 @@
 <span id="2692">2692</span>
 <span id="2693">2693</span>
 <span id="2694">2694</span>
+<span id="2695">2695</span>
+<span id="2696">2696</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -2721,7 +2723,7 @@
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::store::fsm::GenSnapTask</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::store::util</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::store::ProposalContext</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">Error</span>, <span class="prelude-ty">Result</span>};
+<span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">bytes_capacity</span>, <span class="ident">Error</span>, <span class="prelude-ty">Result</span>};
 <span class="kw">use</span> <span class="ident">engine_traits</span>::{<span class="ident">RaftEngine</span>, <span class="ident">RaftLogBatch</span>};
 <span class="kw">use</span> <span class="ident">into_other::into_other</span>;
 <span class="kw">use</span> <span class="ident">tikv_util::worker::Scheduler</span>;
@@ -2874,7 +2876,7 @@
                         .<span class="ident">cache</span>
                         .<span class="ident">iter</span>()
                         .<span class="ident">skip</span>(<span class="ident">left</span>)
-                        .<span class="ident">map</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> (<span class="ident">e</span>.<span class="ident">data</span>.<span class="ident">capacity</span>() <span class="op">+</span> <span class="ident">e</span>.<span class="ident">context</span>.<span class="ident">capacity</span>()) <span class="kw">as</span> <span class="ident">i64</span>)
+                        .<span class="ident">map</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> (<span class="ident">bytes_capacity</span>(<span class="kw-2">&amp;</span><span class="ident">e</span>.<span class="ident">data</span>) <span class="op">+</span> <span class="ident">bytes_capacity</span>(<span class="kw-2">&amp;</span><span class="ident">e</span>.<span class="ident">context</span>)) <span class="kw">as</span> <span class="ident">i64</span>)
                         .<span class="ident">sum</span>::<span class="op">&lt;</span><span class="ident">i64</span><span class="op">&gt;</span>();
                     <span class="self">self</span>.<span class="ident">cache</span>.<span class="ident">truncate</span>(<span class="ident">left</span>);
                 }
@@ -2900,7 +2902,8 @@
             <span class="kw">if</span> <span class="ident">len</span> <span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">cache</span>.<span class="ident">len</span>() {
                 <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">drained_cache_entries_size</span> <span class="op">=</span> <span class="number">0</span>;
                 <span class="self">self</span>.<span class="ident">cache</span>.<span class="ident">drain</span>(..<span class="ident">len</span>).<span class="ident">for_each</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
-                    <span class="ident">drained_cache_entries_size</span> <span class="op">+</span><span class="op">=</span> (<span class="ident">e</span>.<span class="ident">data</span>.<span class="ident">capacity</span>() <span class="op">+</span> <span class="ident">e</span>.<span class="ident">context</span>.<span class="ident">capacity</span>()) <span class="kw">as</span> <span class="ident">i64</span>
+                    <span class="ident">drained_cache_entries_size</span> <span class="op">+</span><span class="op">=</span>
+                        (<span class="ident">bytes_capacity</span>(<span class="kw-2">&amp;</span><span class="ident">e</span>.<span class="ident">data</span>) <span class="op">+</span> <span class="ident">bytes_capacity</span>(<span class="kw-2">&amp;</span><span class="ident">e</span>.<span class="ident">context</span>)) <span class="kw">as</span> <span class="ident">i64</span>
                 });
                 <span class="self">self</span>.<span class="ident">mem_size_change</span> <span class="op">-</span><span class="op">=</span> <span class="ident">drained_cache_entries_size</span>;
             } <span class="kw">else</span> {
@@ -2913,7 +2916,7 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">entries_mem_size</span> <span class="op">=</span> <span class="number">0</span>;
         <span class="kw">for</span> <span class="ident">e</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">entries</span>[<span class="ident">start_idx</span>..] {
             <span class="self">self</span>.<span class="ident">cache</span>.<span class="ident">push_back</span>(<span class="ident">e</span>.<span class="ident">to_owned</span>());
-            <span class="ident">entries_mem_size</span> <span class="op">+</span><span class="op">=</span> (<span class="ident">e</span>.<span class="ident">data</span>.<span class="ident">capacity</span>() <span class="op">+</span> <span class="ident">e</span>.<span class="ident">context</span>.<span class="ident">capacity</span>()) <span class="kw">as</span> <span class="ident">i64</span>;
+            <span class="ident">entries_mem_size</span> <span class="op">+</span><span class="op">=</span> (<span class="ident">bytes_capacity</span>(<span class="kw-2">&amp;</span><span class="ident">e</span>.<span class="ident">data</span>) <span class="op">+</span> <span class="ident">bytes_capacity</span>(<span class="kw-2">&amp;</span><span class="ident">e</span>.<span class="ident">context</span>)) <span class="kw">as</span> <span class="ident">i64</span>;
         }
         <span class="self">self</span>.<span class="ident">mem_size_change</span> <span class="op">+</span><span class="op">=</span> <span class="self">self</span>
             .<span class="ident">get_cache_vec_mem_size_change</span>(<span class="self">self</span>.<span class="ident">cache</span>.<span class="ident">capacity</span>() <span class="kw">as</span> <span class="ident">i64</span>, <span class="ident">old_capacity</span> <span class="kw">as</span> <span class="ident">i64</span>)
@@ -2932,7 +2935,8 @@
         <span class="self">self</span>.<span class="ident">cache</span>
             .<span class="ident">drain</span>(..(<span class="ident">cmp::min</span>(<span class="ident">cache_last_idx</span> <span class="op">+</span> <span class="number">1</span>, <span class="ident">idx</span>) <span class="op">-</span> <span class="ident">cache_first_idx</span>) <span class="kw">as</span> <span class="ident">usize</span>)
             .<span class="ident">for_each</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
-                <span class="ident">drained_cache_entries_size</span> <span class="op">+</span><span class="op">=</span> (<span class="ident">e</span>.<span class="ident">data</span>.<span class="ident">capacity</span>() <span class="op">+</span> <span class="ident">e</span>.<span class="ident">context</span>.<span class="ident">capacity</span>()) <span class="kw">as</span> <span class="ident">i64</span>
+                <span class="ident">drained_cache_entries_size</span> <span class="op">+</span><span class="op">=</span>
+                    (<span class="ident">bytes_capacity</span>(<span class="kw-2">&amp;</span><span class="ident">e</span>.<span class="ident">data</span>) <span class="op">+</span> <span class="ident">bytes_capacity</span>(<span class="kw-2">&amp;</span><span class="ident">e</span>.<span class="ident">context</span>)) <span class="kw">as</span> <span class="ident">i64</span>
             });
         <span class="self">self</span>.<span class="ident">mem_size_change</span> <span class="op">-</span><span class="op">=</span> <span class="ident">drained_cache_entries_size</span>;
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">cache</span>.<span class="ident">len</span>() <span class="op">&lt;</span> <span class="ident">SHRINK_CACHE_CAPACITY</span> <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">cache</span>.<span class="ident">capacity</span>() <span class="op">&gt;</span> <span class="ident">SHRINK_CACHE_CAPACITY</span>
@@ -2950,7 +2954,7 @@
         <span class="self">self</span>.<span class="ident">mem_size_change</span> <span class="op">-</span><span class="op">=</span> <span class="self">self</span>
             .<span class="ident">cache</span>
             .<span class="ident">iter</span>()
-            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> (<span class="ident">e</span>.<span class="ident">data</span>.<span class="ident">capacity</span>() <span class="op">+</span> <span class="ident">e</span>.<span class="ident">context</span>.<span class="ident">capacity</span>()) <span class="kw">as</span> <span class="ident">i64</span>)
+            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> (<span class="ident">bytes_capacity</span>(<span class="kw-2">&amp;</span><span class="ident">e</span>.<span class="ident">data</span>) <span class="op">+</span> <span class="ident">bytes_capacity</span>(<span class="kw-2">&amp;</span><span class="ident">e</span>.<span class="ident">context</span>)) <span class="kw">as</span> <span class="ident">i64</span>)
             .<span class="ident">sum</span>::<span class="op">&lt;</span><span class="ident">i64</span><span class="op">&gt;</span>();
     }
 
@@ -2962,7 +2966,7 @@
         <span class="kw">let</span> <span class="ident">data_size</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="self">self</span>
             .<span class="ident">cache</span>
             .<span class="ident">iter</span>()
-            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">e</span>.<span class="ident">data</span>.<span class="ident">capacity</span>() <span class="op">+</span> <span class="ident">e</span>.<span class="ident">context</span>.<span class="ident">capacity</span>())
+            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">bytes_capacity</span>(<span class="kw-2">&amp;</span><span class="ident">e</span>.<span class="ident">data</span>) <span class="op">+</span> <span class="ident">bytes_capacity</span>(<span class="kw-2">&amp;</span><span class="ident">e</span>.<span class="ident">context</span>))
             .<span class="ident">sum</span>();
         (<span class="ident">ENTRY_MEM_SIZE</span> <span class="op">*</span> <span class="self">self</span>.<span class="ident">cache</span>.<span class="ident">capacity</span>() <span class="op">+</span> <span class="ident">data_size</span>) <span class="kw">as</span> <span class="ident">i64</span>
     }
@@ -4336,7 +4340,7 @@
     )<span class="question-mark">?</span>;
     <span class="ident">snap_data</span>.<span class="ident">mut_meta</span>().<span class="ident">set_for_balance</span>(<span class="ident">for_balance</span>);
     <span class="kw">let</span> <span class="ident">v</span> <span class="op">=</span> <span class="ident">snap_data</span>.<span class="ident">write_to_bytes</span>()<span class="question-mark">?</span>;
-    <span class="ident">snapshot</span>.<span class="ident">set_data</span>(<span class="ident">v</span>);
+    <span class="ident">snapshot</span>.<span class="ident">set_data</span>(<span class="ident">v</span>.<span class="ident">into</span>());
 
     <span class="ident">SNAPSHOT_KV_COUNT_HISTOGRAM</span>.<span class="ident">observe</span>(<span class="ident">stat</span>.<span class="ident">kv_count</span> <span class="kw">as</span> <span class="ident">f64</span>);
     <span class="ident">SNAPSHOT_SIZE_HISTOGRAM</span>.<span class="ident">observe</span>(<span class="ident">stat</span>.<span class="ident">size</span> <span class="kw">as</span> <span class="ident">f64</span>);
@@ -5251,7 +5255,7 @@
         <span class="comment">// Sync if context is marked sync.</span>
         <span class="kw">let</span> <span class="ident">context</span> <span class="op">=</span> <span class="ident">ProposalContext::SYNC_LOG</span>.<span class="ident">to_vec</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">e</span> <span class="op">=</span> <span class="ident">Entry::default</span>();
-        <span class="ident">e</span>.<span class="ident">set_context</span>(<span class="ident">context</span>);
+        <span class="ident">e</span>.<span class="ident">set_context</span>(<span class="ident">context</span>.<span class="ident">into</span>());
         <span class="ident">tbl</span>.<span class="ident">push</span>((<span class="ident">e</span>.<span class="ident">clone</span>(), <span class="bool-val">true</span>));
 
         <span class="comment">// Sync if sync_log is set and context is marked sync_log.</span>

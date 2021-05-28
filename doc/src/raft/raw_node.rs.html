@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `/rust/git/checkouts/raft-rs-42b8049ef2e3af07/91a60ce/src/raw_node.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>raw_node.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><script src="../../crates.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `/rust/git/checkouts/raft-rs-42b8049ef2e3af07/438c671/src/raw_node.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>raw_node.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><script src="../../crates.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
 <link rel="alternate icon" type="image/png" href="../../favicon-16x16.png">
 <link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../raft/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
                 <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
@@ -773,6 +773,28 @@
 <span id="770">770</span>
 <span id="771">771</span>
 <span id="772">772</span>
+<span id="773">773</span>
+<span id="774">774</span>
+<span id="775">775</span>
+<span id="776">776</span>
+<span id="777">777</span>
+<span id="778">778</span>
+<span id="779">779</span>
+<span id="780">780</span>
+<span id="781">781</span>
+<span id="782">782</span>
+<span id="783">783</span>
+<span id="784">784</span>
+<span id="785">785</span>
+<span id="786">786</span>
+<span id="787">787</span>
+<span id="788">788</span>
+<span id="789">789</span>
+<span id="790">790</span>
+<span id="791">791</span>
+<span id="792">792</span>
+<span id="793">793</span>
+<span id="794">794</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -800,13 +822,15 @@
 
 <span class="kw">use</span> <span class="ident">protobuf::Message</span> <span class="kw">as</span> <span class="ident">PbMessage</span>;
 <span class="kw">use</span> <span class="ident">raft_proto::ConfChangeI</span>;
+<span class="kw">use</span> <span class="ident">slog::Logger</span>;
 
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::eraftpb</span>::{<span class="ident">ConfState</span>, <span class="ident">Entry</span>, <span class="ident">EntryType</span>, <span class="ident">HardState</span>, <span class="ident">Message</span>, <span class="ident">MessageType</span>, <span class="ident">Snapshot</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::errors</span>::{<span class="ident">Error</span>, <span class="prelude-ty">Result</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::read_only::ReadState</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">config::Config</span>, <span class="ident">StateRole</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">Raft</span>, <span class="ident">SoftState</span>, <span class="ident">Status</span>, <span class="ident">Storage</span>};
-<span class="kw">use</span> <span class="ident">slog::Logger</span>;
+
+<span class="kw">use</span> <span class="ident">slog::info</span>;
 
 <span class="doccomment">/// Represents a Peer node in the cluster.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Default</span>)]</span>
@@ -871,6 +895,8 @@
     <span class="ident">entries</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Entry</span><span class="op">&gt;</span>,
 
     <span class="ident">snapshot</span>: <span class="ident">Snapshot</span>,
+
+    <span class="ident">is_persisted_msg</span>: <span class="ident">bool</span>,
 
     <span class="ident">light</span>: <span class="ident">LightReady</span>,
 
@@ -948,18 +974,50 @@
     <span class="doccomment">/// If it contains a MsgSnap message, the application MUST report back to raft</span>
     <span class="doccomment">/// when the snapshot has been received or has failed by calling ReportSnapshot.</span>
     <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">messages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Message</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">light</span>.<span class="ident">messages</span>()
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">messages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span>[<span class="ident">Message</span>] {
+        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">is_persisted_msg</span> {
+            <span class="self">self</span>.<span class="ident">light</span>.<span class="ident">messages</span>()
+        } <span class="kw">else</span> {
+            <span class="kw-2">&amp;</span>[]
+        }
     }
 
     <span class="doccomment">/// Take the Messages.</span>
     <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">take_messages</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Message</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">light</span>.<span class="ident">take_messages</span>()
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">take_messages</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Message</span><span class="op">&gt;</span> {
+        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">is_persisted_msg</span> {
+            <span class="self">self</span>.<span class="ident">light</span>.<span class="ident">take_messages</span>()
+        } <span class="kw">else</span> {
+            <span class="ident">Vec::new</span>()
+        }
     }
 
-    <span class="doccomment">/// MustSync indicates whether the HardState and Entries must be synchronously</span>
-    <span class="doccomment">/// written to disk or if an asynchronous write is permissible.</span>
+    <span class="doccomment">/// Persisted Messages specifies outbound messages to be sent AFTER the HardState,</span>
+    <span class="doccomment">/// Entries and Snapshot are persisted to stable storage.</span>
+    <span class="attribute">#[<span class="ident">inline</span>]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">persisted_messages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span>[<span class="ident">Message</span>] {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">is_persisted_msg</span> {
+            <span class="self">self</span>.<span class="ident">light</span>.<span class="ident">messages</span>()
+        } <span class="kw">else</span> {
+            <span class="kw-2">&amp;</span>[]
+        }
+    }
+
+    <span class="doccomment">/// Take the Persisted Messages.</span>
+    <span class="attribute">#[<span class="ident">inline</span>]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">take_persisted_messages</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Message</span><span class="op">&gt;</span> {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">is_persisted_msg</span> {
+            <span class="self">self</span>.<span class="ident">light</span>.<span class="ident">take_messages</span>()
+        } <span class="kw">else</span> {
+            <span class="ident">Vec::new</span>()
+        }
+    }
+
+    <span class="doccomment">/// MustSync is false if and only if</span>
+    <span class="doccomment">/// 1. no HardState or only its commit is different from before</span>
+    <span class="doccomment">/// 2. no Entries and Snapshot</span>
+    <span class="doccomment">/// If it&#39;s false, an asynchronous write of HardState is permissible before calling</span>
+    <span class="doccomment">/// `on_persist_ready` or `advance` or its families.</span>
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">must_sync</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
         <span class="self">self</span>.<span class="ident">must_sync</span>
@@ -974,7 +1032,6 @@
     <span class="ident">last_entry</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">u64</span>, <span class="ident">u64</span>)<span class="op">&gt;</span>,
     <span class="comment">// (index, term) of the snapshot in Ready</span>
     <span class="ident">snapshot</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">u64</span>, <span class="ident">u64</span>)<span class="op">&gt;</span>,
-    <span class="ident">messages</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Message</span><span class="op">&gt;</span>,
 }
 
 <span class="doccomment">/// LightReady encapsulates the commit index, committed entries and</span>
@@ -983,7 +1040,7 @@
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">LightReady</span> {
     <span class="ident">commit_index</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>,
     <span class="ident">committed_entries</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Entry</span><span class="op">&gt;</span>,
-    <span class="ident">messages</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Message</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">messages</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Message</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">LightReady</span> {
@@ -1010,16 +1067,14 @@
     }
 
     <span class="doccomment">/// Messages specifies outbound messages to be sent.</span>
-    <span class="doccomment">/// If it contains a MsgSnap message, the application MUST report back to raft</span>
-    <span class="doccomment">/// when the snapshot has been received or has failed by calling ReportSnapshot.</span>
     <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">messages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Message</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">messages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span>[<span class="ident">Message</span>] {
         <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">messages</span>
     }
 
     <span class="doccomment">/// Take the Messages.</span>
     <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">take_messages</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Message</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">take_messages</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Message</span><span class="op">&gt;</span> {
         <span class="ident">mem::take</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">messages</span>)
     }
 }
@@ -1037,8 +1092,6 @@
     <span class="ident">records</span>: <span class="ident">VecDeque</span><span class="op">&lt;</span><span class="ident">ReadyRecord</span><span class="op">&gt;</span>,
     <span class="comment">// Index which the given committed entries should start from.</span>
     <span class="ident">commit_since_index</span>: <span class="ident">u64</span>,
-    <span class="comment">// Messages that need to be sent to other peers.</span>
-    <span class="ident">messages</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Message</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Storage</span><span class="op">&gt;</span> <span class="ident">RawNode</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
@@ -1054,7 +1107,6 @@
             <span class="ident">max_number</span>: <span class="number">0</span>,
             <span class="ident">records</span>: <span class="ident">VecDeque::new</span>(),
             <span class="ident">commit_since_index</span>: <span class="ident">config</span>.<span class="ident">applied</span>,
-            <span class="ident">messages</span>: <span class="ident">Vec::new</span>(),
         };
         <span class="ident">rn</span>.<span class="ident">prev_hs</span> <span class="op">=</span> <span class="ident">rn</span>.<span class="ident">raft</span>.<span class="ident">hard_state</span>();
         <span class="ident">rn</span>.<span class="ident">prev_ss</span> <span class="op">=</span> <span class="ident">rn</span>.<span class="ident">raft</span>.<span class="ident">soft_state</span>();
@@ -1102,8 +1154,8 @@
         <span class="ident">m</span>.<span class="ident">set_msg_type</span>(<span class="ident">MessageType::MsgPropose</span>);
         <span class="ident">m</span>.<span class="ident">from</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">raft</span>.<span class="ident">id</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">e</span> <span class="op">=</span> <span class="ident">Entry::default</span>();
-        <span class="ident">e</span>.<span class="ident">data</span> <span class="op">=</span> <span class="ident">data</span>;
-        <span class="ident">e</span>.<span class="ident">context</span> <span class="op">=</span> <span class="ident">context</span>;
+        <span class="ident">e</span>.<span class="ident">data</span> <span class="op">=</span> <span class="ident">data</span>.<span class="ident">into</span>();
+        <span class="ident">e</span>.<span class="ident">context</span> <span class="op">=</span> <span class="ident">context</span>.<span class="ident">into</span>();
         <span class="ident">m</span>.<span class="ident">set_entries</span>(<span class="macro">vec!</span>[<span class="ident">e</span>].<span class="ident">into</span>());
         <span class="self">self</span>.<span class="ident">raft</span>.<span class="ident">step</span>(<span class="ident">m</span>)
     }
@@ -1131,8 +1183,8 @@
         <span class="ident">m</span>.<span class="ident">set_msg_type</span>(<span class="ident">MessageType::MsgPropose</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">e</span> <span class="op">=</span> <span class="ident">Entry::default</span>();
         <span class="ident">e</span>.<span class="ident">set_entry_type</span>(<span class="ident">ty</span>);
-        <span class="ident">e</span>.<span class="ident">data</span> <span class="op">=</span> <span class="ident">data</span>;
-        <span class="ident">e</span>.<span class="ident">context</span> <span class="op">=</span> <span class="ident">context</span>;
+        <span class="ident">e</span>.<span class="ident">data</span> <span class="op">=</span> <span class="ident">data</span>.<span class="ident">into</span>();
+        <span class="ident">e</span>.<span class="ident">context</span> <span class="op">=</span> <span class="ident">context</span>.<span class="ident">into</span>();
         <span class="ident">m</span>.<span class="ident">set_entries</span>(<span class="macro">vec!</span>[<span class="ident">e</span>].<span class="ident">into</span>());
         <span class="self">self</span>.<span class="ident">raft</span>.<span class="ident">step</span>(<span class="ident">m</span>)
     }
@@ -1171,14 +1223,8 @@
             <span class="self">self</span>.<span class="ident">commit_since_index</span> <span class="op">=</span> <span class="ident">e</span>.<span class="ident">get_index</span>();
         }
 
-        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">messages</span>.<span class="ident">is_empty</span>() {
-            <span class="ident">mem::swap</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">rd</span>.<span class="ident">messages</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">messages</span>);
-        }
-
-        <span class="kw">if</span> <span class="ident">raft</span>.<span class="ident">state</span> <span class="op">=</span><span class="op">=</span> <span class="ident">StateRole::Leader</span> <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="ident">raft</span>.<span class="ident">msgs</span>.<span class="ident">is_empty</span>() {
-            <span class="comment">// Leader can send messages immediately to make replication concurrently.</span>
-            <span class="comment">// For more details, check raft thesis 10.2.1.</span>
-            <span class="ident">rd</span>.<span class="ident">messages</span>.<span class="ident">push</span>(<span class="ident">mem::take</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">raft</span>.<span class="ident">msgs</span>));
+        <span class="kw">if</span> <span class="op">!</span><span class="ident">raft</span>.<span class="ident">msgs</span>.<span class="ident">is_empty</span>() {
+            <span class="ident">rd</span>.<span class="ident">messages</span> <span class="op">=</span> <span class="ident">mem::take</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">raft</span>.<span class="ident">msgs</span>);
         }
 
         <span class="ident">rd</span>
@@ -1188,7 +1234,8 @@
     <span class="doccomment">///</span>
     <span class="doccomment">/// This includes appending and applying entries or a snapshot, updating the HardState,</span>
     <span class="doccomment">/// and sending messages. The returned `Ready` *MUST* be handled and subsequently</span>
-    <span class="doccomment">/// passed back via advance() or its families.</span>
+    <span class="doccomment">/// passed back via `advance` or its families. Before that, *DO NOT* call any function like</span>
+    <span class="doccomment">/// `step`, `propose`, `campaign` to change internal state.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// `has_ready` should be called first to check if it&#39;s necessary to handle the ready.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">ready</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Ready</span> {
@@ -1207,16 +1254,10 @@
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">prev_ss</span>.<span class="ident">raft_state</span> <span class="op">!</span><span class="op">=</span> <span class="ident">StateRole::Leader</span> <span class="op">&amp;&amp;</span> <span class="ident">raft</span>.<span class="ident">state</span> <span class="op">=</span><span class="op">=</span> <span class="ident">StateRole::Leader</span> {
             <span class="comment">// The vote msg which makes this peer become leader has been sent after persisting.</span>
             <span class="comment">// So the remaining records must be generated during being candidate which can not</span>
-            <span class="comment">// have last_entry and snapshot(if so, it should become follower). The only things</span>
-            <span class="comment">// left are messages and they can be sent without persisting because no key data</span>
-            <span class="comment">// changes (term, vote, entry). These messages should be added before raft.msgs to</span>
-            <span class="comment">// avoid out of order.</span>
+            <span class="comment">// have last_entry and snapshot(if so, it should become follower).</span>
             <span class="kw">for</span> <span class="ident">record</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">records</span>.<span class="ident">drain</span>(..) {
                 <span class="macro">assert_eq!</span>(<span class="ident">record</span>.<span class="ident">last_entry</span>, <span class="prelude-val">None</span>);
                 <span class="macro">assert_eq!</span>(<span class="ident">record</span>.<span class="ident">snapshot</span>, <span class="prelude-val">None</span>);
-                <span class="kw">if</span> <span class="op">!</span><span class="ident">record</span>.<span class="ident">messages</span>.<span class="ident">is_empty</span>() {
-                    <span class="self">self</span>.<span class="ident">messages</span>.<span class="ident">push</span>(<span class="ident">record</span>.<span class="ident">messages</span>);
-                }
             }
         }
 
@@ -1263,10 +1304,9 @@
             <span class="ident">rd_record</span>.<span class="ident">last_entry</span> <span class="op">=</span> <span class="prelude-val">Some</span>((<span class="ident">e</span>.<span class="ident">get_index</span>(), <span class="ident">e</span>.<span class="ident">get_term</span>()));
         }
 
-        <span class="kw">if</span> <span class="op">!</span><span class="ident">raft</span>.<span class="ident">msgs</span>.<span class="ident">is_empty</span>() <span class="op">&amp;&amp;</span> <span class="ident">raft</span>.<span class="ident">state</span> <span class="op">!</span><span class="op">=</span> <span class="ident">StateRole::Leader</span> {
-            <span class="ident">mem::swap</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">rd_record</span>.<span class="ident">messages</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">raft</span>.<span class="ident">msgs</span>);
-        }
-
+        <span class="comment">// Leader can send messages immediately to make replication concurrently.</span>
+        <span class="comment">// For more details, check raft thesis 10.2.1.</span>
+        <span class="ident">rd</span>.<span class="ident">is_persisted_msg</span> <span class="op">=</span> <span class="ident">raft</span>.<span class="ident">state</span> <span class="op">!</span><span class="op">=</span> <span class="ident">StateRole::Leader</span>;
         <span class="ident">rd</span>.<span class="ident">light</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">gen_light_ready</span>();
         <span class="self">self</span>.<span class="ident">records</span>.<span class="ident">push_back</span>(<span class="ident">rd_record</span>);
         <span class="ident">rd</span>
@@ -1275,7 +1315,7 @@
     <span class="doccomment">/// HasReady called when RawNode user need to check if any Ready pending.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">has_ready</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
         <span class="kw">let</span> <span class="ident">raft</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">raft</span>;
-        <span class="kw">if</span> <span class="op">!</span><span class="ident">raft</span>.<span class="ident">msgs</span>.<span class="ident">is_empty</span>() <span class="op">|</span><span class="op">|</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">messages</span>.<span class="ident">is_empty</span>() {
+        <span class="kw">if</span> <span class="op">!</span><span class="ident">raft</span>.<span class="ident">msgs</span>.<span class="ident">is_empty</span>() {
             <span class="kw">return</span> <span class="bool-val">true</span>;
         }
 
@@ -1318,11 +1358,11 @@
         <span class="kw">let</span> <span class="ident">rd_record</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">records</span>.<span class="ident">back</span>().<span class="ident">unwrap</span>();
         <span class="macro">assert!</span>(<span class="ident">rd_record</span>.<span class="ident">number</span> <span class="op">=</span><span class="op">=</span> <span class="ident">rd</span>.<span class="ident">number</span>);
         <span class="kw">let</span> <span class="ident">raft</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">raft</span>;
-        <span class="kw">if</span> <span class="ident">rd_record</span>.<span class="ident">snapshot</span>.<span class="ident">is_some</span>() {
-            <span class="ident">raft</span>.<span class="ident">raft_log</span>.<span class="ident">stable_snap</span>();
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="ident">index</span>, <span class="kw">_</span>)) <span class="op">=</span> <span class="ident">rd_record</span>.<span class="ident">snapshot</span> {
+            <span class="ident">raft</span>.<span class="ident">raft_log</span>.<span class="ident">stable_snap</span>(<span class="ident">index</span>);
         }
-        <span class="kw">if</span> <span class="ident">rd_record</span>.<span class="ident">last_entry</span>.<span class="ident">is_some</span>() {
-            <span class="ident">raft</span>.<span class="ident">raft_log</span>.<span class="ident">stable_entries</span>();
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="ident">index</span>, <span class="ident">term</span>)) <span class="op">=</span> <span class="ident">rd_record</span>.<span class="ident">last_entry</span> {
+            <span class="ident">raft</span>.<span class="ident">raft_log</span>.<span class="ident">stable_entries</span>(<span class="ident">index</span>, <span class="ident">term</span>);
         }
     }
 
@@ -1339,27 +1379,28 @@
     <span class="doccomment">/// valid after ready being persisted.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">on_persist_ready</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">number</span>: <span class="ident">u64</span>) {
         <span class="kw">let</span> (<span class="kw-2">mut</span> <span class="ident">index</span>, <span class="kw-2">mut</span> <span class="ident">term</span>) <span class="op">=</span> (<span class="number">0</span>, <span class="number">0</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">snap_index</span> <span class="op">=</span> <span class="number">0</span>;
         <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">record</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">records</span>.<span class="ident">front</span>() {
             <span class="kw">if</span> <span class="ident">record</span>.<span class="ident">number</span> <span class="op">&gt;</span> <span class="ident">number</span> {
                 <span class="kw">break</span>;
             }
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">record</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">records</span>.<span class="ident">pop_front</span>().<span class="ident">unwrap</span>();
+            <span class="kw">let</span> <span class="ident">record</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">records</span>.<span class="ident">pop_front</span>().<span class="ident">unwrap</span>();
 
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="ident">i</span>, <span class="ident">t</span>)) <span class="op">=</span> <span class="ident">record</span>.<span class="ident">snapshot</span> {
-                <span class="ident">index</span> <span class="op">=</span> <span class="ident">i</span>;
-                <span class="ident">term</span> <span class="op">=</span> <span class="ident">t</span>;
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="ident">i</span>, <span class="kw">_</span>)) <span class="op">=</span> <span class="ident">record</span>.<span class="ident">snapshot</span> {
+                <span class="ident">snap_index</span> <span class="op">=</span> <span class="ident">i</span>;
+                <span class="ident">index</span> <span class="op">=</span> <span class="number">0</span>;
+                <span class="ident">term</span> <span class="op">=</span> <span class="number">0</span>;
             }
 
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="ident">i</span>, <span class="ident">t</span>)) <span class="op">=</span> <span class="ident">record</span>.<span class="ident">last_entry</span> {
                 <span class="ident">index</span> <span class="op">=</span> <span class="ident">i</span>;
                 <span class="ident">term</span> <span class="op">=</span> <span class="ident">t</span>;
             }
-
-            <span class="kw">if</span> <span class="op">!</span><span class="ident">record</span>.<span class="ident">messages</span>.<span class="ident">is_empty</span>() {
-                <span class="self">self</span>.<span class="ident">messages</span>.<span class="ident">push</span>(<span class="ident">mem::take</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">record</span>.<span class="ident">messages</span>));
-            }
         }
-        <span class="kw">if</span> <span class="ident">term</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
+        <span class="kw">if</span> <span class="ident">snap_index</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
+            <span class="self">self</span>.<span class="ident">raft</span>.<span class="ident">on_persist_snap</span>(<span class="ident">snap_index</span>);
+        }
+        <span class="kw">if</span> <span class="ident">index</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
             <span class="self">self</span>.<span class="ident">raft</span>.<span class="ident">on_persist_entries</span>(<span class="ident">index</span>, <span class="ident">term</span>);
         }
     }
@@ -1385,12 +1426,15 @@
     <span class="doccomment">/// Returns the LightReady that contains commit index, committed entries and messages.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// Since Ready must be persisted in order, calling this function implicitly means</span>
-    <span class="doccomment">/// all readys collected before have been persisted.</span>
+    <span class="doccomment">/// all ready collected before have been persisted.</span>
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">advance_append</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">rd</span>: <span class="ident">Ready</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">LightReady</span> {
         <span class="self">self</span>.<span class="ident">commit_ready</span>(<span class="ident">rd</span>);
         <span class="self">self</span>.<span class="ident">on_persist_ready</span>(<span class="self">self</span>.<span class="ident">max_number</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">light_rd</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">gen_light_ready</span>();
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">raft</span>.<span class="ident">state</span> <span class="op">!</span><span class="op">=</span> <span class="ident">StateRole::Leader</span> <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="ident">light_rd</span>.<span class="ident">messages</span>().<span class="ident">is_empty</span>() {
+            <span class="macro">fatal!</span>(<span class="self">self</span>.<span class="ident">raft</span>.<span class="ident">logger</span>, <span class="string">&quot;not leader but has new msg after advance&quot;</span>);
+        }
         <span class="comment">// Set commit index if it&#39;s updated</span>
         <span class="kw">let</span> <span class="ident">hard_state</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">raft</span>.<span class="ident">hard_state</span>();
         <span class="kw">if</span> <span class="ident">hard_state</span>.<span class="ident">commit</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">prev_hs</span>.<span class="ident">commit</span> {
@@ -1400,7 +1444,7 @@
             <span class="macro">assert!</span>(<span class="ident">hard_state</span>.<span class="ident">commit</span> <span class="op">=</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">prev_hs</span>.<span class="ident">commit</span>);
             <span class="ident">light_rd</span>.<span class="ident">commit_index</span> <span class="op">=</span> <span class="prelude-val">None</span>;
         }
-        <span class="macro">assert_eq!</span>(<span class="ident">hard_state</span>, <span class="self">self</span>.<span class="ident">prev_hs</span>, <span class="string">&quot;hard state != prev_hs&quot;</span>,);
+        <span class="macro">assert_eq!</span>(<span class="ident">hard_state</span>, <span class="self">self</span>.<span class="ident">prev_hs</span>, <span class="string">&quot;hard state != prev_hs&quot;</span>);
         <span class="ident">light_rd</span>
     }
 
@@ -1482,7 +1526,7 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">m</span> <span class="op">=</span> <span class="ident">Message::default</span>();
         <span class="ident">m</span>.<span class="ident">set_msg_type</span>(<span class="ident">MessageType::MsgReadIndex</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">e</span> <span class="op">=</span> <span class="ident">Entry::default</span>();
-        <span class="ident">e</span>.<span class="ident">data</span> <span class="op">=</span> <span class="ident">rctx</span>;
+        <span class="ident">e</span>.<span class="ident">data</span> <span class="op">=</span> <span class="ident">rctx</span>.<span class="ident">into</span>();
         <span class="ident">m</span>.<span class="ident">set_entries</span>(<span class="macro">vec!</span>[<span class="ident">e</span>].<span class="ident">into</span>());
         <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">raft</span>.<span class="ident">step</span>(<span class="ident">m</span>);
     }

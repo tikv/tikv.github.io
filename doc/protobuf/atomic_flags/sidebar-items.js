@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["set_redact_bytes",""]]});
+initSidebarItems({"fn":[["set_redact_bytes","Set redact bytes."]]});

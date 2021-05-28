@@ -4201,6 +4201,23 @@
 <span id="4198">4198</span>
 <span id="4199">4199</span>
 <span id="4200">4200</span>
+<span id="4201">4201</span>
+<span id="4202">4202</span>
+<span id="4203">4203</span>
+<span id="4204">4204</span>
+<span id="4205">4205</span>
+<span id="4206">4206</span>
+<span id="4207">4207</span>
+<span id="4208">4208</span>
+<span id="4209">4209</span>
+<span id="4210">4210</span>
+<span id="4211">4211</span>
+<span id="4212">4212</span>
+<span id="4213">4213</span>
+<span id="4214">4214</span>
+<span id="4215">4215</span>
+<span id="4216">4216</span>
+<span id="4217">4217</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -4617,6 +4634,8 @@
     <span class="doccomment">/// 1. when merging, its data in storeMeta will be removed early by the target peer.</span>
     <span class="doccomment">/// 2. all read requests must be rejected.</span>
     <span class="kw">pub</span> <span class="ident">pending_remove</span>: <span class="ident">bool</span>,
+    <span class="doccomment">/// If a snapshot is being applied asynchronously, messages should not be sent.</span>
+    <span class="ident">pending_messages</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">eraftpb::Message</span><span class="op">&gt;</span>,
 
     <span class="doccomment">/// Record the instants of peers being added into the configuration.</span>
     <span class="doccomment">/// Remove them after they are not pending any more.</span>
@@ -4793,6 +4812,7 @@
             },
             <span class="ident">raft_log_size_hint</span>: <span class="number">0</span>,
             <span class="ident">leader_lease</span>: <span class="ident">Lease::new</span>(<span class="ident">cfg</span>.<span class="ident">raft_store_max_leader_lease</span>()),
+            <span class="ident">pending_messages</span>: <span class="macro">vec!</span>[],
             <span class="ident">peer_stat</span>: <span class="ident">PeerStat::default</span>(),
             <span class="ident">catch_up_logs</span>: <span class="prelude-val">None</span>,
             <span class="ident">bcast_wake_up_time</span>: <span class="prelude-val">None</span>,
@@ -5835,8 +5855,18 @@
                 }
                 <span class="self">self</span>.<span class="ident">post_pending_read_index_on_replica</span>(<span class="ident">ctx</span>);
                 <span class="self">self</span>.<span class="ident">read_progress</span>.<span class="ident">update_applied</span>(<span class="self">self</span>.<span class="ident">last_applying_idx</span>);
+                <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">pending_messages</span>.<span class="ident">is_empty</span>() {
+                    <span class="kw">let</span> <span class="ident">msgs</span> <span class="op">=</span> <span class="ident">mem::take</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">pending_messages</span>);
+                    <span class="self">self</span>.<span class="ident">send</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>.<span class="ident">trans</span>, <span class="ident">msgs</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>.<span class="ident">raft_metrics</span>.<span class="ident">send_message</span>);
+                }
             }
-            <span class="ident">CheckApplyingSnapStatus::Idle</span> <span class="op">=</span><span class="op">&gt;</span> {}
+            <span class="ident">CheckApplyingSnapStatus::Idle</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="comment">// FIXME: It&#39;s possible that the snapshot applying task is canceled.</span>
+                <span class="comment">// Although it only happens when shutting down the store or destroying</span>
+                <span class="comment">// the peer, it&#39;s still dengerous if continue to handle ready for the</span>
+                <span class="comment">// peer. So it&#39;s better to revoke `JOB_STATUS_CANCELLING` to ensure all</span>
+                <span class="comment">// started tasks can get finished correctly.</span>
+            }
         }
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">destroy_regions</span> <span class="op">=</span> <span class="macro">vec!</span>[];
@@ -5937,9 +5967,8 @@
             <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">is_leader</span>() {
                 <span class="macro">fail_point!</span>(<span class="string">&quot;raft_before_follower_send&quot;</span>);
             }
-            <span class="kw">for</span> <span class="ident">vec_msg</span> <span class="kw">in</span> <span class="ident">ready</span>.<span class="ident">take_messages</span>() {
-                <span class="self">self</span>.<span class="ident">send</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>.<span class="ident">trans</span>, <span class="ident">vec_msg</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>.<span class="ident">raft_metrics</span>.<span class="ident">send_message</span>);
-            }
+            <span class="kw">let</span> <span class="ident">msgs</span> <span class="op">=</span> <span class="ident">ready</span>.<span class="ident">take_messages</span>();
+            <span class="self">self</span>.<span class="ident">send</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>.<span class="ident">trans</span>, <span class="ident">msgs</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>.<span class="ident">raft_metrics</span>.<span class="ident">send_message</span>);
         }
 
         <span class="self">self</span>.<span class="ident">apply_reads</span>(<span class="ident">ctx</span>, <span class="kw-2">&amp;</span><span class="ident">ready</span>);
@@ -5977,6 +6006,7 @@
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
         <span class="ident">ctx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">PollContext</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span>, <span class="ident">T</span><span class="op">&gt;</span>,
         <span class="ident">invoke_ctx</span>: <span class="ident">InvokeContext</span>,
+        <span class="ident">ready</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Ready</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ApplySnapResult</span><span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="ident">invoke_ctx</span>.<span class="ident">has_snapshot</span>() {
             <span class="comment">// When apply snapshot, there is no log applied and not compacted yet.</span>
@@ -5984,7 +6014,11 @@
         }
 
         <span class="kw">let</span> <span class="ident">apply_snap_result</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">mut_store</span>().<span class="ident">post_ready</span>(<span class="ident">invoke_ctx</span>);
+        <span class="kw">let</span> <span class="ident">has_msg</span> <span class="op">=</span> <span class="op">!</span><span class="ident">ready</span>.<span class="ident">persisted_messages</span>().<span class="ident">is_empty</span>();
+
         <span class="kw">if</span> <span class="ident">apply_snap_result</span>.<span class="ident">is_some</span>() {
+            <span class="self">self</span>.<span class="ident">pending_messages</span> <span class="op">=</span> <span class="ident">ready</span>.<span class="ident">take_persisted_messages</span>();
+
             <span class="comment">// The peer may change from learner to voter after snapshot applied.</span>
             <span class="kw">let</span> <span class="ident">peer</span> <span class="op">=</span> <span class="self">self</span>
                 .<span class="ident">region</span>()
@@ -6003,13 +6037,14 @@
                 );
                 <span class="self">self</span>.<span class="ident">peer</span> <span class="op">=</span> <span class="ident">peer</span>;
             };
-        }
 
-        <span class="kw">if</span> <span class="ident">apply_snap_result</span>.<span class="ident">is_some</span>() {
             <span class="self">self</span>.<span class="ident">activate</span>(<span class="ident">ctx</span>);
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">meta</span> <span class="op">=</span> <span class="ident">ctx</span>.<span class="ident">store_meta</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
             <span class="ident">meta</span>.<span class="ident">readers</span>
                 .<span class="ident">insert</span>(<span class="self">self</span>.<span class="ident">region_id</span>, <span class="ident">ReadDelegate::from_peer</span>(<span class="self">self</span>));
+        } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">has_msg</span> {
+            <span class="kw">let</span> <span class="ident">msgs</span> <span class="op">=</span> <span class="ident">ready</span>.<span class="ident">take_persisted_messages</span>();
+            <span class="self">self</span>.<span class="ident">send</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>.<span class="ident">trans</span>, <span class="ident">msgs</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>.<span class="ident">raft_metrics</span>.<span class="ident">send_message</span>);
         }
 
         <span class="ident">apply_snap_result</span>
@@ -6142,9 +6177,8 @@
             <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">is_leader</span>() {
                 <span class="macro">fail_point!</span>(<span class="string">&quot;raft_before_follower_send&quot;</span>);
             }
-            <span class="kw">for</span> <span class="ident">vec_msg</span> <span class="kw">in</span> <span class="ident">light_rd</span>.<span class="ident">take_messages</span>() {
-                <span class="self">self</span>.<span class="ident">send</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>.<span class="ident">trans</span>, <span class="ident">vec_msg</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>.<span class="ident">raft_metrics</span>.<span class="ident">send_message</span>);
-            }
+            <span class="kw">let</span> <span class="ident">msgs</span> <span class="op">=</span> <span class="ident">light_rd</span>.<span class="ident">take_messages</span>();
+            <span class="self">self</span>.<span class="ident">send</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>.<span class="ident">trans</span>, <span class="ident">msgs</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ctx</span>.<span class="ident">raft_metrics</span>.<span class="ident">send_message</span>);
         }
 
         <span class="kw">if</span> <span class="op">!</span><span class="ident">light_rd</span>.<span class="ident">committed_entries</span>().<span class="ident">is_empty</span>() {

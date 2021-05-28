@@ -1,1 +1,1 @@
-initSidebarItems({"mod":[["coprocessor",""],["errors",""],["router",""],["store",""]]});
+initSidebarItems({"fn":[["bytes_capacity",""]],"mod":[["coprocessor",""],["errors",""],["router",""],["store",""]]});
