@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["PluginError","Error returned by operations on [`RawStorage`]."]],"type":[["PluginResult","Result returned by operations on [`RawStorage`]."]]});

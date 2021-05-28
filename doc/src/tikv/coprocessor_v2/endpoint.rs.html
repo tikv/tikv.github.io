@@ -130,13 +130,11 @@
 <span id="127">127</span>
 <span id="128">128</span>
 <span id="129">129</span>
-<span id="130">130</span>
-<span id="131">131</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2021 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
-<span class="kw">use</span> <span class="ident">coprocessor_plugin_api</span>::{<span class="ident">CoprocessorPlugin</span>, <span class="ident">PluginError</span>, <span class="ident">RawResponse</span>, <span class="ident">Region</span>, <span class="ident">RegionEpoch</span>};
-<span class="kw">use</span> <span class="ident">kvproto::coprocessor_v2</span> <span class="kw">as</span> <span class="ident">coprv2pb</span>;
+<span class="kw">use</span> <span class="ident">coprocessor_plugin_api</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident">kvproto::kvrpcpb</span>;
 <span class="kw">use</span> <span class="ident">semver::VersionReq</span>;
 <span class="kw">use</span> <span class="ident">std::future::Future</span>;
 <span class="kw">use</span> <span class="ident">std::ops::Not</span>;
@@ -168,7 +166,9 @@
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">plugin_directory</span>) <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">copr_cfg</span>.<span class="ident">coprocessor_plugin_directory</span> {
             <span class="kw">let</span> <span class="ident">r</span> <span class="op">=</span> <span class="ident">plugin_registry</span>.<span class="ident">start_hot_reloading</span>(<span class="ident">plugin_directory</span>);
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">err</span>) <span class="op">=</span> <span class="ident">r</span> {
-                <span class="macro">warn!</span>(<span class="string">&quot;unable to start hot-reloading for coprocessor plugins.&quot;</span>; <span class="string">&quot;coprocessor_directory&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">plugin_directory</span>.<span class="ident">display</span>(), <span class="string">&quot;error&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">err</span>);
+                <span class="macro">warn!</span>(<span class="string">&quot;unable to start hot-reloading for coprocessor plugins.&quot;</span>;
+                    <span class="string">&quot;coprocessor_directory&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">plugin_directory</span>.<span class="ident">display</span>(),
+                    <span class="string">&quot;error&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="question-mark">?</span><span class="ident">err</span>);
             }
         }
 
@@ -185,16 +185,16 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_request</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">Engine</span>, <span class="ident">L</span>: <span class="ident">LockManager</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">storage</span>: <span class="kw-2">&amp;</span><span class="ident">Storage</span><span class="op">&lt;</span><span class="ident">E</span>, <span class="ident">L</span><span class="op">&gt;</span>,
-        <span class="ident">req</span>: <span class="ident">coprv2pb::RawCoprocessorRequest</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="kw">impl</span> <span class="ident">Future</span><span class="op">&lt;</span><span class="ident">Output</span> <span class="op">=</span> <span class="ident">coprv2pb::RawCoprocessorResponse</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">response</span> <span class="op">=</span> <span class="ident">coprv2pb::RawCoprocessorResponse::default</span>();
+        <span class="ident">req</span>: <span class="ident">kvrpcpb::RawCoprocessorRequest</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="kw">impl</span> <span class="ident">Future</span><span class="op">&lt;</span><span class="ident">Output</span> <span class="op">=</span> <span class="ident">kvrpcpb::RawCoprocessorResponse</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">response</span> <span class="op">=</span> <span class="ident">kvrpcpb::RawCoprocessorResponse::default</span>();
 
         <span class="kw">let</span> <span class="ident">coprocessor_result</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">handle_request_impl</span>(<span class="ident">storage</span>, <span class="ident">req</span>);
 
         <span class="kw">match</span> <span class="ident">coprocessor_result</span> {
             <span class="prelude-val">Ok</span>(<span class="ident">data</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">response</span>.<span class="ident">set_data</span>(<span class="ident">data</span>),
             <span class="prelude-val">Err</span>(<span class="ident">CoprocessorError::RegionError</span>(<span class="ident">region_err</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">response</span>.<span class="ident">set_region_error</span>(<span class="ident">region_err</span>),
-            <span class="prelude-val">Err</span>(<span class="ident">CoprocessorError::Other</span>(<span class="ident">o</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">response</span>.<span class="ident">set_other_error</span>(<span class="ident">o</span>),
+            <span class="prelude-val">Err</span>(<span class="ident">CoprocessorError::Other</span>(<span class="ident">o</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">response</span>.<span class="ident">set_error</span>(<span class="ident">o</span>),
         }
 
         <span class="ident">std::future::ready</span>(<span class="ident">response</span>)
@@ -204,7 +204,7 @@
     <span class="kw">fn</span> <span class="ident">handle_request_impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">Engine</span>, <span class="ident">L</span>: <span class="ident">LockManager</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">storage</span>: <span class="kw-2">&amp;</span><span class="ident">Storage</span><span class="op">&lt;</span><span class="ident">E</span>, <span class="ident">L</span><span class="op">&gt;</span>,
-        <span class="ident">req</span>: <span class="ident">coprv2pb::RawCoprocessorRequest</span>,
+        <span class="kw-2">mut</span> <span class="ident">req</span>: <span class="ident">kvrpcpb::RawCoprocessorRequest</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">RawResponse</span>, <span class="ident">CoprocessorError</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">plugin</span> <span class="op">=</span> <span class="self">self</span>
             .<span class="ident">plugin_registry</span>
@@ -217,7 +217,7 @@
             })<span class="question-mark">?</span>;
 
         <span class="comment">// Check whether the found plugin satisfies the version constraint.</span>
-        <span class="kw">let</span> <span class="ident">version_req</span> <span class="op">=</span> <span class="ident">VersionReq::parse</span>(<span class="kw-2">&amp;</span><span class="ident">req</span>.<span class="ident">copr_version_constraint</span>)
+        <span class="kw">let</span> <span class="ident">version_req</span> <span class="op">=</span> <span class="ident">VersionReq::parse</span>(<span class="kw-2">&amp;</span><span class="ident">req</span>.<span class="ident">copr_version_req</span>)
             .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">CoprocessorError::Other</span>(<span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">e</span>)))<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">plugin_version</span> <span class="op">=</span> <span class="ident">plugin</span>.<span class="ident">version</span>();
         <span class="ident">version_req</span>
@@ -233,16 +233,14 @@
                 ))
             })<span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="ident">raw_storage_api</span> <span class="op">=</span> <span class="ident">RawStorageImpl::new</span>(<span class="ident">req</span>.<span class="ident">get_context</span>(), <span class="ident">storage</span>);
-        <span class="kw">let</span> <span class="ident">region</span> <span class="op">=</span> <span class="ident">Region</span> {
-            <span class="ident">id</span>: <span class="ident">req</span>.<span class="ident">get_context</span>().<span class="ident">get_region_id</span>(),
-            <span class="ident">region_epoch</span>: <span class="ident">RegionEpoch</span> {
-                <span class="ident">conf_ver</span>: <span class="ident">req</span>.<span class="ident">get_context</span>().<span class="ident">get_region_epoch</span>().<span class="ident">get_conf_ver</span>(),
-                <span class="ident">version</span>: <span class="ident">req</span>.<span class="ident">get_context</span>().<span class="ident">get_region_epoch</span>().<span class="ident">get_version</span>(),
-            },
-        };
+        <span class="kw">let</span> <span class="ident">raw_storage_api</span> <span class="op">=</span> <span class="ident">RawStorageImpl::new</span>(<span class="ident">req</span>.<span class="ident">take_context</span>(), <span class="ident">storage</span>);
+        <span class="kw">let</span> <span class="ident">ranges</span> <span class="op">=</span> <span class="ident">req</span>
+            .<span class="ident">take_ranges</span>()
+            .<span class="ident">into_iter</span>()
+            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">range</span><span class="op">|</span> <span class="ident">range</span>.<span class="ident">start_key</span>..<span class="ident">range</span>.<span class="ident">end_key</span>)
+            .<span class="ident">collect</span>();
 
-        <span class="kw">let</span> <span class="ident">plugin_result</span> <span class="op">=</span> <span class="ident">plugin</span>.<span class="ident">on_raw_coprocessor_request</span>(<span class="kw-2">&amp;</span><span class="ident">region</span>, <span class="kw-2">&amp;</span><span class="ident">req</span>.<span class="ident">data</span>, <span class="kw-2">&amp;</span><span class="ident">raw_storage_api</span>);
+        <span class="kw">let</span> <span class="ident">plugin_result</span> <span class="op">=</span> <span class="ident">plugin</span>.<span class="ident">on_raw_coprocessor_request</span>(<span class="ident">ranges</span>, <span class="ident">req</span>.<span class="ident">data</span>, <span class="kw-2">&amp;</span><span class="ident">raw_storage_api</span>);
 
         <span class="ident">plugin_result</span>.<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">err</span><span class="op">|</span> {
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">region_err</span>) <span class="op">=</span> <span class="ident">extract_region_error</span>(<span class="kw-2">&amp;</span><span class="ident">err</span>) {
@@ -256,12 +254,10 @@
 
 <span class="kw">fn</span> <span class="ident">extract_region_error</span>(<span class="ident">error</span>: <span class="kw-2">&amp;</span><span class="ident">PluginError</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">kvproto::errorpb::Error</span><span class="op">&gt;</span> {
     <span class="kw">match</span> <span class="ident">error</span> {
-        <span class="ident">PluginError::StorageError</span>(<span class="ident">storage_err</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">match</span> <span class="ident">storage_err</span> {
-            <span class="ident">coprocessor_plugin_api::StorageError::Other</span>(<span class="ident">other_err</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">other_err</span>
-                .<span class="ident">downcast_ref</span>::<span class="op">&lt;</span><span class="ident">storage::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span><span class="op">&gt;</span>()
-                .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">storage::errors::extract_region_error</span>::<span class="op">&lt;</span>()<span class="op">&gt;</span>(<span class="ident">e</span>)),
-            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">None</span>,
-        },
+        <span class="ident">PluginError::Other</span>(<span class="ident">other_err</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">other_err</span>
+            .<span class="ident">downcast_ref</span>::<span class="op">&lt;</span><span class="ident">storage::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span><span class="op">&gt;</span>()
+            .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">storage::errors::extract_region_error</span>::<span class="op">&lt;</span>()<span class="op">&gt;</span>(<span class="ident">e</span>)),
+        <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">None</span>,
     }
 }
 </pre></div>
