@@ -5218,6 +5218,42 @@
 <span id="5215">5215</span>
 <span id="5216">5216</span>
 <span id="5217">5217</span>
+<span id="5218">5218</span>
+<span id="5219">5219</span>
+<span id="5220">5220</span>
+<span id="5221">5221</span>
+<span id="5222">5222</span>
+<span id="5223">5223</span>
+<span id="5224">5224</span>
+<span id="5225">5225</span>
+<span id="5226">5226</span>
+<span id="5227">5227</span>
+<span id="5228">5228</span>
+<span id="5229">5229</span>
+<span id="5230">5230</span>
+<span id="5231">5231</span>
+<span id="5232">5232</span>
+<span id="5233">5233</span>
+<span id="5234">5234</span>
+<span id="5235">5235</span>
+<span id="5236">5236</span>
+<span id="5237">5237</span>
+<span id="5238">5238</span>
+<span id="5239">5239</span>
+<span id="5240">5240</span>
+<span id="5241">5241</span>
+<span id="5242">5242</span>
+<span id="5243">5243</span>
+<span id="5244">5244</span>
+<span id="5245">5245</span>
+<span id="5246">5246</span>
+<span id="5247">5247</span>
+<span id="5248">5248</span>
+<span id="5249">5249</span>
+<span id="5250">5250</span>
+<span id="5251">5251</span>
+<span id="5252">5252</span>
+<span id="5253">5253</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2017 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -5263,6 +5299,7 @@
 };
 <span class="kw">use</span> <span class="ident">raft_proto::ConfChangeI</span>;
 <span class="kw">use</span> <span class="ident">sst_importer::SSTImporter</span>;
+<span class="kw">use</span> <span class="ident">tikv_alloc::trace::TraceEvent</span>;
 <span class="kw">use</span> <span class="ident">tikv_util::config</span>::{<span class="ident">Tracker</span>, <span class="ident">VersionTrack</span>};
 <span class="kw">use</span> <span class="ident">tikv_util::mpsc</span>::{<span class="ident">loose_bounded</span>, <span class="ident">LooseBoundedSender</span>, <span class="ident">Receiver</span>};
 <span class="kw">use</span> <span class="ident">tikv_util::time</span>::{<span class="ident">duration_to_sec</span>, <span class="ident">Instant</span>};
@@ -5274,6 +5311,7 @@
 
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::coprocessor</span>::{<span class="ident">Cmd</span>, <span class="ident">CoprocessorHost</span>, <span class="ident">ObserveHandle</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::store::fsm::RaftPollerBuilder</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::store::memory</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::store::metrics</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::store::msg</span>::{<span class="ident">Callback</span>, <span class="ident">PeerMsg</span>, <span class="ident">ReadResponse</span>, <span class="ident">SignificantMsg</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::store::peer::Peer</span>;
@@ -8897,6 +8935,16 @@
     <span class="kw">pub</span> <span class="ident">router</span>: <span class="ident">BatchRouter</span><span class="op">&lt;</span><span class="ident">ApplyFsm</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>, <span class="ident">ControlFsm</span><span class="op">&gt;</span>,
 }
 
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">ApplyRouter</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">EK</span>: <span class="ident">KvEngine</span>,
+{
+    <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
+        <span class="ident">MEMTRACE_APPLY_ROUTER_ALIVE</span>.<span class="ident">trace</span>(<span class="ident">TraceEvent::Reset</span>(<span class="number">0</span>));
+        <span class="ident">MEMTRACE_APPLY_ROUTER_LEAK</span>.<span class="ident">trace</span>(<span class="ident">TraceEvent::Reset</span>(<span class="number">0</span>));
+    }
+}
+
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">ApplyRouter</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>
 <span class="kw">where</span>
     <span class="ident">EK</span>: <span class="ident">KvEngine</span>,
@@ -8985,8 +9033,29 @@
         <span class="comment">// queued inside both queue of control fsm and normal fsm, which can reorder</span>
         <span class="comment">// messages.</span>
         <span class="kw">let</span> (<span class="ident">sender</span>, <span class="ident">apply_fsm</span>) <span class="op">=</span> <span class="ident">ApplyFsm::from_registration</span>(<span class="ident">reg</span>);
-        <span class="kw">let</span> <span class="ident">mailbox</span> <span class="op">=</span> <span class="ident">BasicMailbox::new</span>(<span class="ident">sender</span>, <span class="ident">apply_fsm</span>);
+        <span class="kw">let</span> <span class="ident">mailbox</span> <span class="op">=</span> <span class="ident">BasicMailbox::new</span>(<span class="ident">sender</span>, <span class="ident">apply_fsm</span>, <span class="self">self</span>.<span class="ident">state_cnt</span>().<span class="ident">clone</span>());
         <span class="self">self</span>.<span class="ident">register</span>(<span class="ident">region_id</span>, <span class="ident">mailbox</span>);
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">register</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">region_id</span>: <span class="ident">u64</span>, <span class="ident">mailbox</span>: <span class="ident">BasicMailbox</span><span class="op">&lt;</span><span class="ident">ApplyFsm</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span><span class="op">&gt;</span>) {
+        <span class="self">self</span>.<span class="ident">router</span>.<span class="ident">register</span>(<span class="ident">region_id</span>, <span class="ident">mailbox</span>);
+        <span class="self">self</span>.<span class="ident">update_trace</span>();
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">register_all</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">mailboxes</span>: <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">u64</span>, <span class="ident">BasicMailbox</span><span class="op">&lt;</span><span class="ident">ApplyFsm</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span><span class="op">&gt;</span>)<span class="op">&gt;</span>) {
+        <span class="self">self</span>.<span class="ident">router</span>.<span class="ident">register_all</span>(<span class="ident">mailboxes</span>);
+        <span class="self">self</span>.<span class="ident">update_trace</span>();
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">close</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">region_id</span>: <span class="ident">u64</span>) {
+        <span class="self">self</span>.<span class="ident">router</span>.<span class="ident">close</span>(<span class="ident">region_id</span>);
+        <span class="self">self</span>.<span class="ident">update_trace</span>();
+    }
+
+    <span class="kw">fn</span> <span class="ident">update_trace</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">let</span> <span class="ident">router_trace</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">router</span>.<span class="ident">trace</span>();
+        <span class="ident">MEMTRACE_APPLY_ROUTER_ALIVE</span>.<span class="ident">trace</span>(<span class="ident">TraceEvent::Reset</span>(<span class="ident">router_trace</span>.<span class="ident">alive</span>));
+        <span class="ident">MEMTRACE_APPLY_ROUTER_LEAK</span>.<span class="ident">trace</span>(<span class="ident">TraceEvent::Reset</span>(<span class="ident">router_trace</span>.<span class="ident">leak</span>));
     }
 }
 
@@ -9013,7 +9082,10 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">mailboxes</span> <span class="op">=</span> <span class="ident">Vec::with_capacity</span>(<span class="ident">peers</span>.<span class="ident">size_hint</span>().<span class="number">0</span>);
         <span class="kw">for</span> <span class="ident">peer</span> <span class="kw">in</span> <span class="ident">peers</span> {
             <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">fsm</span>) <span class="op">=</span> <span class="ident">ApplyFsm::from_peer</span>(<span class="ident">peer</span>);
-            <span class="ident">mailboxes</span>.<span class="ident">push</span>((<span class="ident">peer</span>.<span class="ident">region</span>().<span class="ident">get_id</span>(), <span class="ident">BasicMailbox::new</span>(<span class="ident">tx</span>, <span class="ident">fsm</span>)));
+            <span class="ident">mailboxes</span>.<span class="ident">push</span>((
+                <span class="ident">peer</span>.<span class="ident">region</span>().<span class="ident">get_id</span>(),
+                <span class="ident">BasicMailbox::new</span>(<span class="ident">tx</span>, <span class="ident">fsm</span>, <span class="self">self</span>.<span class="ident">router</span>().<span class="ident">state_cnt</span>().<span class="ident">clone</span>()),
+            ));
         }
         <span class="self">self</span>.<span class="ident">router</span>().<span class="ident">register_all</span>(<span class="ident">mailboxes</span>);
     }

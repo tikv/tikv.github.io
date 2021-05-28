@@ -162,12 +162,18 @@
 <span id="159">159</span>
 <span id="160">160</span>
 <span id="161">161</span>
+<span id="162">162</span>
+<span id="163">163</span>
+<span id="164">164</span>
+<span id="165">165</span>
+<span id="166">166</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::mailbox::BasicMailbox</span>;
 <span class="kw">use</span> <span class="ident">std::borrow::Cow</span>;
 <span class="kw">use</span> <span class="ident">std::sync::atomic</span>::{<span class="ident">AtomicPtr</span>, <span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>};
+<span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
 <span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">ptr</span>, <span class="ident">usize</span>};
 
 <span class="comment">// The FSM is notified.</span>
@@ -224,13 +230,16 @@
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">FsmState</span><span class="op">&lt;</span><span class="ident">N</span><span class="op">&gt;</span> {
     <span class="ident">status</span>: <span class="ident">AtomicUsize</span>,
     <span class="ident">data</span>: <span class="ident">AtomicPtr</span><span class="op">&lt;</span><span class="ident">N</span><span class="op">&gt;</span>,
+    <span class="ident">state_cnt</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicUsize</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">N</span>: <span class="ident">Fsm</span><span class="op">&gt;</span> <span class="ident">FsmState</span><span class="op">&lt;</span><span class="ident">N</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">data</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">N</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">FsmState</span><span class="op">&lt;</span><span class="ident">N</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">data</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">N</span><span class="op">&gt;</span>, <span class="ident">state_cnt</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AtomicUsize</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">FsmState</span><span class="op">&lt;</span><span class="ident">N</span><span class="op">&gt;</span> {
+        <span class="ident">state_cnt</span>.<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering::Relaxed</span>);
         <span class="ident">FsmState</span> {
             <span class="ident">status</span>: <span class="ident">AtomicUsize::new</span>(<span class="ident">NOTIFYSTATE_IDLE</span>),
             <span class="ident">data</span>: <span class="ident">AtomicPtr::new</span>(<span class="ident">Box::into_raw</span>(<span class="ident">data</span>)),
+            <span class="ident">state_cnt</span>,
         }
     }
 
@@ -322,6 +331,7 @@
         <span class="kw">if</span> <span class="op">!</span><span class="ident">ptr</span>.<span class="ident">is_null</span>() {
             <span class="kw">unsafe</span> { <span class="ident">Box::from_raw</span>(<span class="ident">ptr</span>) };
         }
+        <span class="self">self</span>.<span class="ident">state_cnt</span>.<span class="ident">fetch_sub</span>(<span class="number">1</span>, <span class="ident">Ordering::Relaxed</span>);
     }
 }
 </pre></div>

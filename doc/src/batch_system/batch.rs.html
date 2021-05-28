@@ -507,6 +507,9 @@
 <span id="504">504</span>
 <span id="505">505</span>
 <span id="506">506</span>
+<span id="507">507</span>
+<span id="508">508</span>
+<span id="509">509</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2020 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -522,6 +525,8 @@
 <span class="kw">use</span> <span class="ident">crossbeam::channel</span>::{<span class="self">self</span>, <span class="ident">SendError</span>};
 <span class="kw">use</span> <span class="ident">file_system</span>::{<span class="ident">set_io_type</span>, <span class="ident">IOType</span>};
 <span class="kw">use</span> <span class="ident">std::borrow::Cow</span>;
+<span class="kw">use</span> <span class="ident">std::sync::atomic::AtomicUsize</span>;
+<span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
 <span class="kw">use</span> <span class="ident">std::thread</span>::{<span class="self">self</span>, <span class="ident">JoinHandle</span>};
 <span class="kw">use</span> <span class="ident">std::time::Duration</span>;
 <span class="kw">use</span> <span class="ident">tikv_util::mpsc</span>;
@@ -989,7 +994,8 @@
     <span class="ident">sender</span>: <span class="ident">mpsc::LooseBoundedSender</span><span class="op">&lt;</span><span class="ident">C::Message</span><span class="op">&gt;</span>,
     <span class="ident">controller</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span>,
 ) <span class="op">-</span><span class="op">&gt;</span> (<span class="ident">BatchRouter</span><span class="op">&lt;</span><span class="ident">N</span>, <span class="ident">C</span><span class="op">&gt;</span>, <span class="ident">BatchSystem</span><span class="op">&lt;</span><span class="ident">N</span>, <span class="ident">C</span><span class="op">&gt;</span>) {
-    <span class="kw">let</span> <span class="ident">control_box</span> <span class="op">=</span> <span class="ident">BasicMailbox::new</span>(<span class="ident">sender</span>, <span class="ident">controller</span>);
+    <span class="kw">let</span> <span class="ident">state_cnt</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">AtomicUsize::new</span>(<span class="number">0</span>));
+    <span class="kw">let</span> <span class="ident">control_box</span> <span class="op">=</span> <span class="ident">BasicMailbox::new</span>(<span class="ident">sender</span>, <span class="ident">controller</span>, <span class="ident">state_cnt</span>.<span class="ident">clone</span>());
     <span class="kw">let</span> (<span class="ident">tx</span>, <span class="ident">rx</span>) <span class="op">=</span> <span class="ident">channel::unbounded</span>();
     <span class="kw">let</span> (<span class="ident">tx2</span>, <span class="ident">rx2</span>) <span class="op">=</span> <span class="ident">channel::unbounded</span>();
     <span class="kw">let</span> <span class="ident">normal_scheduler</span> <span class="op">=</span> <span class="ident">NormalScheduler</span> {
@@ -1000,7 +1006,7 @@
         <span class="ident">sender</span>: <span class="ident">tx</span>,
         <span class="ident">low_sender</span>: <span class="ident">tx2</span>,
     };
-    <span class="kw">let</span> <span class="ident">router</span> <span class="op">=</span> <span class="ident">Router::new</span>(<span class="ident">control_box</span>, <span class="ident">normal_scheduler</span>, <span class="ident">control_scheduler</span>);
+    <span class="kw">let</span> <span class="ident">router</span> <span class="op">=</span> <span class="ident">Router::new</span>(<span class="ident">control_box</span>, <span class="ident">normal_scheduler</span>, <span class="ident">control_scheduler</span>, <span class="ident">state_cnt</span>);
     <span class="kw">let</span> <span class="ident">system</span> <span class="op">=</span> <span class="ident">BatchSystem</span> {
         <span class="ident">name_prefix</span>: <span class="prelude-val">None</span>,
         <span class="ident">router</span>: <span class="ident">router</span>.<span class="ident">clone</span>(),

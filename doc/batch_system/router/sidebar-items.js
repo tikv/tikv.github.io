@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["CheckDoResult",""]],"struct":[["Router","Router route messages to its target mailbox."]]});
+initSidebarItems({"enum":[["CheckDoResult",""]],"struct":[["NormalMailMap",""],["Router","Router route messages to its target mailbox."],["RouterTrace","A struct that traces the approximate memory usage of router."]]});

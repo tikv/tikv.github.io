@@ -2557,6 +2557,48 @@
 <span id="2554">2554</span>
 <span id="2555">2555</span>
 <span id="2556">2556</span>
+<span id="2557">2557</span>
+<span id="2558">2558</span>
+<span id="2559">2559</span>
+<span id="2560">2560</span>
+<span id="2561">2561</span>
+<span id="2562">2562</span>
+<span id="2563">2563</span>
+<span id="2564">2564</span>
+<span id="2565">2565</span>
+<span id="2566">2566</span>
+<span id="2567">2567</span>
+<span id="2568">2568</span>
+<span id="2569">2569</span>
+<span id="2570">2570</span>
+<span id="2571">2571</span>
+<span id="2572">2572</span>
+<span id="2573">2573</span>
+<span id="2574">2574</span>
+<span id="2575">2575</span>
+<span id="2576">2576</span>
+<span id="2577">2577</span>
+<span id="2578">2578</span>
+<span id="2579">2579</span>
+<span id="2580">2580</span>
+<span id="2581">2581</span>
+<span id="2582">2582</span>
+<span id="2583">2583</span>
+<span id="2584">2584</span>
+<span id="2585">2585</span>
+<span id="2586">2586</span>
+<span id="2587">2587</span>
+<span id="2588">2588</span>
+<span id="2589">2589</span>
+<span id="2590">2590</span>
+<span id="2591">2591</span>
+<span id="2592">2592</span>
+<span id="2593">2593</span>
+<span id="2594">2594</span>
+<span id="2595">2595</span>
+<span id="2596">2596</span>
+<span id="2597">2597</span>
+<span id="2598">2598</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2016 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -2598,6 +2640,7 @@
 <span class="kw">use</span> <span class="ident">keys</span>::{<span class="self">self</span>, <span class="ident">data_end_key</span>, <span class="ident">data_key</span>, <span class="ident">enc_end_key</span>, <span class="ident">enc_start_key</span>};
 <span class="kw">use</span> <span class="ident">pd_client</span>::{<span class="ident">FeatureGate</span>, <span class="ident">PdClient</span>};
 <span class="kw">use</span> <span class="ident">sst_importer::SSTImporter</span>;
+<span class="kw">use</span> <span class="ident">tikv_alloc::trace::TraceEvent</span>;
 <span class="kw">use</span> <span class="ident">tikv_util::config</span>::{<span class="ident">Tracker</span>, <span class="ident">VersionTrack</span>};
 <span class="kw">use</span> <span class="ident">tikv_util::mpsc</span>::{<span class="self">self</span>, <span class="ident">LooseBoundedSender</span>, <span class="ident">Receiver</span>};
 <span class="kw">use</span> <span class="ident">tikv_util::time</span>::{<span class="ident">duration_to_sec</span>, <span class="ident">Instant</span> <span class="kw">as</span> <span class="ident">TiInstant</span>};
@@ -2620,6 +2663,7 @@
     <span class="ident">CollectedReady</span>,
 };
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::store::local_metrics::RaftMetrics</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::store::memory</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::store::metrics</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::store::peer_storage</span>::{<span class="self">self</span>, <span class="ident">HandleRaftReadyContext</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::store::transport::Transport</span>;
@@ -2727,6 +2771,17 @@
     <span class="ident">ER</span>: <span class="ident">RaftEngine</span>,
 {
     <span class="kw">pub</span> <span class="ident">router</span>: <span class="ident">BatchRouter</span><span class="op">&lt;</span><span class="ident">PeerFsm</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>, <span class="ident">StoreFsm</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">RaftRouter</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">EK</span>: <span class="ident">KvEngine</span>,
+    <span class="ident">ER</span>: <span class="ident">RaftEngine</span>,
+{
+    <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
+        <span class="ident">MEMTRACE_RAFT_ROUTER_ALIVE</span>.<span class="ident">trace</span>(<span class="ident">TraceEvent::Reset</span>(<span class="number">0</span>));
+        <span class="ident">MEMTRACE_RAFT_ROUTER_LEAK</span>.<span class="ident">trace</span>(<span class="ident">TraceEvent::Reset</span>(<span class="number">0</span>));
+    }
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span> <span class="ident">Clone</span> <span class="kw">for</span> <span class="ident">RaftRouter</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span>
@@ -2839,6 +2894,32 @@
         <span class="self">self</span>.<span class="ident">broadcast_normal</span>(<span class="op">|</span><span class="op">|</span> {
             <span class="ident">PeerMsg::SignificantMsg</span>(<span class="ident">SignificantMsg::StoreResolved</span> { <span class="ident">store_id</span>, <span class="ident">group_id</span> })
         })
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">register</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">region_id</span>: <span class="ident">u64</span>, <span class="ident">mailbox</span>: <span class="ident">BasicMailbox</span><span class="op">&lt;</span><span class="ident">PeerFsm</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span><span class="op">&gt;</span>) {
+        <span class="self">self</span>.<span class="ident">router</span>.<span class="ident">register</span>(<span class="ident">region_id</span>, <span class="ident">mailbox</span>);
+        <span class="self">self</span>.<span class="ident">update_trace</span>();
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">register_all</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">mailboxes</span>: <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">u64</span>, <span class="ident">BasicMailbox</span><span class="op">&lt;</span><span class="ident">PeerFsm</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">ER</span><span class="op">&gt;</span><span class="op">&gt;</span>)<span class="op">&gt;</span>) {
+        <span class="self">self</span>.<span class="ident">router</span>.<span class="ident">register_all</span>(<span class="ident">mailboxes</span>);
+        <span class="self">self</span>.<span class="ident">update_trace</span>();
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">close</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">region_id</span>: <span class="ident">u64</span>) {
+        <span class="self">self</span>.<span class="ident">router</span>.<span class="ident">close</span>(<span class="ident">region_id</span>);
+        <span class="self">self</span>.<span class="ident">update_trace</span>();
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">clear_cache</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="self">self</span>.<span class="ident">router</span>.<span class="ident">clear_cache</span>();
+        <span class="self">self</span>.<span class="ident">update_trace</span>();
+    }
+
+    <span class="kw">fn</span> <span class="ident">update_trace</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">let</span> <span class="ident">router_trace</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">router</span>.<span class="ident">trace</span>();
+        <span class="ident">MEMTRACE_RAFT_ROUTER_ALIVE</span>.<span class="ident">trace</span>(<span class="ident">TraceEvent::Reset</span>(<span class="ident">router_trace</span>.<span class="ident">alive</span>));
+        <span class="ident">MEMTRACE_RAFT_ROUTER_LEAK</span>.<span class="ident">trace</span>(<span class="ident">TraceEvent::Reset</span>(<span class="ident">router_trace</span>.<span class="ident">leak</span>));
     }
 }
 
@@ -3866,7 +3947,10 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">address</span> <span class="op">=</span> <span class="ident">Vec::with_capacity</span>(<span class="ident">region_peers</span>.<span class="ident">len</span>());
         <span class="kw">for</span> (<span class="ident">tx</span>, <span class="ident">fsm</span>) <span class="kw">in</span> <span class="ident">region_peers</span> {
             <span class="ident">address</span>.<span class="ident">push</span>(<span class="ident">fsm</span>.<span class="ident">region_id</span>());
-            <span class="ident">mailboxes</span>.<span class="ident">push</span>((<span class="ident">fsm</span>.<span class="ident">region_id</span>(), <span class="ident">BasicMailbox::new</span>(<span class="ident">tx</span>, <span class="ident">fsm</span>)));
+            <span class="ident">mailboxes</span>.<span class="ident">push</span>((
+                <span class="ident">fsm</span>.<span class="ident">region_id</span>(),
+                <span class="ident">BasicMailbox::new</span>(<span class="ident">tx</span>, <span class="ident">fsm</span>, <span class="self">self</span>.<span class="ident">router</span>.<span class="ident">state_cnt</span>().<span class="ident">clone</span>()),
+            ));
         }
         <span class="self">self</span>.<span class="ident">router</span>.<span class="ident">register_all</span>(<span class="ident">mailboxes</span>);
 
@@ -4346,7 +4430,7 @@
         <span class="ident">meta</span>.<span class="ident">region_read_progress</span>
             .<span class="ident">insert</span>(<span class="ident">region_id</span>, <span class="ident">peer</span>.<span class="ident">peer</span>.<span class="ident">read_progress</span>.<span class="ident">clone</span>());
 
-        <span class="kw">let</span> <span class="ident">mailbox</span> <span class="op">=</span> <span class="ident">BasicMailbox::new</span>(<span class="ident">tx</span>, <span class="ident">peer</span>);
+        <span class="kw">let</span> <span class="ident">mailbox</span> <span class="op">=</span> <span class="ident">BasicMailbox::new</span>(<span class="ident">tx</span>, <span class="ident">peer</span>, <span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">router</span>.<span class="ident">state_cnt</span>().<span class="ident">clone</span>());
         <span class="self">self</span>.<span class="ident">ctx</span>.<span class="ident">router</span>.<span class="ident">register</span>(<span class="ident">region_id</span>, <span class="ident">mailbox</span>);
         <span class="self">self</span>.<span class="ident">ctx</span>
             .<span class="ident">router</span>

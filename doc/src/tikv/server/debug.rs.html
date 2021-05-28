@@ -2003,7 +2003,6 @@
 <span id="2000">2000</span>
 <span id="2001">2001</span>
 <span id="2002">2002</span>
-<span id="2003">2003</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2017 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -2374,7 +2373,7 @@
                 }
             };
             <span class="kw">if</span> <span class="ident">region_state</span>.<span class="ident">get_state</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">PeerState::Tombstone</span> {
-                <span class="macro">v1!</span>(<span class="string">&quot;skip because it&#39;s already tombstone&quot;</span>);
+                <span class="macro">info!</span>(<span class="string">&quot;skip {} because it&#39;s already tombstone&quot;</span>, <span class="ident">region_id</span>);
                 <span class="kw">continue</span>;
             }
             <span class="kw">let</span> <span class="ident">region</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">region_state</span>.<span class="ident">get_region</span>();
@@ -2414,7 +2413,7 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">recover_all</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">threads</span>: <span class="ident">usize</span>, <span class="ident">read_only</span>: <span class="ident">bool</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">db</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">engines</span>.<span class="ident">kv</span>.<span class="ident">clone</span>();
 
-        <span class="macro">v1!</span>(<span class="string">&quot;Calculating split keys...&quot;</span>);
+        <span class="macro">info!</span>(<span class="string">&quot;Calculating split keys...&quot;</span>);
         <span class="kw">let</span> <span class="ident">split_keys</span> <span class="op">=</span> <span class="ident">divide_db</span>(<span class="ident">db</span>.<span class="ident">as_inner</span>(), <span class="ident">threads</span>)
             .<span class="ident">unwrap</span>()
             .<span class="ident">into_iter</span>()
@@ -2440,7 +2439,7 @@
                 .<span class="ident">name</span>(<span class="macro">format!</span>(<span class="string">&quot;mvcc-recover-thread-{}&quot;</span>, <span class="ident">thread_index</span>))
                 .<span class="ident">spawn</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
                     <span class="ident">tikv_alloc::add_thread_memory_accessor</span>();
-                    <span class="macro">v1!</span>(
+                    <span class="macro">info!</span>(
                         <span class="string">&quot;thread {}: started on range [{}, {})&quot;</span>,
                         <span class="ident">thread_index</span>,
                         <span class="ident">log_wrappers::Value::key</span>(<span class="kw-2">&amp;</span><span class="ident">start_key</span>),
@@ -2467,7 +2466,7 @@
             .<span class="ident">map</span>(<span class="op">|</span><span class="ident">h</span>: <span class="ident">JoinHandle</span><span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span><span class="op">&gt;</span><span class="op">|</span> <span class="ident">h</span>.<span class="ident">join</span>())
             .<span class="ident">map</span>(<span class="op">|</span><span class="ident">r</span><span class="op">|</span> {
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">r</span> {
-                    <span class="macro">ve1!</span>(<span class="string">&quot;{:?}&quot;</span>, <span class="ident">e</span>);
+                    <span class="macro">error!</span>(<span class="string">&quot;{:?}&quot;</span>, <span class="ident">e</span>);
                 }
                 <span class="ident">r</span>
             })
@@ -2853,10 +2852,10 @@
             <span class="ident">write_opts</span>.<span class="ident">set_sync</span>(<span class="bool-val">true</span>);
             <span class="macro">box_try!</span>(<span class="ident">wb</span>.<span class="ident">write_opt</span>(<span class="kw-2">&amp;</span><span class="ident">write_opts</span>));
         } <span class="kw">else</span> {
-            <span class="macro">v1!</span>(<span class="string">&quot;thread {}: skip write {} rows&quot;</span>, <span class="ident">thread_index</span>, <span class="ident">batch_size</span>);
+            <span class="macro">info!</span>(<span class="string">&quot;thread {}: skip write {} rows&quot;</span>, <span class="ident">thread_index</span>, <span class="ident">batch_size</span>);
         }
 
-        <span class="macro">v1!</span>(
+        <span class="macro">info!</span>(
             <span class="string">&quot;thread {}: total fix default: {}, lock: {}, write: {}&quot;</span>,
             <span class="ident">thread_index</span>,
             <span class="ident">mvcc_checker</span>.<span class="ident">default_fix_count</span>,
@@ -2865,7 +2864,7 @@
         );
 
         <span class="kw">if</span> <span class="ident">batch_size</span> <span class="op">&lt;</span> <span class="ident">wb_limit</span> {
-            <span class="macro">v1!</span>(<span class="string">&quot;thread {} has finished working.&quot;</span>, <span class="ident">thread_index</span>);
+            <span class="macro">info!</span>(<span class="string">&quot;thread {} has finished working.&quot;</span>, <span class="ident">thread_index</span>);
             <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
         }
     }
@@ -2960,10 +2959,9 @@
     <span class="kw">fn</span> <span class="ident">check_mvcc_key</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">wb</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">RocksWriteBatch</span>, <span class="ident">key</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">scan_count</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">scan_count</span> <span class="op">%</span> <span class="number">1_000_000</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
-            <span class="macro">v1!</span>(
+            <span class="macro">info!</span>(
                 <span class="string">&quot;thread {}: scan {} rows&quot;</span>,
-                <span class="self">self</span>.<span class="ident">thread_index</span>,
-                <span class="self">self</span>.<span class="ident">scan_count</span>
+                <span class="self">self</span>.<span class="ident">thread_index</span>, <span class="self">self</span>.<span class="ident">scan_count</span>
             );
         }
 
@@ -2996,7 +2994,7 @@
 
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="ident">commit_ts</span>, <span class="kw">_</span>)) <span class="op">=</span> <span class="ident">write</span> {
                     <span class="kw">if</span> <span class="ident">check_ts</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">commit_ts</span> {
-                        <span class="macro">v1!</span>(
+                        <span class="macro">info!</span>(
                             <span class="string">&quot;thread {}: LOCK {} is less than WRITE ts, key: {}, {}: {}, commit_ts: {}&quot;</span>,
                             <span class="self">self</span>.<span class="ident">thread_index</span>,
                             <span class="ident">kind</span>,
@@ -3020,7 +3018,7 @@
                             <span class="ident">next_default</span> <span class="op">=</span> <span class="bool-val">true</span>;
                         }
                         <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> {
-                            <span class="macro">v1!</span>(
+                            <span class="macro">info!</span>(
                                 <span class="string">&quot;thread {}: no corresponding DEFAULT record for LOCK, key: {}, lock_ts: {}&quot;</span>,
                                 <span class="self">self</span>.<span class="ident">thread_index</span>,
                                 <span class="ident">log_wrappers::Value::key</span>(<span class="ident">key</span>),
@@ -3060,7 +3058,7 @@
             }
 
             <span class="kw">if</span> <span class="ident">next_default</span> {
-                <span class="macro">v1!</span>(
+                <span class="macro">info!</span>(
                     <span class="string">&quot;thread {}: orphan DEFAULT record, key: {}, start_ts: {}&quot;</span>,
                     <span class="self">self</span>.<span class="ident">thread_index</span>,
                     <span class="ident">log_wrappers::Value::key</span>(<span class="ident">key</span>),
@@ -3072,7 +3070,7 @@
 
             <span class="kw">if</span> <span class="ident">next_write</span> {
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="ident">commit_ts</span>, <span class="kw-2">ref</span> <span class="ident">w</span>)) <span class="op">=</span> <span class="ident">write</span> {
-                    <span class="macro">v1!</span>(
+                    <span class="macro">info!</span>(
                         <span class="string">&quot;thread {}: no corresponding DEFAULT record for WRITE, key: {}, start_ts: {}, commit_ts: {}&quot;</span>,
                         <span class="self">self</span>.<span class="ident">thread_index</span>,
                         <span class="ident">log_wrappers::Value::key</span>(<span class="ident">key</span>),
