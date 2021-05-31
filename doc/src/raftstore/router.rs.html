@@ -272,6 +272,30 @@
 <span id="269">269</span>
 <span id="270">270</span>
 <span id="271">271</span>
+<span id="272">272</span>
+<span id="273">273</span>
+<span id="274">274</span>
+<span id="275">275</span>
+<span id="276">276</span>
+<span id="277">277</span>
+<span id="278">278</span>
+<span id="279">279</span>
+<span id="280">280</span>
+<span id="281">281</span>
+<span id="282">282</span>
+<span id="283">283</span>
+<span id="284">284</span>
+<span id="285">285</span>
+<span id="286">286</span>
+<span id="287">287</span>
+<span id="288">288</span>
+<span id="289">289</span>
+<span id="290">290</span>
+<span id="291">291</span>
+<span id="292">292</span>
+<span id="293">293</span>
+<span id="294">294</span>
+<span id="295">295</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -282,8 +306,8 @@
 <span class="kw">use</span> <span class="ident">kvproto::raft_cmdpb::RaftCmdRequest</span>;
 <span class="kw">use</span> <span class="ident">kvproto::raft_serverpb::RaftMessage</span>;
 <span class="kw">use</span> <span class="ident">raft::SnapshotStatus</span>;
-<span class="kw">use</span> <span class="ident">tikv_util::error</span>;
 <span class="kw">use</span> <span class="ident">tikv_util::time::ThreadReadId</span>;
+<span class="kw">use</span> <span class="ident">tikv_util</span>::{<span class="ident">deadline::Deadline</span>, <span class="ident">error</span>};
 
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::store::fsm::RaftRouter</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::store::transport</span>::{<span class="ident">CasualRouter</span>, <span class="ident">ProposalRouter</span>, <span class="ident">StoreRouter</span>};
@@ -323,10 +347,16 @@
 
     <span class="doccomment">/// Sends RaftCmdRequest to local store.</span>
     <span class="kw">fn</span> <span class="ident">send_command</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">req</span>: <span class="ident">RaftCmdRequest</span>, <span class="ident">cb</span>: <span class="ident">Callback</span><span class="op">&lt;</span><span class="ident">EK::Snapshot</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">RaftStoreResult</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">region_id</span> <span class="op">=</span> <span class="ident">req</span>.<span class="ident">get_header</span>().<span class="ident">get_region_id</span>();
-        <span class="kw">let</span> <span class="ident">cmd</span> <span class="op">=</span> <span class="ident">RaftCommand::new</span>(<span class="ident">req</span>, <span class="ident">cb</span>);
-        <span class="op">&lt;</span><span class="self">Self</span> <span class="kw">as</span> <span class="ident">ProposalRouter</span><span class="op">&lt;</span><span class="ident">EK::Snapshot</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::send</span>(<span class="self">self</span>, <span class="ident">cmd</span>)
-            .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">handle_send_error</span>(<span class="ident">region_id</span>, <span class="ident">e</span>))
+        <span class="ident">send_command_impl</span>::<span class="op">&lt;</span><span class="ident">EK</span>, <span class="kw">_</span><span class="op">&gt;</span>(<span class="self">self</span>, <span class="ident">req</span>, <span class="ident">cb</span>, <span class="prelude-val">None</span>)
+    }
+
+    <span class="kw">fn</span> <span class="ident">send_command_with_deadline</span>(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="ident">req</span>: <span class="ident">RaftCmdRequest</span>,
+        <span class="ident">cb</span>: <span class="ident">Callback</span><span class="op">&lt;</span><span class="ident">EK::Snapshot</span><span class="op">&gt;</span>,
+        <span class="ident">deadline</span>: <span class="ident">Deadline</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">RaftStoreResult</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+        <span class="ident">send_command_impl</span>::<span class="op">&lt;</span><span class="ident">EK</span>, <span class="kw">_</span><span class="op">&gt;</span>(<span class="self">self</span>, <span class="ident">req</span>, <span class="ident">cb</span>, <span class="prelude-val">Some</span>(<span class="ident">deadline</span>))
     }
 
     <span class="doccomment">/// Reports the peer being unreachable to the Region.</span>
@@ -364,6 +394,24 @@
             <span class="ident">PeerMsg::SignificantMsg</span>(<span class="ident">SignificantMsg::StoreResolved</span> { <span class="ident">store_id</span>, <span class="ident">group_id</span> })
         })
     }
+}
+
+<span class="kw">fn</span> <span class="ident">send_command_impl</span><span class="op">&lt;</span><span class="ident">EK</span>, <span class="ident">PR</span><span class="op">&gt;</span>(
+    <span class="ident">router</span>: <span class="kw-2">&amp;</span><span class="ident">PR</span>,
+    <span class="ident">req</span>: <span class="ident">RaftCmdRequest</span>,
+    <span class="ident">cb</span>: <span class="ident">Callback</span><span class="op">&lt;</span><span class="ident">EK::Snapshot</span><span class="op">&gt;</span>,
+    <span class="ident">deadline</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Deadline</span><span class="op">&gt;</span>,
+) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">RaftStoreResult</span><span class="op">&lt;</span>()<span class="op">&gt;</span>
+<span class="kw">where</span>
+    <span class="ident">EK</span>: <span class="ident">KvEngine</span>,
+    <span class="ident">PR</span>: <span class="ident">ProposalRouter</span><span class="op">&lt;</span><span class="ident">EK::Snapshot</span><span class="op">&gt;</span>,
+{
+    <span class="kw">let</span> <span class="ident">region_id</span> <span class="op">=</span> <span class="ident">req</span>.<span class="ident">get_header</span>().<span class="ident">get_region_id</span>();
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cmd</span> <span class="op">=</span> <span class="ident">RaftCommand::new</span>(<span class="ident">req</span>, <span class="ident">cb</span>);
+    <span class="ident">cmd</span>.<span class="ident">deadline</span> <span class="op">=</span> <span class="ident">deadline</span>;
+    <span class="ident">router</span>
+        .<span class="ident">send</span>(<span class="ident">cmd</span>)
+        .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">handle_send_error</span>(<span class="ident">region_id</span>, <span class="ident">e</span>))
 }
 
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">LocalReadRouter</span><span class="op">&lt;</span><span class="ident">EK</span><span class="op">&gt;</span>: <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Clone</span>

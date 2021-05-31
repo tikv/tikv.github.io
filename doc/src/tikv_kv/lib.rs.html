@@ -986,6 +986,11 @@
 <span id="983">983</span>
 <span id="984">984</span>
 <span id="985">985</span>
+<span id="986">986</span>
+<span id="987">987</span>
+<span id="988">988</span>
+<span id="989">989</span>
+<span id="990">990</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="comment">// Copyright 2021 TiKV Project Authors. Licensed under Apache-2.0.</span>
 
@@ -1027,7 +1032,7 @@
 <span class="kw">use</span> <span class="ident">kvproto::errorpb::Error</span> <span class="kw">as</span> <span class="ident">ErrorHeader</span>;
 <span class="kw">use</span> <span class="ident">kvproto::kvrpcpb</span>::{<span class="ident">Context</span>, <span class="ident">ExtraOp</span> <span class="kw">as</span> <span class="ident">TxnExtraOp</span>, <span class="ident">KeyRange</span>};
 <span class="kw">use</span> <span class="ident">thiserror::Error</span>;
-<span class="kw">use</span> <span class="ident">tikv_util::escape</span>;
+<span class="kw">use</span> <span class="ident">tikv_util</span>::{<span class="ident">deadline::Deadline</span>, <span class="ident">escape</span>};
 <span class="kw">use</span> <span class="ident">txn_types</span>::{<span class="ident">Key</span>, <span class="ident">TimeStamp</span>, <span class="ident">TxnExtra</span>, <span class="ident">Value</span>};
 
 <span class="kw">pub</span> <span class="kw">use</span> <span class="self">self</span><span class="ident">::btree_engine</span>::{<span class="ident">BTreeEngine</span>, <span class="ident">BTreeEngineIterator</span>, <span class="ident">BTreeEngineSnapshot</span>};
@@ -1099,11 +1104,16 @@
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">WriteData</span> {
     <span class="kw">pub</span> <span class="ident">modifies</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Modify</span><span class="op">&gt;</span>,
     <span class="kw">pub</span> <span class="ident">extra</span>: <span class="ident">TxnExtra</span>,
+    <span class="kw">pub</span> <span class="ident">deadline</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Deadline</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">WriteData</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">modifies</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Modify</span><span class="op">&gt;</span>, <span class="ident">extra</span>: <span class="ident">TxnExtra</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="self">Self</span> { <span class="ident">modifies</span>, <span class="ident">extra</span> }
+        <span class="self">Self</span> {
+            <span class="ident">modifies</span>,
+            <span class="ident">extra</span>,
+            <span class="ident">deadline</span>: <span class="prelude-val">None</span>,
+        }
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_modifies</span>(<span class="ident">modifies</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Modify</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
